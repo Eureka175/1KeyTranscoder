@@ -1,0 +1,28 @@
+# Runtime logs / reports
+logs/
+*.log
+*.csv
+
+# Temporary / partial outputs
+*.part
+*.part.mov
+*.part.mkv
+*.encode.log
+
+# Generated outputs
+results/
+output/
+testout/
+archive/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Local/editor
+.vscode/
+.idea/
+
+# Local test media
+testsets/
+tools/
