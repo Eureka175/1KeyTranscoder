@@ -94,6 +94,34 @@ python x265_archive.py --input <dir> --output <dir> [--preset uhq|hq|small|fast|
                        [--ffmpeg ...] [--ffprobe ...] [--dry-run]
 ```
 
+## Sony metadata-preservation POC (prototype, separate from the above)
+
+`sony_poc.py` + `preservation/` implement a structural preservation
+prototype for Sony camera metadata (rtmd timed KLV track, file-level
+`nrtm` meta with Lens profile + NonRealTimeMeta XML, PROF/USMT uuid
+boxes). It does not touch the scaling architecture.
+
+```
+python sony_poc.py --source "testsets/adjust/车内高晃动适中噪点.MP4"
+python sony_poc.py --all          # every Sony original under testsets/
+```
+
+Pipeline per file (intermediates under `work/<job-id>/`, gitignored):
+
+```
+source -> GPAC demux (bundle: metadata/manifest.json, tracks/, boxes/)
+       -> FFmpeg libx265 ultrafast -> video/encoded.mov (+ .mkv copy)
+       -> MP4Box mux (video + copied PCM audio) -> rtmd via NHML
+       -> tref/cdsc + nrtm meta + brands -> uuid byte patch
+       -> final/output.mp4 (XAVC brand) + report.json
+       (PRESERVED/MODIFIED/MISSING/UNKNOWN)
+```
+
+Requires GPAC at `C:\Program Files\GPAC` (or `--gpac-dir`). The video
+intermediate for muxing is MOV, not MKV: GPAC's MKV reader quantizes
+timestamps to milliseconds, breaking exact 1001/60000 rtmd alignment;
+the MKV copy is produced for inspection only.
+
 Dry-run (no encoding, full audit trail):
 
 ```

@@ -26,3 +26,9 @@ __pycache__/
 # Local test media
 testsets/
 tools/
+
+# Forensic reports / generated inspection logs
+metadata_forensics/
+
+# Preservation POC intermediates
+work/

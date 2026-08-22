@@ -78,13 +78,19 @@ class SourceClassification:
 
 @dataclass(frozen=True)
 class ScalingContext:
-    """Generic source factors relative to the 4K60 reference."""
+    """Generic source factors relative to the 4K60 reference.
+
+    aspect_ratio (width / height) is diagnostic-only: it is calculated,
+    stored and logged, but must NOT be used as an extra multiplier in
+    any scaling formula in this phase.
+    """
     reference_width: int
     reference_height: int
     reference_fps: float
     spatial_factor: float
     temporal_factor: float
     pixel_rate_factor: float
+    aspect_ratio: float
     source_class: str
     normalized_ob: float
 
@@ -121,3 +127,7 @@ class EffectiveParams:
     @property
     def pixel_rate_factor(self) -> float:
         return self.context.pixel_rate_factor
+
+    @property
+    def aspect_ratio(self) -> float:
+        return self.context.aspect_ratio
