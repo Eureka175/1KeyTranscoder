@@ -38,7 +38,7 @@ from .models import (
 # min-keyint fields with a 200-frame LA cap, static VBV).
 LEGACY_RULES: dict[str, dict[str, Any]] = {
     "rc_lookahead": {"mode": "fps", "cap": 200},
-    "gop_lookahead": {"mode": "fps", "cap": 200},
+    "gop_lookahead": {"mode": "fps", "cap": 20},
     "min_keyint": {"mode": "fps"},
 }
 
@@ -208,6 +208,7 @@ class ScalingEngine:
             spatial_factor=spatial,
             temporal_factor=temporal,
             pixel_rate_factor=pixel_rate,
+            aspect_ratio=src.width / src.height if src.height > 0 else 1.0,
             source_class=classification.source_class,
             normalized_ob=classification.normalized_ob,
         )

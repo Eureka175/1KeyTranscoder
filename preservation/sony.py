@@ -1,9 +1,13 @@
-"""Sony metadata-preservation backend (POC).
+"""Sony metadata-preservation backend.
 
 Preserves, as structured container data (not generic key/value tags):
 
-- rtmd timed metadata track: verbatim samples (raw + NHML pair), stsd
-  sample entry type, timescale, stts/stsz timing, tref/cdsc association
+- rtmd timed metadata track: verbatim container-level copy from the
+  source (MP4Box -add src#<id>), stsd sample entry, timescale,
+  stts/stsz timing, elst, tref/cdsc association. The bundle also keeps
+  a raw samples dump + NHML dump as inspectable forensic evidence, but
+  NHML is NOT the reconstruction vehicle (GPAC's NHML import rounds
+  track durations at 600-tick precision and breaks the timeline).
 - file-level meta (nrtm): Lens profile item + NonRealTimeMeta XML
 - vendor uuid boxes: PROF x1 (root), USMT x4 (3 trak tails + moov tail)
 
@@ -22,6 +26,7 @@ from . import isobmf
 from .gpac import GpacContainerBackend
 from .models import (
     BUNDLE_VERSION,
+    AudioTrackInfo,
     MetadataTrack,
     NrtmMeta,
     PreservationBundle,
@@ -84,6 +89,10 @@ class ParsedFile:
             [int(e.get("SampleCount", "0")), int(e.get("SampleDelta", "0"))]
             for e in _find_all(trak, "TimeToSampleEntry")
         ]
+        elst = [
+            [int(e.get("Duration", "0")), int(e.get("MediaTime", "0"))]
+            for e in _find_all(trak, "EditListEntry")
+        ]
         stsz = _find_all(trak, "SampleSizeBox")
         const_size = 0
         sizes: list[int] = []
@@ -102,6 +111,7 @@ class ParsedFile:
             "handler_name": hdlr.get("Name", ""),
             "sample_entry": stsd_entry,
             "stts": stts,
+            "elst": elst,
             "constant_sample_size": const_size,
             "sample_sizes": sizes,
             "refs": refs,
@@ -117,7 +127,12 @@ class ParsedFile:
         hdlr = _find_child(meta, "HandlerBox")
         infe = _find_all(meta, "ItemInfoEntryBox")
         xml_box = _find_child(meta, "XMLBox")
-        item = {}
+        item = {
+            "item_id": 0,
+            "item_name": "",
+            "item_mime": "",
+            "item_type": "",
+        }
         if infe:
             item = {
                 "item_id": int(infe[0].get("item_ID", "0")),
@@ -205,9 +220,33 @@ class SonyPreservationBackend:
         if self.ffprobe:
             stream_tags = _ffprobe_stream_tags(self.ffprobe, source)
 
+        # movie (mvhd) timescale: A7M5 = 60000, A7M4 = 90000 while its
+        # video track runs at 30000 — they are not the same thing
+        movie_timescale = 0
+        moov = _find_child(parsed.root, "MovieBox")
+        if moov is not None:
+            mvhd = _find_child(moov, "MovieHeaderBox")
+            if mvhd is not None:
+                movie_timescale = int(mvhd.get("TimeScale", "0"))
+
         tracks: list[MetadataTrack] = []
+        audio_tracks: list[AudioTrackInfo] = []
+        video_timescale = 0
         for trak in parsed.tracks():
             info = parsed.track_info(trak)
+            if info["handler_type"] == "vide" and not video_timescale:
+                video_timescale = info["timescale"]
+            if info["handler_type"] == "soun":
+                audio_tracks.append(AudioTrackInfo(
+                    track_id=info["track_id"],
+                    handler_type="soun",
+                    timescale=info["timescale"],
+                    media_duration=info["media_duration"],
+                    track_duration=info["track_duration"],
+                    sample_entry=info["sample_entry"],
+                    sample_count=sum(c for c, _ in info["stts"]),
+                ))
+                continue
             if info["handler_type"] != "meta" or not info["sample_entry"]:
                 continue
             entry = info["sample_entry"]
@@ -319,11 +358,12 @@ class SonyPreservationBackend:
                 item_mime=meta_info["item_mime"],
                 item_type=meta_info["item_type"],
             )
-            lens = boxes_dir / "lens_profile.bin"
-            self.gpac.dump_meta_item(source, meta_info["item_id"], lens)
-            nrtm.lens_profile_file = str(lens.relative_to(bundle_dir))
-            nrtm.lens_profile_size = lens.stat().st_size
-            nrtm.lens_profile_sha256 = isobmf.sha256_file(lens)
+            if meta_info["item_id"] > 0:
+                lens = boxes_dir / "lens_profile.bin"
+                self.gpac.dump_meta_item(source, meta_info["item_id"], lens)
+                nrtm.lens_profile_file = str(lens.relative_to(bundle_dir))
+                nrtm.lens_profile_size = lens.stat().st_size
+                nrtm.lens_profile_sha256 = isobmf.sha256_file(lens)
             xml_out = boxes_dir / "nrtm.xml"
             if self.gpac.dump_meta_xml(source, xml_out):
                 nrtm.xml_file = str(xml_out.relative_to(bundle_dir))
@@ -338,8 +378,11 @@ class SonyPreservationBackend:
             brand_minor_version=minor,
             compatible_brands=compat,
             tracks=tracks,
+            audio_tracks=audio_tracks,
             boxes=boxes,
             nrtm=nrtm,
+            video_timescale=video_timescale,
+            movie_timescale=movie_timescale,
         )
         bundle.to_json(bundle_dir / "manifest.json")
         return bundle
@@ -352,31 +395,74 @@ class SonyPreservationBackend:
         bundle_dir: Path,
         stage_mov: Path,
     ) -> None:
-        """MP4Box-level reconstruction into stage_mov (in place).
+        """Metadata-structure reconstruction into stage_mov (in place).
+
+        The rtmd/audio tracks themselves are NOT imported here: they are
+        container-copied verbatim from the source by MP4Box during the
+        -new mux (see preservation.pipeline). GPAC's NHML import path
+        recomputes every track's tkhd/elst durations at 600-tick
+        precision (verified against GPAC 26.02: 360360@60000 -> 360300)
+        regardless of -timescale/:moovts/:timescale, which desyncs the
+        video timeline from the rtmd timeline; native ISOBMFF track
+        copy keeps the source timing exact, so NHML is not used for
+        reconstruction at all.
+
+        Here we:
+        1. verify the copied metadata tracks carry the source payload
+           verbatim (raw dump + sha256, fail loudly on mismatch)
+        2. re-add tref/cdsc (rtmd -> video; track IDs resolved from the
+           rebuilt file)
+        3. re-add the file-level nrtm meta (Lens profile item + XML)
 
         uuid byte-patching is NOT done here (it is a raw byte operation);
         call uuid_inserts() and apply with isobmf.insert_uuid_boxes().
         """
-        for track in bundle.tracks:
-            nhml = bundle_dir / track.nhml_file
-            spec = str(nhml)
-            if track.handler_name:
-                spec += f":name={track.handler_name}"
-            self.gpac.add_track(stage_mov, spec)
-
-        # tref/cdsc: rtmd track -> video track. Track IDs may have
-        # changed; resolve from the rebuilt file.
         rebuilt = ParsedFile(self.gpac.diso_xml(stage_mov))
         video_id = 0
         meta_ids: list[int] = []
+        meta_infos: dict[int, dict[str, Any]] = {}
         for trak in rebuilt.tracks():
             info = rebuilt.track_info(trak)
             if info["handler_type"] == "vide" and not video_id:
                 video_id = info["track_id"]
             if info["handler_type"] == "meta":
                 meta_ids.append(info["track_id"])
+                meta_infos[info["track_id"]] = info
         if not video_id:
             raise RuntimeError(f"no video track in {stage_mov}")
+
+        # verbatim payload verification: every copied metadata track
+        # must carry the exact source bytes and stts
+        scratch = bundle_dir / "verify"
+        scratch.mkdir(parents=True, exist_ok=True)
+        for track in bundle.tracks:
+            match_id = None
+            for meta_id in meta_ids:
+                info = meta_infos[meta_id]
+                if (
+                    info["sample_entry"] == track.sample_entry_type
+                    and info["stts"] == track.stts
+                    and info["timescale"] == track.timescale
+                ):
+                    match_id = meta_id
+                    break
+            if match_id is None:
+                raise RuntimeError(
+                    f"{stage_mov}: no meta track matching "
+                    f"{track.sample_entry_type}/{track.timescale}/"
+                    f"{track.stts[:1]} — direct track copy lost the "
+                    f"metadata track"
+                )
+            raw = scratch / f"track{match_id}_samples.bin"
+            self.gpac.raw_track(stage_mov, match_id, raw)
+            actual = isobmf.sha256_file(raw)
+            if actual != track.samples_sha256:
+                raise RuntimeError(
+                    f"{stage_mov}: meta track {match_id} payload hash "
+                    f"{actual} != source {track.samples_sha256} — "
+                    f"refusing to continue"
+                )
+
         for meta_id in meta_ids:
             self.gpac.add_track_ref(stage_mov, meta_id, "cdsc", video_id)
 

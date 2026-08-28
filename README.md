@@ -1,12 +1,17 @@
-# x265 Archive Encoder
+# 1KeyTranscoder
 
-Recursive, resumable Windows batch encoder. Only **x265** is implemented;
-NVENC/QSV/VCE are future backends behind `encoders/base.py`.
+Recursive, resumable Windows batch encoder with Sony camera-metadata
+preservation. Only **x265** is implemented; NVENC/QSV/VCE are future
+backends behind `encoders/base.py`.
+
+**Main entry point: `1keytransc.py`** (replaces `x265_archive.py`, which
+remains temporarily as migration reference only).
 
 ## Layout
 
 ```
-x265_archive.py          orchestration (CLI, batch loop, resume, exec, postprobe)
+1keytransc.py            MAIN: CLI, batch loop, resume, exec, postprobe
+x265_archive.py          legacy entry point (reference only, do not extend)
 x265.json                base 4K60 profiles: UHQ / HQ / SMALL / FAST (authoritative)
 x265_scaling.json        all source-dependent scaling rules (PROVISIONAL values)
 core/
@@ -17,9 +22,72 @@ core/
   config.py              explicit config loading, executable discovery
   logging_utils.py       loggers + CSV field lists / row builders
 encoders/
-  base.py                EncoderBackend protocol
+  base.py                EncoderBackend protocol + pixel-format mapping
   x265.py                PARAM_MAP, x265 value formatting, FFmpeg command
+                         (full output + video-only preservation intermediate)
+preservation/
+  pipeline.py            Sony pipeline: extract -> rebuild -> validate
+  sony.py                SonyPreservationBackend (rtmd/nrtm/uuid bundle)
+  gpac.py                GPAC/MP4Box subprocess wrapper (container backend)
+  isobmf.py              ISO-BMFF box walker / uuid byte patcher /
+                         tkhd+elst duration repair
+  validate.py            ORIGINAL vs FINAL structural comparison
+  gyroflow.py            Gyroflow headless consumer validation
+  poc_video.py           POC video/audio backends (reference)
 ```
+
+## Sony metadata preservation
+
+Sony XAVC sources (detected by the `rtmd` data stream) automatically go
+through the preservation pipeline instead of a plain FFmpeg remux:
+
+```
+source -> probe + scaling (core/, unchanged)
+       -> GPAC demux (bundle: metadata/manifest.json, tracks/, boxes/)
+       -> FFmpeg libx265 (scaled production params) -> video/encoded.mov
+       -> MP4Box -new: video + per-track audio container copy + per-track
+          rtmd container copy (native ISOBMFF copies, exact source timing)
+       -> payload verification + tref/cdsc + nrtm meta + brands
+       -> uuid byte patch (GPAC cannot write vendor uuid boxes)
+       -> <basename>.MP4 (uppercase extension, XAVC brand) + report.json
+       -> Gyroflow headless validation (auto-detected, or --gyroflow)
+```
+
+Preserved: rtmd timed KLV track (verbatim samples, exact 1001/60000
+timing), tref/cdsc, file-level `nrtm` meta (Lens profile item when
+present + NonRealTimeMeta XML), PROF/USMT and any other vendor uuid
+boxes, track timescales and presentation durations.
+
+Container rules discovered during bring-up (do not regress):
+
+- The video intermediate for muxing is **MOV, not MKV**: GPAC's MKV
+  reader quantizes timestamps to milliseconds, breaking exact
+  1001/60000 rtmd alignment.
+- The movie timescale must equal the **source mvhd timescale** (A7M5
+  60000, A7M4 90000 — not necessarily the video track timescale) and
+  must be passed to **every** MP4Box rewrite (`gpac.movie_timescale`),
+  or GPAC resets it to the first track's media timescale.
+- **Reconstruction never uses NHML.** GPAC 26.02 recomputes every
+  track's tkhd/elst durations at 600-tick precision whenever an
+  NHML-imported track is present (360360@60000 → 360300), regardless
+  of `-timescale` / `:moovts` / `:timescale`; the rtmd track is
+  instead container-copied from the source (`-add src#<trackID>`),
+  which keeps the exact source timing through the whole chain
+  (`-ref`/`-set-meta`/`-add-item`/`-set-xml`/`-flat`/`-brand`).
+- `#audio` in MP4Box copies only the FIRST audio track; the pipeline
+  adds every source audio track by its track ID (4× mono stays 4× mono).
+- `isobmf.patch_track_durations()` remains available as a Level-3
+  fallback for other GPAC versions; it is not part of the normal
+  pipeline anymore.
+
+A run fails (output not delivered) if structural validation reports
+critical MISSING/MODIFIED items, or if Gyroflow cannot parse the same
+metadata from the output as from the original.
+
+Requires GPAC at `C:\Program Files\GPAC` (or `--gpac-dir`).
+
+sony_poc.py is the original standalone POC and is kept for reference;
+it is not a second main program.
 
 ## Configuration flow
 
@@ -89,43 +157,20 @@ output size. Missing class rule → static base-profile VBV (logged).
 ## Usage
 
 ```
-python x265_archive.py --input <dir> --output <dir> [--preset uhq|hq|small|fast|all]
-                       [--config x265.json] [--scaling-config x265_scaling.json]
-                       [--ffmpeg ...] [--ffprobe ...] [--dry-run]
+python 1keytransc.py --input <dir> --output <dir> [--preset uhq|hq|small|fast|all]
+                     [--config x265.json] [--scaling-config x265_scaling.json]
+                     [--ffmpeg ...] [--ffprobe ...]
+                     [--gpac-dir "C:\Program Files\GPAC"] [--gyroflow ...]
+                     [--dry-run]
 ```
 
-## Sony metadata-preservation POC (prototype, separate from the above)
-
-`sony_poc.py` + `preservation/` implement a structural preservation
-prototype for Sony camera metadata (rtmd timed KLV track, file-level
-`nrtm` meta with Lens profile + NonRealTimeMeta XML, PROF/USMT uuid
-boxes). It does not touch the scaling architecture.
-
-```
-python sony_poc.py --source "testsets/adjust/车内高晃动适中噪点.MP4"
-python sony_poc.py --all          # every Sony original under testsets/
-```
-
-Pipeline per file (intermediates under `work/<job-id>/`, gitignored):
-
-```
-source -> GPAC demux (bundle: metadata/manifest.json, tracks/, boxes/)
-       -> FFmpeg libx265 ultrafast -> video/encoded.mov (+ .mkv copy)
-       -> MP4Box mux (video + copied PCM audio) -> rtmd via NHML
-       -> tref/cdsc + nrtm meta + brands -> uuid byte patch
-       -> final/output.mp4 (XAVC brand) + report.json
-       (PRESERVED/MODIFIED/MISSING/UNKNOWN)
-```
-
-Requires GPAC at `C:\Program Files\GPAC` (or `--gpac-dir`). The video
-intermediate for muxing is MOV, not MKV: GPAC's MKV reader quantizes
-timestamps to milliseconds, breaking exact 1001/60000 rtmd alignment;
-the MKV copy is produced for inspection only.
+Sony intermediates (bundle, encoded.mov, stage/final, report.json) live
+under `<output>\.1ktwork\<job-id>\` for inspection and resume.
 
 Dry-run (no encoding, full audit trail):
 
 ```
-python x265_archive.py --input testsets --output out_dry --preset all --dry-run
+python 1keytransc.py --input testsets --output out_dry --preset all --dry-run
 ```
 
 Per file this logs SOURCE / CLASSIFICATION / SCALING / SCALED_PARAM

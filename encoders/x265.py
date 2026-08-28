@@ -17,10 +17,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from core.models import EffectiveParams
+from core.models import EffectiveParams, SourceInfo
 from core.scaling import ceil_expression
 
-from .base import EncoderBackend
+from .base import EncoderBackend, ffmpeg_pix_fmt
 
 PARAM_MAP = {
     "rd": "rd",
@@ -161,8 +161,8 @@ def build_command(
     profile: dict[str, Any],
     effective: EffectiveParams,
     video_stream_count: int,
-) -> tuple[list[str], dict[str, Any]]:
-    # Effective parameters are final: only serialization happens here.
+    src_info: SourceInfo,
+) -> tuple[list[str], dict[str, Any]]:    # Effective parameters are final: only serialization happens here.
     x265_params, effective_dict = build_x265_params(effective)
 
     cmd = [
@@ -182,7 +182,7 @@ def build_command(
         "-c:v:0", "libx265",
         "-preset", str(profile["preset"]),
         "-crf", str(profile["crf"]),
-        "-pix_fmt", "yuv420p10le",
+        "-pix_fmt", ffmpeg_pix_fmt(src_info),
     ]
 
     # Any additional video stream (DJI attached picture, cover image, etc.)
@@ -207,6 +207,51 @@ def build_command(
     return cmd, effective_dict
 
 
+def build_video_command(
+    ffmpeg: Path,
+    src: Path,
+    out_mov: Path,
+    profile: dict[str, Any],
+    effective: EffectiveParams,
+    src_info: SourceInfo,
+) -> tuple[list[str], dict[str, Any]]:
+    """Video-only intermediate MOV for the preservation container rebuild.
+
+    Same encoder parameters as build_command(), but only the primary
+    video stream: audio is container-copied from the source by the
+    container backend, and the camera metadata tracks cannot pass
+    through FFmpeg at all (they are re-added from the preservation
+    bundle by MP4Box).
+
+    MOV, not MKV: GPAC's MKV reader quantizes timestamps to
+    milliseconds, breaking exact 1001/60000 rtmd alignment.
+    """
+    x265_params, effective_dict = build_x265_params(effective)
+
+    cmd = [
+        str(ffmpeg),
+        "-hide_banner",
+        "-nostdin",
+        "-stats",
+        "-y",
+        "-i", str(src),
+
+        "-map", "0:v:0",
+        "-c:v", "libx265",
+        "-preset", str(profile["preset"]),
+        "-crf", str(profile["crf"]),
+        "-pix_fmt", ffmpeg_pix_fmt(src_info),
+
+        "-an", "-sn", "-dn",
+        "-fps_mode", "passthrough",
+        "-x265-params", x265_params,
+        "-tag:v", "hvc1",
+        str(out_mov),
+    ]
+
+    return cmd, effective_dict
+
+
 class X265Backend(EncoderBackend):
     """x265/libx265 implementation of the encoder-backend contract."""
 
@@ -222,6 +267,7 @@ class X265Backend(EncoderBackend):
         profile: dict[str, Any],
         effective: EffectiveParams,
         video_stream_count: int,
+        src_info: SourceInfo,
     ) -> tuple[list[str], dict[str, Any]]:
         return build_command(
             ffmpeg,
@@ -230,4 +276,25 @@ class X265Backend(EncoderBackend):
             profile,
             effective,
             video_stream_count,
+            src_info,
+        )
+
+    def build_video_command(
+        self,
+        ffmpeg: Path,
+        src: Path,
+        out_mov: Path,
+        profile: dict[str, Any],
+        effective: EffectiveParams,
+        src_info: SourceInfo,
+    ) -> tuple[list[str], dict[str, Any]]:
+        """Video-only intermediate for the metadata-preservation
+        container rebuild (Sony pipeline)."""
+        return build_video_command(
+            ffmpeg,
+            src,
+            out_mov,
+            profile,
+            effective,
+            src_info,
         )

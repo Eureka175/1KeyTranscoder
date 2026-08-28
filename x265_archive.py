@@ -278,6 +278,7 @@ def encode_one(
         profile,
         effective,
         source_summary["video_streams"],
+        src_info,
     )
 
     logger.info(

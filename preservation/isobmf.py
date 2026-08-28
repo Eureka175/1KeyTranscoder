@@ -180,6 +180,150 @@ def uuid_guid(ext_type: bytes) -> str:
     )
 
 
+def _patch_u32(f, offset: int, old: int, new: int) -> None:
+    f.seek(offset)
+    cur = struct.unpack(">I", f.read(4))[0]
+    if cur != old:
+        raise RuntimeError(f"patch_u32 @{offset}: expected {old}, found {cur}")
+    f.seek(offset)
+    f.write(struct.pack(">I", new))
+
+
+def _patch_u64(f, offset: int, old: int, new: int) -> None:
+    f.seek(offset)
+    cur = struct.unpack(">Q", f.read(8))[0]
+    if cur != old:
+        raise RuntimeError(f"patch_u64 @{offset}: expected {old}, found {cur}")
+    f.seek(offset)
+    f.write(struct.pack(">Q", new))
+
+
+def patch_track_durations(path: Path, movie_timescale: int) -> list[str]:
+    """Fix tkhd/elst durations truncated by GPAC's 600-tick rounding.
+
+    GPAC (26.02) recomputes track-header presentation durations at its
+    internal 600 ticks/s precision whenever an NHML import rewrites the
+    file, regardless of the movie timescale requested for the output
+    (1741740 units @60000 -> 17417.4 -> 1741700). The mdhd media
+    durations and stts tables stay exact, so the true presentation
+    duration is recoverable per track:
+
+        presentation = (mdhd_duration - elst_media_time)  (track units)
+                       * movie_timescale / track_timescale
+
+    Only 4/8-byte duration fields are rewritten in place; no box size
+    or offset changes. Tracks whose values are already exact are
+    untouched. Tracks with multi-entry or empty-edit edit lists are
+    skipped (reported), never guessed.
+
+    Returns a list of human-readable patch descriptions.
+    """
+    roots = root_boxes(path)
+    moov = next((b for b in roots if b.type == "moov"), None)
+    if moov is None:
+        raise RuntimeError(f"no moov box in {path}")
+
+    patched: list[str] = []
+    with path.open("r+b") as f:
+        for trak in _children(f, moov):
+            if trak.type != "trak":
+                continue
+            handler = _trak_handler(f, trak)
+            tkhd = mdia = elst = None
+            for c in _children(f, trak):
+                if c.type == "tkhd":
+                    tkhd = c
+                elif c.type == "edts":
+                    for e in _children(f, c):
+                        if e.type == "elst":
+                            elst = e
+                elif c.type == "mdia":
+                    mdia = c
+            if tkhd is None or mdia is None:
+                continue
+            mdhd = next(
+                (c for c in _children(f, mdia) if c.type == "mdhd"), None
+            )
+            if mdhd is None:
+                continue
+
+            f.seek(mdhd.data_offset)
+            ver = f.read(1)[0]
+            f.seek(mdhd.data_offset + (20 if ver == 1 else 12))
+            track_ts = struct.unpack(">I", f.read(4))[0]
+            if ver == 1:
+                media_dur = struct.unpack(">Q", f.read(8))[0]
+            else:
+                media_dur = struct.unpack(">I", f.read(4))[0]
+            if not track_ts:
+                continue
+
+            # edit list: only the simple single-entry case is patched
+            media_time = 0
+            elst_entry_off: int | None = None
+            elst_ver = 0
+            if elst is not None:
+                f.seek(elst.data_offset)
+                elst_ver = f.read(1)[0]
+                f.seek(elst.data_offset + 4)
+                count = struct.unpack(">I", f.read(4))[0]
+                if count != 1:
+                    if count > 1:
+                        patched.append(
+                            f"trak:{handler}: multi-entry elst skipped"
+                        )
+                    elst = None
+                else:
+                    elst_entry_off = elst.data_offset + 8
+                    f.seek(elst_entry_off + (8 if elst_ver == 1 else 4))
+                    mt_size = 8 if elst_ver == 1 else 4
+                    media_time = int.from_bytes(
+                        f.read(mt_size), "big", signed=True
+                    )
+
+            if media_time < 0:
+                patched.append(f"trak:{handler}: empty edit skipped")
+                continue
+
+            expected = round(
+                (media_dur - media_time) * movie_timescale / track_ts
+            )
+
+            f.seek(tkhd.data_offset)
+            tkhd_ver = f.read(1)[0]
+            dur_off = tkhd.data_offset + (28 if tkhd_ver == 1 else 20)
+            f.seek(dur_off)
+            if tkhd_ver == 1:
+                old = struct.unpack(">Q", f.read(8))[0]
+            else:
+                old = struct.unpack(">I", f.read(4))[0]
+            if old != expected:
+                if tkhd_ver == 1:
+                    _patch_u64(f, dur_off, old, expected)
+                else:
+                    _patch_u32(f, dur_off, old, expected)
+                patched.append(
+                    f"trak:{handler}: tkhd duration {old} -> {expected}"
+                )
+
+            if elst is not None and elst_entry_off is not None:
+                f.seek(elst_entry_off)
+                if elst_ver == 1:
+                    old_e = struct.unpack(">Q", f.read(8))[0]
+                else:
+                    old_e = struct.unpack(">I", f.read(4))[0]
+                if old_e != expected:
+                    if elst_ver == 1:
+                        _patch_u64(f, elst_entry_off, old_e, expected)
+                    else:
+                        _patch_u32(f, elst_entry_off, old_e, expected)
+                    patched.append(
+                        f"trak:{handler}: elst duration "
+                        f"{old_e} -> {expected}"
+                    )
+    return patched
+
+
 def insert_uuid_boxes(
     src: Path,
     dst: Path,

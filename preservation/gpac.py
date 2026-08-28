@@ -8,6 +8,14 @@ Quirks discovered during bring-up (do not "fix" blindly):
 - `-dts` writes <stem>_ts.txt next to the input as well.
 - `-diso -std` streams the full box XML to stdout (clean parse source).
 - Every run prints "[iso file] Unknown box type rtmd" on stderr; benign.
+- Every file-rewriting command (`-new`, `-add`, `-ref`, `-set-meta`,
+  `-flat`, ...) resets the movie timescale to the default 600 unless
+  `-timescale` is passed on THAT command; on `-new` it must precede
+  `-new` or it is silently ignored. Track-header durations are computed
+  in movie timescale at that moment, so a post-hoc `-timescale` rewrite
+  only rescales already-truncated values (17417 -> 1741700, not
+  1741740). Hence `movie_timescale` is threaded through every mutating
+  call below.
 """
 
 from __future__ import annotations
@@ -66,13 +74,30 @@ def _opt_spec(spec: str) -> str:
 
 
 class GpacContainerBackend:
-    def __init__(self, gpac_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        gpac_dir: Path | None = None,
+        movie_timescale: int = 0,
+    ) -> None:
         base = gpac_dir or DEFAULT_GPAC_DIR
         self.mp4box = base / "mp4box.exe"
         if not self.mp4box.is_file():
             self.mp4box = base / "MP4Box.exe"
         if not self.mp4box.is_file():
             raise FileNotFoundError(f"mp4box.exe not found under {base}")
+        # Movie timescale to enforce while building/rewriting a file.
+        # GPAC's default of 600 truncates track durations (e.g. 1741740
+        # units @60000 -> 17417.4 -> 17417 ticks @600), which desyncs
+        # the video track from a 60000-timescale rtmd timeline. Every
+        # file-rewriting command resets the timescale to the default,
+        # so it must be passed on EACH mutating call, and BEFORE -new
+        # (after -new it is silently ignored).
+        self.movie_timescale = movie_timescale
+
+    def _ts_args(self) -> list[str]:
+        if self.movie_timescale > 0:
+            return ["-timescale", str(self.movie_timescale)]
+        return []
 
     # -- inspection -----------------------------------------------------
 
@@ -169,28 +194,32 @@ class GpacContainerBackend:
     # -- reconstruction ---------------------------------------------------
 
     def mux_new(self, dst: Path, adds: list[str]) -> None:
-        """MP4Box -new dst -add A -add B ..."""
+        """MP4Box -timescale T -new dst -add A -add B ..."""
         dst.parent.mkdir(parents=True, exist_ok=True)
-        cmd = [str(self.mp4box), "-new", _opt(str(dst))]
+        cmd = [str(self.mp4box)] + self._ts_args()
+        cmd += ["-new", _opt(str(dst))]
         for a in adds:
             cmd += ["-add", _opt_spec(a)]
         _run(cmd, "MP4Box -new/-add")
 
     def add_track(self, mov: Path, spec: str) -> None:
         _run(
-            [str(self.mp4box), "-add", _opt_spec(spec), str(mov)],
+            [str(self.mp4box)] + self._ts_args()
+            + ["-add", _opt_spec(spec), str(mov)],
             f"MP4Box -add {spec}",
         )
 
     def add_track_ref(self, mov: Path, tk_id: int, ref: str, ref_id: int) -> None:
         _run(
-            [str(self.mp4box), "-ref", f"{tk_id}:{ref}:{ref_id}", str(mov)],
+            [str(self.mp4box)] + self._ts_args()
+            + ["-ref", f"{tk_id}:{ref}:{ref_id}", str(mov)],
             f"MP4Box -ref {tk_id}:{ref}:{ref_id}",
         )
 
     def set_meta(self, mov: Path, meta_type: str) -> None:
         _run(
-            [str(self.mp4box), "-set-meta", meta_type, str(mov)],
+            [str(self.mp4box)] + self._ts_args()
+            + ["-set-meta", meta_type, str(mov)],
             f"MP4Box -set-meta {meta_type}",
         )
 
@@ -206,13 +235,15 @@ class GpacContainerBackend:
         if item_id:
             spec += f":id={item_id}"
         _run(
-            [str(self.mp4box), "-add-item", spec, str(mov)],
+            [str(self.mp4box)] + self._ts_args()
+            + ["-add-item", spec, str(mov)],
             f"MP4Box -add-item {file.name}",
         )
 
     def set_meta_xml(self, mov: Path, xml_file: Path) -> None:
         _run(
-            [str(self.mp4box), "-set-xml", _opt(xml_file), str(mov)],
+            [str(self.mp4box)] + self._ts_args()
+            + ["-set-xml", _opt(xml_file), str(mov)],
             "MP4Box -set-xml",
         )
 
@@ -223,7 +254,7 @@ class GpacContainerBackend:
         compat: list[str],
         remove: list[str] | None = None,
     ) -> None:
-        cmd = [str(self.mp4box), "-brand", major]
+        cmd = [str(self.mp4box)] + self._ts_args() + ["-brand", major]
         for b in compat:
             cmd += ["-ab", b]
         for b in remove or []:
@@ -237,4 +268,7 @@ class GpacContainerBackend:
         Required before isobmf.insert_uuid_boxes(): insertions must never
         shift the mdat payload, or stco/co64 chunk offsets break.
         """
-        _run([str(self.mp4box), "-flat", str(mov)], "MP4Box -flat")
+        _run(
+            [str(self.mp4box)] + self._ts_args() + ["-flat", str(mov)],
+            "MP4Box -flat",
+        )

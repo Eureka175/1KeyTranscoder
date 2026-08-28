@@ -22,9 +22,11 @@ from .models import PreservationBundle
 class VideoBackend(Protocol):
     """Encode the source video into an intermediate container."""
 
-    def encode(self, source: Path, out_mkv: Path) -> None:
-        """Encode source's main video to out_mkv (MKV). Must be 1:1 in
-        frame count and frame rate with the source."""
+    def encode(self, source: Path, out_mov: Path) -> None:
+        """Encode source's main video to out_mov (MOV intermediate;
+        NOT MKV: GPAC's MKV reader quantizes timestamps to
+        milliseconds). Must be 1:1 in frame count and frame rate with
+        the source."""
         ...
 
 
