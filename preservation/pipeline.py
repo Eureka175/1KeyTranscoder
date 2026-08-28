@@ -13,6 +13,9 @@ scaling machinery; the POC used libx265 ultrafast).
         -> reconstruct: payload verification, tref/cdsc, nrtm meta,
            brands
         -> flatten, uuid byte patch (GPAC cannot write uuid boxes)
+        -> (optional, hardware backends) stts-based duration repair
+        -> (optional) meta item_type byte patch (Sony 00000000 vs
+           GPAC 'mime')
         -> final/output.mov -> validate.compare -> optional Gyroflow
         -> report.json
 
@@ -41,6 +44,7 @@ final/output.mov is handed back without rebuilding.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -55,6 +59,25 @@ from .sony import SonyPreservationBackend
 from .validate import compare
 
 
+def _item_type_bytes(item_type: str) -> bytes | None:
+    """Source item_type (diso XML string) -> 4 bytes.
+
+    GPAC renders a null fourcc as 8 hex chars ("00000000") and printable
+    item types as their 4CC ("mime"). Returns None when unparseable.
+    """
+    text = (item_type or "").strip()
+    if not text:
+        return None
+    if re.match(r"^[0-9A-Fa-f]{8}$", text):
+        try:
+            return bytes.fromhex(text)
+        except ValueError:
+            return None
+    if len(text) == 4:
+        return text.encode("latin-1")
+    return None
+
+
 def run_sony_pipeline(
     *,
     source: Path,
@@ -64,6 +87,7 @@ def run_sony_pipeline(
     ffprobe: Path,
     has_audio: bool = True,
     gyroflow: Path | None = None,
+    fix_hw_timing: bool = False,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -191,11 +215,13 @@ def run_sony_pipeline(
     step("verifying copied tracks / tref / nrtm meta...")
     sony.reconstruct(bundle, bundle_dir, stage)
 
-    # moov must sit after mdat before byte-level uuid insertion
+    # flatten, then brands — each its OWN invocation. GPAC's -flat
+    # resets the movie timescale to the first track's media timescale
+    # (A7M4: 90000 -> 30000) even with -timescale threaded, and -brand
+    # is the pass that restores it; a combined -flat -brand does not
+    # apply the threaded -timescale either. moov must sit after mdat
+    # before byte-level uuid insertion.
     gpac.flatten(stage)
-
-    # brands AFTER flatten: -flat rewrites the file and resets ftyp
-    # to GPAC's default (qt) otherwise
     if bundle.major_brand:
         compat = [
             b for b in bundle.compatible_brands
@@ -234,18 +260,67 @@ def run_sony_pipeline(
         step(f"  {skipped} uuid box(es) already carried over by GPAC")
     isobmf.insert_uuid_boxes(stage, final, inserts)
 
+    # 5b. byte-level duration repair for hardware-encoder intermediates.
+    # rigaya's mp4 muxer writes mvhd at timescale 1000 with a
+    # millisecond-quantized edit list; GPAC's import truncates every
+    # track duration by up to 0.5 ms (585585 -> 585540 @90000 on A7M4)
+    # and mangles the imported video mdhd. Re-derive each track's
+    # presentation duration from the exact stts table, then the movie
+    # duration. Pure 4/8-byte in-place patches; a no-op when values are
+    # already exact (x265/FFmpeg intermediates never need it).
+    if fix_hw_timing:
+        step("repairing durations from stts (hardware-intermediate path)...")
+        for desc in isobmf.patch_track_durations(
+            final, movie_timescale, from_stts=True
+        ):
+            step(f"  {desc}")
+        mvhd_desc = isobmf.patch_movie_duration(final)
+        if mvhd_desc:
+            step(f"  {mvhd_desc}")
+
+    # 5c. meta item_type byte patch. GPAC's -add-item writes item_type
+    # 'mime' for re-added meta items; Sony sources carry 00000000 (their
+    # infe is v0). validate.compare would otherwise report
+    # nrtm.lens_profile.item_type MODIFIED.
+    if bundle.nrtm and bundle.nrtm.item_id > 0:
+        target = _item_type_bytes(bundle.nrtm.item_type)
+        if target is None:
+            step(
+                "WARNING: unrecognized source item_type "
+                f"{bundle.nrtm.item_type!r}; item_type patch skipped"
+            )
+        else:
+            try:
+                desc = isobmf.patch_meta_item_type(
+                    final, bundle.nrtm.item_id, target
+                )
+                if desc:
+                    step(f"  {desc}")
+                else:
+                    step("  meta item_type already exact")
+            except RuntimeError as exc:
+                step(f"WARNING: meta item_type patch skipped: {exc}")
+
     # 6. structural validation. Timing regression guards
     # (movie timescale/duration, track timescales/durations, stts,
     # rtmd elst, audio track count) live in validate.compare and make
     # the run FAIL on any drift. No duration patch is applied: the
     # direct-copy path is exact (see module docstring).
     step("validating original vs final...")
+    known_facts: dict[str, Any] = {}
+    if bundle.tracks:
+        known_facts["rtmd_sha256"] = bundle.tracks[0].samples_sha256
+    if bundle.nrtm:
+        known_facts["lens_sha256"] = bundle.nrtm.lens_profile_sha256
+        known_facts["lens_size"] = bundle.nrtm.lens_profile_size
+        known_facts["xml_sha256"] = bundle.nrtm.xml_sha256
     report = compare(
         original=source,
         final=final,
         gpac=gpac,
         ffprobe=ffprobe,
         scratch=work_dir / "validate",
+        known_facts=known_facts,
     )
 
     # 7. downstream consumer validation (hard acceptance test)

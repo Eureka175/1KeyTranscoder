@@ -247,6 +247,35 @@ class GpacContainerBackend:
             "MP4Box -set-xml",
         )
 
+    def meta_pass(
+        self,
+        mov: Path,
+        meta_type: str | None = None,
+        meta_items: list[tuple[Path, str, str, int]] | None = None,
+        meta_xml: Path | None = None,
+    ) -> None:
+        """One MP4Box invocation: -set-meta + -add-item* + -set-xml.
+
+        Verified on GPAC 26.02: the combined invocation preserves the
+        movie timescale (90000 for A7M4) and applies all three
+        operations in one file rewrite. NOTE: -ref must stay a SEPARATE
+        invocation — the combined -ref does not apply the threaded
+        -timescale, and -ref is also the pass that restores the movie
+        timescale after -new (see gpac.py module docstring).
+        """
+        cmd = [str(self.mp4box)] + self._ts_args()
+        if meta_type:
+            cmd += ["-set-meta", meta_type]
+        for file, name, mime, item_id in (meta_items or []):
+            spec = f"{_opt(file)}:name={name}:mime={mime}"
+            if item_id:
+                spec += f":id={item_id}"
+            cmd += ["-add-item", spec]
+        if meta_xml:
+            cmd += ["-set-xml", _opt(meta_xml)]
+        cmd.append(str(mov))
+        _run(cmd, "MP4Box combined meta pass")
+
     def set_brand(
         self,
         mov: Path,

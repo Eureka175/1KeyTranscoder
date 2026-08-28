@@ -431,6 +431,92 @@ def patch_movie_duration(path: Path) -> str | None:
         return f"mvhd duration {old} -> {max_dur} (timescale {ts})"
 
 
+def patch_meta_item_type(
+    path: Path,
+    item_id: int,
+    target_type: bytes,
+) -> str | None:
+    """Patch the item_type of a file-level meta item (infe v2) in place.
+
+    GPAC's `-add-item` writes item_type 'mime' for re-added meta items;
+    Sony sources carry item_type 0x00000000 (their infe is v0, which has
+    no item_type field and is rendered as 00000000). validate.compare
+    reports the divergence as nrtm.lens_profile.item_type MODIFIED.
+    This narrow patch rewrites the 4-byte item_type of the matching
+    v2 infe back to the source value.
+
+    Idempotent: returns None when already equal. Only infe version 2 is
+    touched (v0/v1 have no item_type field). Returns a human-readable
+    description of the patch, or None when nothing changed.
+    """
+    if len(target_type) != 4:
+        raise ValueError("target item_type must be exactly 4 bytes")
+
+    roots = root_boxes(path)
+
+    _FOUND_EXACT = object()
+
+    def search_meta(meta_box: Box):
+        """Walk one meta box's iinf entries; patch and return a
+        description, _FOUND_EXACT when already equal, or None when no
+        matching v2 infe exists."""
+        for sub in _children(f, meta_box, fullbox=True):
+            if sub.type != "iinf":
+                continue
+            # iinf fullbox: version/flags(4) + entry_count(2)
+            f.seek(sub.data_offset + 4)
+            count = struct.unpack(">H", f.read(2))[0]
+            off = sub.data_offset + 6
+            for _ in range(count):
+                infe = _read_header(f, off, sub.end)
+                if infe is None or infe.type != "infe":
+                    break
+                f.seek(infe.data_offset)
+                ver = f.read(1)[0]
+                if ver != 2:
+                    off = infe.end
+                    continue
+                f.seek(infe.data_offset + 4)
+                iid = struct.unpack(">H", f.read(2))[0]
+                if iid != item_id:
+                    off = infe.end
+                    continue
+                f.seek(infe.data_offset + 8)
+                cur = f.read(4)
+                if cur == target_type:
+                    return _FOUND_EXACT
+                _patch_u32(
+                    f,
+                    infe.data_offset + 8,
+                    struct.unpack(">I", cur)[0],
+                    struct.unpack(">I", target_type)[0],
+                )
+                return (
+                    f"infe item {item_id} item_type "
+                    f"{cur!r} -> {target_type!r}"
+                )
+        return None
+
+    with path.open("r+b") as f:
+        for root in roots:
+            if root.type == "meta":
+                res = search_meta(root)
+                if res is _FOUND_EXACT:
+                    return None
+                if res is not None:
+                    return res
+            elif root.type == "moov":
+                for child in _children(f, root):
+                    if child.type != "meta":
+                        continue
+                    res = search_meta(child)
+                    if res is _FOUND_EXACT:
+                        return None
+                    if res is not None:
+                        return res
+    raise RuntimeError(f"no v2 infe with item_id {item_id} in {path}")
+
+
 def insert_uuid_boxes(
     src: Path,
     dst: Path,

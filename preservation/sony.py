@@ -4,10 +4,12 @@ Preserves, as structured container data (not generic key/value tags):
 
 - rtmd timed metadata track: verbatim container-level copy from the
   source (MP4Box -add src#<id>), stsd sample entry, timescale,
-  stts/stsz timing, elst, tref/cdsc association. The bundle also keeps
-  a raw samples dump + NHML dump as inspectable forensic evidence, but
-  NHML is NOT the reconstruction vehicle (GPAC's NHML import rounds
-  track durations at 600-tick precision and breaks the timeline).
+  stts/stsz timing, elst, tref/cdsc association. The bundle keeps the
+  payload SHA-256 + sample-size table as verification facts; the raw
+  payload dump is deleted right after hashing (disk-minimization
+  policy). NHML is neither produced nor used: reconstruction uses
+  native container copy, and GPAC's NHML import rounds track durations
+  at 600-tick precision and breaks the timeline.
 - file-level meta (nrtm): Lens profile item + NonRealTimeMeta XML
 - vendor uuid boxes: PROF x1 (root), USMT x4 (3 trak tails + moov tail)
 
@@ -167,23 +169,6 @@ def _ffprobe_stream_tags(ffprobe: Path, src: Path) -> list[dict[str, str]]:
     return [st.get("tags", {}) for st in payload.get("streams", [])]
 
 
-def _fix_nhml_last_duration(nhml: Path, last_delta: int) -> None:
-    """Add duration="<last stts delta>" to the last NHNTSample."""
-    if last_delta <= 0:
-        return
-    text = nhml.read_text(encoding="utf-8")
-    idx = text.rfind("<NHNTSample")
-    if idx < 0:
-        return
-    end = text.find(">", idx)
-    if end < 0:
-        return
-    if "duration=" in text[idx:end]:
-        return
-    text = text[:end] + f' duration="{last_delta}"' + text[end:]
-    nhml.write_text(text, encoding="utf-8")
-
-
 class SonyPreservationBackend:
     """MetadataPreservationBackend implementation for Sony XAVC files."""
 
@@ -255,15 +240,6 @@ class SonyPreservationBackend:
 
             samples_bin = tdir / "samples.bin"
             self.gpac.raw_track(source, info["track_id"], samples_bin)
-            nhml, media = self.gpac.nhml_dump(
-                source, info["track_id"], tdir, entry
-            )
-            # The NHML dump carries per-sample DTS but no duration for
-            # the last sample; GPAC then imports it with delta 0 and the
-            # track comes out one frame short. Pin it from the stts.
-            _fix_nhml_last_duration(
-                nhml, info["stts"][-1][1] if info["stts"] else 0
-            )
 
             sizes = info["sample_sizes"]
             if not sizes and info["constant_sample_size"]:
@@ -279,6 +255,17 @@ class SonyPreservationBackend:
                     f"raw dump size {samples_bin.stat().st_size} != "
                     f"sum(stsz) {sum(sizes)} for track {info['track_id']}"
                 )
+
+            # Payload hash is the only thing downstream needs from the
+            # raw dump (reconstruction copies the track verbatim from
+            # the source; validation re-derives from the rebuilt file).
+            # Delete the (large) payload dump immediately — the rtmd
+            # track alone is ~2.1 GB per 30 min of 4K60 material.
+            samples_sha256 = isobmf.sha256_file(samples_bin)
+            try:
+                samples_bin.unlink()
+            except OSError:
+                pass
 
             # map stream tags by handler name (timecode lives here)
             tc_tag = ""
@@ -309,10 +296,10 @@ class SonyPreservationBackend:
                     for t in r["targets"]
                 ],
                 timecode_tag=tc_tag,
-                samples_file=str(samples_bin.relative_to(bundle_dir)),
-                samples_sha256=isobmf.sha256_file(samples_bin),
-                nhml_file=str(nhml.relative_to(bundle_dir)),
-                nhml_media_file=str(media.relative_to(bundle_dir)),
+                samples_file="",
+                samples_sha256=samples_sha256,
+                nhml_file="",
+                nhml_media_file="",
             )
             (tdir / "track.json").write_text(
                 json.dumps(
@@ -463,24 +450,35 @@ class SonyPreservationBackend:
                     f"refusing to continue"
                 )
 
+        # -ref must be its own invocation: it is the pass that restores
+        # the movie timescale after -new (GPAC's -new sets it to the
+        # first track's media timescale regardless of -timescale), and a
+        # combined -ref does not apply the threaded -timescale.
         for meta_id in meta_ids:
             self.gpac.add_track_ref(stage_mov, meta_id, "cdsc", video_id)
 
-        # file-level meta (nrtm)
+        # file-level meta (nrtm): -set-meta + -add-item + -set-xml go
+        # through ONE combined invocation (single file rewrite), which
+        # preserves the movie timescale.
+        meta_type: str | None = None
+        meta_items: list[tuple[Path, str, str, int]] = []
+        meta_xml: Path | None = None
         if bundle.nrtm:
-            self.gpac.set_meta(stage_mov, bundle.nrtm.handler_type)
+            meta_type = bundle.nrtm.handler_type
             if bundle.nrtm.lens_profile_file:
-                self.gpac.add_meta_item(
-                    stage_mov,
-                    bundle_dir / bundle.nrtm.lens_profile_file,
-                    bundle.nrtm.item_name,
-                    bundle.nrtm.item_mime,
-                    bundle.nrtm.item_id,
+                meta_items.append(
+                    (
+                        bundle_dir / bundle.nrtm.lens_profile_file,
+                        bundle.nrtm.item_name,
+                        bundle.nrtm.item_mime,
+                        bundle.nrtm.item_id,
+                    )
                 )
             if bundle.nrtm.xml_file:
-                self.gpac.set_meta_xml(
-                    stage_mov, bundle_dir / bundle.nrtm.xml_file
-                )
+                meta_xml = bundle_dir / bundle.nrtm.xml_file
+        self.gpac.meta_pass(
+            stage_mov, meta_type, meta_items, meta_xml
+        )
 
     # ------------------------------------------------------------------
 

@@ -209,6 +209,35 @@ def find_executable(
     )
 
 
+def find_hw_tool(
+    script_dir: Path,
+    exe_name: str,
+    explicit: str | None = None,
+) -> Path:
+    """Locate a rigaya encoder executable (tools/<ToolVer>/<exe>.exe)."""
+    if explicit:
+        p = Path(explicit)
+        if not p.is_absolute():
+            p = script_dir / p
+        if not p.is_file():
+            raise FileNotFoundError(f"{exe_name} not found: {p}")
+        return p.resolve()
+
+    candidates = sorted((script_dir / "tools").glob(f"**/{exe_name}"))
+    if candidates:
+        return candidates[0].resolve()
+
+    found = shutil.which(exe_name)
+    if found:
+        return Path(found).resolve()
+
+    raise FileNotFoundError(
+        f"Could not find {exe_name}. Expected under tools\\ "
+        "(e.g. tools/NVEncC_9.31_x64/) or in PATH; use --tool-* to "
+        "specify an explicit path."
+    )
+
+
 def verify_executable(path: Path, expected: str) -> None:
     try:
         result = subprocess.run(

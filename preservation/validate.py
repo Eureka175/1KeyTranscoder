@@ -57,9 +57,15 @@ class FileFacts:
         gpac: GpacContainerBackend,
         ffprobe: Path,
         scratch: Path,
+        facts: dict[str, Any] | None = None,
     ) -> None:
+        """facts overrides payload dumps with precomputed values
+        (rtmd_sha256 / lens_sha256 / lens_size / xml_sha256), used for
+        the ORIGINAL side where the extraction bundle already hashed
+        the payloads — the raw dumps are deleted after hashing."""
         self.path = path
         scratch.mkdir(parents=True, exist_ok=True)
+        facts = facts or {}
         self.probe = _ffprobe(ffprobe, path)
         self.parsed = ParsedFile(gpac.diso_xml(path))
         self.uuids = _uuid_inventory(path)
@@ -67,22 +73,25 @@ class FileFacts:
         self.meta = self.parsed.meta_info()
 
         # payload hashes for verification
-        self.rtmd_sha256 = ""
-        meta_tracks = [t for t in self.tracks if t["handler_type"] == "meta"]
-        if meta_tracks:
-            raw = scratch / "rtmd_samples.bin"
-            gpac.raw_track(path, meta_tracks[0]["track_id"], raw)
-            self.rtmd_sha256 = isobmf.sha256_file(raw)
+        self.rtmd_sha256 = str(facts.get("rtmd_sha256", "") or "")
+        if not self.rtmd_sha256:
+            meta_tracks = [
+                t for t in self.tracks if t["handler_type"] == "meta"
+            ]
+            if meta_tracks:
+                raw = scratch / "rtmd_samples.bin"
+                gpac.raw_track(path, meta_tracks[0]["track_id"], raw)
+                self.rtmd_sha256 = isobmf.sha256_file(raw)
 
-        self.lens_sha256 = ""
-        self.lens_size = 0
-        self.xml_sha256 = ""
-        if self.meta and self.meta.get("item_id"):
+        self.lens_sha256 = str(facts.get("lens_sha256", "") or "")
+        self.lens_size = int(facts.get("lens_size", 0) or 0)
+        self.xml_sha256 = str(facts.get("xml_sha256", "") or "")
+        if self.meta and self.meta.get("item_id") and not self.lens_sha256:
             lens = scratch / "lens_profile.bin"
             gpac.dump_meta_item(path, self.meta["item_id"], lens)
             self.lens_sha256 = isobmf.sha256_file(lens)
             self.lens_size = lens.stat().st_size
-        if self.meta and self.meta.get("has_xml"):
+        if self.meta and self.meta.get("has_xml") and not self.xml_sha256:
             xml_out = scratch / "meta.xml"
             if gpac.dump_meta_xml(path, xml_out):
                 self.xml_sha256 = isobmf.sha256_file(xml_out)
@@ -104,8 +113,9 @@ def compare(
     gpac: GpacContainerBackend,
     ffprobe: Path,
     scratch: Path,
+    known_facts: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    src = FileFacts(original, gpac, ffprobe, scratch / "original")
+    src = FileFacts(original, gpac, ffprobe, scratch / "original", known_facts)
     out = FileFacts(final, gpac, ffprobe, scratch / "final")
 
     items: list[dict[str, str]] = []
