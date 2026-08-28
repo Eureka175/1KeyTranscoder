@@ -1,0 +1,77 @@
+{
+  "encoder": "x265",
+  "schema_version": "1.0",
+  "status": "PROVISIONAL - all ratio, threshold and clamp values in this file are calibration candidates, not final production values",
+  "enabled": true,
+
+  "reference": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 59.94,
+    "note": "4K60 reference configuration. The base profiles in x265.json are tuned for this. Scaling factors are computed relative to these values."
+  },
+
+  "classification": {
+    "metric": "normalized_ob = container_ob_bits_per_sec / (width * height * fps)",
+    "unit": "bits per pixel-frame",
+    "note": "Metadata-only source-efficiency indicator. This is NOT a GOP detector and makes no frame-type claims.",
+    "intra_like_codecs": ["prores", "dnxhd", "dnxhr"],
+    "intra_like_note": "INTRA_LIKE currently triggers only on intra-only codec families. H.264/HEVC sources are never classified INTRA_LIKE in this phase (no genuine All-I test source available yet).",
+    "thresholds": {
+      "low_max": 0.12,
+      "high_min": 0.25,
+      "status": "PROVISIONAL - calibrate against real corpus. Reference points: 4K60 150Mbps XAVC HS ~= 0.30, 1080p30 10Mbps ~= 0.16, 1080p30 5Mbps ~= 0.08, 4K60 600Mbps All-I ~= 1.21"
+    }
+  },
+
+  "param_rules": {
+    "_comment": "Modes: fixed (default for anything not listed), fps (FR* expressions evaluated against source fps), sqrt_pixels (scaled by spatial factor), pixel_rate (scaled by pixel-rate factor). Everything not listed here stays fixed to the base profile value (crf/rd/psy/aq/etc. are intentionally never scaled).",
+    "rc_lookahead": {
+      "mode": "fps",
+      "cap": 200,
+      "note": "FR* from base profile, ceil(fps * factor), then capped. Cap bounds x265 memory on high-FPS sources (32 GB RAM target)."
+    },
+    "gop_lookahead": {
+      "mode": "fps",
+      "cap": 200
+    },
+    "min_keyint": {
+      "mode": "fps",
+      "note": "FR* evaluated, intentionally uncapped."
+    },
+    "merange": {
+      "mode": "sqrt_pixels",
+      "min": 16,
+      "max": 92,
+      "status": "PROVISIONAL clamp bounds - prevent 8K search-complexity explosion; calibrate on real 6K/8K material later"
+    }
+  },
+
+  "dynamic_vbv": {
+    "_comment": "vbv_maxrate_kbps = clamp(OB * target_ratio, OB * min_ratio, OB * max_ratio); vbv_bufsize_kbps = round(maxrate * bufsize_factor). OB = original container bitrate in kbps. CRF remains the primary quality control; maxrate is a local bitrate ceiling, bufsize is the VBV buffer constraint. Missing class entry falls back to the static base-profile VBV.",
+    "UHQ": {
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.55, "target_ratio": 0.70, "max_ratio": 0.85, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.70, "target_ratio": 0.85, "max_ratio": 1.00, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.90, "target_ratio": 1.00, "max_ratio": 1.25, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.30, "target_ratio": 0.40, "max_ratio": 0.55, "bufsize_factor": 3.0, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
+    },
+    "HQ": {
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.35, "target_ratio": 0.50, "max_ratio": 0.65, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.60, "target_ratio": 0.75, "max_ratio": 0.90, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.85, "target_ratio": 1.00, "max_ratio": 1.15, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.25, "target_ratio": 0.35, "max_ratio": 0.45, "bufsize_factor": 3.0, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
+    },
+    "SMALL": {
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.20, "target_ratio": 0.30, "max_ratio": 0.40, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.40, "target_ratio": 0.55, "max_ratio": 0.70, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.75, "target_ratio": 0.90, "max_ratio": 1.05, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.15, "target_ratio": 0.25, "max_ratio": 0.35, "bufsize_factor": 3.0, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
+    },
+    "FAST": {
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.30, "target_ratio": 0.40, "max_ratio": 0.50, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.50, "target_ratio": 0.65, "max_ratio": 0.80, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.80, "target_ratio": 0.95, "max_ratio": 1.10, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.20, "target_ratio": 0.30, "max_ratio": 0.40, "bufsize_factor": 3.0, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
+    }
+  }
+}
