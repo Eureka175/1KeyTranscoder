@@ -19,6 +19,15 @@ import subprocess
 import time
 from pathlib import Path
 
+from core.color import (
+    ColorInfo,
+    MATRIX_TOKENS,
+    PRIMARIES_TOKENS,
+    RANGE_TOKENS,
+    TRANSFER_TOKENS,
+    UNSET,
+)
+
 from .caps import run_tool, supports
 
 
@@ -308,6 +317,52 @@ def ask_fallback_new_console(
             return True
         time.sleep(1.0)
     return True  # no answer within the window: proceed with fallback
+
+
+def color_flag_args(
+    color: ColorInfo | None,
+    known: set[str],
+) -> tuple[list[str], list[str]]:
+    """ColorInfo -> rigaya color-signalling flags.
+
+    Values are validated against the tool's --help flag names and the
+    verified token tables in core.color; values the tool cannot
+    represent are left unset and reported. Returns (args, notes).
+    """
+    args: list[str] = []
+    notes: list[str] = []
+    if color is None:
+        return args, notes
+    for flag, value, table, label in (
+        ("--colorprim", color.primaries, PRIMARIES_TOKENS, "primaries"),
+        ("--transfer", color.transfer, TRANSFER_TOKENS, "transfer"),
+        ("--colormatrix", color.matrix, MATRIX_TOKENS, "matrix"),
+        ("--colorrange", color.range, RANGE_TOKENS, "range"),
+    ):
+        if value in UNSET:
+            continue
+        token = table.get(str(value))
+        if token is None:
+            notes.append(
+                f"color {label} '{value}' not representable by the tool; "
+                "left unset"
+            )
+            continue
+        if flag.lstrip("-") not in known:
+            notes.append(f"{flag} not advertised by tool; skipped")
+            continue
+        args += [flag, token]
+    if color.master_display:
+        if "master-display" in known:
+            args += ["--master-display", color.master_display]
+        else:
+            notes.append("--master-display not advertised by tool")
+    if color.max_cll:
+        if "max-cll" in known:
+            args += ["--max-cll", color.max_cll]
+        else:
+            notes.append("--max-cll not advertised by tool")
+    return args, notes
 
 
 def plan_initial_format(

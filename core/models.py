@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .color import ColorInfo
+
 PRESETS = ("UHQ", "HQ", "SMALL", "FAST")
 
 # Source-efficiency classes produced by SourceClassifier.
@@ -66,6 +68,7 @@ class SourceInfo:
     raw_streams: tuple[dict[str, Any], ...] = field(
         default=(), compare=False,
     )
+    color: ColorInfo = field(default_factory=ColorInfo)
 
 
 @dataclass(frozen=True)

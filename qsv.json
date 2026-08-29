@@ -4,7 +4,6 @@
   "profile": {
     "UHQ": {
       "tu": "best",
-      "tu_level": 1,
       "icq": 21,
       "profile": "main10",
       "tier": "high",
@@ -31,6 +30,7 @@
       "qp_min": [18, 20, 22],
       "qp_max": [32, 36, 40],
       "open_gop": true,
+      "atc_sei": "auto",
       "hyper_mode": "adaptive",
       "gop_len": 600,
       "async_depth": 3,
@@ -40,7 +40,6 @@
 
     "HQ": {
       "tu": "best",
-      "tu_level": 1,
       "icq": 22,
       "profile": "main10",
       "tier": "high",
@@ -67,6 +66,7 @@
       "qp_min": [20, 22, 24],
       "qp_max": [35, 40, 45],
       "open_gop": true,
+      "atc_sei": "auto",
       "hyper_mode": "adaptive",
       "gop_len": 600,
       "async_depth": 3,
@@ -76,7 +76,6 @@
 
     "SMALL": {
       "tu": "best",
-      "tu_level": 1,
       "icq": 26,
       "profile": "main10",
       "tier": "high",
@@ -103,6 +102,7 @@
       "qp_min": [22, 24, 26],
       "qp_max": [38, 42, 45],
       "open_gop": true,
+      "atc_sei": "auto",
       "hyper_mode": "adaptive",
       "gop_len": 600,
       "async_depth": 3,
@@ -112,7 +112,6 @@
 
     "FAST": {
       "tu": "balanced",
-      "tu_level": 4,
       "icq": 24,
       "profile": "main10",
       "tier": "high",
@@ -139,6 +138,7 @@
       "qp_min": [20, 22, 24],
       "qp_max": [38, 42, 45],
       "open_gop": true,
+      "atc_sei": "auto",
       "hyper_mode": "adaptive",
       "gop_len": 600,
       "async_depth": 3,

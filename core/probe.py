@@ -1,12 +1,13 @@
 """ffprobe probing (metadata-only) and the SourceInfo adapter.
 
-probe_source() is preserved byte-for-byte from the original
-x265_archive.py: ONE metadata pass per file, no -show_frames, no
--show_packets, no GOP analysis. The CSV layer depends on its exact
-(summary, streams) return structure.
+probe_source() is preserved from the original x265_archive.py with one
+additive extension (stream side_data_list for HDR mastering/CLL): ONE
+metadata pass per file, no -show_frames, no -show_packets, no GOP
+analysis. The CSV layer depends on its exact (summary, streams)
+return structure.
 
     probe_source() -> (summary dict, raw stream list)
-    build_source_info() -> SourceInfo   (adapter)
+    build_source_info() -> SourceInfo   (adapter, incl. ColorInfo)
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .color import ColorInfo
 from .models import SourceInfo, StreamBrief
 
 
@@ -94,6 +96,50 @@ def _pix_fmt_chroma(pix_fmt: str) -> str:
     return ""
 
 
+def _frac_to_int(value: Any, scale: int) -> int:
+    """ffprobe fraction "a/b" (or int) -> int scaled by `scale`."""
+    try:
+        text = str(value).strip()
+        if "/" in text:
+            num, den = text.split("/", 1)
+            return round(int(num) / int(den) * scale)
+        return round(float(text) * scale)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return 0
+
+
+def _side_data_color(video: dict[str, Any]) -> tuple[str, str]:
+    """HDR side data -> (rigaya master-display string, "maxCLL,maxFALL")."""
+    master_display = ""
+    max_cll = ""
+    for sd in video.get("side_data_list") or []:
+        typ = str(sd.get("side_data_type") or "")
+        if "Mastering display" in typ:
+            # rigaya format: G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min);
+            # coordinates scaled to 50000, luminance to 10000
+            # (0.0001 cd/m2 units).
+            master_display = (
+                f"G({_frac_to_int(sd.get('green_x'), 50000)},"
+                f"{_frac_to_int(sd.get('green_y'), 50000)})"
+                f"B({_frac_to_int(sd.get('blue_x'), 50000)},"
+                f"{_frac_to_int(sd.get('blue_y'), 50000)})"
+                f"R({_frac_to_int(sd.get('red_x'), 50000)},"
+                f"{_frac_to_int(sd.get('red_y'), 50000)})"
+                f"WP({_frac_to_int(sd.get('white_point_x'), 50000)},"
+                f"{_frac_to_int(sd.get('white_point_y'), 50000)})"
+                f"L({_frac_to_int(sd.get('max_luminance'), 10000)},"
+                f"{_frac_to_int(sd.get('min_luminance'), 10000)})"
+            )
+        elif "Content light" in typ:
+            try:
+                max_cll = (
+                    f"{int(sd.get('max_content'))},{int(sd.get('max_average'))}"
+                )
+            except (TypeError, ValueError):
+                max_cll = ""
+    return master_display, max_cll
+
+
 def probe_source(
     ffprobe: Path,
     src: Path,
@@ -118,7 +164,8 @@ def probe_source(
             "color_range,color_space,color_transfer,color_primaries,"
             "field_order,r_frame_rate,avg_frame_rate,time_base,start_time,"
             "duration,bit_rate,nb_frames,channels,sample_rate,sample_fmt,"
-            "channel_layout,bits_per_raw_sample,bits_per_coded_sample:"
+            "channel_layout,bits_per_raw_sample,bits_per_coded_sample,"
+            "side_data_list:"
             "disposition"
         ),
         "-of", "json",
@@ -292,6 +339,10 @@ def build_source_info(
 ) -> SourceInfo:
     """Adapter: probe_source() output -> typed SourceInfo."""
     pix_fmt = summary["pix_fmt"]
+    video = next(
+        (st for st in streams if st.get("codec_type") == "video"), {}
+    )
+    master_display, max_cll = _side_data_color(video)
     return SourceInfo(
         path=path,
         size_bytes=summary["source_size_bytes"],
@@ -322,4 +373,12 @@ def build_source_info(
         ),
         raw_summary=summary,
         raw_streams=tuple(streams),
+        color=ColorInfo(
+            primaries=str(summary["color_primaries"] or ""),
+            transfer=str(summary["color_transfer"] or ""),
+            matrix=str(summary["color_space"] or ""),
+            range=str(summary["color_range"] or ""),
+            master_display=master_display,
+            max_cll=max_cll,
+        ),
     )

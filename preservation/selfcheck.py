@@ -47,7 +47,8 @@ def _ffprobe_streams(ffprobe: Path, path: Path) -> list[dict[str, Any]]:
             "-show_entries",
             "stream=index,codec_type,codec_name,profile,pix_fmt,width,"
             "height,sample_rate,channels,sample_fmt,r_frame_rate,"
-            "avg_frame_rate,nb_read_packets,duration,bits_per_raw_sample:"
+            "avg_frame_rate,nb_read_packets,duration,bits_per_raw_sample,"
+            "color_space,color_transfer,color_primaries,color_range:"
             "stream_tags=timecode,handler_name",
             "-of", "json", str(path),
         ],
@@ -254,6 +255,12 @@ def detailed_compare(
     if s_v and o_v:
         for key in ("width", "height", "avg_frame_rate", "nb_read_packets"):
             note(f"video.ffprobe.{key}", s_v.get(key), o_v.get(key))
+        # color signalling must survive the re-encode
+        for key in (
+            "color_primaries", "color_transfer", "color_space",
+            "color_range",
+        ):
+            note(f"video.{key}", s_v.get(key), o_v.get(key))
         results.append(
             {
                 "item": "video.ffprobe.codec",

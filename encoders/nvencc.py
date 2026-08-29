@@ -16,8 +16,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from core.color import ColorInfo
+
 from .caps import BackendCaps, CONSERVATIVE_CAPS
-from .hw import build_flag_args, known_flags
+from .hw import build_flag_args, color_flag_args, known_flags
 
 # nvenc.json profile key -> (flag candidates, kind)
 PARAM_MAP = {
@@ -50,13 +52,15 @@ PARAM_MAP = {
     "pic_struct": ("--pic-struct", "flag"),
 }
 
-# nvenc.json keys intentionally not mapped: AV1-only or session-level
-# options (atc_sei is AV1; split_enc/parallel/output_buf/cuda_schedule/
-# avoid_idle_clock are process-level; avhw conflicts with the
-# forced-software-decode policy; output_depth is derived from the
-# source / downgrade ladder).
+# nvenc.json keys intentionally not mapped: split_enc/parallel/
+# output_buf/cuda_schedule/avoid_idle_clock are process/session-level
+# options revisited separately; output_depth is derived from the
+# source / downgrade ladder. atc_sei is handled explicitly in
+# build_args (its "auto" value would be swallowed by the AUTO token
+# check in build_flag_args) — it is an HEVC SEI (alternative transfer
+# characteristics, HLG signalling), not an AV1 option.
 _SKIPPED_ALWAYS = (
-    "atc_sei", "split_enc", "parallel", "output_buf",
+    "split_enc", "parallel", "output_buf",
     "cuda_schedule", "avoid_idle_clock", "avhw", "output_depth",
 )
 
@@ -76,21 +80,28 @@ class NvencBackend:
         chroma: str,
         depth: int,
         vfr: bool = False,
-    ) -> tuple[list[str], list[str]]:
+        color: ColorInfo | None = None,
+    ) -> tuple[list[str], list[str], list[str]]:
         """Full argument list (before -o) for one encode attempt.
 
-        Returns (argv, skipped_keys)."""
+        Returns (argv, skipped_keys, color_notes)."""
         args, skipped = build_flag_args(profile, PARAM_MAP, self.known)
+        cargs, cnotes = color_flag_args(color, self.known)
         args = [
             "--avsw", "--video-track", "1", "-c", "hevc",
             "--output-depth", str(depth),
             *args,
         ]
+        # atc_sei ("auto") is a legit rigaya CLI value and would be
+        # swallowed by the AUTO token check in build_flag_args.
+        if profile.get("atc_sei") and "atc-sei" in self.known:
+            args += ["--atc-sei", str(profile["atc_sei"])]
+        args += cargs
         if chroma == "4:2:2":
             args += ["--output-csp", "yuv422"]
         if vfr:
             args += ["--avsync", "forcecfr"]
-        return args, skipped
+        return args, skipped, cnotes
 
     def command(
         self,
@@ -101,10 +112,13 @@ class NvencBackend:
         depth: int,
         vfr: bool = False,
         audio_copy: bool = False,
-    ) -> tuple[list[str], list[str]]:
-        args, skipped = self.build_args(profile, chroma, depth, vfr)
+        color: ColorInfo | None = None,
+    ) -> tuple[list[str], list[str], list[str]]:
+        args, skipped, notes = self.build_args(
+            profile, chroma, depth, vfr, color
+        )
         cmd = [str(self.tool), "-i", str(source), *args]
         if audio_copy:
             cmd += ["--audio-copy"]
         cmd += ["-f", "mp4", "-o", str(output)]
-        return cmd, skipped
+        return cmd, skipped, notes

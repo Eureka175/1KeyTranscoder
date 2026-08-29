@@ -196,6 +196,17 @@ def compare(
            sv.get("nb_frames"), ov.get("nb_frames"))
         eq("video.frame_rate",
            sv.get("avg_frame_rate"), ov.get("avg_frame_rate"))
+        # Color signalling must survive the re-encode (SDR bt709,
+        # HLG arib-std-b67, HDR10 smpte2084+bt2020). Raw ffprobe
+        # spellings are compared; a mismatch means the encoder pass
+        # dropped or rewrote the color metadata.
+        for key, label in (
+            ("color_primaries", "video.color_primaries"),
+            ("color_transfer", "video.color_transfer"),
+            ("color_space", "video.color_space"),
+            ("color_range", "video.color_range"),
+        ):
+            eq(label, sv.get(key), ov.get(key))
         eq("video.timescale",
            src_v["timescale"], out_v["timescale"])
         eq("video.track_duration",
@@ -426,6 +437,10 @@ def compare(
             "video.track_duration",
             "video.stts",
             "video.elst",
+            "video.color_primaries",
+            "video.color_transfer",
+            "video.color_space",
+            "video.color_range",
             "audio.streams",
             "audio.tracks",
             "audio.track_duration",

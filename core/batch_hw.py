@@ -296,10 +296,11 @@ def hw_encode_with_fallback(
     cur_input = source
     stripped = False
     rung_idx = 0
+    color = src_info.color
     while rung_idx < len(rungs):
         c, d = rungs[rung_idx]
-        cmd, skipped = backend.command(
-            cur_input, output, profile, c, d, vfr, audio_copy
+        cmd, skipped, color_notes = backend.command(
+            cur_input, output, profile, c, d, vfr, audio_copy, color
         )
         if skipped and rung_idx == 0:
             emit_warning(
@@ -309,6 +310,11 @@ def hw_encode_with_fallback(
                 f"(skipped): {', '.join(sorted(skipped))}",
                 warnings,
             )
+        if color_notes and rung_idx == 0:
+            for note in color_notes:
+                emit_warning(
+                    logger, file_logger, f"{backend.name}: {note}", warnings
+                )
         file_logger.info("COMMAND | %s", subprocess.list2cmdline(cmd))
         raw_log = output.with_name(output.name + f".{label}.log")
         try:
@@ -492,6 +498,14 @@ def log_hw_header(
         backend.name.upper(),
         json.dumps(profile, ensure_ascii=False, sort_keys=True),
     )
+    c = src_info.color
+    if c is not None and c.is_set:
+        file_logger.info(
+            "SOURCE_COLOR | primaries=%s transfer=%s matrix=%s range=%s "
+            "master_display=%s max_cll=%s",
+            c.primaries or "-", c.transfer or "-", c.matrix or "-",
+            c.range or "-", c.master_display or "-", c.max_cll or "-",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -618,8 +632,9 @@ def encode_one_sony_hw(
     )
 
     def build_cmd(chroma: str, depth: int) -> list[str]:
-        cmd, _ = backend.command(
-            src, encoded_mov, profile, chroma, depth, vfr, audio_copy=False
+        cmd, _, _ = backend.command(
+            src, encoded_mov, profile, chroma, depth, vfr,
+            audio_copy=False, color=src_info.color,
         )
         return cmd
 
@@ -789,7 +804,8 @@ def encode_one_hw_classic(
     show_progress: bool = True,
     throughput_cb: Callable[[float], None] | None = None,
 ) -> str:
-    """Non-Sony material: video + audio only, single-tool single pass."""
+    """Non-Sony material: video + audio only, single-tool single pass.
+    (DJI/非 Sony 全轨道适配留待后续独立 session.)"""
     part_dst = dst.with_name(dst.stem + ".part.mov")
     safe_unlink(part_dst)
 
@@ -809,9 +825,9 @@ def encode_one_hw_classic(
     logger.info("[POLICY] %s | non-Sony: metadata dropped by policy", src.name)
 
     if dry_run:
-        cmd, _ = backend.command(
+        cmd, _, _ = backend.command(
             src, part_dst, profile, planned[0], planned[1],
-            vfr, audio_copy=True,
+            vfr, audio_copy=True, color=src_info.color,
         )
         file_logger.info(
             "DRY-RUN | no encode performed | %s",
