@@ -235,6 +235,22 @@ git checkout pre_S1S5
 详细自检对视频轨码流变化 (avc1→hvc1) 误报 → 改为校验"转码目标为
 HEVC"(预期差异)。
 
+## 14. 硬件后端全流程验收（1kt.py 终版，x265 未动）
+
+| 后端 | 范围 | 结果 |
+|---|---|---|
+| NVENC | testsets 全量 15 文件，HQ，`--check full`，`--jobs 1`，headless | **done=15 failed=0** ✅ |
+| QSV | 同上（4:2:2 素材按策略 420 转档 + 4 键白名单跳过 WARNING） | **合计 15/15** ✅（首轮 10 个后触发一次控制台管道故障，修复后续跑 5/5） |
+
+全部文件：**40-41/0/0（0 MODIFIED）+ Gyroflow PASS（188s 长片 376376
+IMU 样本逐项一致）+ 详细自检 PASS（47/48/64 项按机型）**；DJI 经典
+路径交付正常；GC 后 `.1ktwork` 仅剩 caps。
+
+本阶段修复：控制台 `print` 在 stdout 管道失效（后台/重定向场景）时抛
+`OSError [Errno 22]` 导致整任务崩溃 → `emit_warning`/`run_hw_tool`/
+`run_ffmpeg` 的控制台输出全部改为 best-effort（try/except，日志文件
+始终是权威记录）。
+
 ## 13. 拍板项落地（check 独立/动态调度/失败摘要/README）
 
 - **check 模块独立**：`preservation/checker.py` 统一封装三级验证，

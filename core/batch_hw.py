@@ -94,10 +94,17 @@ def emit_warning(
     msg: str,
     warnings: list[str] | None = None,
 ) -> None:
-    """Prominent WARNING: work window + total log + per-file log."""
+    """Prominent WARNING: work window + total log + per-file log.
+
+    The console print is best-effort only: a broken/closed stdout
+    (headless service, redirected log pipe) must never crash the job —
+    the log files are the authoritative record."""
     logger.warning("[WARNING] %s", msg)
     file_logger.warning("WARNING | %s", msg)
-    print(f"[WARNING] {msg}", flush=True)
+    try:
+        print(f"[WARNING] {msg}", flush=True)
+    except OSError:
+        pass
     if warnings is not None:
         warnings.append(msg)
 

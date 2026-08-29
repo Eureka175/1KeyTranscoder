@@ -133,14 +133,17 @@ def run_ffmpeg(
                         if bitrate is not None
                         else "N/A"
                     )
-                    print(
-                        f"\r[PROGRESS] {current_frame} frames / "
-                        f"{total} frames total | "
-                        f"{elapsed:.1f} sec elapsed | "
-                        f"{bitrate_text}          ",
-                        end="",
-                        flush=True,
-                    )
+                    try:
+                        print(
+                            f"\r[PROGRESS] {current_frame} frames / "
+                            f"{total} frames total | "
+                            f"{elapsed:.1f} sec elapsed | "
+                            f"{bitrate_text}          ",
+                            end="",
+                            flush=True,
+                        )
+                    except OSError:
+                        pass
                     last_console = now
                 if now - last_logged_progress >= 10.0:
                     file_logger.info(
@@ -157,10 +160,16 @@ def run_ffmpeg(
                     )
                     last_logged_progress = now
             return_code = proc.wait()
-        print()
+        try:
+            print()
+        except OSError:
+            pass
         return return_code, time.monotonic() - started
     except KeyboardInterrupt:
-        print()
+        try:
+            print()
+        except OSError:
+            pass
         file_logger.warning(
             "INTERRUPTED | elapsed=%.3f sec",
             time.monotonic() - started,
@@ -173,7 +182,10 @@ def run_ffmpeg(
                 pass
         return None, time.monotonic() - started
     except Exception:
-        print()
+        try:
+            print()
+        except OSError:
+            pass
         file_logger.exception(
             "EXECUTION FAILED | elapsed=%.3f sec",
             time.monotonic() - started,

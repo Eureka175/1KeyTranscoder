@@ -148,6 +148,7 @@ def run_hw_tool(
     last_console = 0.0
     last_frame = 0
     last_fps = 0.0
+    console_dead = False
 
     raw_log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -186,17 +187,24 @@ def run_hw_tool(
                 now = time.monotonic()
                 if now - last_console >= 1.0:
                     total = str(total_frames) if total_frames > 0 else "?"
-                    print(
-                        f"\r[{label.upper()}] {last_frame} frames / "
-                        f"{total} frames total | "
-                        f"{time.monotonic() - started:.1f} sec elapsed | "
-                        f"{last_fps:.1f} fps          ",
-                        end="",
-                        flush=True,
-                    )
+                    try:
+                        print(
+                            f"\r[{label.upper()}] {last_frame} frames / "
+                            f"{total} frames total | "
+                            f"{time.monotonic() - started:.1f} sec "
+                            f"elapsed | {last_fps:.1f} fps          ",
+                            end="",
+                            flush=True,
+                        )
+                    except OSError:
+                        console_dead = True
                     last_console = now
             return_code = proc.wait()
-        print()
+        if not console_dead:
+            try:
+                print()
+            except OSError:
+                pass
         return return_code, time.monotonic() - started
     except KeyboardInterrupt:
         print()
