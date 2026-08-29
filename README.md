@@ -4,13 +4,13 @@ Recursive, resumable Windows batch encoder with Sony camera-metadata
 preservation. Only **x265** is implemented; NVENC/QSV/VCE are future
 backends behind `encoders/base.py`.
 
-**Main entry point: `1keytransc.py`** (replaces `x265_archive.py`, which
+**Main entry point: `1kt.py`** (replaces `x265_archive.py`, which
 remains temporarily as migration reference only).
 
 ## Layout
 
 ```
-1keytransc.py            MAIN: CLI, batch loop, resume, exec, postprobe
+1kt.py            MAIN: CLI, batch loop, resume, exec, postprobe
 x265_archive.py          legacy entry point (reference only, do not extend)
 x265.json                base 4K60 profiles: UHQ / HQ / SMALL / FAST (authoritative)
 x265_scaling.json        all source-dependent scaling rules (PROVISIONAL values)
@@ -157,7 +157,7 @@ output size. Missing class rule → static base-profile VBV (logged).
 ## Usage
 
 ```
-python 1keytransc.py --input <dir> --output <dir> [--preset uhq|hq|small|fast|all]
+python 1kt.py --input <dir> --output <dir> [--preset uhq|hq|small|fast|all]
                      [--config x265.json] [--scaling-config x265_scaling.json]
                      [--ffmpeg ...] [--ffprobe ...]
                      [--gpac-dir "C:\Program Files\GPAC"] [--gyroflow ...]
@@ -170,7 +170,7 @@ under `<output>\.1ktwork\<job-id>\` for inspection and resume.
 Dry-run (no encoding, full audit trail):
 
 ```
-python 1keytransc.py --input testsets --output out_dry --preset all --dry-run
+python 1kt.py --input testsets --output out_dry --preset all --dry-run
 ```
 
 Per file this logs SOURCE / CLASSIFICATION / SCALING / SCALED_PARAM
@@ -185,3 +185,4 @@ preprobe/postprobe CSVs (whose schemas are unchanged).
 - `param_rules.merange` clamp (16–92)
 - LA caps (200) are production-intent but configurable
 - `INTRA_LIKE` ratios are placeholders; no genuine All-I source exists yet
+

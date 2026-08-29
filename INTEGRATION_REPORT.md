@@ -12,7 +12,7 @@ fixes multi-audio-track copying, and re-runs both acceptance corpora.
 ## A. Final architecture
 
 ```
-1keytransc.py            MAIN (single entry point): CLI, input discovery,
+1kt.py            MAIN (single entry point): CLI, input discovery,
                          output root, resume/skip, probe/classify/scale,
                          backend selection, classic + Sony pipelines,
                          CSV/logging orchestration
@@ -226,3 +226,4 @@ validation instead of being silently tolerated.
 - Old POC manifests (no `audio_tracks`) trigger re-extraction, because
   `#audio` copies only the FIRST audio track — multi-track audio
   requires the per-track copy list.
+
