@@ -10,12 +10,15 @@ from __future__ import annotations
 import csv
 import logging
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any
 
 from .models import EffectiveParams
 from .probe import _parse_float
+
+_CSV_LOCK = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -75,23 +78,24 @@ def append_csv(
 
     exists = path.exists() and path.stat().st_size > 0
 
-    with path.open(
-        "a",
-        newline="",
-        encoding="utf-8-sig",
-    ) as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=fieldnames,
-            extrasaction="ignore",
-        )
-        if not exists:
-            writer.writeheader()
+    with _CSV_LOCK:
+        with path.open(
+            "a",
+            newline="",
+            encoding="utf-8-sig",
+        ) as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=fieldnames,
+                extrasaction="ignore",
+            )
+            if not exists:
+                writer.writeheader()
 
-        writer.writerow({
-            key: "" if row.get(key) is None else row.get(key)
-            for key in fieldnames
-        })
+            writer.writerow({
+                key: "" if row.get(key) is None else row.get(key)
+                for key in fieldnames
+            })
 
 
 def append_rows(

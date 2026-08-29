@@ -133,9 +133,13 @@ def run_hw_tool(
     raw_log_path: Path,
     total_frames: int,
     label: str = "hw",
+    progress: bool = True,
 ) -> tuple[int | None, float]:
     """Run one hardware-encoder command with live progress.
 
+    progress=False suppresses the per-session console progress line
+    (used in parallel worker mode, where interleaved \\r lines would
+    garble the work window; the dashboard shows status instead).
     Returns (return_code, elapsed_sec); return_code is None when the
     run was interrupted or failed to execute (callers treat None like
     a failure and clean up their own outputs).
@@ -177,6 +181,8 @@ def run_hw_tool(
                     continue
                 last_frame = int(m.group(2))
                 last_fps = float(m.group(3))
+                if not progress:
+                    continue
                 now = time.monotonic()
                 if now - last_console >= 1.0:
                     total = str(total_frames) if total_frames > 0 else "?"

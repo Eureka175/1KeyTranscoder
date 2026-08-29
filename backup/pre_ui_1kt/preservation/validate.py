@@ -58,21 +58,17 @@ class FileFacts:
         ffprobe: Path,
         scratch: Path,
         facts: dict[str, Any] | None = None,
-        level: str = "advanced",
     ) -> None:
         """facts overrides payload dumps with precomputed values
         (rtmd_sha256 / lens_sha256 / lens_size / xml_sha256), used for
         the ORIGINAL side where the extraction bundle already hashed
-        the payloads — the raw dumps are deleted after hashing.
-        level='basic' skips the non-essential dumps (lens/xml/uuid)."""
+        the payloads — the raw dumps are deleted after hashing."""
         self.path = path
         scratch.mkdir(parents=True, exist_ok=True)
         facts = facts or {}
         self.probe = _ffprobe(ffprobe, path)
         self.parsed = ParsedFile(gpac.diso_xml(path))
-        self.uuids = (
-            _uuid_inventory(path) if level != "basic" else []
-        )
+        self.uuids = _uuid_inventory(path)
         self.tracks = [self.parsed.track_info(t) for t in self.parsed.tracks()]
         self.meta = self.parsed.meta_info()
 
@@ -90,8 +86,6 @@ class FileFacts:
         self.lens_sha256 = str(facts.get("lens_sha256", "") or "")
         self.lens_size = int(facts.get("lens_size", 0) or 0)
         self.xml_sha256 = str(facts.get("xml_sha256", "") or "")
-        if level == "basic":
-            return
         if self.meta and self.meta.get("item_id") and not self.lens_sha256:
             lens = scratch / "lens_profile.bin"
             gpac.dump_meta_item(path, self.meta["item_id"], lens)
@@ -120,15 +114,9 @@ def compare(
     ffprobe: Path,
     scratch: Path,
     known_facts: dict[str, Any] | None = None,
-    level: str = "advanced",
 ) -> dict[str, Any]:
-    """level: 'basic' = essential core metadata only (timeline, tracks,
-    rtmd payload/timing, tref, timecode — skips nrtm lens/xml details
-    and the uuid inventory); 'advanced' = everything."""
-    src = FileFacts(
-        original, gpac, ffprobe, scratch / "original", known_facts, level
-    )
-    out = FileFacts(final, gpac, ffprobe, scratch / "final", None, level)
+    src = FileFacts(original, gpac, ffprobe, scratch / "original", known_facts)
+    out = FileFacts(final, gpac, ffprobe, scratch / "final")
 
     items: list[dict[str, str]] = []
 
@@ -327,8 +315,8 @@ def compare(
                     "rtmd.timecode_tag", MISSING,
                     f"original={s_tc!r} final={o_tc!r}"))
 
-    # --- nrtm meta (advanced only) ---
-    if level != "basic" and src.meta and src.meta["handler_type"] == "nrtm":
+    # --- nrtm meta ---
+    if src.meta and src.meta["handler_type"] == "nrtm":
         if out.meta and out.meta["handler_type"] == "nrtm":
             items.append(_item("nrtm.meta", PRESERVED, "hdlr=nrtm"))
             eq("nrtm.lens_profile.name",
@@ -347,59 +335,57 @@ def compare(
             items.append(_item("nrtm.meta", MISSING,
                                "no nrtm meta box in final"))
 
-    # --- uuid boxes (advanced only) ---
+    # --- uuid boxes ---
     def count_by(label: str, inv: list[dict[str, str]]) -> int:
         return sum(1 for u in inv if u["label"] == label)
 
-    if level != "basic":
-        for label in ("PROF", "USMT"):
-            sc, oc = count_by(label, src.uuids), count_by(label, out.uuids)
-            if sc == 0:
-                continue
-            if oc == 0:
-                items.append(_item(f"uuid.{label}", MISSING,
-                                   f"original had {sc}"))
-            elif oc != sc:
-                items.append(_item(f"uuid.{label}", MODIFIED,
-                                   f"count original={sc} final={oc}"))
+    for label in ("PROF", "USMT"):
+        sc, oc = count_by(label, src.uuids), count_by(label, out.uuids)
+        if sc == 0:
+            continue
+        if oc == 0:
+            items.append(_item(f"uuid.{label}", MISSING,
+                               f"original had {sc}"))
+        elif oc != sc:
+            items.append(_item(f"uuid.{label}", MODIFIED,
+                               f"count original={sc} final={oc}"))
+        else:
+            s_hash = sorted(u["sha256"] for u in src.uuids
+                            if u["label"] == label)
+            o_hash = sorted(u["sha256"] for u in out.uuids
+                            if u["label"] == label)
+            if s_hash == o_hash:
+                s_ctx = sorted(u["context"] for u in src.uuids
+                               if u["label"] == label)
+                o_ctx = sorted(u["context"] for u in out.uuids
+                               if u["label"] == label)
+                if s_ctx == o_ctx:
+                    items.append(_item(
+                        f"uuid.{label}", PRESERVED,
+                        f"{sc} box(es), bytes+context match"))
+                else:
+                    items.append(_item(
+                        f"uuid.{label}", MODIFIED,
+                        f"payloads match, context {s_ctx} vs {o_ctx}"))
             else:
-                s_hash = sorted(u["sha256"] for u in src.uuids
-                                if u["label"] == label)
-                o_hash = sorted(u["sha256"] for u in out.uuids
-                                if u["label"] == label)
-                if s_hash == o_hash:
-                    s_ctx = sorted(u["context"] for u in src.uuids
-                                   if u["label"] == label)
-                    o_ctx = sorted(u["context"] for u in out.uuids
-                                   if u["label"] == label)
-                    if s_ctx == o_ctx:
-                        items.append(_item(
-                            f"uuid.{label}", PRESERVED,
-                            f"{sc} box(es), bytes+context match"))
-                    else:
-                        items.append(_item(
-                            f"uuid.{label}", MODIFIED,
-                            f"payloads match, context {s_ctx} vs {o_ctx}"))
-                else:
-                    items.append(_item(f"uuid.{label}", MODIFIED,
-                                       "payload bytes differ"))
+                items.append(_item(f"uuid.{label}", MODIFIED,
+                                   "payload bytes differ"))
 
-        # unlabeled uuids are verified byte-for-byte like labeled ones
-        for u in src.uuids:
-            if not u["label"]:
-                match = any(
-                    o["sha256"] == u["sha256"]
-                    and o["context"] == u["context"]
-                    for o in out.uuids
-                )
-                if match:
-                    items.append(_item(
-                        f"uuid.unknown.{u['uuid'][:13]}", PRESERVED,
-                        f"verbatim at {u['context']}"))
-                else:
-                    items.append(_item(
-                        f"uuid.unknown.{u['uuid'][:13]}", MISSING,
-                        f"uuid at {u['context']} not in final"))
+    # unlabeled uuids are verified byte-for-byte like labeled ones
+    for u in src.uuids:
+        if not u["label"]:
+            match = any(
+                o["sha256"] == u["sha256"] and o["context"] == u["context"]
+                for o in out.uuids
+            )
+            if match:
+                items.append(_item(
+                    f"uuid.unknown.{u['uuid'][:13]}", PRESERVED,
+                    f"verbatim at {u['context']}"))
+            else:
+                items.append(_item(
+                    f"uuid.unknown.{u['uuid'][:13]}", MISSING,
+                    f"uuid at {u['context']} not in final"))
 
     summary = {
         PRESERVED: sum(1 for i in items if i["status"] == PRESERVED),

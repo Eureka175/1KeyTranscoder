@@ -88,7 +88,6 @@ def run_sony_pipeline(
     has_audio: bool = True,
     gyroflow: Path | None = None,
     fix_hw_timing: bool = False,
-    check_level: str = "advanced",
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -307,7 +306,7 @@ def run_sony_pipeline(
     # rtmd elst, audio track count) live in validate.compare and make
     # the run FAIL on any drift. No duration patch is applied: the
     # direct-copy path is exact (see module docstring).
-    step(f"validating original vs final (check={check_level})...")
+    step("validating original vs final...")
     known_facts: dict[str, Any] = {}
     if bundle.tracks:
         known_facts["rtmd_sha256"] = bundle.tracks[0].samples_sha256
@@ -315,7 +314,6 @@ def run_sony_pipeline(
         known_facts["lens_sha256"] = bundle.nrtm.lens_profile_sha256
         known_facts["lens_size"] = bundle.nrtm.lens_profile_size
         known_facts["xml_sha256"] = bundle.nrtm.xml_sha256
-    compare_level = "basic" if check_level == "basic" else "advanced"
     report = compare(
         original=source,
         final=final,
@@ -323,83 +321,28 @@ def run_sony_pipeline(
         ffprobe=ffprobe,
         scratch=work_dir / "validate",
         known_facts=known_facts,
-        level=compare_level,
     )
 
-    # 7. downstream consumer validation (advanced/full only)
-    if check_level != "basic":
-        if gyroflow is not None:
-            step("Gyroflow headless validation...")
-            try:
-                report["gyroflow"] = gyroflow_check(
-                    original=source,
-                    final=final,
-                    gyroflow=gyroflow,
-                    scratch=work_dir / "validate",
-                )
-                step(
-                    f"gyroflow: {report['gyroflow']['status']} "
-                    f"({report['gyroflow']['detail']})"
-                )
-            except Exception as exc:
-                report["gyroflow"] = {
-                    "status": "FAIL",
-                    "detail": f"Gyroflow validation error: {exc}",
-                }
-                step(f"gyroflow: FAIL ({exc})")
-        elif check_level == "full":
-            step(
-                "WARNING: Gyroflow 未安装 — full 检查的消费端对比将跳过"
-                "（结构检查照常执行）"
-            )
-
-    # 8. full: detailed metadata selfcheck (preservation.selfcheck)
-    if check_level == "full":
-        from .selfcheck import detailed_compare as detailed
-
-        step("detailed metadata selfcheck (full)...")
+    # 7. downstream consumer validation (hard acceptance test)
+    if gyroflow is not None:
+        step("Gyroflow headless validation...")
         try:
-            selfcheck_dir = work_dir / "validate" / "selfcheck"
-            sc = detailed(
+            report["gyroflow"] = gyroflow_check(
                 original=source,
                 final=final,
-                gpac=gpac,
-                ffprobe=ffprobe,
-                log_dir=selfcheck_dir,
                 gyroflow=gyroflow,
+                scratch=work_dir / "validate",
             )
-            report["selfcheck"] = {
-                "overall": sc["overall"],
-                "summary": sc["summary"],
-                "log_dir": str(selfcheck_dir),
-            }
-            step(f"selfcheck: {sc['overall']} {sc['summary']}")
-            if sc["overall"] != "PASS":
-                report["structural_success"] = False
-                report["critical_missing"].append(
-                    {
-                        "item": "selfcheck.full",
-                        "status": "FAIL",
-                        "detail": (
-                            f"{sc['summary']} — see "
-                            f"{selfcheck_dir}"
-                        ),
-                    }
-                )
+            step(
+                f"gyroflow: {report['gyroflow']['status']} "
+                f"({report['gyroflow']['detail']})"
+            )
         except Exception as exc:
-            report["selfcheck"] = {
-                "overall": "FAIL",
-                "detail": f"selfcheck error: {exc}",
+            report["gyroflow"] = {
+                "status": "FAIL",
+                "detail": f"Gyroflow validation error: {exc}",
             }
-            report["structural_success"] = False
-            report["critical_missing"].append(
-                {
-                    "item": "selfcheck.full",
-                    "status": "FAIL",
-                    "detail": f"selfcheck error: {exc}",
-                }
-            )
-            step(f"selfcheck: FAIL ({exc})")
+            step(f"gyroflow: FAIL ({exc})")
 
     report["job_dir"] = str(work_dir)
     report_path.write_text(

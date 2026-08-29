@@ -199,18 +199,41 @@ QSV 单文件端到端（A7M5 6s）：**41/0/0 + Gyroflow PASS**。
 
 ```powershell
 # 全量测试（NVENC HQ）
-python 1keytransc.py --input testsets --output work\final_test_nvenc --encoder nvenc --preset hq --auto-downgrade
+python 1kt.py --input testsets --output work\final_test_nvenc --encoder nvenc --preset hq
 
 # 自检（内部测试）
 python tests\run_selfcheck.py --encoder nvenc
 python tests\run_selfcheck.py --encoder qsv
 
 # watchfolder
-python watchfolder.py --input <in> --output <out> --encoder nvenc --preset hq --interval 60 --auto-downgrade
+python watchfolder.py --input <in> --output <out> --encoder nvenc --preset hq --interval 60
 
 # 回滚
 git checkout pre_S1S5
 ```
+
+## 12. UI/调度/验证强度改造（1kt.py 阶段）
+
+**主程序改名 `1kt.py`**；硬件批量逻辑抽出至 `core/batch_hw.py`（主程序
+保持 thin orchestrator），辅助模块：`core/paths.py`、`core/postprobe.py`、
+`core/dashboard.py`/`core/dashboard_ui.py`、`preservation/selfcheck.py`
+（详细自检由 tests 移入生产包，tests 变薄 CLI）。
+
+新增能力（全部 targeted 实测通过）：
+
+| 功能 | 开关 | 实测 |
+|---|---|---|
+| 验证强度 | `--check basic`(默认)/`advanced`/`full` | basic=32/0/0 核心子集; advanced=41/0/0+Gyroflow; full=advanced+详细自检(A7M5 64/0, A7M4 47/0), Gyroflow 未安装时提示并跳过消费端对比 |
+| 单后端调度 | `--jobs 1`(默认)/`N`/`auto` | auto=NVENC quality 2 路/FAST 3 路/QSV 1 路(实测预算表); 2 文件并行 2/2 通过 |
+| 多后端并行 | `--experimental-multihw` | 启用即打印实验性声明(质量一致性不保证); 路由 v1: 4:2:2→NVENC, 其余轮流; 2 文件 2/2 通过 |
+| 双窗口 UI | 默认(非 headless) | nvidia-smi 风格看板独立控制台(1.5s 刷新, 状态 JSON)+工作信息窗口留 log; `--headless` 不弹窗仍写 dashboard.json |
+| 报错处理 | 默认 | 不弹窗: 自动降级梯(每级 WARNING)+工作窗口打印+log+`failed_files.json` |
+| 失败重跑 | `--retry-list <json> --encoder x265` | nvenc 重跑 ✅; **x265 重跑 41/0/0 + Gyroflow PASS** ✅(用户目标场景) |
+
+**本阶段修复的缺陷**：并行线程共享 `gpac.movie_timescale` 竞争
+(A7M5 拿到 A7M4 的 90000 → 时长补丁错值) → 改为 threading.local;
+详细自检对视频轨码流变化 (avc1→hvc1) 误报 → 改为校验"转码目标为
+HEVC"(预期差异)。
 
 ## 11. 并行可行性实测（后续 --jobs 的依据）
 

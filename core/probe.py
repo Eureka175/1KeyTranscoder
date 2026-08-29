@@ -265,6 +265,26 @@ def probe_source(
     return summary, streams
 
 
+def count_frames(ffprobe: Path, path: Path) -> tuple[int, str]:
+    """(decoded packet count, avg_frame_rate) for the first video stream."""
+    cmd = [
+        str(ffprobe), "-v", "error", "-count_packets",
+        "-select_streams", "v:0",
+        "-show_entries",
+        "stream=nb_read_packets,nb_frames,avg_frame_rate",
+        "-of", "json", str(path),
+    ]
+    result = run_capture(cmd)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffprobe failed on {path}: {result.stderr[-500:]}")
+    streams = json.loads(result.stdout).get("streams", [])
+    if not streams:
+        raise RuntimeError(f"no video stream in {path}")
+    st = streams[0]
+    frames = int(st.get("nb_read_packets") or st.get("nb_frames") or 0)
+    return frames, str(st.get("avg_frame_rate") or "")
+
+
 def build_source_info(
     path: Path,
     summary: dict[str, Any],

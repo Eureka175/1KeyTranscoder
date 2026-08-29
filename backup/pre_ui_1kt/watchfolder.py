@@ -39,7 +39,7 @@ def main() -> int:
     args = ap.parse_args()
 
     cmd = [
-        sys.executable, str(ROOT / "1kt.py"),
+        sys.executable, str(ROOT / "1keytransc.py"),
         "--input", args.input,
         "--output", args.output,
         "--encoder", args.encoder,

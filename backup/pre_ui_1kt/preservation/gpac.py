@@ -24,7 +24,6 @@ import os
 import re
 import shutil
 import subprocess
-import threading
 from pathlib import Path
 
 DEFAULT_GPAC_DIR = Path(r"C:\Program Files\GPAC")
@@ -93,19 +92,7 @@ class GpacContainerBackend:
         # file-rewriting command resets the timescale to the default,
         # so it must be passed on EACH mutating call, and BEFORE -new
         # (after -new it is silently ignored).
-        # Thread-local: parallel workers (--jobs/--experimental-multihw)
-        # share one backend object, each pipeline invocation sets its
-        # own source movie timescale.
-        self._local = threading.local()
-        self._default_ts = movie_timescale
-
-    @property
-    def movie_timescale(self) -> int:
-        return getattr(self._local, "ts", self._default_ts)
-
-    @movie_timescale.setter
-    def movie_timescale(self, value: int) -> None:
-        self._local.ts = value
+        self.movie_timescale = movie_timescale
 
     def _ts_args(self) -> list[str]:
         if self.movie_timescale > 0:

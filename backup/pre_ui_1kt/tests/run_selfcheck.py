@@ -31,7 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from preservation.selfcheck import detailed_compare  # noqa: E402
+from tests.sony_selfcheck import detailed_compare  # noqa: E402
 from preservation.gpac import GpacContainerBackend  # noqa: E402
 from preservation.gyroflow import find_gyroflow  # noqa: E402
 
@@ -95,7 +95,7 @@ def main() -> int:
 
     # 1. main program run
     rc, output = run_main(
-        ROOT / "1kt.py", source, work_root, args.encoder, args.preset
+        ROOT / "1keytransc.py", source, work_root, args.encoder, args.preset
     )
     check("main.exit_code", rc == 0, f"rc={rc}")
 
