@@ -235,6 +235,25 @@ git checkout pre_S1S5
 详细自检对视频轨码流变化 (avc1→hvc1) 误报 → 改为校验"转码目标为
 HEVC"(预期差异)。
 
+## 13. 拍板项落地（check 独立/动态调度/失败摘要/README）
+
+- **check 模块独立**：`preservation/checker.py` 统一封装三级验证，
+  管线改调用；`--check` 现作用于**所有后端**（x265 实测 basic
+  32/0/0、advanced 41/0/0+Gyroflow PASS）。
+- **删除 `--auto-downgrade`**（不留兼容别名）；watchfolder/start.bat
+  重写（透传 `--check/--jobs/--headless/--experimental-multihw`），
+  `--once` 实测 rc=0。
+- **失败摘要独立文件**：`failed_files.json` 增 `error_summary` 与
+  `error_detail_file`（`logs/failed_details/<job>.txt` 存日志尾 40
+  行），坏文件注入实测通过。
+- **`--jobs auto` 动态调整**：`AdaptiveJobs` 波次调度——按波实测
+  聚合吞吐增减工作数（>3% 增长加路 / <7% 衰减回撤历史最优 / 每 6
+  波上探），无写死预算表，安全上限按 CPU 核数推导；multihw 双后端
+  各自一个自适应控制器。实测日志 `[ADAPTIVE nvenc] wave aggregate=…
+  fps -> next workers=…` 正常收敛。
+- **README 彻底重写**（依赖/快速开始/验证强度/降级与报错/并行调度/
+  双窗口/watchfolder/自检/目录/限制/回滚）。
+
 ## 11. 并行可行性实测（后续 --jobs 的依据）
 
 **编码器级并发**（NVEncC quality+hq，4K60 56.6s 素材，3390 帧，

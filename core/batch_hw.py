@@ -19,10 +19,12 @@ import argparse
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -214,6 +216,18 @@ def hw_backend_for(
     return QsvBackend(tool, caps)
 
 
+def _last_encode_fps(raw_log: Path) -> float:
+    """Parse the encoder's final 'encoded N frames, F fps' line."""
+    try:
+        text = raw_log.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return 0.0
+    matches = re.findall(
+        r"encoded\s+\d+\s+frames,\s*([\d.]+)\s+fps", text
+    )
+    return float(matches[-1]) if matches else 0.0
+
+
 def hw_encode_with_fallback(
     *,
     label: str,
@@ -234,7 +248,7 @@ def hw_encode_with_fallback(
     file_logger: logging.Logger,
     progress_cb: Callable[[int, float], None] | None = None,
     show_progress: bool = True,
-) -> tuple[list[str], tuple[str, int]]:
+) -> tuple[list[str], tuple[str, int], float]:
     """Automatic three-tier downgrade ladder (NO prompt window).
 
     Capability-driven downgrades happen silently up front (WARNING);
@@ -326,7 +340,7 @@ def hw_encode_with_fallback(
             else:
                 ok = True
         if ok:
-            return warnings, (c, d)
+            return warnings, (c, d), _last_encode_fps(raw_log)
 
         tail = read_log_tail(raw_log)
         cls = "format" if rc == 0 else classify_failure(tail)
@@ -477,6 +491,29 @@ def log_hw_header(
 # failure records (JSON) + retry list
 # ---------------------------------------------------------------------------
 
+def _brief_error(log_path: str | None, detail_file: Path) -> str:
+    """Write the last 40 log lines to detail_file; return the last 8
+    lines as the brief summary (both independent files per failure)."""
+    tail: list[str] = []
+    if log_path:
+        try:
+            lines = Path(log_path).read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines()
+            tail = lines[-40:]
+        except OSError:
+            pass
+    if tail:
+        try:
+            detail_file.parent.mkdir(parents=True, exist_ok=True)
+            detail_file.write_text(
+                "\n".join(tail) + "\n", encoding="utf-8", errors="replace"
+            )
+        except OSError:
+            pass
+    return "\n".join(tail[-8:]) if tail else "(no log available)"
+
+
 def record_failure(
     failed_path: Path,
     *,
@@ -487,8 +524,15 @@ def record_failure(
     error: str,
     log_path: str,
 ) -> None:
-    """Append one failure record to the JSON failure list."""
+    """Append one failure record to the JSON failure list; the brief
+    error summary goes into its own file under failed_details/."""
     failed_path.parent.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    detail_file = (
+        failed_path.parent / "failed_details"
+        / f"{job_id_for(source)}_{stamp}.txt"
+    )
+    brief = _brief_error(log_path, detail_file)
     try:
         records = json.loads(
             failed_path.read_text(encoding="utf-8")
@@ -503,6 +547,8 @@ def record_failure(
             "backend": backend_name,
             "stage": stage,
             "error": error,
+            "error_summary": brief,
+            "error_detail_file": str(detail_file),
             "log_path": log_path,
         }
     )
@@ -554,6 +600,7 @@ def encode_one_sony_hw(
     dry_run: bool,
     status_cb: StatusCb | None = None,
     show_progress: bool = True,
+    throughput_cb: Callable[[float], None] | None = None,
 ) -> str:
     """Sony preservation path with a rigaya hardware encoder."""
     work_dir = work_root / job_id_for(src)
@@ -595,7 +642,7 @@ def encode_one_sony_hw(
     def encode_video(source: Path, out_mov: Path) -> None:
         if status_cb:
             status_cb("encoding", f"{planned[0]}/{planned[1]}")
-        enc_warnings, used = hw_encode_with_fallback(
+        enc_warnings, used, enc_fps = hw_encode_with_fallback(
             label="nvencc" if backend.kind == "nvencc" else "qsvencc",
             backend=backend, source=source, output=out_mov,
             profile=profile, src_info=src_info, vfr=vfr,
@@ -608,6 +655,8 @@ def encode_one_sony_hw(
         )
         warnings.extend(enc_warnings)
         file_logger.info("ENCODE_FORMAT | %s/%s", used[0], used[1])
+        if throughput_cb is not None:
+            throughput_cb(enc_fps)
 
     def pipe_log(msg: str) -> None:
         logger.info("[SONY] %s", msg)
@@ -731,6 +780,7 @@ def encode_one_hw_classic(
     dry_run: bool,
     status_cb: StatusCb | None = None,
     show_progress: bool = True,
+    throughput_cb: Callable[[float], None] | None = None,
 ) -> str:
     """Non-Sony material: video + audio only, single-tool single pass."""
     part_dst = dst.with_name(dst.stem + ".part.mov")
@@ -767,7 +817,7 @@ def encode_one_hw_classic(
     if status_cb:
         status_cb("encoding", f"{planned[0]}/{planned[1]}")
     try:
-        warnings, used = hw_encode_with_fallback(
+        warnings, used, enc_fps = hw_encode_with_fallback(
             label="nvencc" if backend.kind == "nvencc" else "qsvencc",
             backend=backend, source=src, output=part_dst,
             profile=profile, src_info=src_info, vfr=vfr,
@@ -783,6 +833,8 @@ def encode_one_hw_classic(
         file_logger.exception("HW ENCODE FAILED")
         safe_unlink(part_dst)
         return "failed"
+    if throughput_cb is not None:
+        throughput_cb(enc_fps)
 
     if not part_dst.is_file() or part_dst.stat().st_size <= 0:
         logger.error("[FAIL] encoder produced no output | %s", src)
@@ -854,6 +906,9 @@ class BatchCtx:
     status: DashboardStatus | None = None
     show_progress: bool = True
     warnings_total: list[str] = field(default_factory=list)
+    # (backend_name, encode_fps) samples collected by workers, read by
+    # the adaptive wave scheduler between waves
+    throughput: list[tuple[str, float]] = field(default_factory=list)
 
 
 def _status_cb_for(
@@ -938,6 +993,9 @@ def process_file_hw(
             dry_run=ctx.dry_run,
             status_cb=_status_cb_for(ctx, src),
             show_progress=ctx.show_progress,
+            throughput_cb=lambda fps: ctx.throughput.append(
+                (backend.name, fps)
+            ),
         )
     else:
         result = encode_one_hw_classic(
@@ -960,6 +1018,9 @@ def process_file_hw(
             dry_run=ctx.dry_run,
             status_cb=_status_cb_for(ctx, src),
             show_progress=ctx.show_progress,
+            throughput_cb=lambda fps: ctx.throughput.append(
+                (backend.name, fps)
+            ),
         )
 
     if result == "failed" and ctx.failed_path is not None:
@@ -974,15 +1035,64 @@ def process_file_hw(
     return result
 
 
-def budget_workers(backend_name: str, profile: dict[str, Any]) -> int:
-    """Static worker budget per backend + preset weight (measured):
-    NVENC quality-class saturates VE at 2 sessions, FAST scales to 3;
-    QSV totals peak at 1 session (2 sessions total throughput is lower
-    than solo)."""
-    if backend_name == "nvenc":
-        preset_name = str(profile.get("preset", "")).lower()
-        return 3 if preset_name not in ("quality",) else 2
-    return 1
+class AdaptiveJobs:
+    """Runtime-adaptive worker count (no hardcoded per-backend table).
+
+    Measures per-wave AGGREGATE encode throughput (sum of per-file
+    encoder fps across the wave) and adjusts the worker count between
+    waves: grow when the current wave clearly beats the previous one,
+    shrink back to the best observed count when aggregate degrades,
+    and periodically re-probe upward. The safety cap derives from the
+    machine (CPU cores), not from preset tables.
+    """
+
+    def __init__(self, logger: logging.Logger | None = None, start: int = 2):
+        self.logger = logger
+        self.current = max(1, start)
+        self.best_w = self.current
+        self.best_agg = 0.0
+        self.history: list[tuple[int, float]] = []
+        self.stable_rounds = 0
+        self.cap = max(2, min(8, (os.cpu_count() or 4)))
+
+    def note_wave(self, agg_fps: float, label: str = "") -> int:
+        """Record one wave's aggregate fps; returns next worker count."""
+        if agg_fps > self.best_agg:
+            self.best_agg = agg_fps
+            self.best_w = self.current
+        self.history.append((self.current, agg_fps))
+
+        prev_max = max(
+            (a for w, a in self.history if w < self.current), default=0.0
+        )
+        if (
+            self.current < self.cap
+            and prev_max > 0
+            and agg_fps > prev_max * 1.03
+        ):
+            # growing clearly helps -> add one worker
+            self.current += 1
+            self.stable_rounds = 0
+        elif agg_fps < self.best_agg * 0.93:
+            # aggregate collapsed -> back to the best observed count
+            self.current = max(1, self.best_w)
+            self.stable_rounds = 0
+        else:
+            self.stable_rounds += 1
+            if self.stable_rounds >= 6 and self.current < self.cap:
+                # periodic upward re-probe (cheap insurance against
+                # local optima)
+                self.current += 1
+                self.stable_rounds = 0
+
+        if self.logger is not None:
+            self.logger.info(
+                "[ADAPTIVE%s] wave aggregate=%.1f fps -> next workers=%d "
+                "(best %.1f @ %d, cap %d)",
+                f" {label}" if label else "",
+                agg_fps, self.current, self.best_agg, self.best_w, self.cap,
+            )
+        return self.current
 
 
 def run_hw_pool(
@@ -990,24 +1100,49 @@ def run_hw_pool(
     backend,
     sources: list[Path],
     logger: logging.Logger,
-    workers: int,
+    workers: int | str,
 ) -> dict[str, int]:
-    """Single-backend worker pool (threads; work is subprocess-bound)."""
+    """Single-backend scheduling.
+
+    workers: int >= 1 (fixed), or "auto" (adaptive wave scheduling:
+    the worker count is adjusted between waves from measured aggregate
+    throughput)."""
     counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0}
-    if workers <= 1:
-        ctx.show_progress = True
-        for src in sources:
-            counters[process_file_hw(ctx, backend, src, logger)] += 1
+
+    if workers != "auto":
+        n = int(workers)
+        if n <= 1:
+            ctx.show_progress = True
+            for src in sources:
+                counters[process_file_hw(ctx, backend, src, logger)] += 1
+            return counters
+        ctx.show_progress = False
+        with ThreadPoolExecutor(max_workers=n) as ex:
+            futures = {
+                ex.submit(process_file_hw, ctx, backend, src, logger): src
+                for src in sources
+            }
+            for fut in as_completed(futures):
+                counters[fut.result()] += 1
         return counters
+
+    # ---- adaptive wave scheduling ----
     ctx.show_progress = False
-    with ThreadPoolExecutor(max_workers=workers) as ex:
-        futures = {
-            ex.submit(process_file_hw, ctx, backend, src, logger): src
-            for src in sources
-        }
-        for fut in as_completed(futures):
-            result = fut.result()
-            counters[result] += 1
+    ctrl = AdaptiveJobs(logger, start=2)
+    pending = deque(sources)
+    while pending:
+        wave_size = min(ctrl.current, len(pending))
+        wave = [pending.popleft() for _ in range(wave_size)]
+        ctx.throughput.clear()
+        with ThreadPoolExecutor(max_workers=wave_size) as ex:
+            futures = {
+                ex.submit(process_file_hw, ctx, backend, src, logger): src
+                for src in wave
+            }
+            for fut in as_completed(futures):
+                counters[fut.result()] += 1
+        agg = sum(fps for _, fps in ctx.throughput)
+        ctrl.note_wave(agg, backend.name)
     return counters
 
 
@@ -1018,16 +1153,13 @@ def run_multihw_pool(
     sources: list[Path],
     logger: logging.Logger,
 ) -> dict[str, int]:
-    """EXPERIMENTAL: dual-backend parallel scheduling.
+    """EXPERIMENTAL dual-backend scheduling (adaptive per backend).
 
-    Static routing v1: 4:2:2 sources go to NVENC (4:2:2 direct encode),
-    everything else alternates between the two backends. Worker counts
-    come from budget_workers(). Work stealing is not implemented (see
-    questions in the implementation report)."""
-    # route by probing chroma cheaply (probe already cached in CSV runs,
-    # but routing happens before per-file probe; use ffprobe directly)
-    nvenc_sources: list[Path] = []
-    qsv_sources: list[Path] = []
+    Static routing v1 (4:2:2 -> NVENC, others alternate) + one adaptive
+    worker controller per backend, waves taken from both queues
+    concurrently."""
+    nvenc_sources: deque[Path] = deque()
+    qsv_sources: deque[Path] = deque()
     flip = False
     for src in sources:
         chroma = ""
@@ -1044,19 +1176,34 @@ def run_multihw_pool(
             flip = not flip
 
     ctx.show_progress = False
+    ctrl_n = AdaptiveJobs(logger, start=2)
+    ctrl_q = AdaptiveJobs(logger, start=1)
     counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0}
-    with ThreadPoolExecutor(
-        max_workers=budget_workers("nvenc", ctx.profile) + 1
-    ) as ex:
-        futures = {}
-        for src in nvenc_sources:
-            futures[
-                ex.submit(process_file_hw, ctx, backend_nvenc, src, logger)
-            ] = src
-        for src in qsv_sources:
-            futures[
-                ex.submit(process_file_hw, ctx, backend_qsv, src, logger)
-            ] = src
-        for fut in as_completed(futures):
-            counters[fut.result()] += 1
+
+    while nvenc_sources or qsv_sources:
+        wave: list[tuple[Path, Any]] = []
+        for _ in range(min(ctrl_n.current, len(nvenc_sources))):
+            wave.append((nvenc_sources.popleft(), backend_nvenc))
+        for _ in range(min(ctrl_q.current, len(qsv_sources))):
+            wave.append((qsv_sources.popleft(), backend_qsv))
+        if not wave:
+            break
+        ctx.throughput.clear()
+        with ThreadPoolExecutor(max_workers=len(wave)) as ex:
+            futures = {
+                ex.submit(process_file_hw, ctx, be, src, logger): src
+                for src, be in wave
+            }
+            for fut in as_completed(futures):
+                counters[fut.result()] += 1
+        agg_n = sum(
+            fps for name, fps in ctx.throughput if name == "nvenc"
+        )
+        agg_q = sum(
+            fps for name, fps in ctx.throughput if name == "qsv"
+        )
+        if any(name == "nvenc" for name, _ in ctx.throughput):
+            ctrl_n.note_wave(agg_n, "nvenc")
+        if any(name == "qsv" for name, _ in ctx.throughput):
+            ctrl_q.note_wave(agg_q, "qsv")
     return counters

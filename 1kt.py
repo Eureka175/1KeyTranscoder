@@ -27,7 +27,6 @@ from typing import Any
 
 from core.batch_hw import (
     BatchCtx,
-    budget_workers,
     hw_backend_for,
     run_hw_pool,
     run_multihw_pool,
@@ -408,11 +407,13 @@ def encode_one_sony(
     gpac: GpacContainerBackend,
     gyroflow: Path | None,
     work_root: Path,
+    check_level: str = "basic",
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
 ) -> str:
-    """x265 Sony preservation path (legacy, unchanged behavior)."""
+    """x265 Sony preservation path (manual --encoder x265 only;
+    --check levels apply like on hardware backends)."""
     import time
 
     from core.paths import job_id_for, safe_unlink
@@ -478,7 +479,7 @@ def encode_one_sony(
             has_audio=source_summary["audio_streams"] > 0,
             gyroflow=gyroflow,
             fix_hw_timing=False,
-            check_level="advanced",
+            check_level=check_level,
             log=pipe_log,
         )
     except Exception as exc:
@@ -609,7 +610,7 @@ def parse_args() -> argparse.Namespace:
         default="1",
         help=(
             "同一硬件后端的工作调度: 1(默认, 单线程) | N(固定并发) | "
-            "auto(按实测预算自适应: NVENC quality档=2, FAST档=3, QSV=1)."
+            "auto(波次实测聚合吞吐动态调整工作数, 无写死预算表)."
         ),
     )
     parser.add_argument(
@@ -640,13 +641,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--no-downgrade", action="store_true",
         help="禁止编码格式降级: 能力不满足则跳过文件, 运行时失败不重试.",
-    )
-    parser.add_argument(
-        "--auto-downgrade", action="store_true",
-        help=(
-            "已废弃的兼容别名: 运行时失败现在默认自动降级且不再弹窗, "
-            "此开关无效果."
-        ),
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -853,11 +847,6 @@ def main() -> int:
     logger.info("Experimental multihw: %s", args.experimental_multihw)
     logger.info("Headless: %s", args.headless)
     logger.info("Keep work dirs: %s", args.keep_work)
-    if args.auto_downgrade:
-        logger.info(
-            "Note: --auto-downgrade is a deprecated no-op (runtime "
-            "failures now downgrade automatically, no prompt window)"
-        )
     logger.info("============================================================")
 
     counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0}
@@ -910,6 +899,7 @@ def main() -> int:
                         postprobe_csv=postprobe_csv,
                         postprobe_stream_csv=postprobe_stream_csv,
                         gpac=gpac, gyroflow=gyroflow, work_root=work_root,
+                        check_level=args.check,
                         logger=logger, file_logger=file_logger,
                         dry_run=args.dry_run,
                     )
@@ -956,11 +946,9 @@ def main() -> int:
                 ctx, backend, backend_qsv, sources, logger
             )
         else:
-            if jobs_value == "auto":
-                workers = budget_workers(backend.name, profile)
-            else:
-                workers = int(jobs_value)
-            round_counters = run_hw_pool(ctx, backend, sources, logger, workers)
+            round_counters = run_hw_pool(
+                ctx, backend, sources, logger, jobs_value
+            )
 
         for key, value in round_counters.items():
             counters[key] += value

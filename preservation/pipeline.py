@@ -50,13 +50,11 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from . import isobmf
+from . import checker, isobmf
 from .gpac import GpacContainerBackend
-from .gyroflow import check as gyroflow_check
 from .models import PreservationBundle
 from .poc_video import CopyAudioBackend
 from .sony import SonyPreservationBackend
-from .validate import compare
 
 
 def _item_type_bytes(item_type: str) -> bytes | None:
@@ -302,11 +300,9 @@ def run_sony_pipeline(
             except RuntimeError as exc:
                 step(f"WARNING: meta item_type patch skipped: {exc}")
 
-    # 6. structural validation. Timing regression guards
-    # (movie timescale/duration, track timescales/durations, stts,
-    # rtmd elst, audio track count) live in validate.compare and make
-    # the run FAIL on any drift. No duration patch is applied: the
-    # direct-copy path is exact (see module docstring).
+    # 6. post-encode checks (independent checker module, applies to
+    # every backend's Sony output). Timing regression guards live in
+    # validate.compare and make the run FAIL on any drift.
     step(f"validating original vs final (check={check_level})...")
     known_facts: dict[str, Any] = {}
     if bundle.tracks:
@@ -315,91 +311,17 @@ def run_sony_pipeline(
         known_facts["lens_sha256"] = bundle.nrtm.lens_profile_sha256
         known_facts["lens_size"] = bundle.nrtm.lens_profile_size
         known_facts["xml_sha256"] = bundle.nrtm.xml_sha256
-    compare_level = "basic" if check_level == "basic" else "advanced"
-    report = compare(
+    report = checker.run_checks(
         original=source,
         final=final,
         gpac=gpac,
         ffprobe=ffprobe,
-        scratch=work_dir / "validate",
+        level=check_level,
+        gyroflow=gyroflow,
+        work_dir=work_dir,
         known_facts=known_facts,
-        level=compare_level,
+        log=step,
     )
-
-    # 7. downstream consumer validation (advanced/full only)
-    if check_level != "basic":
-        if gyroflow is not None:
-            step("Gyroflow headless validation...")
-            try:
-                report["gyroflow"] = gyroflow_check(
-                    original=source,
-                    final=final,
-                    gyroflow=gyroflow,
-                    scratch=work_dir / "validate",
-                )
-                step(
-                    f"gyroflow: {report['gyroflow']['status']} "
-                    f"({report['gyroflow']['detail']})"
-                )
-            except Exception as exc:
-                report["gyroflow"] = {
-                    "status": "FAIL",
-                    "detail": f"Gyroflow validation error: {exc}",
-                }
-                step(f"gyroflow: FAIL ({exc})")
-        elif check_level == "full":
-            step(
-                "WARNING: Gyroflow 未安装 — full 检查的消费端对比将跳过"
-                "（结构检查照常执行）"
-            )
-
-    # 8. full: detailed metadata selfcheck (preservation.selfcheck)
-    if check_level == "full":
-        from .selfcheck import detailed_compare as detailed
-
-        step("detailed metadata selfcheck (full)...")
-        try:
-            selfcheck_dir = work_dir / "validate" / "selfcheck"
-            sc = detailed(
-                original=source,
-                final=final,
-                gpac=gpac,
-                ffprobe=ffprobe,
-                log_dir=selfcheck_dir,
-                gyroflow=gyroflow,
-            )
-            report["selfcheck"] = {
-                "overall": sc["overall"],
-                "summary": sc["summary"],
-                "log_dir": str(selfcheck_dir),
-            }
-            step(f"selfcheck: {sc['overall']} {sc['summary']}")
-            if sc["overall"] != "PASS":
-                report["structural_success"] = False
-                report["critical_missing"].append(
-                    {
-                        "item": "selfcheck.full",
-                        "status": "FAIL",
-                        "detail": (
-                            f"{sc['summary']} — see "
-                            f"{selfcheck_dir}"
-                        ),
-                    }
-                )
-        except Exception as exc:
-            report["selfcheck"] = {
-                "overall": "FAIL",
-                "detail": f"selfcheck error: {exc}",
-            }
-            report["structural_success"] = False
-            report["critical_missing"].append(
-                {
-                    "item": "selfcheck.full",
-                    "status": "FAIL",
-                    "detail": f"selfcheck error: {exc}",
-                }
-            )
-            step(f"selfcheck: FAIL ({exc})")
 
     report["job_dir"] = str(work_dir)
     report_path.write_text(
