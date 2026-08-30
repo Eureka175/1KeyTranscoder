@@ -148,7 +148,8 @@ class GpacContainerBackend:
         Track enumeration that stays robust where -diso XML parsing
         fails (DJI files carry a hidden mjpeg cover track whose sample
         entry breaks ElementTree). Each track dict:
-        {number, id, timescale, handler, entry, sample_count}.
+        {number, id, timescale, handler, entry, sample_count,
+         media_duration_ms}.
         """
         movie_ts = 0
         m = re.search(
@@ -170,6 +171,7 @@ class GpacContainerBackend:
                     "handler": "",
                     "entry": "",
                     "sample_count": 0,
+                    "media_duration_ms": 0.0,
                 }
                 tracks.append(cur)
                 continue
@@ -181,6 +183,17 @@ class GpacContainerBackend:
             ms = re.search(r"Media Samples:\s*(\d+)", line)
             if ms:
                 cur["sample_count"] = int(ms.group(1))
+            md = re.search(
+                r"Media Duration\s+(\d+):(\d+):(\d+)\.(\d+)", line
+            )
+            if md:
+                h, mi, s, frac = (
+                    int(md.group(1)), int(md.group(2)),
+                    int(md.group(3)), int(md.group(4).ljust(3, "0")[:3]),
+                )
+                cur["media_duration_ms"] = (
+                    (h * 3600 + mi * 60 + s) * 1000 + frac
+                )
         return movie_ts, tracks
 
     # -- extraction -----------------------------------------------------

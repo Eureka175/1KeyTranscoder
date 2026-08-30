@@ -615,6 +615,9 @@ def parse_args() -> argparse.Namespace:
             "编码后验证强度. basic(默认)=仅必要核心元数据; "
             "advanced=完整结构校验+Gyroflow; full=advanced+详细自检"
             "(64项, 先探测 Gyroflow 安装, 未安装则提示并跳过消费端对比)."
+            " Sony 与 DJI 路径均生效: DJI basic=轨道清单+载荷sha256; "
+            "advanced=+Gyroflow 逐帧四元数; full=+逐轨时基/时长/"
+            "载荷首尾字节/流级事实."
         ),
     )
     parser.add_argument(

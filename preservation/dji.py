@@ -240,14 +240,25 @@ def run_dji_check(
     gyroflow: Path | None,
     scratch: Path,
     vfr: bool = False,
+    level: str = "basic",
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """ORIGINAL vs FINAL structural + payload + consumer check for DJI.
 
+    Level gates (mirrors the Sony --check scheme):
+      basic    : track inventory, data-track payload sha256/size/sample
+                 count, audio streams, video frames/fps (CFR only)
+      advanced : basic + Gyroflow consumer check (type-2 parsed facts +
+                 type-3 per-frame quaternions)
+      full     : advanced + deep items (per-track timescale/media
+                 duration, payload head/tail bytes, ffprobe stream
+                 facts incl. data-track tags)
+
     Critical items: data-track payloads (djmd/dbgi/tmcd) byte-identical,
-    track inventory, audio streams, video frame count/fps (CFR only).
-    Movie timescale is informational (DJI quaternions align by frame
-    index; GPAC -new sets it to the first track's media timescale).
+    track inventory, audio streams, video frame count/fps (CFR only),
+    and (at full) the deep items. Movie timescale is informational
+    (DJI quaternions align by frame index; GPAC -new sets it to the
+    first track's media timescale).
     """
     scratch.mkdir(parents=True, exist_ok=True)
     items: list[dict[str, str]] = []
@@ -325,6 +336,22 @@ def run_dji_check(
             continue
         eq(f"dji.{entry}.payload_sha256", s_hash, o_hash)
         eq(f"dji.{entry}.payload_size", s_size, o_size)
+        if level == "full":
+            def head_tail(path: Path) -> tuple[str, str]:
+                with path.open("rb") as f:
+                    head = f.read(32)
+                    f.seek(max(0, path.stat().st_size - 32))
+                    tail = f.read(32)
+                return head.hex(), tail.hex()
+
+            eq(
+                f"dji.{entry}.head_bytes",
+                head_tail(s_raw)[0], head_tail(o_raw)[0],
+            )
+            eq(
+                f"dji.{entry}.tail_bytes",
+                head_tail(s_raw)[1], head_tail(o_raw)[1],
+            )
         s_smp = next(
             (t["sample_count"] for t in src_tracks if t["id"] == track_id),
             0,
@@ -378,14 +405,88 @@ def run_dji_check(
     # --- movie timescale (informational; quaternions are frame-indexed) ---
     eq("dji.movie_timescale", src_ts, out_ts)
 
-    # --- Gyroflow consumer check ---
+    # --- full-level deep items ---
+    if level == "full":
+        def track_table(tracks: list[dict]) -> list[tuple]:
+            return sorted(
+                (t["handler"], t["entry"], t["timescale"])
+                for t in tracks
+                if t["handler"] != "vide"
+            )
+
+        def dur_table(tracks: list[dict]) -> list[tuple]:
+            return sorted(
+                (t["handler"], t["entry"], round(t["media_duration_ms"]))
+                for t in tracks
+                if t["handler"] != "vide"
+            )
+
+        eq(
+            "dji.track_timescales",
+            track_table(src_tracks), track_table(out_tracks),
+        )
+        eq(
+            "dji.track_durations_ms",
+            dur_table(src_tracks), dur_table(out_tracks),
+        )
+
+        def stream_facts(path: Path) -> dict[str, Any]:
+            cmd = [
+                str(ffprobe), "-v", "error", "-show_streams", "-of",
+                "json", str(path),
+            ]
+            proc = subprocess.run(
+                cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                errors="replace", check=False,
+            )
+            if proc.returncode != 0:
+                return {"video": (), "audio": [], "data": []}
+            streams = json.loads(proc.stdout).get("streams", [])
+            video = next(
+                (st for st in streams if st.get("codec_type") == "video"),
+                {},
+            )
+            return {
+                "video": (
+                    video.get("width"), video.get("height"),
+                    video.get("pix_fmt"), video.get("profile"),
+                ),
+                "audio": sorted(
+                    (
+                        st.get("codec_name"), st.get("sample_fmt"),
+                        st.get("sample_rate"), st.get("channels"),
+                    )
+                    for st in streams
+                    if st.get("codec_type") == "audio"
+                ),
+                "data": sorted(
+                    (
+                        st.get("codec_tag_string"),
+                        (st.get("tags") or {}).get("handler_name", ""),
+                        (st.get("tags") or {}).get("timecode", ""),
+                    )
+                    for st in streams
+                    if st.get("codec_type") == "data"
+                ),
+            }
+
+        s_facts = stream_facts(original)
+        o_facts = stream_facts(final)
+        eq("dji.video.ffprobe", s_facts["video"], o_facts["video"])
+        eq("dji.audio.ffprobe", s_facts["audio"], o_facts["audio"])
+        eq("dji.data.ffprobe_tags", s_facts["data"], o_facts["data"])
+
+    # --- Gyroflow consumer check (advanced+) ---
     gyro: dict[str, Any] | None = None
-    if gyroflow is not None:
+    if gyroflow is not None and level != "basic":
         log("DJI Gyroflow consumer validation...")
         gyro = gyroflow_dji_check(
             original, final, gyroflow, scratch / "gyroflow"
         )
         log(f"dji gyroflow: {gyro['status']} ({gyro['detail']})")
+    elif level == "basic":
+        gyro = {"status": SKIP, "detail": "skipped at check=basic"}
     else:
         gyro = {"status": SKIP, "detail": "Gyroflow not installed"}
 
@@ -396,7 +497,7 @@ def run_dji_check(
         UNKNOWN: sum(1 for i in items if i["status"] == UNKNOWN),
     }
     critical_prefixes = ("dji.video", "dji.track", "dji.djmd",
-                         "dji.dbgi", "dji.tmcd", "dji.audio")
+                         "dji.dbgi", "dji.tmcd", "dji.audio", "dji.data")
     critical_missing = [
         i for i in items
         if i["status"] == MISSING

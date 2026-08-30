@@ -909,6 +909,7 @@ def encode_one_dji_hw(
     preserve_reports: Path,
     keep_work: bool,
     no_downgrade: bool,
+    check_level: str,
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
@@ -1067,8 +1068,8 @@ def encode_one_dji_hw(
             if mv_desc:
                 pipe_log(mv_desc)
 
-            # 5. checks (payload sha256 + inventory + Gyroflow)
-            pipe_log("validating original vs final (dji check)...")
+            # 5. checks (payload sha256 + inventory + Gyroflow, level-gated)
+            pipe_log(f"validating original vs final (dji check={check_level})...")
             report = dji.run_dji_check(
                 original=src,
                 final=final,
@@ -1077,6 +1078,7 @@ def encode_one_dji_hw(
                 gyroflow=gyroflow,
                 scratch=work_dir / "validate",
                 vfr=vfr,
+                level=check_level,
                 log=pipe_log,
             )
             report["job_dir"] = str(work_dir)
@@ -1126,9 +1128,10 @@ def encode_one_dji_hw(
     gyro = report.get("gyroflow")
     logger.info(
         "[PRESERVE-OK] %s | PRESERVED=%d MODIFIED=%d MISSING=%d | "
-        "gyroflow=%s | warnings=%d",
+        "gyroflow=%s | check=%s | warnings=%d",
         src.name, s["PRESERVED"], s["MODIFIED"], s["MISSING"],
         gyro.get("status") if gyro else "not-run",
+        check_level,
         len(warnings),
     )
     file_logger.info(
@@ -1349,6 +1352,7 @@ def process_file_hw(
             preserve_reports=ctx.preserve_reports,
             keep_work=ctx.keep_work,
             no_downgrade=ctx.no_downgrade,
+            check_level=ctx.check_level,
             logger=logger,
             file_logger=file_logger,
             dry_run=ctx.dry_run,
