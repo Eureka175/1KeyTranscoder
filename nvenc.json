@@ -134,7 +134,7 @@
       "bframes": 5,
       "bref_mode": "each",
       "ref": 4,
-      "tf_level": "off",
+      "tf_level": 0,
       "nonrefp": false,
       "mv_precision": "q-pel",
       "chroma_qp_offset": -1,
