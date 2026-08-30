@@ -1,0 +1,278 @@
+# Source: https://forum.doom9.org/printthread.php?t=186767
+# Fetched: 2026-08-29 17:09:53 +08:00
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+<meta name="generator" content="vBulletin 3.8.11" />
+<title>Doom9's Forum -  Unable to compress film without visible green artefacts (banding)</title>
+<style type="text/css">
+<!--
+td, p, li, div
+{
+	font: 10pt verdana, geneva, lucida, 'lucida grande', arial, helvetica, sans-serif;
+}
+.smallfont
+{
+	font-size: 11px;
+}
+.tborder
+{
+	border: 1px solid #808080;
+}
+.thead
+{
+	background-color: #EEEEEE;
+}
+.page
+{
+	background-color: #FFFFFF;
+	color: #000000;
+}
+-->
+</style>
+</head>
+<body class="page">
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr valign="bottom">
+	<td><a href="https://forum.doom9.org/"><img src="images/misc/vbulletin3_logo_white.gif" alt="Doom9's Forum" border="0" /></a></td>
+	<td align="right">
+		<div class="smallfont"></div>
+		
+	</td>
+</tr>
+</table>
+
+<br />
+
+<div>
+	<a href="https://forum.doom9.org/index.php" accesskey="1"><strong>Doom9's Forum</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/index.php</em></span>)
+</div>
+<div>
+	- &nbsp; <a href="forumdisplay.php?f=84"><strong>Royalty free video codecs (VP8, VP9, AV1 and AV2)</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/forumdisplay.php?f=84</em></span>)
+</div>
+<div>
+	- &nbsp; - &nbsp;  <a href="showthread.php?t=186767" accesskey="3"><strong>Unable to compress film without visible green artefacts (banding)</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/showthread.php?t=186767</em></span>)
+</div>
+
+<br />
+
+<table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">hihu</td>
+			<td class="smallfont" align="right">6th January 2026 23:24</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+			<div><strong>Unable to compress film without visible green artefacts (banding)</strong><br />&nbsp;</div>
+		
+		
+			<div class="smallfont">3 Attachment(s)</div>
+		
+
+		<div>Hello everyone,<br />
+<br />
+I'm trying to encode the film The Bone Collector but somehow I'm unable to compress it without green blocking artifacts. <br />
+<br />
+I tried several CRF values, ranging from CRF 6 to CRF 22, and also added some tweaks to my command line, including the recommended 10-bit input. Furthermore, I'm using SVT-AV1 but recently tried to use AOM-AV1 on single frames, but even there on CRF 6, I get a lot of banding.<br />
+The worst part is at the beginning, during the taxi ride.<br />
+<br />
+Basically I'm using this command line:<br />
+<br />
+<div style="margin:20px; margin-top:5px">
+	<div class="smallfont" style="margin-bottom:2px">Code:</div>
+	<hr /><code style="margin:0px" dir="ltr" style="text-align:left">ffmpeg -i input.mkv \<br />
+-an \<br />
+-c:v libsvtav1 -crf 10 -preset 2 -pix_fmt yuv420p10le \<br />
+-svtav1-params &quot;aq-mode=2:tune=0:keyint=1s:enable-overlays=1:scd=1:scm=0:enable-variance-boost=1:enable-qm=1:qm-min=0:luminance-qp-bias=20:tf-strength=0:film-grain=6&quot; \<br />
+-y output.mkv</code><hr />
+</div>I found most of the additional parameters online, and especially enable-variance-boost, luminance-qp-bias=20 is recommended for dark content. I also enabled the recommendations form svt-av1-psy.<br />
+<br />
+The only thing that helps a little is enabling film-grain with low values (4-6) to get rid of the large green veil that lies over the image.<br />
+<br />
+After discovering this &quot;problem&quot; I took a look at other films, and especially dark and not moving image content is problematic, like dark skies with clouds.<br />
+<br />
+Here are some pictures. The original, the SVT AV1 version, and also one encoded with x264. x264 loses plenty of details, but the things that should be black are black.<br />
+<br />
+Is there anything I can optimize in the command line? Or what else could I try.<br />
+Thank you very much for your help. Much appreciated. <br />
+hihu</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">GeoffreyA</td>
+			<td class="smallfont" align="right">7th January 2026 08:44</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>Hello hihu,<br />
+<br />
+I carefully looked but couldn't find green areas on the picture. I think these are two separate problems. The green could be related to your playback chain. What player and renderer are you using? Do you see green in all scenes? What happens after removing -pix_fmt yuv420p10le? At any rate, there does seem to be a colour shift between the images, the AV1 looking &quot;redder.&quot;<br />
+<br />
+Secondly, regarding the banding, that seems present in the source, so debanding would need to be run before encoding; for example, neo_f3kdb.<br />
+<br />
+Not sure how to handle dark scenes in SVT-AV1, but you are on the right track with variance-boost. Try the <a href="https://github.com/QuickFatHedgehog/FFmpeg-Builds-SVT-AV1-HDR/releases" target="_blank">SVT-AV1-HDR fork</a> too; it handles grain better. In x264/5, use -aq-mode 3 for tackling dark scenes.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">Z2697</td>
+			<td class="smallfont" align="right">7th January 2026 14:03</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>Not even the same frame? Come on.<br />
+<br />
+And x264 loses detail comparing to SVT-AV1? To be nice to each other, I really don't know what to say.<br />
+(assuming pic1 is source pic2 is av1 pic3 is x264)</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">Selur</td>
+			<td class="smallfont" align="right">7th January 2026 20:11</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>maybe adding vui signaling of luma scale, color matrix, etc. could help,....</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">hihu</td>
+			<td class="smallfont" align="right">8th January 2026 15:23</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+			<div class="smallfont">3 Attachment(s)</div>
+		
+
+		<div>Hello, <br />
+<br />
+Thank you, GeoffreyA, for your help. You are a genius. It's really related to the playback.<br />
+I'm new to this HDR stuff and my Linux system recently integrated HDR in an experimental state.<br />
+However, this seems to do the trick. Disabling HDR on the monitor.<br />
+<br />
+I took a look at this forum post from my Windows computer, and I also was unable to spot any difference. This was because HDR was disabled; then I enabled it, and then you were able to see the artifact.<br />
+As I'm not experienced with this HDR display, disabling the HDR helps. It seems you are not able to play SDR content on an HDR-enabled display.<br />
+<br />
+I did two encodes of only this picture, with and without HDR, and the HDR version seems to be a little brighter on the HDR monitor with HDR enabled.<br />
+<br />
+@Z2697: Those new pictures are the same frame, just for you info. ref_0011 is the original reference. and 8 bit and 10 bit are the encoded ones.<br />
+<br />
+Thank you<br />
+hihu</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">benwaggoner</td>
+			<td class="smallfont" align="right">12th January 2026 23:13</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>hihu</strong>
+					(Post 2026939)
+				</div>
+				<div style="font-style:italic">@Z2697: Those new pictures are the same frame, just for you info. ref_0011 is the original reference. and 8 bit and 10 bit are the encoded ones.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>They look pretty much identical to me other than some slight tone mapping variance. JPEG doesn't really support HDR on any platform I know of, so I'm not sure how you made these or what I am looking at, or should be seeing.</div>
+	</td>
+</tr>
+</table>
+<br />
+
+<br />
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr valign="top">
+	<td class="smallfont">All times are GMT +1. The time now is <span class="time">10:09</span>.</td>
+	<td align="right">
+		<div class="smallfont"></div>
+		
+	</td>
+</tr>
+</table>
+
+<p class="smallfont" align="center">
+	Powered by vBulletin&reg; Version 3.8.11<br />Copyright &copy;2000 - 2026, vBulletin Solutions Inc.
+	<br />
+	
+</p>
+
+</body>
+</html>

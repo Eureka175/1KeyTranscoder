@@ -1,0 +1,1370 @@
+﻿ 
+"Visually lossless" encoding (or close to it) for UHD sources: experiences? - Doom9's Forum 
+Welcome to Doom9 's Forum, THE in-place to be for everyone interested in DVD conversion. 
+Before you start posting please read the forum rules . By posting to this forum you agree to abide by the rules. 
+Domains: forum.doom9.org / forum.doom9.net / forum.doom9.se 
+Doom9's Forum 
+ > Video Encoding 
+> High Efficiency Video Coding (HEVC) 
+"Visually lossless" encoding (or close to it) for UHD sources: experiences?
+User Name 
+Remember Me? 
+Password 
+Register 
+FAQ 
+Today's Posts 
+Search 
+Search Forums 
+Show Threads 
+Show Posts 
+Tag Search 
+Advanced Search 
+Go to Page... 
+Thread Tools 
+Search this Thread 
+21st June 2017, 13:51
+# 1 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+"Visually lossless" encoding (or close to it) for UHD sources: experiences? 
+Hello doom9 community!
+I am a new user in this forum...
+However, I have been reading here for as long as I can remember. 
+I would like to pick your brains regarding reasonable presets for high quality HEVC encoding on UHD sources. 
+To give you a frame of reference for what I am looking for, this is how I encode and used to encode 1080p Blu-ray sources, based on my own trials and findings:
+Originally, I used the following:
+- x264 8bit
+- Preset: Slow
+- Tune: Film
+- CRF: 16
+- Audio: DTS-HD / TrueHD / Atmos passthrough
+Recently, I switched to HEVC for 1080p sources:
+- x265 10bit
+- Preset: Medium
+- Tune: Grain
+- CRF: 17
+- Audio: opus 1.1.5 (640kbit/s VBR for 8 channels, 480kbit/s VBR for 6 channels) for DTS-HD / TrueHD, passthrough for Atmos
+My recent findings were the following:
+- x265 8bit is useless in my eyes (at least for 1080p / 8bit sources), looks much worse than x264 8bit. Way too much banding.
+- x265 @ no tune is too blurry for me.
+- x265 10bit + Grain @ Medium @ CRF17 saves 20-30% in comparison to my old x264 8bit setting, while looking equal or better. 
+- opus obviously saves a lot of space, bitrate is even higher than needed for transparency (buffer for a clear conscience). 
+I know that the pro community here probably uses custom command line settings only, but I like the convenience of Handbrake and I have always been happy with the presets and tunes.
+However, based on my settings for 1080p stuff, what do you think would be a good UHD (2160p / 10bit / BT.2020 / HDR10) source equivalent?
+I encoded one of those LG or Samsung UHD demos with my usual HEVC settings - it looked perfect to me and saved some space too... But it also took ages (encoding speed was 1.7 fps average) and I was just wondering if I can squeeze either a few more fps or a higher saving out of it, while still being "visually lossless" or close to it.
+Ideally I should do my own trials again, I know that of course.
+But that seems much more difficult on my non-UHD PC, I'd always have to go to the TV and side-by-side comparisons seem very difficult too...
+So I thought I'd ask you guys, maybe you are already there and have some good advice for me? 
+Thank you very much in advance!
+Last edited by jd17; 21st June 2017 at 13:54 .
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+23rd June 2017, 08:01
+# 2 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Is there something wrong with my question or am I just too early in asking it? 
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+23rd June 2017, 11:13
+# 3 
+|   Link 
+Gser 
+Registered User
+Join Date: Apr 2008
+Posts: 374
+This has some good hints. 
+https://forum.doom9.org/showthread.php?t=172458 
+Tune grain takes care of most of it, except for qcomp and deblock settings. Personally I use --no-strong-intra-smoothing on higher CRFs, you'll just have to encode and see if it makes a difference for you.
+Gser 
+View Public Profile 
+Find More Posts by Gser 
+23rd June 2017, 11:55
+# 4 
+|   Link 
+Motenai Yoda 
+Registered User
+Join Date: Jan 2010
+Posts: 704
+first, what version of x265 are you comparing to x264? as the last lambda2 patch greatly improve low detail retention
+second you are using preset medium which disable psy-rdoq enhancement too
+btw iirc opus max bitrate is about 510kbps, and imho it's just overkill
+__________________
+powered by Google Translator
+Motenai Yoda 
+View Public Profile 
+Find More Posts by Motenai Yoda 
+23rd June 2017, 12:26
+# 5 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Gser 
+This has some good hints. 
+https://forum.doom9.org/showthread.php?t=172458 
+Tune grain takes care of most of it, except for qcomp and deblock settings. Personally I use --no-strong-intra-smoothing on higher CRFs, you'll just have to encode and see if it makes a difference for you.
+As far as I see it, this thread is mainly about 1080p sources, or am I wrong? I thought things might be different for 2160p? Are they not?
+Apart from that, I did read a bit in that thread before but the post from "sneaker_ger"...
+https://forum.doom9.org/showthread.p...01#post1733901 
+...eventually made me decide against using those settings.
+While that custom film tune adds some detail, it also introduces a lot of artifacts.
+To me grain seems much closer to the source and I do have more detail due to using CRF 17 instead of 19.5-20 in the example.
+The whole recommendation is also based on the slower preset, which is just unbearably slow on my i5-7500.
+I did however compare x265 10bit CRF17 grain at presets fast, medium, slow and slower and there was no significant gain in quality of slow or slower over medium in my eyes.
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+23rd June 2017, 12:34
+# 6 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Motenai Yoda 
+first, what version of x265 are you comparing to x264? as the last lambda2 patch greatly improve low detail retention
+I am using x265 10bit 2.3 from this post:
+https://forum.handbrake.fr/viewtopic...=10bit#p169744 
+Quote:
+second you are using preset medium which disable psy-rdoq enhancement too
+Yes, I kind of answered why I use medium in the previous post...
+Should I manually enable psy-rdoq for medium?
+Quote:
+btw iirc opus max bitrate is about 510kbps, and imho it's just overkill
+510kbit/s is maximum for stereo and yes, overkill for stereo of course.
+opus recommends up to 450kbit/s for 8 channels, so I just added some bitrate for my clear conscience. 
+The files are still small and setting 640kbit/s VBR for 8 channels usually ends up at around 530kbit/s average (range between 470kbit/s and 620kbit/s until now).
+Last edited by jd17; 23rd June 2017 at 12:38 .
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+23rd June 2017, 15:40
+# 7 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Motenai Yoda 
+as the last lambda2 patch greatly improve low detail retention
+I just googled a bit and saw that now there is x265 2.4 - I assume you are referring to that update?
+Do you know where I can get the according libx265_main10.dll needed for Handbrake in Windows?
+Unfortunately, the Handbrake team has not released that yet...
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+23rd June 2017, 21:03
+# 8 
+|   Link 
+davidsama 
+Registered User
+Join Date: Sep 2006
+Posts: 36
+http://www.msystem.waw.pl/x265/ 
+davidsama 
+View Public Profile 
+Find More Posts by davidsama 
+26th June 2017, 07:11
+# 9 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Thank you so much! 
+I'll try to conduct some comparisons between 2.3 and 2.4...
+Due to the lack of responses I assume there are not many 2160p experiences yet..?
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+2nd July 2017, 09:53
+# 10 
+|   Link 
+Winston_Smith_101 
+Registered User
+Join Date: Sep 2016
+Posts: 16
+For 1080p sources I use these settings and the output is visually nearly lossless to my eyes: "--crf 18 --preset veryslow --output-depth 10 --rskip --no-sao" The Options are explained here: http://x265.readthedocs.io/en/default/cli.html 
+The "--no-sao" Switch makes a huge difference. The Output gets much sharper. It kills the "blurryness" you mentioned in your first post. -> Try it! Personally I dont use "tune grain", because the files get so much bigger with this option and with the "--no-sao" switch the output quality is far good enough.
+I assume that for 2160p sources --crf 19 or 20 could be enough.
+I hate to say it, but your Intel Core i5-7500 is not fast enough for hq x265 encoding. YOu can do it, but it takes ages. You need a much faster High End CPU for this.
+Winston_Smith_101 
+View Public Profile 
+Find More Posts by Winston_Smith_101 
+2nd July 2017, 18:27
+# 11 
+|   Link 
+AMED 
+Registered User
+Join Date: Sep 2004
+Location: Auckland, New Zealand
+Posts: 466
+Is there much of the bitrate bump by using the --no-soa with your current settings?
+__________________
+A Man Eating Duck
+AMED 
+View Public Profile 
+Find More Posts by AMED 
+3rd July 2017, 09:39
+# 12 
+|   Link 
+Winston_Smith_101 
+Registered User
+Join Date: Sep 2016
+Posts: 16
+Quote:
+Originally Posted by AMED 
+Is there much of the bitrate bump by using the --no-soa with your current settings?
+I can't see any significant increase in bitrate with "--no-sao".
+Winston_Smith_101 
+View Public Profile 
+Find More Posts by Winston_Smith_101 
+5th July 2017, 07:56
+# 13 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Winston_Smith_101 
+For 1080p sources I use these settings and the output is visually nearly lossless to my eyes: "--crf 18 --preset veryslow --output-depth 10 --rskip --no-sao" The Options are explained here: http://x265.readthedocs.io/en/default/cli.html 
+The "--no-sao" Switch makes a huge difference. The Output gets much sharper. It kills the "blurryness" you mentioned in your first post. -> Try it! Personally I dont use "tune grain", because the files get so much bigger with this option and with the "--no-sao" switch the output quality is far good enough.
+I assume that for 2160p sources --crf 19 or 20 could be enough.
+Thanks for your help!
+Although I doubt that your settings are enough for me on 1080p sources (even tune grain is already worse compared to x264 film on sources with grain), I think just using "--no-sao" seems like a very good alternative for 2160p. 
+I will definitely do some comparisons (for 1080p too, of course).
+I just wonder why you would use the "veryslow" preset, nobody seems to go slower than "slower"...
+Do you actually see a visual benefit of veryslow over slower, slow or medium? ...Or a reasonable file size reduction?
+Quote:
+I hate to say it, but your Intel Core i5-7500 is not fast enough for hq x265 encoding. YOu can do it, but it takes ages. You need a much faster High End CPU for this.
+Well, yes and no.
+I bought the i5-7500 because it is one of the most efficient CPUs out there. Even though it's obviously slower than an i7-7700 for instance, the efficiency of the i7 is worse (i.e. the power consumption over encoding time is higher).
+I also found that more and more threads only get you diminishing returns.
+I'm perfectly happy with the 1080p encoding speed of x265, but 2160p is definitely a different beast.
+I assume your CPU is much more powerful, what encoding speed do you get on 2160p / 10bit / BT.2020 / HDR10 sources when you use x265 10bit, preset medium, tune film and CRF17?
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+5th July 2017, 16:13
+# 14 
+|   Link 
+Winston_Smith_101 
+Registered User
+Join Date: Sep 2016
+Posts: 16
+Quote:
+Originally Posted by jd17 
+Although I doubt that your settings are enough for me on 1080p sources (even tune grain is already worse compared to x264 film on sources with grain), I think just using "--no-sao" seems like a very good alternative for 2160p. 
+I will definitely do some comparisons (for 1080p too, of course).
+These settings do not produce REALLY lossless results, but are very pleasing to my eyes, more that necessary. 
+Crf 17 results are more detailed, but not necessary for me. They are only much larger in filesize. Without direct comparison I see no obvious losses. 
+Quote:
+Originally Posted by jd17 
+I just wonder why you would use the "veryslow" preset, nobody seems to go slower than "slower"...
+Do you actually see a visual benefit of veryslow over slower, slow or medium? ...Or a reasonable file size reduction?
+I use veryslow because of the file size reduction. Maybe this is not really necessary, but I'm not in a hurry. My processors are fast enough. I use x265 because I like high quality movies without excessive bitrates. I would like to use the full potential of the codec. Ok, the "placebo" settings are to slow for my machine. ;-)
+My computer has 2 Intel Xeon e5-2683 v3 CPUs each with 14 cores. If I encode 4 1080p movies at the same time x265 uses all cores very well. Sorry, I have so far no experience with 2160p encodes.
+Last edited by Winston_Smith_101; 5th July 2017 at 16:18 .
+Winston_Smith_101 
+View Public Profile 
+Find More Posts by Winston_Smith_101 
+7th July 2017, 09:40
+# 15 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Winston_Smith_101 
+The "--no-sao" Switch makes a huge difference. The Output gets much sharper. It kills the "blurryness" you mentioned in your first post. -> Try it! Personally I dont use "tune grain", because the files get so much bigger with this option and with the "--no-sao" switch the output quality is far good enough.
+You Sir, are a genius. 
+Simply adding --no-sao makes such a big difference!
+However, the bitrate bump is very minor and encoding speed also barely suffers. 
+I created a series of comparison screenshots last night, I'll share them when I get home today.
+Essentially it's obviously not as close to the source as tune grain, but so much better than regular tune=none without adjustments.
+It really seems like the best "bang for the buck". 
+I cannot understand why sao is not disabled by default.
+Is it essential at low bitrates?
+I updated my personal encoding presets accordingly. 
+https://docs.google.com/spreadsheets...it?usp=sharing 
+Last edited by jd17; 7th July 2017 at 09:43 .
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+7th July 2017, 10:04
+# 16 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Winston_Smith_101 
+My computer has 2 Intel Xeon e5-2683 v3 CPUs each with 14 cores. If I encode 4 1080p movies at the same time x265 uses all cores very well.
+That is just insanity! 
+So you have 56 threads in one machine?!
+I have to admit that I was referring to x264 regarding diminishing returns of more cores / threads.
+The performance gains may very well be much better on x265, I don't know.
+Does that in return mean that x265 utilizes 14 threads well for one movie?
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+7th July 2017, 14:55
+# 17 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+I used avidemux to go to the exact frame, made a screenshot with the print key and saved the file as .tif.
+Obviously I had to convert the image to .jpg for the upload, I used paint.net and moved the slider to 100%.
+The screenshot is a B-frame from "Captain America: Civil War".
+5 minute source sample is 812 MB.
+1. x265 10bit lossless. tif file size is 1.36 MB.
+http://i.imgur.com/KvlXsfT.jpg 
+(I created a 10bit lossless encode to avoid 10bit to 8bit dithering noise difference in the image comparison.)
+2. x265 10bit CRF17 medium grain, v2.4. tif file size is 1.26 MB.
+http://i.imgur.com/Gy5id4Z.jpg 
+Video is 267 MB.
+3. x265 10bit CRF17 medium grain, v2.3. tif file size is 1.25 MB.
+http://i.imgur.com/QSdrHUW.jpg 
+Video is 238 MB.
+4. x265 10bit CRF17 medium none, no-sao, v2.4. tif file size is 1.21 MB.
+http://i.imgur.com/SHSqgjJ.jpg 
+Video is 108 MB.
+5. x265 10bit CRF17 medium none, v2.4. tif file size is 1.07 MB.
+http://i.imgur.com/C7GrH4D.jpg 
+Video is 99 MB.
+6. x265 10bit CRF17 medium none, v2.3. tif file size is 1.07 MB.
+http://i.imgur.com/MKZjAbL.jpg 
+Video is 89 MB.
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+7th July 2017, 19:00
+# 18 
+|   Link 
+Winston_Smith_101 
+Registered User
+Join Date: Sep 2016
+Posts: 16
+Quote:
+Originally Posted by jd17 
+That is just insanity! 
+So you have 56 threads in one machine?! Does that in return mean that x265 utilizes 14 threads well for one movie?
+Thank you. x265 utilizes 14 threads very well. It can utilize more than 14 threads! I encode 4 1080p movies at the same time with 14 threads each, because these utilize the 2 CPUs a little bit better than just 2 movies with 28 threads each. But the encoding speed with just 2 movies and 28 threads each is per movie somewhat faster. x265 with one 1080p movie utilizes 28 threads on average 70-100%, but 2 1080p movies with 14 threads each 90-100%. So I decided to encode 4 movies at the same time. :-)
+My screenshot is in the attchment.
+Quote:
+Originally Posted by jd17 
+I cannot understand why sao is not disabled by default.
+A very good question, but I dont know the answer. It is also a mystery to me. Because of sao I did't like x265 at the beginning.
+Attached Images 
+X265.jpg (203.2 KB, 8969 views) 
+Winston_Smith_101 
+View Public Profile 
+Find More Posts by Winston_Smith_101 
+9th July 2017, 11:13
+# 19 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Gser 
+Tune grain takes care of most of it, except for qcomp and deblock settings.
+I added --qcomp 0.8 and --deblock -2:-2 to tune grain, but the result looks a bit worse than standard tune grain to me.
+However, there is a bit of a file size reduction.
+Quote:
+Personally I use --no-strong-intra-smoothing on higher CRFs, you'll just have to encode and see if it makes a difference for you.
+I tried that as well.
+While the difference is extremely subtle when added to tune grain, adding --no-strong-intra-smoothing to "tune none" degrades picture quality in my opinion.
+It introduces a bit of banding that is not there in the source.
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+9th July 2017, 12:07
+# 20 
+|   Link 
+Gser 
+Registered User
+Join Date: Apr 2008
+Posts: 374
+Quote:
+Originally Posted by jd17 
+It introduces a bit of banding that is not there in the source.
+Even in 10-bit?
+Gser 
+View Public Profile 
+Find More Posts by Gser 
+9th July 2017, 13:30
+# 21 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Yes, I only use 10bit for x265.
+Have a look:
+Quote:
+Originally Posted by jd17 
+1. x265 10bit lossless.
+http://i.imgur.com/KvlXsfT.jpg 
+4. x265 10bit CRF17 medium none, no-sao, v2.4.
+http://i.imgur.com/SHSqgjJ.jpg 
+x265 10bit CRF17 medium none, no-sao, no-strong-intra-smoothing:
+http://i.imgur.com/afa3bxE.jpg 
+It is no massive banding, but still visible at his cheek and chin for instance.
+Last edited by jd17; 9th July 2017 at 13:33 .
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+9th July 2017, 14:15
+# 22 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Winston_Smith_101 
+A very good question, but I dont know the answer. It is also a mystery to me. Because of sao I did't like x265 at the beginning.
+https://forum.doom9.org/showpost.php...postcount=5446 
+Maybe we'll get an answer. 
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+16th July 2017, 11:00
+# 23 
+|   Link 
+Weyoun 
+Registered User
+Join Date: Jul 2017
+Posts: 11
+Quote:
+Originally Posted by jd17 
+Yes, I only use 10bit for x265.
+Have a look:
+x265 10bit CRF17 medium none, no-sao, no-strong-intra-smoothing:
+http://i.imgur.com/afa3bxE.jpg 
+It is no massive banding, but still visible at his cheek and chin for instance.
+If you compare his facial hair, you will see why no-strong-intra-smoothing is preferable by some people. It really depends on each individual what your eyes/brain notice more. I did not noticed any banding difference but immediately noticed the difference in quality of facial hair. 
+The difference that no-strong-intra-smoothing is even more pronounced with sources with more small fine detail such as film grain, rainy scenes, or oceanic/lake scenes with water rippling over the screen. It will not make as big of a difference in an office scene of a non-grainy movie such as the one you chose for comparison.
+Weyoun 
+View Public Profile 
+Find More Posts by Weyoun 
+17th July 2017, 13:55
+# 24 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+I am struggling to see what you mean to be honest.
+Do you mean his eyebrow when you say facial hair?
+If so - I do see a difference there too, the eyebrow in the --no-strong-intra-smoothing encode is a bit thicker.
+However, the --strong-intra-smoothing encode is closer to the source in my opinion.
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+18th July 2017, 16:31
+# 25 
+|   Link 
+Weyoun 
+Registered User
+Join Date: Jul 2017
+Posts: 11
+Quote:
+Originally Posted by jd17 
+I am struggling to see what you mean to be honest.
+Do you mean his eyebrow when you say facial hair?
+If so - I do see a difference there too, the eyebrow in the --no-strong-intra-smoothing encode is a bit thicker.
+However, the --strong-intra-smoothing encode is closer to the source in my opinion.
+Compare the shape of the hair round his mouth/under his nose. In the one with strong-intra-smoothing, it looks more like an artificial circle. In the one with non-strong-intra-smoothing, it looks more like an organic shape like the source. This is a small difference. You will need a different scene/source, with more small fine details, to see bigger benefits of non-strong-intra-smoothing. Also, the difference is more pronounced if you turn up the CRF. For low CRF, there will be little difference.
+Weyoun 
+View Public Profile 
+Find More Posts by Weyoun 
+27th July 2017, 07:28
+# 26 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+IMO HEVC is not the codec I would use to keep UHD visually lossless, if that is needed I would just spend extra on storage and use XAVC-I or Prores, or just keep the source as is, There is a limit for how much "lossless" can be compressed, and giving the extra encoding time to achieve this with HEVC it is not worth it. The goal imo is too make it transparent under normal viewing conditions while keeping the file size as small as possible. Personally for this reason I'm not that fond of tune grain, it doubles bitrate and encoding time for very little difference in viewing experience for none grainy sources. 
+These are the "best" settings for size/quality ratio I have found when experimenting with UHD encodes: 
+Code:
+--preset slow --profile main10 --level-idc 51 --crf 22 --keyint fps*10 --min-keyint fps --rc-lookahead fps --bframes 8 
+For anything not shot on film these settings have giving me very good consistent results in the 10-20Mbps range for 24/25p material and 20-30Mbps for 50/60p with a lot of movement (from roughly ten high quality XAVC-I/PRORES/uncompressed sources) that have been visually transparent under normal viewing conditions (55" oled @ a 2,5m viewing distance). Ofc, when comparing stills up close they are not visually lossless (although clean sources have come close), but from my encodes I have found that this is a very good sweet spot for compression for UHD. But sure tune grain or other parameters can be added, but in my experience it ads a lot of bits for very little visual benefit (for non grainy sources that is). For some sources I have not been able to tell the difference from crf18 with tune grain even though it the file size has been five times as high as crf22. 
+The only HQ grain heavy UHD source I got is the SVT test sequence, at CRF24 ~40Mbps it looks alright with minimal noticeably artifacts at normal viewing distance but most grain is lost. To retain the grain and make it look visually lossless 100Mbps+ with extremely slow encoding times is needed. 
+Encoding speed for these settings on a 4770k is roughly 1.7fps, which is imo to slow for universal usability. I would like achieve at least 5fps for the same kind of quality/file size. Which looks like a possibility with newer versions and something like 7820X so we are definitely getting there, this was not the case a few years ago with x265. From 2.4 and onwards I have starting to be confident in the consistent quality of the encoder, so from now on I would just like to see the same amount of quality in faster encodes. 
+Note that this is only for UHD, for lower res, settings and the pro and cons of using HEVC is a different beast. But for UHD, low CRF values and grain retention can result in really huge file sizes when re-encoding from a high quality source, most sources get a bitrate of 50-100Mbps, 10-40 is the range I have been targeting and there is no question that x265 absolutely destroys x264 at this res and at these bitrates, and the visual fidelity is really good.
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+27th July 2017, 08:43
+# 27 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Thanks for your input! 
+I have already found my sweetspot and shared that in a parallel thread:
+Basic syntax:
+Quote:
+--profile main10 --high-tier --level-idc 5.1 --no-open-gop --hdr --hrd --aud --chromaloc 2 --range limited --colorprim bt2020 --transfer smpte-st-2084 --colormatrix bt2020nc --master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(*,*)" --max-cll "*,*"
+Custom (my quality settings):
+Quote:
+--preset medium --crf 17.00 --no-sao --min-keyint 1 --keyint 120 --hdr-opt
+For movies with non-reference picture quality I will use --crf 19 instead of 17.
+I agree that --tune grain is overkill for UHD sources, which is why I was very happy about Winston_Smith_101's simple recommendation to just use --no-sao.
+I also meant "transparent for normal viewing conditions" when I said "visually lossless", however I want that to be valid for close viewing distances to a very big screen as well.
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+29th July 2017, 15:46
+# 28 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by jd17 
+Thanks for your input! 
+I have already found my sweetspot and shared that in a parallel thread:
+Basic syntax:
+Custom (my quality settings):
+For movies with non-reference picture quality I will use --crf 19 instead of 17.
+I agree that --tune grain is overkill for UHD sources, which is why I was very happy about Winston_Smith_101's simple recommendation to just use --no-sao.
+I also meant "transparent for normal viewing conditions" when I said "visually lossless", however I want that to be valid for close viewing distances to a very big screen as well.
+Ignoring the HDR commands (source dependant), those settings gives a noticable drop in qulity for the compression ratio im targetting. What is the rationale for preset medium, no open gop and keyframes?
+I will play with sao, although I have a feeling that disabling it might have a negative effect at some point (i.e more beneficial at higher bitrates).
+What bitrates are you seeing with those settings? Have you tried to compress a hq source? Encoding a uhd source that is close to lossless will resultat in a much higher bitrate at low crf values then a "smooth" already compressed source. Everyone have their preferences, but those settings will resualt in way to large files for my tasting.
+Last edited by excellentswordfight; 29th July 2017 at 15:56 .
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+29th July 2017, 21:48
+# 29 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by excellentswordfight 
+What is the rationale for preset medium, no open gop and keyframes?
+Medium:
+Primarily encoding speed. Medium encodes are also a bit smaller than slow, slower and veryslow (those three had about the same size in my tests).
+Although the medium encodes are a bit smaller, I have not seen any degradation at CRF 17 in comparison so far.
+I assume that the same visual quality as CRF 17 medium can be achieved with a higher CRF at preset slower or veryslow. Probably CRF 18 or 19.
+no-open-gop:
+Part of the --uhd-bd spec.
+I did not notice any downside in tests so I kept it for better compatibility.
+keyint:
+High keyint values can cause UHD playback devices to timeout during seek. The benefit above 120 is marginal, so I selected this value as compromise. --uhd-bd would trigger 24.
+You can see my test results here:
+https://forum.doom9.org/showthread.p...13#post1812613 
+Quote:
+I will play with sao, although I have a feeling that disabling it might have a negative effect at some point (i.e more beneficial at higher bitrates).
+Well, I even created an encode at an extremely low bitrate and still preferred the non-blurry look of --no-sao. So I don't see a downside.
+https://forum.doom9.org/showthread.p...48#post1811748 
+Quote:
+What bitrates are you seeing with those settings? Have you tried to compress a hq source? Encoding a uhd source that is close to lossless will resultat in a much higher bitrate at low crf values then a "smooth" already compressed source. Everyone have their preferences, but those settings will resualt in way to large files for my tasting.
+I only tested on a few of the UHD HDR demos out there and I am quite happy with the bitrates. Mostly between 10 and 20 mbit/s (while the sources are between 40 and 80 mbit/s).
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+30th July 2017, 18:06
+# 30 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by jd17 
+Medium:
+Primarily encoding speed. Medium encodes are also a bit smaller than slow, slower and veryslow (those three had about the same size in my tests).
+Although the medium encodes are a bit smaller, I have not seen any degradation at CRF 17 in comparison so far.
+I assume that the same visual quality as CRF 17 medium can be achieved with a higher CRF at preset slower or veryslow. Probably CRF 18 or 19.
+no-open-gop:
+Part of the --uhd-bd spec.
+I did not notice any downside in tests so I kept it for better compatibility.
+keyint:
+High keyint values can cause UHD playback devices to timeout during seek. The benefit above 120 is marginal, so I selected this value as compromise. --uhd-bd would trigger 24.
+You can see my test results here:
+https://forum.doom9.org/showthread.p...13#post1812613 
+Well, I even created an encode at an extremely low bitrate and still preferred the non-blurry look of --no-sao. So I don't see a downside.
+https://forum.doom9.org/showthread.p...48#post1811748 
+I only tested on a few of the UHD HDR demos out there and I am quite happy with the bitrates. Mostly between 10 and 20 mbit/s (while the sources are between 40 and 80 mbit/s).
+I played a bit with SAO and yes, disabling it gave better results for my settings as well.
+I dont see the reason to keep it UHD-BD compatible-ish, since all those settings hurt compression, and it will play fine on most players with a USB stick anyway so why bother with it. The likelihood of it ending up on an UHD-BD disk if not encoded for that medium in the first place seems very unlikely. And encoding 50p or greater, would severely suffer with those settings
+I did a quick test, comparing these settings
+Code:
+--preset slow --profile main10 --level-idc 51 --crf 22 --keyint 240 --min-keyint 24 --rc-lookahead 24 --bframes 8 --no-sao 
+Code:
+--preset medium --profile main10 --level-idc 51 --crf 18 --keyint 120 --min-keyint 1 --no-open-gop --no-sao 
+The crf 18 encode turned out over twice as big and I have to say that the quality improvement was very low, and indistinguishable from normal viewing distance. If the speed gain outweights the quality/size ratio, well thats personal, but I wouldnt make that trade.
+Comparison samples: https://ufile.io/mp0tv 
+Last edited by excellentswordfight; 30th July 2017 at 18:29 .
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+31st July 2017, 00:34
+# 31 
+|   Link 
+Asmodian 
+Registered User
+Join Date: Feb 2002
+Location: San Jose, California
+Posts: 2,673
+You cannot make the comparison of the important parameters for compatibility and faster seeking (--keyint 120, --min-keyint 1, and --no-open-gop) while changing the crf value by 4! If crf 22 is already transparent you wouldn't notice a quality improvement but the file size goes up a lot.
+Those settings actually hurt compression very little, almost the entire change in your file size was from the crf change, and they are often worth it for the improved seeking performance.
+--medium v.s. slow is not very significant either, certainly not needing 4 crf lower for the same quality, simply go with the slowest preset you can stand.
+__________________
+madVR options explained 
+Last edited by Asmodian; 31st July 2017 at 00:40 .
+Asmodian 
+View Public Profile 
+Find More Posts by Asmodian 
+31st July 2017, 07:11
+# 32 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by Asmodian 
+You cannot make the comparison of the important parameters for compatibility and faster seeking (--keyint 120, --min-keyint 1, and --no-open-gop) while changing the crf value by 4! If crf 22 is already transparent you wouldn't notice a quality improvement but the file size goes up a lot.
+Those settings actually hurt compression very little, almost the entire change in your file size was from the crf change, and they are often worth it for the improved seeking performance.
+--medium v.s. slow is not very significant either, certainly not needing 4 crf lower for the same quality, simply go with the slowest preset you can stand.
+I actually tried a bunch of different crf values, and a crf22 sample was included, and that encode displayed a pretty huge difference, big enough to even be noticeable at normal playback. And what I was fishing for was not that crf22 at slow settings is comparable per say to CRF18 at faster, but that CRF22 can look transparent with certain settings, rendering diminishing returns with higher values (especially below 20).
+And I was not saying that the open-gop, and keyframes interval settings were wrong, I was just questioning them.
+Last edited by excellentswordfight; 31st July 2017 at 07:31 .
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+31st July 2017, 08:08
+# 33 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by excellentswordfight 
+I played a bit with SAO and yes, disabling it gave better results for my settings as well.
+Glad to hear it. 
+Quote:
+I dont see the reason to keep it UHD-BD compatible-ish, since all those settings hurt compression, and it will play fine on most players with a USB stick anyway so why bother with it. The likelihood of it ending up on an UHD-BD disk if not encoded for that medium in the first place seems very unlikely. And encoding 50p or greater, would severely suffer with those settings
+I made several comparison tests, the only parameter triggered by --uhd-bd that actually hurts compression is --keyint.
+However, as you can see in my test, the impact is dramatically diminished by my compromise value of 120.
+--keyint 72 or 96 would be just as fine in most movies too (based on a 24p framerate of course).
+Every other --uhd-bd parameter...
+--no-open-gop
+--chromaloc 2
+--aud
+--level-idc 51
+--high-tier
+...has essentially no impact on compression whatsoever.
+https://forum.doom9.org/showthread.p...93#post1812493 
+Quote:
+Code:
+--preset slow --profile main10 --level-idc 51 --crf 22 --keyint 240 --min-keyint 24 --rc-lookahead 24 --bframes 8 --no-sao 
+I would actually be very interested if you see a difference between slow and medium at CRF 22. Since medium encodes are smaller (and encoding is much quicker), maybe there is something for you to gain as well. 
+Quote:
+If the speed gain outweights the quality/size ratio, well thats personal, but I wouldnt make that trade.
+Well, in that case you should encode slower or veryslow. That is where x265 is most efficient.
+Last edited by jd17; 31st July 2017 at 09:55 .
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+1st August 2017, 09:38
+# 34 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by jd17 
+Glad to hear it. 
+I made several comparison tests, the only parameter triggered by --uhd-bd that actually hurts compression is --keyint.
+However, as you can see in my test, the impact is dramatically diminished by my compromise value of 120.
+--keyint 72 or 96 would be just as fine in most movies too (based on a 24p framerate of course).
+I'm sure that these settings didn't effect much in your tests, and they sure as hell didnt effect at all my test (since they got the same amount of I-frames). But I have encoded stuff that uses greater then 120 I-frames interval, and 50p stuff were a greater interval and 8 bframes is very beneficial. And every I-frame save is an compression gain...
+Quote:
+Originally Posted by jd17 
+Glad to hear it. 
+Every other --uhd-bd parameter...
+--no-open-gop
+--chromaloc 2
+--aud
+--level-idc 51
+--high-tier
+...has essentially no impact on compression whatsoever.
+https://forum.doom9.org/showthread.p...93#post1812493 
+I'm well aware of those settings, and open gop does increase compression efficiency since b frames it can reference frames outside it's gop, is it significant enough to make any difference at high crf/bitrate vaules? Probably not.
+Quote:
+Originally Posted by jd17 
+Glad to hear it. 
+I would actually be very interested if you see a difference between slow and medium at CRF 22. Since medium encodes are smaller (and encoding is much quicker), maybe there is something for you to gain as well. 
+As I stated above, a small sample of this can be viewed in the "compare" sample of the uploaded screenshots. The difference is drastic.
+Last edited by excellentswordfight; 1st August 2017 at 09:46 .
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+1st August 2017, 22:48
+# 35 
+|   Link 
+Asmodian 
+Registered User
+Join Date: Feb 2002
+Location: San Jose, California
+Posts: 2,673
+Quote:
+Originally Posted by excellentswordfight 
+As I stated above, a small sample of this can be viewed in the "compare" sample of the uploaded screenshots. The difference is drastic.
+Are those frame types all the same or are you comparing I-frames to B-frames to P-frames? 
+I agree with you in that using medium instead a slower preset is never worth it, personally I always use veryslow or custom settings that are even slower than that, placebo is a bit too slow even for me. If medium is both faster and smaller than slow then the quality will be even worse than the change in speed or size alone would account for (increase crf by 0.1 if you want to drop the size a small amount).
+However, you seem to keep testing multiple things at once and discounting very reasonable options because you tested them as part of a command line that was also meant to reduce encode times a lot.
+Sorry to keep going on about it but I am against open-gop. 
+__________________
+madVR options explained 
+Asmodian 
+View Public Profile 
+Find More Posts by Asmodian 
+2nd August 2017, 07:32
+# 36 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by excellentswordfight 
+As I stated above, a small sample of this can be viewed in the "compare" sample of the uploaded screenshots. The difference is drastic.
+I had not looked into your files before because somehow I thought they were videos, not pictures.
+Would you be so kind as to provide the full resolution source screenshot as well?
+Honestly, just comparing the fullscreen CRF22 and CRF18 frames - CRF22 looks crisper to me!
+How would that be possible?! I know we are not supposed to compare stills, but I cannot believe this would just be medium vs. slow.
+Slow should never compensate for 4 whole CRF steps, right?!
+Maybe I had not selected moving objects that were fast enough in my own still comparisons... But I compared the speed preset alone and kept everything else the same, including CRF (normally 17) - always looking at B-frames only in all presets.
+Never have I seen such big differences!
+Are you sure there are no other parameters that could account for the difference in sharpness?
+According to your previous posts your only changes compared to regular --slow are the following:
+--keyint 240 (instead of 250)
+--min-keyint 24 (instead of 23)
+--rc-lookahead 24 (instead of 25)
+--bframes 8 (instead of 4)
+None of those settings should improve picture quality, right?
+I had another look at the preset differences and I tried to highlight common things in slower presets vs. medium, I also greyed out things that don't change:
+To my understanding, --rdoq-level 2 (and therefor --psy-rdoq 1 instead of 0) will make a big difference.
+--me, --subme and --ref maybe too.
+But still, is that enough to make such a big difference that CRF22 can look sharper than CRF18?
+I am doubting all of my own comparisons now... 
+Last edited by jd17; 2nd August 2017 at 14:08 .
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+3rd August 2017, 15:11
+# 37 
+|   Link 
+Winston_Smith_101 
+Registered User
+Join Date: Sep 2016
+Posts: 16
+In my experience, it is a really good idea to use relative slow compression settings. These pay themselves both with the file size, as well as with the picture quality. Today's machines are still too slow, especially with 4k content. In reasonable time it is hardly possible to use the full potential of x265.
+Winston_Smith_101 
+View Public Profile 
+Find More Posts by Winston_Smith_101 
+6th August 2017, 16:54
+# 38 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+@excellentswordfight:
+Unfortunately, I was able to reproduce your findings.
+As suspected, I did not choose objects that were moving as fast in my previous comparisons.
+Therefore, the difference between medium and slow seemed minor to me.
+This time I used the 2160p (but 8bit, BT.709, SDR) LG Demo "Hoverboard" and selected a few fast-paced B-frames.
+Just as in your comparison, the difference in sharpness between medium and slow is quite obvious in such frames - even when slow is paired with a much higher CRF like 22.
+Although I am pretty sure the difference (medium vs. slow) is almost invisible once the video is rolling, I have decided to follow your advice. 
+The step from medium to slow seems significant enough, as I have highlighted myself...
+Accordingly, I am changing my parameters to this:
+Quote:
+--preset slow --crf 18.00 --no-sao --min-keyint 1 --keyint 120 --hdr-opt
+The bitrate in CRF17 medium and CRF18 slow is pretty much the same.
+However, the difference in encoding speed is massive, and painful. 
+While I could yield quite acceptable 3.59 fps with medium/17, I'm left with 1.52 fps at slow/18...
+I am happy to provide some of the stills if anyone is interested.
+I'm not sure what to do with reference picture quality 1080p Blu-rays.
+https://docs.google.com/spreadsheets...it?usp=sharing 
+I kept using --tune grain on these and now I wonder if I get better results with CRF17 slow none (plus --no-sao) instead of CRF17 medium grain. Even lower CRF like 16, 15 etc. would still be smaller without tune grain...
+I could also go for CRF19 slow grain, which is about the same bitrate as CRF17 medium grain, but the encoding speed drops even more severely in this scenario:
+CRF17 medium grain: 7.55 fps
+CRF19 slow grain: 2.57 fps
+CRF15 slow none --no-sao: 3.72 fps
+(All three have about the same bitrate.)
+I am looking forward to all of your advice! 
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+8th August 2017, 18:58
+# 39 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+I uploaded a small comparison (for a 1080p reference Blu-ray) here:
+https://ufile.io/zxvta 
+I would really like to hear your opinion.
+One frame is fast movement, the second one is from a sharp close-up. All B-frames in source and encodes.
+I ruled out one of the three options but I am not certain about the two others. So I need your help. 
+Technically the source is a --lossless 10bit encode.
+Last edited by jd17; 8th August 2017 at 19:05 .
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+9th August 2017, 19:22
+# 40 
+|   Link 
+SeeMoreDigital 
+Life's clearer in 4K UHD
+Join Date: Jun 2003
+Location: Notts, UK
+Posts: 12,421
+I guess if you want to create 'visually lossless' looking HEVC encodes, it might be achieved by using just 'i-frames' or failing that 'i-frames' and 'p-frames' - if it's possible to do 
+It would also be interesting to see if such encodes are hardware playback compatible...
+__________________
+| I've been testing hardware media playback devices and software A/V encoders and decoders since 2001 | My Network Layout & A/V Gear | 
+SeeMoreDigital 
+View Public Profile 
+Find More Posts by SeeMoreDigital 
+11th August 2017, 22:13
+# 41 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Winston_Smith_101 
+For 1080p sources I use these settings and the output is visually nearly lossless to my eyes: "--crf 18 --preset veryslow --output-depth 10 --rskip --no-sao"
+As it turns out - I should never have doubted you. 
+The only thing that kept my initial test encodes from being perfect was the medium preset.
+Although even at medium, --no-sao was the main ingredient that made the big day/night difference, preset slow (in my case) gave it the edge.
+Essentially, CRF17 / slow / no-sao is pretty much as good as CRF17 / medium / grain. Either appears to be a bit closer to the source depending on what kind of still frame I choose, but none of this is visible when the video rolls.
+While CRF17 / slow / no-sao has a clear advantage in file size, CRF17 / medium / grain is almost twice as fast to encode.
+CRF18 and 19 are very good too. CRF20 starts to introduce some minor artifacts.
+I quickly ruled out CRF19 / slow / grain or better slow (and slower, veryslow, placebo) + grain in general.
+It definitely introduces artificial over-sharpening. It seems like --psy-rdoq 10.0 is responsible, since medium + grain (--psy-rdoq 0.0) is very good and true to the source.
+So, my general conclusion from all the testing is quite simple - maybe this helps someone else looking for sensible, (almost) transparent encodes in the future. 6 easy rules. 
+1. x265 version 2.4 or newer.
+2. 10 Bit.
+3. Preset: slow, slower, veryslow or placebo. As slow as possible, but at least "slow".
+4. CRF values between 16 and 19.
+5. Tune: none.
+6. --no-sao is mandatory.
+This applies to 1080p and UHD, the latter just gets some additional commands:
+Quote:
+--high-tier --level-idc 5.1
+--no-open-gop --min-keyint 1 --keyint 120
+--hdr --hdr-opt
+--hrd --aud --chromaloc 2
+--colorprim bt2020 --transfer smpte-st-2084 --colormatrix bt2020nc
+--master-display "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(*,*)" --max-cll "*,*"
+Thanks for all the help I received here. 
+Hopefully others can benefit from my experiences.
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+12th August 2017, 18:35
+# 42 
+|   Link 
+Boulder 
+Pig on the wing
+Join Date: Mar 2002
+Location: Finland
+Posts: 5,844
+Funny, one would expect that UHD resolution wouldn't require such a low CRF to look transparent.
+__________________
+And if the band you're in starts playing different tunes
+I'll see you on the dark side of the Moon... 
+Boulder 
+View Public Profile 
+Find More Posts by Boulder 
+14th August 2017, 07:41
+# 43 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+In the end, it all comes down to the kind of device you are watching on and your viewing distance to it.
+I inspected my encodes by getting close (~ 1m) to my 65" OLED.
+That way it is already very difficult for me to tell CRF19 and CRF17 apart.
+At CRF20, I start noticing "pixel clouds" around moving objects more and more...
+It does not seem to matter all that much if it's 1080p or 2160p - the potential issues are the same (and start being visible at the same or similar CRF values).
+So, judging from my normal viewing distance to the 65" TV (~ 3m), CRF17 and CRF18 are a bit overkill, yes.
+However, the bitrates I am seeing even with CRF17 are very reasonable and I don't want to have any regrets later. 
+My encodes should be transparent even on very large high end displays (or screens) and short viewing distances to them. YMMV. 
+Last edited by jd17; 14th August 2017 at 10:20 .
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+25th August 2017, 19:22
+# 44 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by jd17 
+In the end, it all comes down to the kind of device you are watching on and your viewing distance to it.
+I inspected my encodes by getting close (~ 1m) to my 65" OLED.
+That way it is already very difficult for me to tell CRF19 and CRF17 apart.
+At CRF20, I start noticing "pixel clouds" around moving objects more and more...
+It does not seem to matter all that much if it's 1080p or 2160p - the potential issues are the same (and start being visible at the same or similar CRF values).
+So, judging from my normal viewing distance to the 65" TV (~ 3m), CRF17 and CRF18 are a bit overkill, yes.
+However, the bitrates I am seeing even with CRF17 are very reasonable and I don't want to have any regrets later. 
+My encodes should be transparent even on very large high end displays (or screens) and short viewing distances to them. YMMV. 
+I done some more tests, with the uncompressed tears of steel source this time, which should be a very good source for representing uhd movies (non HDR though). And I still don' agree with you regarding the CRF values, especially now when we talk slow settings. CRF19 gave an bitrate of 40Mbps, this was indistinguishable from the source even when comparing stills, so even crf19 was overkill here and going for crf17-18 would have given bitrates even over what UHD-Bluray offers. I even seen sources were crf values in this range even breaks lvl5.1.
+CRF22 for this source ended up half as big and encoded faster, difference was hard to tell even from stills when unscaled. When zoomed you could tell that there was a loss of quality though. Source got transparent around CRF20.
+Played some with the iframes value, and it seemed like 
+ Code:
+--no-open-gop --min-keyint 1 --keyint 120 
+gave an 5%ish bitrate increase compared to the standard settings at the same crf/quality level.
+But again, the tradeoffs here is a personal preference. If total transparancy is important a lower CRF value might be necessary, but the difference in bitrate here is imo a bit to big to go as low as 17-18. But for me, all encodes have been transparent at playback with crf22 with the settings in this thread, so I take the drastic smaller file sizes any day.
+Last edited by excellentswordfight; 26th August 2017 at 00:50 .
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+25th August 2017, 21:46
+# 45 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Hi excellentswordfight!
+I am neither promoting any of this, nor am I downloading what I am going to talk about now...
+This is just an FYI. I am clearly distancing myself from the following:
+There are now actual UHD Blu-ray encodes of five different movies out there, swirling around the web.
+MediaInfo of those encodes can be viewed without downloading anything.
+It turns out that these encodes have been created using settings quite similar to what I concluded:
+x265 2.4
+Preset: slow
+Tune: none
+CRF: 17
+(Relevant) options: --hdr-opt --no-sao --deblock -2:-2 --no-open-gop --min-keyint 1 --keyint 24 --no-strong-intra-smoothing
+Those encodes range from 11.0 mbit/s for the smallest one to 29.5 mbit/s for the largest one, a very grainy movie.
+The average bitrate amongst these 5 movies is 19.5 mbit/s.
+Considering the fact that --deblock -2:-2 and --keyint 24 will add significant bitrate over my settings I feel quite confident in my findings.
+Those 5 movies also seem to represent a good average of what one might encounter sometime in the future.
+The source bitrates for those movies (also swirling around and MediaInfo viewable) range from 43.7 mbit/s to 72.6 mbit/s.
+Last edited by jd17; 25th August 2017 at 21:54 .
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+25th August 2017, 23:46
+# 46 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by jd17 
+Hi excellentswordfight!
+I am neither promoting any of this, nor am I downloading what I am going to talk about now...
+This is just an FYI. I am clearly distancing myself from the following:
+There are now actual UHD Blu-ray encodes of five different movies out there, swirling around the web.
+MediaInfo of those encodes can be viewed without downloading anything.
+It turns out that these encodes have been created using settings quite similar to what I concluded:
+x265 2.4
+Preset: slow
+Tune: none
+CRF: 17
+(Relevant) options: --hdr-opt --no-sao --deblock -2:-2 --no-open-gop --min-keyint 1 --keyint 24 --no-strong-intra-smoothing
+Those encodes range from 11.0 mbit/s for the smallest one to 29.5 mbit/s for the largest one, a very grainy movie.
+The average bitrate amongst these 5 movies is 19.5 mbit/s.
+Considering the fact that --deblock -2:-2 and --keyint 24 will add significant bitrate over my settings I feel quite confident in my findings.
+Those 5 movies also seem to represent a good average of what one might encounter sometime in the future.
+The source bitrates for those movies (also swirling around and MediaInfo viewable) range from 43.7 mbit/s to 72.6 mbit/s.
+Yes, keyint 24 would add noticeable increase in bitrate. 
+We can either discuss shady rips on the internet, or tests that we can controll and validate ourselves. I would rather choose the later, please feel free to share your findings.
+Tears of steel encode (crf19 with your settings):
+Code:
+ID : 1
+Format : HEVC
+Format/Info : High Efficiency Video Coding
+Format profile : Main 10@L5.1@High
+Codec ID : hev1
+Codec ID/Info : High Efficiency Video Coding
+Duration : 12 min 14 s
+Bit rate : 39.5 Mb/s
+Width : 3 840 pixels
+Height : 1 616 pixels
+Display aspect ratio : 2.40:1
+Frame rate mode : Constant
+Frame rate : 24.000 FPS
+Color space : YUV
+Chroma subsampling : 4:2:0
+Bit depth : 10 bits
+Bits/(Pixel*Frame) : 0.265
+Stream size : 3.37 GiB (100%)
+Writing library : x265 2.5+12-fcd9154fa4e2:[Windows][GCC 7.2.0][64 bit] 10bit
+Encoding settings : cpuid=1173503 / frame-threads=3 / numa-pools=8 / wpp / no-pmode / no-pme / no-psnr / no-ssim / log-level=2 / input-csp=1 / input-res=3840x1616 / interlace=0 / total-frames=0 / level-idc=51 / high-tier=1 / uhd-bd=0 / ref=4 / no-allow-non-conformance / no-repeat-headers / annexb / no-aud / no-hrd / info / hash=0 / no-temporal-layers / no-open-gop / min-keyint=1 / keyint=120 / bframes=4 / b-adapt=2 / b-pyramid / bframe-bias=0 / rc-lookahead=25 / lookahead-slices=4 / scenecut=40 / no-intra-refresh / ctu=64 / min-cu-size=8 / rect / no-amp / max-tu-size=32 / tu-inter-depth=1 / tu-intra-depth=1 / limit-tu=0 / rdoq-level=2 / dynamic-rd=0.00 / no-ssim-rd / signhide / no-tskip / nr-intra=0 / nr-inter=0 / no-constrained-intra / strong-intra-smoothing / max-merge=3 / limit-refs=3 / limit-modes / me=3 / subme=3 / merange=57 / temporal-mvp / weightp / no-weightb / no-analyze-src-pics / deblock=0:0 / no-sao / no-sao-non-deblock / rd=4 / no-early-skip / rskip / no-fast-intra / no-tskip-fast / no-cu-lossless / no-b-intra / no-splitrd-skip / rdpenalty=0 / psy-rd=2.00 / psy-rdoq=1.00 / no-rd-refine / analysis-reuse-mode=0 / no-lossless / cbqpoffs=0 / crqpoffs=0 / rc=crf / crf=19.0 / qcomp=0.60 / qpstep=4 / stats-write=0 / stats-read=0 / vbv-maxrate=160000 / vbv-bufsize=160000 / vbv-init=0.9 / crf-max=0.0 / crf-min=0.0 / ipratio=1.40 / pbratio=1.30 / aq-mode=1 / aq-strength=1.00 / cutree / zone-count=0 / no-strict-cbr / qg-size=32 / no-rc-grain / qpmax=69 / qpmin=0 / no-const-vbv / sar=0 / overscan=0 / videoformat=5 / range=0 / colorprim=1 / transfer=1 / colormatrix=1 / chromaloc=0 / display-window=0 / max-cll=0,0 / min-luma=0 / max-luma=1023 / log2-max-poc-lsb=8 / vui-timing-info / vui-hrd-info / slices=1 / opt-qp-pps / opt-ref-list-length-pps / no-multi-pass-opt-rps / scenecut-bias=0.05 / no-opt-cu-delta-qp / no-aq-motion / no-hdr / no-hdr-opt / no-dhdr10-opt / analysis-reuse-level=5 / scale-factor=0 / refine-intra=0 / refine-inter=0 / refine-mv=0 / no-limit-sao / ctu-info=0
+Color range : Limited
+Color primaries : BT.709
+Transfer characteristics : BT.709
+Matrix coefficients : BT.709 
+https://media.xiph.org/tearsofsteel/ try it out for yourself.
+edit. Not saying that CRF17 is a bad value for every case (even though CRF19 seems absolutly sufficient even if transparency is a priority) , I just wanna point out that if you encode uhd of high quality with crf17, be prepared for the possibility of an huge increase in bitrate.
+Last edited by excellentswordfight; 26th August 2017 at 00:32 .
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+26th August 2017, 11:27
+# 47 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by excellentswordfight 
+We can either discuss shady rips on the internet, or tests that we can controll and validate ourselves. I would rather choose the later, please feel free to share your findings.
+Tears of steel encode (crf19 with your settings):
+[...]
+https://media.xiph.org/tearsofsteel/ try it out for yourself.
+I am sorry but I fail to see how your example would be more representative of an actual UHD Blu-ray than the demo videos I encoded.
+Isn't this Tears of Steel example you linked raw video?
+What kind of source bitrate are we talking about? 500 mbit/s?!
+Also it's BT.709 and SDR...
+A UHD Blu-ray will always be HEVC with bitrates ranging from maybe 35 mbit/s to 80 mbit/s + BT.2020 + HDR.
+So, in my opinion, the Exodus UHD HDR demo for instance should be representing a UHD Blu-ray much more accurately at 42.8 mbit/s HEVC.
+Regarding the "shady rips on the internet":
+Apart from the fact that those are illegal of course I don't see an issue with these encodes (judging from the MediaInfo).
+The encoder clearly knew what they were doing looking at the parameters.
+The resulting x265 bitrates seem realistic judged from the source bitrates and they coincide with my testencodes of demo videos.
+I have mentioned this before but I created some new encodes of the Exodus sample with my settings. CRF17, 19 and 22.
+Download link for source:
+http://files.hdrsamples.com/download...odus_draft.mp4 
+CRF22 is much smaller of course, but even the CRF17 encode has a reasonably low bitrate and this sample is action-packed.
+Source:
+Code:
+Video
+ID : 1
+Format : HEVC
+Format/Info : High Efficiency Video Coding
+Format profile : Main 10@L5.1@High
+Codec ID : hev1
+Codec ID/Info : High Efficiency Video Coding
+Duration : 47 s 750 ms
+Bit rate : 42.8 Mb/s 
+Width : 3 840 pixels
+Height : 2 160 pixels
+Display aspect ratio : 16:9
+Frame rate mode : Constant
+Frame rate : 24.000 FPS
+Original frame rate : 23.976 (24000/1001) FPS
+Color space : YUV
+Chroma subsampling : 4:2:0 (Type 2)
+Bit depth : 10 bits
+Bits/(Pixel*Frame) : 0.215
+Stream size : 244 MiB (99%)
+Writing library : ATEME Titan KFE 3.7.0 (4.7.0.2002)
+Color range : Limited
+Color primaries : BT.2020
+Transfer characteristics : SMPTE ST 2084
+Matrix coefficients : BT.2020 non-constant
+Mastering display color primaries : R: x=0.680000 y=0.320000, G: x=0.265000 y=0.690000, B: x=0.150000 y=0.060000, White point: x=0.312700 y=0.329000
+Mastering display luminance : min: 0.0200 cd/m2, max: 1200.0000 cd/m2 
+Encode (CRF17 slow):
+Code:
+Video
+ID : 1
+Format : HEVC
+Format/Info : High Efficiency Video Coding
+Format profile : Main 10@L5.1@High
+Codec ID : V_MPEGH/ISO/HEVC
+Duration : 47 s 798 ms
+Bit rate : 17.5 Mb/s 
+Width : 3 840 pixels
+Height : 2 160 pixels
+Display aspect ratio : 16:9
+Frame rate mode : Constant
+Frame rate : 23.976 FPS
+Original frame rate : 24.000 FPS
+Color space : YUV
+Chroma subsampling : 4:2:0 (Type 2)
+Bit depth : 10 bits
+Bits/(Pixel*Frame) : 0.088
+Stream size : 99.8 MiB (98%)
+Writing library : x265 2.5+4-b4a5bcfe29c7:[Windows][MSVC 1910][64 bit] 10bit
+Encoding settings : cpuid=1173503 / frame-threads=2 / numa-pools=4 / wpp / no-pmode / no-pme / no-psnr / no-ssim / log-level=2 / input-csp=1 / input-res=3840x2160 / interlace=0 / total-frames=0 / level-idc=51 / high-tier=1 / uhd-bd=0 / ref=4 / no-allow-non-conformance / repeat-headers / annexb / aud / hrd / info / hash=0 / no-temporal-layers / no-open-gop / min-keyint=1 / keyint=120 / bframes=4 / b-adapt=2 / b-pyramid / bframe-bias=0 / rc-lookahead=25 / lookahead-slices=4 / scenecut=40 / no-intra-refresh / ctu=64 / min-cu-size=8 / rect / no-amp / max-tu-size=32 / tu-inter-depth=1 / tu-intra-depth=1 / limit-tu=0 / rdoq-level=2 / dynamic-rd=0.00 / no-ssim-rd / signhide / no-tskip / nr-intra=0 / nr-inter=0 / no-constrained-intra / strong-intra-smoothing / max-merge=3 / limit-refs=3 / limit-modes / me=3 / subme=3 / merange=57 / temporal-mvp / weightp / no-weightb / no-analyze-src-pics / deblock=0:0 / no-sao / no-sao-non-deblock / rd=4 / no-early-skip / rskip / no-fast-intra / no-tskip-fast / no-cu-lossless / no-b-intra / rdpenalty=0 / psy-rd=2.00 / psy-rdoq=1.00 / no-rd-refine / analysis-reuse-mode=0 / no-lossless / cbqpoffs=0 / crqpoffs=0 / rc=crf / crf=17.0 / qcomp=0.60 / qpstep=4 / stats-write=0 / stats-read=0 / vbv-maxrate=160000 / vbv-bufsize=160000 / vbv-init=0.9 / crf-max=0.0 / crf-min=0.0 / ipratio=1.40 / pbratio=1.30 / aq-mode=1 / aq-strength=1.00 / cutree / zone-count=0 / no-strict-cbr / qg-size=32 / no-rc-grain / qpmax=69 / qpmin=0 / no-const-vbv / sar=1 / overscan=0 / videoformat=5 / range=0 / colorprim=9 / transfer=16 / colormatrix=9 / chromaloc=1 / chromaloc-top=2 / chromaloc-bottom=2 / display-window=0 / master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(12000000,200) / max-cll=0,0 / min-luma=0 / max-luma=1023 / log2-max-poc-lsb=8 / vui-timing-info / vui-hrd-info / slices=1 / opt-qp-pps / opt-ref-list-length-pps / no-multi-pass-opt-rps / scenecut-bias=0.05 / no-opt-cu-delta-qp / no-aq-motion / hdr / hdr-opt / no-dhdr10-opt / analysis-reuse-level=5 / scale-factor=0 / refine-intra=0 / refine-inter=0 / refine-mv=0 / no-limit-sao / ctu-info=0
+Default : Yes
+Forced : Yes
+Color range : Limited
+Color primaries : BT.2020
+Transfer characteristics : SMPTE ST 2084
+Matrix coefficients : BT.2020 non-constant
+Mastering display color primaries : R: x=0.680000 y=0.320000, G: x=0.265000 y=0.690000, B: x=0.150000 y=0.060000, White point: x=0.312700 y=0.329000
+Mastering display luminance : min: 0.0200 cd/m2, max: 1200.0000 cd/m2 
+Encode (CRF19 slow):
+Code:
+Video
+ID : 1
+Format : HEVC
+Format/Info : High Efficiency Video Coding
+Format profile : Main 10@L5.1@High
+Codec ID : V_MPEGH/ISO/HEVC
+Duration : 47 s 798 ms
+Bit rate : 13.2 Mb/s 
+Width : 3 840 pixels
+Height : 2 160 pixels
+Display aspect ratio : 16:9
+Frame rate mode : Constant
+Frame rate : 23.976 FPS
+Original frame rate : 24.000 FPS
+Color space : YUV
+Chroma subsampling : 4:2:0 (Type 2)
+Bit depth : 10 bits
+Bits/(Pixel*Frame) : 0.067
+Stream size : 75.4 MiB (97%)
+Writing library : x265 2.5+4-b4a5bcfe29c7:[Windows][MSVC 1910][64 bit] 10bit
+Encoding settings : cpuid=1173503 / frame-threads=2 / numa-pools=4 / wpp / no-pmode / no-pme / no-psnr / no-ssim / log-level=2 / input-csp=1 / input-res=3840x2160 / interlace=0 / total-frames=0 / level-idc=51 / high-tier=1 / uhd-bd=0 / ref=4 / no-allow-non-conformance / repeat-headers / annexb / aud / hrd / info / hash=0 / no-temporal-layers / no-open-gop / min-keyint=1 / keyint=120 / bframes=4 / b-adapt=2 / b-pyramid / bframe-bias=0 / rc-lookahead=25 / lookahead-slices=4 / scenecut=40 / no-intra-refresh / ctu=64 / min-cu-size=8 / rect / no-amp / max-tu-size=32 / tu-inter-depth=1 / tu-intra-depth=1 / limit-tu=0 / rdoq-level=2 / dynamic-rd=0.00 / no-ssim-rd / signhide / no-tskip / nr-intra=0 / nr-inter=0 / no-constrained-intra / strong-intra-smoothing / max-merge=3 / limit-refs=3 / limit-modes / me=3 / subme=3 / merange=57 / temporal-mvp / weightp / no-weightb / no-analyze-src-pics / deblock=0:0 / no-sao / no-sao-non-deblock / rd=4 / no-early-skip / rskip / no-fast-intra / no-tskip-fast / no-cu-lossless / no-b-intra / rdpenalty=0 / psy-rd=2.00 / psy-rdoq=1.00 / no-rd-refine / analysis-reuse-mode=0 / no-lossless / cbqpoffs=0 / crqpoffs=0 / rc=crf / crf=19.0 / qcomp=0.60 / qpstep=4 / stats-write=0 / stats-read=0 / vbv-maxrate=160000 / vbv-bufsize=160000 / vbv-init=0.9 / crf-max=0.0 / crf-min=0.0 / ipratio=1.40 / pbratio=1.30 / aq-mode=1 / aq-strength=1.00 / cutree / zone-count=0 / no-strict-cbr / qg-size=32 / no-rc-grain / qpmax=69 / qpmin=0 / no-const-vbv / sar=1 / overscan=0 / videoformat=5 / range=0 / colorprim=9 / transfer=16 / colormatrix=9 / chromaloc=1 / chromaloc-top=2 / chromaloc-bottom=2 / display-window=0 / master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(12000000,200) / max-cll=0,0 / min-luma=0 / max-luma=1023 / log2-max-poc-lsb=8 / vui-timing-info / vui-hrd-info / slices=1 / opt-qp-pps / opt-ref-list-length-pps / no-multi-pass-opt-rps / scenecut-bias=0.05 / no-opt-cu-delta-qp / no-aq-motion / hdr / hdr-opt / no-dhdr10-opt / analysis-reuse-level=5 / scale-factor=0 / refine-intra=0 / refine-inter=0 / refine-mv=0 / no-limit-sao / ctu-info=0
+Default : Yes
+Forced : Yes
+Color range : Limited
+Color primaries : BT.2020
+Transfer characteristics : SMPTE ST 2084
+Matrix coefficients : BT.2020 non-constant
+Mastering display color primaries : R: x=0.680000 y=0.320000, G: x=0.265000 y=0.690000, B: x=0.150000 y=0.060000, White point: x=0.312700 y=0.329000
+Mastering display luminance : min: 0.0200 cd/m2, max: 1200.0000 cd/m2 
+Encode (CRF22 slow):
+Code:
+Video
+ID : 1
+Format : HEVC
+Format/Info : High Efficiency Video Coding
+Format profile : Main 10@L5.1@High
+Codec ID : V_MPEGH/ISO/HEVC
+Duration : 47 s 798 ms
+Bit rate : 8 475 kb/s 
+Width : 3 840 pixels
+Height : 2 160 pixels
+Display aspect ratio : 16:9
+Frame rate mode : Constant
+Frame rate : 23.976 FPS
+Original frame rate : 24.000 FPS
+Color space : YUV
+Chroma subsampling : 4:2:0 (Type 2)
+Bit depth : 10 bits
+Bits/(Pixel*Frame) : 0.043
+Stream size : 48.3 MiB (96%)
+Writing library : x265 2.5+4-b4a5bcfe29c7:[Windows][MSVC 1910][64 bit] 10bit
+Encoding settings : cpuid=1173503 / frame-threads=2 / numa-pools=4 / wpp / no-pmode / no-pme / no-psnr / no-ssim / log-level=2 / input-csp=1 / input-res=3840x2160 / interlace=0 / total-frames=0 / level-idc=51 / high-tier=1 / uhd-bd=0 / ref=4 / no-allow-non-conformance / repeat-headers / annexb / aud / hrd / info / hash=0 / no-temporal-layers / no-open-gop / min-keyint=1 / keyint=120 / bframes=4 / b-adapt=2 / b-pyramid / bframe-bias=0 / rc-lookahead=25 / lookahead-slices=4 / scenecut=40 / no-intra-refresh / ctu=64 / min-cu-size=8 / rect / no-amp / max-tu-size=32 / tu-inter-depth=1 / tu-intra-depth=1 / limit-tu=0 / rdoq-level=2 / dynamic-rd=0.00 / no-ssim-rd / signhide / no-tskip / nr-intra=0 / nr-inter=0 / no-constrained-intra / strong-intra-smoothing / max-merge=3 / limit-refs=3 / limit-modes / me=3 / subme=3 / merange=57 / temporal-mvp / weightp / no-weightb / no-analyze-src-pics / deblock=0:0 / no-sao / no-sao-non-deblock / rd=4 / no-early-skip / rskip / no-fast-intra / no-tskip-fast / no-cu-lossless / no-b-intra / rdpenalty=0 / psy-rd=2.00 / psy-rdoq=1.00 / no-rd-refine / analysis-reuse-mode=0 / no-lossless / cbqpoffs=0 / crqpoffs=0 / rc=crf / crf=22.0 / qcomp=0.60 / qpstep=4 / stats-write=0 / stats-read=0 / vbv-maxrate=160000 / vbv-bufsize=160000 / vbv-init=0.9 / crf-max=0.0 / crf-min=0.0 / ipratio=1.40 / pbratio=1.30 / aq-mode=1 / aq-strength=1.00 / cutree / zone-count=0 / no-strict-cbr / qg-size=32 / no-rc-grain / qpmax=69 / qpmin=0 / no-const-vbv / sar=1 / overscan=0 / videoformat=5 / range=0 / colorprim=9 / transfer=16 / colormatrix=9 / chromaloc=1 / chromaloc-top=2 / chromaloc-bottom=2 / display-window=0 / master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(12000000,200) / max-cll=0,0 / min-luma=0 / max-luma=1023 / log2-max-poc-lsb=8 / vui-timing-info / vui-hrd-info / slices=1 / opt-qp-pps / opt-ref-list-length-pps / no-multi-pass-opt-rps / scenecut-bias=0.05 / no-opt-cu-delta-qp / no-aq-motion / hdr / hdr-opt / no-dhdr10-opt / analysis-reuse-level=5 / scale-factor=0 / refine-intra=0 / refine-inter=0 / refine-mv=0 / no-limit-sao / ctu-info=0
+Default : Yes
+Forced : Yes
+Color range : Limited
+Color primaries : BT.2020
+Transfer characteristics : SMPTE ST 2084
+Matrix coefficients : BT.2020 non-constant
+Mastering display color primaries : R: x=0.680000 y=0.320000, G: x=0.265000 y=0.690000, B: x=0.150000 y=0.060000, White point: x=0.312700 y=0.329000
+Mastering display luminance : min: 0.0200 cd/m2, max: 1200.0000 cd/m2 
+Last edited by jd17; 26th August 2017 at 11:30 .
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+26th August 2017, 15:37
+# 48 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by jd17 
+I am sorry but I fail to see how your example would be more representative of an actual UHD Blu-ray than the demo videos I encoded.
+Isn't this Tears of Steel example you linked raw video?
+What kind of source bitrate are we talking about? 500 mbit/s?!
+Yes, the datarate is 2Gbps, there are also DI versions at lower bitrates.
+Quote:
+Originally Posted by jd17 
+Also it's BT.709 and SDR...
+So?
+Quote:
+Originally Posted by jd17 
+So, in my opinion, the Exodus UHD HDR demo for instance should be representing a UHD Blu-ray much more accurately at 42.8 mbit/s HEVC.
+I had a look at that demo, and I truly hope that you are wrong here. There is no "texture" to that video, either its dnr or it lost in compression at some stage so no wonder you are getting that low bitrates. If the retail version looks the same I hope that we will get higher quality releases in the future.
+And the length/clip pace of it makes it hard to make conclusions regarding GOP/I-frame settings.
+Quote:
+Originally Posted by jd17 
+Regarding the "shady rips on the internet":
+Apart from the fact that those are illegal of course I don't see an issue with these encodes (judging from the MediaInfo).
+Well we cant know if its a re-encoded from another source then the original encode, if filters has been used (which some groups use to get lower bitrates), and we cant know if it transparent to the source or not. Thats why I dont find it that interesting
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+27th August 2017, 07:44
+# 49 
+|   Link 
+WhatZit 
+Registered User
+Join Date: Aug 2016
+Posts: 60
+Quote:
+Originally Posted by excellentswordfight 
+There is no "texture" to that video, either its dnr or it lost in compression at some stage so no wonder you are getting that low bitrates.
+And the length/clip pace of it makes it hard to make conclusions regarding GOP/I-frame settings.
+Unfortunately, there's a hell of a lot of so-called "HDR" samples like that, with many seeming more focused on demonstrating the 4K UHD aspect than actual 10-Bit HDR.
+Which is why I've ended up sticking to the Cymatic Jazz demo from this page for most of my HDR experimentation:
+http://4kmedia.org/page/1/?s=hdr 
+In fact, I find it ironic that the marketing/advertising clips from the various panel manufacturers are some of the more "honest" examples out there 
+WhatZit 
+View Public Profile 
+Find More Posts by WhatZit 
+28th August 2017, 21:38
+# 50 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+I created encodes of all the demos as well.
+Unfortunately, most of them are 59.94 or 60 fps, so not really representative of your common Hollywood movie either.
+This is why I concentrated on "Samsung HDR Wonderland" before, which is the only one in 23.976 fps.
+Anyhow, the results for CRF17 slow are as follows:
+(I bumped keyint to 300 for the 59/60 fps demos, it does not make a big difference though.)
+LG Chess:
+source: 56.3 mbit/s
+encode: 25.9 mbit/s
+LG Colors of Journey:
+source: 53.6 mbit/s
+encode: 21.4 mbit/s
+LG Cymatic Jazz:
+source: 56.5 mbit/s
+encode: 36.9 mbit/s
+LG Daylight:
+source: 50.0 mbit/s
+encode: 33.2 mbit/s
+LG Rays of Light:
+source: 41.7 mbit/s
+encode: 30.6 mbit/s
+Samsung Chasing the Light:
+source: 58.8 mbit/s
+encode: 42.4 mbit/s
+Samsung Wonderland:
+source: 45.7 mbit/s
+encode: 17.7 mbit/s
+Sony Camp:
+source: 75.6 mbit/s
+encode: 29.3 mbit/s
+Sony Bravia OLED:
+source: 72.9 mbit/s
+encode: 26.4 mbit/s
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+« 
+ Previous Thread 
+ |
+ Next Thread 
+ » 
+Thread Tools 
+Show Printable Version 
+Search this Thread 
+Advanced Search 
+Posting Rules
+You may not post new threads
+You may not post replies
+You may not post attachments
+You may not edit your posts
+BB code is On 
+Smilies are On 
+[IMG] code is On 
+HTML code is Off 
+Forum Rules 
+Forum Jump 
+User Control Panel 
+ Private Messages 
+ Subscriptions 
+ Who's Online 
+ Search Forums 
+ Forums Home 
+Announcements and Chat 
+     General Discussion 
+     News 
+     Forum / Site Suggestions & Help 
+ General 
+     Decrypting 
+     Newbies 
+     DVD2AVI / DGIndex 
+     Audio encoding 
+     Subtitles 
+     Linux, Mac OS X, & Co 
+ Capturing and Editing Video 
+     Avisynth Usage 
+     Avisynth Development 
+     VapourSynth 
+     Capturing Video 
+     DV 
+     HDTV / DVB / TiVo 
+     NLE - Non Linear Editing 
+     VirtualDub, VDubMod & AviDemux 
+     New and alternative a/v containers 
+ Video Encoding 
+     (Auto) Gordian Knot 
+     MPEG-4 ASP 
+     MPEG-4 Encoder GUIs 
+     MPEG-4 AVC / H.264 
+     High Efficiency Video Coding (HEVC) 
+     New and alternative video codecs 
+     MPEG-2 Encoding 
+     Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+ (HD) DVD, Blu-ray & (S)VCD 
+     One click suites for DVD backup and DVD creation 
+     DVD & BD Rebuilder 
+     (HD) DVD & Blu-ray authoring 
+     Advanced authoring 
+     IFO/VOB Editors 
+     DVD burning 
+ Hardware & Software 
+     Software players 
+     Hardware players 
+     PC Hard & Software 
+ Programming and Hacking 
+     Development 
+     Translations 
+All times are GMT +1. The time now is 09:25 .
+doom9.org -
+Archive -
+Top 
+Powered by vBulletin® Version 3.8.11
+Copyright ©2000 - 2026, vBulletin Solutions Inc.

@@ -1,0 +1,771 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:https://github.com/psy-ex/svt-av1-psy/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/psy-ex/svt-av1-psy/releases"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/psy-ex/svt-av1-psy/releases.atom"/>
+  <title>Release notes from svt-av1-psy</title>
+  <updated>2025-04-19T17:18:08Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/739123434/v3.0.2</id>
+    <updated>2025-04-20T00:47:51Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/psy-ex/svt-av1-psy/releases/tag/v3.0.2"/>
+    <title>v3.0.2: Supernova</title>
+    <content type="html">&lt;p&gt;Good evening anyone who&#39;s reading. It&#39;s been a considerably amount of time since we were stated to release, but here we are.&lt;/p&gt;
+&lt;p&gt;This will be the last BIG release of svt-av1-psy for a long while.&lt;/p&gt;
+&lt;p&gt;I&#39;ll be starting to port over all of the relevant features to mainline svt-av1.&lt;/p&gt;
+&lt;p&gt;However, even after all relevant features will have been ported, I won&#39;t be working on &quot;mainline&quot; svt-av1-psy anymore; all future feature additions, bug fixes and optimizations will be done on an svt-av1-psy &quot;fork&quot;.&lt;/p&gt;
+&lt;p&gt;Some members wish to distance themselves from the project for reasons I won&#39;t discuss here; they&#39;re not harmful to the svt-av1-psy project, those members just want to leave their work on svt-av1-psy as history.&lt;/p&gt;
+&lt;p&gt;Getting back on topic, we&#39;ve decided to release our current coup-de-grâce efforts, svt-av1-psy 3.0.2: Supernova. We&#39;re going out with a bang!&lt;/p&gt;
+&lt;h2&gt;PSY Updates&lt;/h2&gt;
+&lt;h3&gt;Features&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;--sharp-tx&lt;/code&gt; has been added and enabled by default; it disables conventional transform optimizations to provide a sharper output overall. In 2.3.0-B, it was enabled by default for tune 0/3. It has the effect, although unintended at the time, of making psy-rd much stronger, which is why it has been kept default. However, for improved user control, we&#39;ve decided to make it a user controllable setting.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;--hbd-mds&lt;/code&gt; has been added as a setting. It can be used to change the bit-depth of the mode decision pipeline. By default, it respects presets defaults. At 1/2/3, it forces 10-bit+ (HBD) mode decision, 8/10-bit hybrid mode decision and full 8-bit mode decision. It has been made available because on faster presets, especially with psy-rd, forcing 10-bit mode decision can make a huge difference to quality.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Quality &amp;amp; Performance&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;--psy-rd&lt;/code&gt; can now be used with all tunes.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;--psy-rd&lt;/code&gt; has been optimized to slighly increase encoding speed.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;High quality svt-av1-psy psy-rd has been added, and is activated at &lt;code&gt;--psy-rd&amp;gt;=0.6&lt;/code&gt; while using presets 6 and slower. It can considerably increase the strength of psy-rd, greatly increasing visual quality at no rate cost. It&#39;s been implemented hrough some careful mode decision changes that occur when psy-rd influence is significant enough. The reason behind not implementing by default and limiting it to slower presets (&amp;lt;=P6) is that it has a non negligible speed penalty, which gets problematic for the fastest presets; it only provides it at higher psy-rd strengths, justifiying the limiting it to &lt;code&gt;-psy-rd&amp;gt;=0.6&lt;/code&gt;.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;--spy-rd&lt;/code&gt; levels have been added for greater control over the visual tradeoff that spy-rd pathways provide. The available levels are 0/1/2: 0 is default, with spy-rd disabled. 1 is fully enabled spy-rd (intra mode decision sharpness and interpolation sharpness modifications) and 2 is partially enabled spy-rd (interpolation sharpness modifications only).&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;--sharp-tx 1 --psy-rd 0.5&lt;/code&gt; has been made default to increase high fidelity encoding performance.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;--noise-norm-strength 1&lt;/code&gt; is now default. It provides a decent visual quality increase with minor tradeoffs. The recommended strength for tune 0/3 is still &lt;code&gt;--noise-norm-strength 3&lt;/code&gt;.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Bug Fixes&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;The 8-bit psy-rd path has been fully fixed by &lt;a class=&quot;user-mention notranslate&quot; data-hovercard-type=&quot;user&quot; data-hovercard-url=&quot;/users/juliobbv/hovercard&quot; data-octo-click=&quot;hovercard-link-click&quot; data-octo-dimensions=&quot;link_type:self&quot; href=&quot;https://github.com/juliobbv&quot;&gt;@juliobbv&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--tune 2&lt;/code&gt; now behaves as expected.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Changes against mainline&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Full alt-ref temporal filtering quality has been restored to Preset 2 since it provided a significant increase in quality to alt-ref TF in darker scenes.&lt;/li&gt;
+&lt;li&gt;The intra lambda RDO value has been reverted to 2.3.0-C values, from 50 to 65, to improve low light performance. While the change did improve energy retention in brighter scenes, it actually made dark scene performance worse.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Changes from mainline&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;--frame-luma-bias&lt;/code&gt; has been changed to &lt;code&gt;--luminance-qp-bias&lt;/code&gt;, following mainline&#39;s implementation.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;--lp&lt;/code&gt; threading behavior has changed and it has resulted in some svt-av1-psy features to not be bit-exact when &lt;code&gt;--lp&amp;gt;1&lt;/code&gt;. This is expected and will not be adressed.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Like mainline, &lt;code&gt;--adaptive-film-grain&lt;/code&gt; is now enabled by default internally. In a future release, I will add a special feature to make encoder grain synthesis much stronger.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;A bunch of other optimizations, bug fixes, and lots of ARM64 NEON SIMD for you ARM64 peeps.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Support Us&lt;/h2&gt;
+&lt;p&gt;As SVT-AV1-PSY&#39;s codebase has become more complex and the encoder&#39;s capabilities have increased dramatically, our efforts have scaled in kind. We have poured hours into coding, testing, distributing, and supporting this piece of open-source software entirely for free, and our work isn&#39;t stopping any time soon. This time, I&#39;ve been all alone in rebasing, reworking and fixing bugs from some stuff that wasn&#39;t entirely our fault :)&lt;/p&gt;
+&lt;p&gt;If you appreciate the work that we do and you&#39;d like to support us, we are always excited to see code contributions from outside of the core development team. Otherwise, you can support us monetarily via the links below.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Julio Barba&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;BlueSwordM&lt;/strong&gt;: &lt;em&gt;Coming VERY Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;Clybius&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;Gianni Rosato&lt;/strong&gt;: &lt;a href=&quot;https://github.com/sponsors/gianni-rosato?o=esc&quot;&gt;Donate&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;You can also visit our website at &lt;a href=&quot;https://svt-av1-psy.com/&quot; rel=&quot;nofollow&quot;&gt;svt-av1-psy.com&lt;/a&gt;. Any support you can offer goes a long way, and we sincerely appreciate it.&lt;/p&gt;
+&lt;h2&gt;Binaries (SvtAv1EncApp)&lt;/h2&gt;
+&lt;p&gt;Linux builds:&lt;/p&gt;
+&lt;p&gt;x86-64-v3 (AVX2) ------------&amp;gt; MD5 = 82bd9fea8888498bcc35f5ae986cae7d&lt;br&gt;
+x86-64-v4 (AVX512) --------&amp;gt; MD5 = 650072893823ae7c28a779cdf32698e6&lt;/p&gt;
+&lt;p&gt;macOS builds:&lt;/p&gt;
+&lt;p&gt;Coming soon!&lt;/p&gt;
+&lt;p&gt;Windows builds:&lt;/p&gt;
+&lt;p&gt;Coming soon enough.&lt;/p&gt;
+&lt;p&gt;Unofficial Handbrake repository and builds can be found here: &lt;a href=&quot;https://github.com/Nj0be/HandBrake-SVT-AV1-PSY&quot;&gt;https://github.com/Nj0be/HandBrake-SVT-AV1-PSY&lt;/a&gt;&lt;br&gt;
+Do note that 3.0.2 hasn&#39;t been pushed to Handbrake svt-av1-psy yet.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Thanks for using SVT-AV1-PSY, and see you on the other side for SVT-AV1-PSYEX&lt;/em&gt;&lt;/p&gt;</content>
+    <author>
+      <name>BlueSwordM</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/24881046?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/739123434/v2.3.0-B</id>
+    <updated>2025-04-19T23:36:47Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/psy-ex/svt-av1-psy/releases/tag/v2.3.0-B"/>
+    <title>v2.3.0-B: lighting up the scene!</title>
+    <content type="html">&lt;p&gt;Hello and good evening everyone! I hope you&#39;re all doing well, despite current events.&lt;/p&gt;
+&lt;p&gt;We&#39;ve recently polished up the latest release of svt-av1-psy and have even added a few things for you to play with.&lt;/p&gt;
+&lt;h2&gt;PSY Updates&lt;/h2&gt;
+&lt;h3&gt;Features&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;--spy-rd&lt;/code&gt; has been added: it&#39;s a psychovisually-based metric focused on enhancing sharpness and detail retention, with a slight trade-off in blocking and banding artifacts, without deeply affecting RD/RDO decisions like psy-rd.&lt;br&gt;
+&lt;strong&gt;It can be used independently or alongside psy-rd.&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Quality &amp;amp; Performance&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;--tune 0&lt;/code&gt; can now be used alongside &lt;code&gt;--psy-rd&lt;/code&gt;. Test it out and see how it performs for your usecases.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--sharpness&amp;gt;0&lt;/code&gt; now enables sharper transform optimizations&lt;/li&gt;
+&lt;li&gt;Improved film grain synthesis parallelism: greatly improved speed on multi-threaded encodes using in-encoder grain synth!&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Bug Fixes&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;--psy-rd&amp;gt;0&lt;/code&gt; has been fully fixed. This also improves general performance in many ways, performance and visual quality included.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Support Us&lt;/h2&gt;
+&lt;p&gt;As SVT-AV1-PSY&#39;s codebase has become more complex and the encoder&#39;s capabilities have increased dramatically, our efforts have scaled in kind. We have poured hours into coding, testing, distributing, and supporting this piece of open-source software entirely for free, and our work isn&#39;t stopping any time soon.&lt;/p&gt;
+&lt;p&gt;If you appreciate the work that we do and you&#39;d like to support us, we are always excited to see code contributions from outside of the core development team. Otherwise, you can support us monetarily via the links below.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Julio Barba&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;BlueSwordM&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;Clybius&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;Gianni Rosato&lt;/strong&gt;: &lt;a href=&quot;https://github.com/sponsors/gianni-rosato?o=esc&quot;&gt;Donate&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;You can also visit our website at &lt;a href=&quot;https://svt-av1-psy.com/&quot; rel=&quot;nofollow&quot;&gt;svt-av1-psy.com&lt;/a&gt;. Any support you can offer goes a long way, and we sincerely appreciate it. &lt;g-emoji class=&quot;g-emoji&quot; alias=&quot;hearts&quot;&gt;♥️&lt;/g-emoji&gt;&lt;/p&gt;
+&lt;h2&gt;Binaries (SvtAv1EncApp)&lt;/h2&gt;
+&lt;p&gt;Linux builds:&lt;/p&gt;
+&lt;p&gt;x86-64-v3 (AVX2) ------------&amp;gt; MD5 = 11746e2ee8cb9b198e7572910c1e9a18&lt;br&gt;
+x86-64-v4 (AVX512) --------&amp;gt; MD5 = 1e9cd2be5a207d8e6d0cb350b444734a&lt;/p&gt;
+&lt;p&gt;macOS builds:&lt;/p&gt;
+&lt;p&gt;Coming soon!&lt;/p&gt;
+&lt;p&gt;Windows builds:&lt;/p&gt;
+&lt;p&gt;Coming soon!&lt;/p&gt;
+&lt;p&gt;Unofficial Handbrake repository and builds can be found here: &lt;a href=&quot;https://github.com/Nj0be/HandBrake-SVT-AV1-PSY&quot;&gt;https://github.com/Nj0be/HandBrake-SVT-AV1-PSY&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Thanks for using SVT-AV1-PSY, and see you on the other side for SVT-AV1-PSYEX&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Full Changelog&lt;/strong&gt;: &lt;a class=&quot;commit-link&quot; href=&quot;https://github.com/psy-ex/svt-av1-psy/compare/v2.3.0-A...v2.3.0-B&quot;&gt;&lt;tt&gt;v2.3.0-A...v2.3.0-B&lt;/tt&gt;&lt;/a&gt;&lt;/p&gt;</content>
+    <author>
+      <name>BlueSwordM</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/24881046?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/739123434/v2.3.0-A</id>
+    <updated>2025-02-01T03:53:12Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/psy-ex/svt-av1-psy/releases/tag/v2.3.0-A"/>
+    <title>v2.3.0-A</title>
+    <content type="html">&lt;p&gt;Hello everyone! Merry Christmas to those who celebrate – we have a special gift for you this holiday season in the form of &lt;strong&gt;SVT-AV1-PSY v2.3.0-A&lt;/strong&gt;! 🎁&lt;/p&gt;
+&lt;p&gt;Also, this is going to be my last release working heavily on features for SVT-AV1-PSY, at least for a while. You can read more at &lt;a href=&quot;https://giannirosato.com/blog/post/end-of-psy/&quot; rel=&quot;nofollow&quot;&gt;my blog post&lt;/a&gt;, but it has been great fun and I&#39;ll miss working on features for this project very much. I&#39;ll still be acting as the project&#39;s maintainer for now, but very infrequently. Luckily, this project has always been a team effort, and I&#39;m more than certain my talented team members will keep these gears turning without me, so keep tuning in for new  #releases!&lt;/p&gt;
+&lt;h2&gt;PSY Updates&lt;/h2&gt;
+&lt;h3&gt;Features&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Introduced &lt;code&gt;--enable-tf 2&lt;/code&gt; which adaptively scales temporal filtering strength based on 64x64 block error&lt;/li&gt;
+&lt;li&gt;Introduced &lt;code&gt;--psy-rd&lt;/code&gt;, a feature designed to help retain visual energy to improve perceptual fidelity&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Quality &amp;amp; Performance&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;New default &lt;code&gt;--sharpness&lt;/code&gt; value of 1&lt;/li&gt;
+&lt;li&gt;Allowed use of additional interpolation levels for sub pixel motion estimation to improve quality at preset -1&lt;/li&gt;
+&lt;li&gt;Variance Boost now samples across three octiles for more consistent boosting behavior&lt;/li&gt;
+&lt;li&gt;Increased visual sharpness on keyframes relative to user-configured &lt;code&gt;--sharpness&lt;/code&gt; value when using Tune 3&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Bug Fixes&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Fixed a bug preventing use of &lt;code&gt;--fast-decode 2&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Fixed crashing with Tune 3 at high CRF values (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;2649075310&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/psy-ex/svt-av1-psy/issues/96&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/psy-ex/svt-av1-psy/issues/96/hovercard&quot; href=&quot;https://github.com/psy-ex/svt-av1-psy/issues/96&quot;&gt;#96&lt;/a&gt;)&lt;/li&gt;
+&lt;li&gt;Fixed a bug where CRF and MBR values weren&#39;t printing correctly to the terminal&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Support Us&lt;/h2&gt;
+&lt;p&gt;As SVT-AV1-PSY&#39;s codebase has become more complex and the encoder&#39;s capabilities have increased dramatically, our efforts have scaled in kind. We have poured hours into coding, testing, distributing, and supporting this piece of open-source software entirely for free, and our work isn&#39;t stopping any time soon.&lt;/p&gt;
+&lt;p&gt;If you appreciate the work that we do and you&#39;d like to support us, we are always excited to see code contributions from outside of the core development team. Otherwise, you can support us monetarily via the links below.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Julio Barba&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;BlueSwordM&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;Clybius&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;Gianni Rosato&lt;/strong&gt;: &lt;a href=&quot;https://github.com/sponsors/gianni-rosato?o=esc&quot;&gt;Donate&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;You can also visit our website at &lt;a href=&quot;https://svt-av1-psy.com/&quot; rel=&quot;nofollow&quot;&gt;svt-av1-psy.com&lt;/a&gt;. Any support you can offer goes a long way, and we sincerely appreciate it. &lt;g-emoji class=&quot;g-emoji&quot; alias=&quot;hearts&quot;&gt;♥️&lt;/g-emoji&gt;&lt;/p&gt;
+&lt;h2&gt;Binaries&lt;/h2&gt;
+&lt;p&gt;Linux builds: &lt;em&gt;(MD5: &lt;code&gt;df0ee3ec323a930c7db8796d50bf0e19&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AVX2 (x86-64-v3)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;macOS builds: &lt;em&gt;(MD5: &lt;code&gt;a40c52d5f99205bf47bbbe1feeee0b15&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AArch64 (Apple Silicon)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Other Builds: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/discussions/118&quot; data-hovercard-type=&quot;discussion&quot; data-hovercard-url=&quot;/psy-ex/svt-av1-psy/discussions/118/hovercard&quot;&gt;&lt;code&gt;Community Builds Thread&lt;/code&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Thanks for using SVT-AV1-PSY!&lt;/em&gt; &amp;lt;3&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Full Changelog&lt;/strong&gt;: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.3.0-A&quot;&gt;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.3.0-A&lt;/a&gt;&lt;/p&gt;</content>
+    <author>
+      <name>gianni-rosato</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/35711760?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/739123434/v2.3.0</id>
+    <updated>2024-10-30T04:50:47Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/psy-ex/svt-av1-psy/releases/tag/v2.3.0"/>
+    <title>v2.3.0</title>
+    <content type="html">&lt;p&gt;We made a lot of progress in v2.2.1-A &amp;amp; v2.2.1-B, but we still have more for you on the heels of mainline&#39;s release with &lt;strong&gt;SVT-AV1-PSY v2.3.0&lt;/strong&gt;! 🌠&lt;/p&gt;
+&lt;h2&gt;PSY Updates&lt;/h2&gt;
+&lt;h3&gt;Features&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;New parameter &lt;code&gt;--kf-tf-strength&lt;/code&gt; for controlling alternate reference frame temporal filtering on keyframes. This should enable users to more finely control temporal filtering, specifically in scenarios where the benefits of lower &lt;code&gt;--tf-strength&lt;/code&gt; are desired without the accompanying bitrate increase. The default value for this new parameter is 1.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Quality &amp;amp; Performance&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Tune 4 now considers user-selected min &amp;amp; max QM values&lt;/li&gt;
+&lt;li&gt;Tune 4&#39;s chroma boost curve has been modified to be more compression efficient&lt;/li&gt;
+&lt;li&gt;The deblocking loop filter has been disabled at medium-high to high fidelity when using Tune 4&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Documentation&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Removed deprecated &lt;code&gt;no-dec&lt;/code&gt; build option from &lt;code&gt;build.sh&lt;/code&gt; example command list&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Bug Fixes&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Reverted optimized 32 and wider AVX2 block subtract due to a suspect memory issue causing crashing according to some users&lt;/li&gt;
+&lt;li&gt;Corrected noise normalization strength not being printed correctly when set to 0 with Tune 3&lt;/li&gt;
+&lt;li&gt;Fixed user-specified disablement of temporal filtering being ignored&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Mainline Updates&lt;/h2&gt;
+&lt;h3&gt;API updates&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Preset shift: M12/M13 mapped to M11, M7-M11 shifted one position down. API does not change, all presets from MR-M13 will still be accepted&lt;/li&gt;
+&lt;li&gt;svt_av1_enc_get_packet API is now a blocking call for low-delay enforcing a picture in, picture out model&lt;/li&gt;
+&lt;li&gt;--fast-decode range changed from 0-1 to 0-2 available on all presets&lt;/li&gt;
+&lt;li&gt;Introducing a new definition of --lp being levels of parallelism with a new field in the config structure level_of_parallelism&lt;/li&gt;
+&lt;li&gt;logical_processors will be deprecated in the 3.0 release&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Encoder&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;NEW FAST DECODE MODE&lt;/li&gt;
+&lt;li&gt;New fast-decode (2) to allow for an average AV1 software cycle reduction of 25-50% vs fast-decode 0 with a 1-3% BD-Rate loss across the presets&lt;/li&gt;
+&lt;li&gt;Improved fast-decode (1) option to increase its AV1 software cycle reduction by ~10% while maintaining the same quality levels&lt;/li&gt;
+&lt;li&gt;Improved --lp settings for high resolutions, with CRF gaining a ~4% improvement in speed and VBR gaining ~15%&lt;/li&gt;
+&lt;li&gt;Further Arm-based optimizations improving the efficiency of previously written Arm-neon implementations by an average of 30%. See below for more information on specific presets&lt;/li&gt;
+&lt;li&gt;Address speed regressions for high resolutions first pass encode by tuning the threading parameters, with 1080p showing the biggest gains&lt;/li&gt;
+&lt;li&gt;Enabled AVX512 by default in cmake allowing for ~2-4% speedup&lt;/li&gt;
+&lt;li&gt;Enabled LTO by default if using a new enough compiler
+&lt;ul&gt;
+&lt;li&gt;If LTO is a problem or causes one, it can be disabled by adding -DSVT_AV1_LTO=OFF to cmake to force it off.&lt;/li&gt;
+&lt;li&gt;Please report any issues that occur when using it.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Cleanup Build &amp;amp; Bug Fixes &amp;amp; Documentation&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;third_party: update safestringlib with applicable upstream changes&lt;/li&gt;
+&lt;li&gt;Improved the unit test coverage for Arm-neon code&lt;/li&gt;
+&lt;li&gt;Updated documentation&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Arm Improvements&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Speed comparison was done against v2.2 on AWS Graviton4 instances with Clang 19.1.1&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--lp 1&lt;/code&gt; was used for all tests&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4&gt;Standard bitdepth (Bosphorus 1080p):&lt;/h4&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Preset&lt;/th&gt;
+&lt;th&gt;Uplift&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;1.15x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;1&lt;/td&gt;
+&lt;td&gt;1.24x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;2&lt;/td&gt;
+&lt;td&gt;1.29x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;3&lt;/td&gt;
+&lt;td&gt;1.17x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;4&lt;/td&gt;
+&lt;td&gt;1.22x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;5&lt;/td&gt;
+&lt;td&gt;1.31x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;6&lt;/td&gt;
+&lt;td&gt;1.40x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;7 (against 2.2 preset 8)&lt;/td&gt;
+&lt;td&gt;1.50x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;8 (against 2.2 preset 9)&lt;/td&gt;
+&lt;td&gt;1.61x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;9 (against 2.2 preset 10&lt;/td&gt;
+&lt;td&gt;1.31x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;10 (against 2.2 preset 11 )&lt;/td&gt;
+&lt;td&gt;1.29x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;11 (against 2.2 preset 12/13)&lt;/td&gt;
+&lt;td&gt;1.24x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h4&gt;High bitdepth (Bosphorus 2160p):&lt;/h4&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Preset&lt;/th&gt;
+&lt;th&gt;Uplift&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;1.18x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;1&lt;/td&gt;
+&lt;td&gt;1.19x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;2&lt;/td&gt;
+&lt;td&gt;1.16x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;3&lt;/td&gt;
+&lt;td&gt;1.27x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;4&lt;/td&gt;
+&lt;td&gt;1.33x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;5&lt;/td&gt;
+&lt;td&gt;1.27x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;6&lt;/td&gt;
+&lt;td&gt;1.33x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;7 (against 2.2 preset 8)&lt;/td&gt;
+&lt;td&gt;1.35x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;8 (against 2.2 preset 9)&lt;/td&gt;
+&lt;td&gt;1.82x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;9 (against 2.2 preset 10)&lt;/td&gt;
+&lt;td&gt;1.95x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;10 (against 2.2 preset 11)&lt;/td&gt;
+&lt;td&gt;1.40x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;11 (against 2.2 preset 12/13)&lt;/td&gt;
+&lt;td&gt;1.35x&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;em&gt;Huge thanks to the mainline devs for these incredible improvements!&lt;/em&gt;&lt;/p&gt;
+&lt;h2&gt;Support Us&lt;/h2&gt;
+&lt;p&gt;As SVT-AV1-PSY&#39;s codebase has become more complex and the encoder&#39;s capabilities have increased dramatically, our efforts have scaled in kind. We have poured hours into coding, testing, distributing, and supporting this piece of open-source software entirely for free, and our work isn&#39;t stopping any time soon.&lt;/p&gt;
+&lt;p&gt;If you appreciate the work that we do and you&#39;d like to support us, we are always excited to see code contributions from outside of the core development team. Otherwise, you can support us monetarily via the links below.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Gianni Rosato&lt;/strong&gt;: &lt;a href=&quot;https://github.com/sponsors/gianni-rosato?o=esc&quot;&gt;Donate&lt;/a&gt;&lt;br&gt;
+&lt;strong&gt;Julio Barba&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;BlueSwordM&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;Clybius&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;You can also visit our website at &lt;a href=&quot;https://svt-av1-psy.com/&quot; rel=&quot;nofollow&quot;&gt;svt-av1-psy.com&lt;/a&gt;. Any support you can offer goes a long way, and we sincerely appreciate it. &lt;g-emoji class=&quot;g-emoji&quot; alias=&quot;hearts&quot;&gt;♥️&lt;/g-emoji&gt;&lt;/p&gt;
+&lt;h2&gt;Binaries&lt;/h2&gt;
+&lt;p&gt;Linux builds: &lt;em&gt;(MD5: &lt;code&gt;fd3174b3fb83bf2b7c9212080d0e424c&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AVX2 (x86-64-v3)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;macOS builds: &lt;em&gt;(MD5: &lt;code&gt;5a44e0e98bcd91fe7a0cf89fd2a5e5aa&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AArch64 (Apple Silicon)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Other builds: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/discussions/88&quot; data-hovercard-type=&quot;discussion&quot; data-hovercard-url=&quot;/psy-ex/svt-av1-psy/discussions/88/hovercard&quot;&gt;&lt;code&gt;Community Builds Thread&lt;/code&gt;&lt;/a&gt; &lt;em&gt;(Unofficial)&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Thanks for using SVT-AV1-PSY!&lt;/em&gt; &amp;lt;3&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Full Changelog&lt;/strong&gt;: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.3.0&quot;&gt;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.3.0&lt;/a&gt;&lt;/p&gt;</content>
+    <author>
+      <name>gianni-rosato</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/35711760?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/739123434/v2.2.1-B</id>
+    <updated>2024-10-10T07:09:11Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/psy-ex/svt-av1-psy/releases/tag/v2.2.1-B"/>
+    <title>v2.2.1-B</title>
+    <content type="html">&lt;p&gt;Our first ever &lt;code&gt;B&lt;/code&gt; release is here with &lt;strong&gt;SVT-AV1-PSY v2.2.1-B&lt;/strong&gt;! 🕺&lt;/p&gt;
+&lt;h2&gt;PSY Updates&lt;/h2&gt;
+&lt;h3&gt;Features&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;New parameter &lt;code&gt;--noise-norm-strength&lt;/code&gt; for controlling noise normalization. It is configurable with values 0 through 4, with a default value of 0. Noise normalization intelligently boosts higher frequency details in parts of the video where these details may otherwise be erased, helping preserve visual consistency in some scenarios.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Quality &amp;amp; Performance&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Tune 4 variance boost scaling is now a bit flatter&lt;/li&gt;
+&lt;li&gt;Adjusted Tune 4 lambda weights&lt;/li&gt;
+&lt;li&gt;Limited the maximum available transform size available to Tune 4 to 32x32&lt;/li&gt;
+&lt;li&gt;Adjusted the default sharpness parameter used by Tune 4&lt;/li&gt;
+&lt;li&gt;New custom Variance Boost curve for Tune 4&lt;/li&gt;
+&lt;li&gt;Ported speedups for AVX2 hardware from aomenc&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Documentation&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;DLF 2 option is now properly reflected in the help menu&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Bug Fixes&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Fixed a bug where on certain devices under specific circumstances, encoding extremely small images resulted in a floating point exception&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Support Us&lt;/h2&gt;
+&lt;p&gt;As SVT-AV1-PSY&#39;s codebase has become more complex and the encoder&#39;s capabilities have increased dramatically, our efforts have scaled in kind. We have poured hours into coding, testing, distributing, and supporting this piece of open-source software entirely for free, and our work isn&#39;t stopping any time soon.&lt;/p&gt;
+&lt;p&gt;If you appreciate the work that we do and you&#39;d like to support us, we are always excited to see code contributions from outside of the core development team. Otherwise, you can support us monetarily via the links below.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Gianni Rosato&lt;/strong&gt;: &lt;a href=&quot;https://github.com/sponsors/gianni-rosato?o=esc&quot;&gt;Donate&lt;/a&gt;&lt;br&gt;
+&lt;strong&gt;Julio Barba&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;BlueSwordM&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;Clybius&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;You can also visit our website at &lt;a href=&quot;https://svt-av1-psy.com/&quot; rel=&quot;nofollow&quot;&gt;svt-av1-psy.com&lt;/a&gt;. Any support you can offer goes a long way, and we sincerely appreciate it. &lt;g-emoji class=&quot;g-emoji&quot; alias=&quot;hearts&quot;&gt;♥️&lt;/g-emoji&gt;&lt;/p&gt;
+&lt;h2&gt;Binaries&lt;/h2&gt;
+&lt;p&gt;Linux builds: &lt;em&gt;(MD5: &lt;code&gt;f619a782ec61606d99528a621f61b3fa&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AVX2 (x86-64-v3)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;macOS builds: &lt;em&gt;(MD5: &lt;code&gt;758e673604be33ac1039f3b0ba5656a8&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AArch64 (Apple Silicon)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Other builds: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/discussions/79&quot; data-hovercard-type=&quot;discussion&quot; data-hovercard-url=&quot;/psy-ex/svt-av1-psy/discussions/79/hovercard&quot;&gt;&lt;code&gt;Community Builds Thread&lt;/code&gt;&lt;/a&gt; &lt;em&gt;(Unofficial)&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Thanks for using SVT-AV1-PSY!&lt;/em&gt; &amp;lt;3&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Full Changelog&lt;/strong&gt;: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.2.1-B&quot;&gt;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.2.1-B&lt;/a&gt;&lt;/p&gt;</content>
+    <author>
+      <name>gianni-rosato</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/35711760?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/739123434/v2.2.1-A</id>
+    <updated>2024-09-27T03:50:19Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/psy-ex/svt-av1-psy/releases/tag/v2.2.1-A"/>
+    <title>v2.2.1-A</title>
+    <content type="html">&lt;p&gt;Our most significant PSY micro-release is here with &lt;strong&gt;SVT-AV1-PSY v2.2.1-A&lt;/strong&gt;!!! 🏆&lt;/p&gt;
+&lt;h2&gt;PSY Updates&lt;/h2&gt;
+&lt;h3&gt;Features&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Encoding with &lt;strong&gt;odd (non-mod2) dimensions&lt;/strong&gt; is now possible&lt;/li&gt;
+&lt;li&gt;Encoding at &lt;strong&gt;resolutions lower than 64x64&lt;/strong&gt; is now possible, down to as small as 4x4&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Quality &amp;amp; Performance&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;A new variance boost curve for Tune 4 has been introduced, optimized for still image encoding performance&lt;/li&gt;
+&lt;li&gt;Improved color reproduction &amp;amp; overall picture quality in Tune 4 &amp;amp; Tune 2 through chroma qindex scaling (similar functionality is already present in Tune 3)&lt;/li&gt;
+&lt;li&gt;Higher quality presets are available when encoding 16K&lt;/li&gt;
+&lt;li&gt;Default &lt;code&gt;--chroma-qm-min&lt;/code&gt; has been updated to 8 (from 0)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Documentation&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Updated Handbrake link to new, cross-platform Handbrake PSY builds&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Bug Fixes&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;The version number should now be correct when building from an archive instead of cloning with git&lt;/li&gt;
+&lt;li&gt;AVIFs with dimensions exceeding 4K resolution should decode correctly in applications that previously refused to decode these images when they were produced by SVT-AV1(-PSY)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Other&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;The &lt;code&gt;enable-libdovi&lt;/code&gt; &amp;amp; &lt;code&gt;enable-libhdr10plus&lt;/code&gt; flags in &lt;code&gt;build.sh&lt;/code&gt; have been updated to &lt;code&gt;enable-dovi&lt;/code&gt; &amp;amp; &lt;code&gt;enable-hdr10plus&lt;/code&gt;. The old flags will still work, but are no longer documented &amp;amp; will be considered deprecated from this point forward.&lt;/li&gt;
+&lt;li&gt;We have a website now! Come check us out at &lt;a href=&quot;https://svt-av1-psy.com/&quot; rel=&quot;nofollow&quot;&gt;svt-av1-psy.com&lt;/a&gt;!&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Support Us&lt;/h2&gt;
+&lt;p&gt;As SVT-AV1-PSY&#39;s codebase has become more complex and the encoder&#39;s capabilities have increased dramatically, our efforts have scaled in kind. We have poured hours into coding, testing, distributing, and supporting this piece of open-source software entirely for free, and our work isn&#39;t stopping any time soon.&lt;/p&gt;
+&lt;p&gt;If you appreciate the work that we do and you&#39;d like to support us, we are always excited to see code contributions from outside of the core development team. Otherwise, you can support us monetarily via the links below.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Gianni Rosato&lt;/strong&gt;: &lt;a href=&quot;https://github.com/sponsors/gianni-rosato?o=esc&quot;&gt;Donate&lt;/a&gt;&lt;br&gt;
+&lt;strong&gt;Julio Barba&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;BlueSwordM&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;Clybius&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Any support you can offer goes a long way, and we sincerely appreciate it. &lt;g-emoji class=&quot;g-emoji&quot; alias=&quot;hearts&quot;&gt;♥️&lt;/g-emoji&gt;&lt;/p&gt;
+&lt;h2&gt;Binaries&lt;/h2&gt;
+&lt;p&gt;Linux builds: &lt;em&gt;(MD5: &lt;code&gt;d3315ac26f07afa6b4d899eebd207562&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AVX2 (x86-64-v3)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;macOS builds: &lt;em&gt;(MD5: &lt;code&gt;e68976d9e899259188a7d96eaddb07bc&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AArch64 (Apple Silicon)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Windows &amp;amp; Other builds: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/discussions/69&quot; data-hovercard-type=&quot;discussion&quot; data-hovercard-url=&quot;/psy-ex/svt-av1-psy/discussions/69/hovercard&quot;&gt;&lt;code&gt;Community Builds Thread&lt;/code&gt;&lt;/a&gt; &lt;em&gt;(Unofficial)&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Thanks for using SVT-AV1-PSY!&lt;/em&gt; &amp;lt;3&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Full Changelog&lt;/strong&gt;: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.2.1-A&quot;&gt;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.2.1-A&lt;/a&gt;&lt;/p&gt;</content>
+    <author>
+      <name>gianni-rosato</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/35711760?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/739123434/v2.2.1</id>
+    <updated>2024-09-11T03:33:44Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/psy-ex/svt-av1-psy/releases/tag/v2.2.1"/>
+    <title>v2.2.1</title>
+    <content type="html">&lt;p&gt;Just a quick update with a couple of bug fixes &amp;amp; documentation adjustments 🐞&lt;/p&gt;
+&lt;h2&gt;PSY Updates&lt;/h2&gt;
+&lt;h3&gt;Documentation&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Fix &lt;code&gt;--tf-strength&lt;/code&gt; parameter information in the README&lt;/li&gt;
+&lt;li&gt;Add donation info&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Bug Fixes&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Fix multiple-counting block bug in Tune 3 SSIM rdmult&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Mainline Updates&lt;/h2&gt;
+&lt;h3&gt;Cleanup, bug fixes&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Fixed debug arm macOS builds by removing invalid assert&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Support Us&lt;/h2&gt;
+&lt;p&gt;As SVT-AV1-PSY&#39;s codebase has become more complex and the encoder&#39;s capabilities have increased dramatically, our efforts have scaled in kind. We have poured hours into coding, testing, distributing, and supporting this piece of open-source software entirely for free, and our work isn&#39;t stopping any time soon.&lt;/p&gt;
+&lt;p&gt;If you appreciate the work that we do and you&#39;d like to support us, we are always excited to see code contributions from outside of the core development team. Otherwise, you can support us monetarily via the links below.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Gianni Rosato&lt;/strong&gt;: &lt;a href=&quot;https://github.com/sponsors/gianni-rosato?o=esc&quot;&gt;Donate&lt;/a&gt;&lt;br&gt;
+&lt;strong&gt;Julio Barba&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;BlueSwordM&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;Clybius&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Any support you can offer goes a long way, and we sincerely appreciate it. &lt;g-emoji class=&quot;g-emoji&quot; alias=&quot;hearts&quot;&gt;♥️&lt;/g-emoji&gt;&lt;/p&gt;
+&lt;h2&gt;Binaries&lt;/h2&gt;
+&lt;p&gt;Linux builds: &lt;em&gt;(MD5: &lt;code&gt;300314556a376a85efb1dd8313c82171&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AVX2 (x86-64-v3)&lt;/li&gt;
+&lt;li&gt;AVX-512 (x86-64-v4)&lt;/li&gt;
+&lt;li&gt;AVX-512 (Zen 3)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;macOS builds: &lt;em&gt;(MD5: &lt;code&gt;ed10a223401dacc8b015b1813e9e4490&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AArch64 (Apple Silicon)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Windows &amp;amp; Other builds: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/discussions/66&quot; data-hovercard-type=&quot;discussion&quot; data-hovercard-url=&quot;/psy-ex/svt-av1-psy/discussions/66/hovercard&quot;&gt;&lt;code&gt;Community Builds Thread&lt;/code&gt;&lt;/a&gt; &lt;em&gt;(Unofficial)&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Thanks for using SVT-AV1-PSY!&lt;/em&gt; &amp;lt;3&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Full Changelog&lt;/strong&gt;: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.2.1&quot;&gt;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.2.1&lt;/a&gt;&lt;/p&gt;</content>
+    <author>
+      <name>gianni-rosato</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/35711760?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/739123434/v2.2.0</id>
+    <updated>2024-08-29T19:38:30Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/psy-ex/svt-av1-psy/releases/tag/v2.2.0"/>
+    <title>v2.2.0</title>
+    <content type="html">&lt;p&gt;Long time no see! We&#39;re back with another exciting release: &lt;strong&gt;SVT-AV1-PSY v2.2.0&lt;/strong&gt;! 🎉&lt;/p&gt;
+&lt;h2&gt;PSY Updates&lt;/h2&gt;
+&lt;h3&gt;Features&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;--tf-strength&lt;/code&gt; parameter for manually adjusting temporal filtering strength. By default, reduces temporal filtering strength by 4x&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--chroma-qm-min&lt;/code&gt; &amp;amp; &lt;code&gt;--chroma-qm-max&lt;/code&gt; parameters for adjusting quantization matrix flatness for chroma planes&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;--tune 4&lt;/code&gt; - A new Tune called Still Picture has been introduced for AVIF encoding, with promising gains observed over aomenc, aomenc 4:4:4, and mainline SVT-AV1&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Quality &amp;amp; Performance&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Enable 10-bit subpixel motion estimation processing for 10-bit inputs on Preset 3 &amp;amp; below&lt;/li&gt;
+&lt;li&gt;Enable SUPERRES_AUTO_ALL for Tune 3 when superres-mode=4
+&lt;ul&gt;
+&lt;li&gt;Disables ALT-REF superres for speed and quality&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Add unipred bias for SSIM full mode decision cost when using Tune 3&lt;/li&gt;
+&lt;li&gt;New perceptual QM curve when using Tune 3
+&lt;ul&gt;
+&lt;li&gt;Better chroma QM adjustment &amp;amp; better high fidelity performance&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Vastly improved screen content detection when &lt;code&gt;--scm 2&lt;/code&gt; is set. Currently only enabled in Tune 4&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Documentation&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;--help&lt;/code&gt; menu correctly prints maximum CRF value (70)&lt;/li&gt;
+&lt;li&gt;Default Tune 2 is better reflected across documentation&lt;/li&gt;
+&lt;li&gt;Updated build documentation&lt;/li&gt;
+&lt;li&gt;Additional featured projects&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Bug Fixes&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Scoped down QM disablement to only affect NEON-enabled systems&lt;/li&gt;
+&lt;li&gt;Scoped down global sharpness features to &lt;code&gt;--sharpness 1&lt;/code&gt;, as was the original intention&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Mainline Updates&lt;/h2&gt;
+&lt;h3&gt;API updates&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;No API changes on this release&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Encoder&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Improve the tradeoffs for the random access mode across presets:
+&lt;ul&gt;
+&lt;li&gt;Speedup of ~15% across presets M0 - M8 while maintaining similar quality levels&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Improve the tradeoffs for the low-delay mode across presets&lt;/li&gt;
+&lt;li&gt;Increased temporal resolution setting to 6L for 4k resolutions by default&lt;/li&gt;
+&lt;li&gt;Added ARM optimizations for functions with &lt;code&gt;c_only&lt;/code&gt; equivalent yielding an average speedup of ~13% for 4k 10-bit&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Cleanup Build &amp;amp; bug fixes &amp;amp; documentation&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Profile-guided-optimized helper build overhaul&lt;/li&gt;
+&lt;li&gt;Major cleanup and fixing of Neon unit test suite&lt;/li&gt;
+&lt;li&gt;Address stylecheck dependence on public repositories&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Support Us&lt;/h2&gt;
+&lt;p&gt;As SVT-AV1-PSY&#39;s codebase has become more complex and the encoder&#39;s capabilities have increased dramatically, our efforts have scaled in kind. We have poured hours into coding, testing, distributing, and supporting this piece of open-source software entirely for free, and our work isn&#39;t stopping any time soon.&lt;/p&gt;
+&lt;p&gt;If you appreciate the work that we do and you&#39;d like to support us, we are always excited to see code contributions from outside of the core development team. Otherwise, you can support us monetarily via the links below.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Gianni Rosato&lt;/strong&gt;: &lt;a href=&quot;https://github.com/sponsors/gianni-rosato?o=esc&quot;&gt;Donate&lt;/a&gt;&lt;br&gt;
+&lt;strong&gt;Julio Barba&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;BlueSwordM&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;br&gt;
+&lt;strong&gt;Clybius&lt;/strong&gt;: &lt;em&gt;Coming Soon&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Any support you can offer goes a long way, and we sincerely appreciate it. &lt;g-emoji class=&quot;g-emoji&quot; alias=&quot;hearts&quot;&gt;♥️&lt;/g-emoji&gt;&lt;/p&gt;
+&lt;h2&gt;Binaries&lt;/h2&gt;
+&lt;p&gt;Linux builds: &lt;em&gt;(MD5: &lt;code&gt;3f30899255f474518d393e8f868db2d3&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;x86-64-v3 (AVX2)&lt;/li&gt;
+&lt;li&gt;x86-64-v4 (compiler AVX-512)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;macOS builds: &lt;em&gt;(MD5: &lt;code&gt;26cdba09ef411f0a0ad6067308c2019b&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AArch64 (Apple Silicon)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Windows builds: &lt;em&gt;(MD5: &lt;code&gt;009bb6bd1e014f6660b9b07eb8399126&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;x86-64-v3 (compiler AVX-512)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;Thanks for using SVT-AV1-PSY!&lt;/em&gt; &amp;lt;3&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Full Changelog&lt;/strong&gt;: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.2.0&quot;&gt;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.2.0&lt;/a&gt;&lt;/p&gt;</content>
+    <author>
+      <name>gianni-rosato</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/35711760?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/739123434/v2.2.0-rc1</id>
+    <updated>2024-08-11T05:28:25Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/psy-ex/svt-av1-psy/releases/tag/v2.2.0-rc1"/>
+    <title>v2.2.0-rc1</title>
+    <content type="html">&lt;p&gt;&lt;em&gt;Note: this is a release candidate, not an official release. Expect the lack of polish that usually accompanies pre-release software, as well as this potentially incomplete release changelog.&lt;/em&gt;&lt;/p&gt;
+&lt;h2&gt;PSY Updates&lt;/h2&gt;
+&lt;h3&gt;Features&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;--tf-strength&lt;/code&gt; parameter for manually adjusting temporal filtering strength. By default, reduces temporal filtering strength by 4x&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Quality &amp;amp; Performance&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Enable 10-bit subpixel motion estimation processing for 10-bin inputs on Preset 3 &amp;amp; below&lt;/li&gt;
+&lt;li&gt;Enable SUPERRES_AUTO_ALL for Tune 3 when superres-mode=4
+&lt;ul&gt;
+&lt;li&gt;Disables ALT-REF superres for speed and quality&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Add unipred bias for SSIM full mode decision cost when using Tune 3&lt;/li&gt;
+&lt;li&gt;New perceptual QM curve when using Tune 3
+&lt;ul&gt;
+&lt;li&gt;Better chroma QM adjustment &amp;amp; better high fidelity performance&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Documentation&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;--help&lt;/code&gt; menu correctly prints maximum CRF value (70)&lt;/li&gt;
+&lt;li&gt;Default Tune 2 is better reflected across documentation&lt;/li&gt;
+&lt;li&gt;Updated build documentation&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Bug Fixes&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Scoped down QM disablement to only affect NEON-enabled systems&lt;/li&gt;
+&lt;li&gt;Scoped down global sharpness features to &lt;code&gt;--sharpness 1&lt;/code&gt;, as was the original intention&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Mainline Updates&lt;/h2&gt;
+&lt;h3&gt;API updates&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;No API changes on this release&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Encoder&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Improve the tradeoffs for the random access mode across presets:
+&lt;ul&gt;
+&lt;li&gt;Speedup of ~15% across presets M0 - M8 while maintaining similar quality levels&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Improve the tradeoffs for the low-delay mode across presets&lt;/li&gt;
+&lt;li&gt;Increased temporal resolution setting to 6L for 4k resolutions by default&lt;/li&gt;
+&lt;li&gt;Added ARM optimizations for functions with &lt;code&gt;c_only&lt;/code&gt; equivalent yielding an average speedup of ~13% for 4k 10-bit&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Cleanup Build &amp;amp; bug fixes &amp;amp; documentation&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Profile-guided-optimized helper build overhaul&lt;/li&gt;
+&lt;li&gt;Major cleanup and fixing of Neon unit test suite&lt;/li&gt;
+&lt;li&gt;Address stylecheck dependence on public repositories&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;Thanks for using SVT-AV1-PSY!&lt;/em&gt; &lt;g-emoji class=&quot;g-emoji&quot; alias=&quot;hearts&quot;&gt;♥️&lt;/g-emoji&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Full Changelog&lt;/strong&gt;: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.2.0-rc1&quot;&gt;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.2.0-rc1&lt;/a&gt;&lt;/p&gt;</content>
+    <author>
+      <name>gianni-rosato</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/35711760?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/739123434/v2.1.0-A</id>
+    <updated>2024-06-10T00:14:51Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/psy-ex/svt-av1-psy/releases/tag/v2.1.0-A"/>
+    <title>v2.1.0-A</title>
+    <content type="html">&lt;p&gt;Hi there! We&#39;re back with our micro-release format to announce some exciting changes in &lt;strong&gt;SVT-AV1-PSY v2.1.0-A&lt;/strong&gt;! 🎉&lt;/p&gt;
+&lt;h2&gt;PSY Updates&lt;/h2&gt;
+&lt;h3&gt;Features&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;New parameter &lt;code&gt;--max-32-tx-size&lt;/code&gt;, which restricts block transform sizes to a maximum of 32x32 pixels. This can be useful in very specific scenarios for improving overall efficiency&lt;/li&gt;
+&lt;li&gt;Added support for HDR10+ JSON files via a new &lt;code&gt;--hdr10plus-json&lt;/code&gt; parameter (thanks &lt;a class=&quot;user-mention notranslate&quot; data-hovercard-type=&quot;user&quot; data-hovercard-url=&quot;/users/quietvoid/hovercard&quot; data-octo-click=&quot;hovercard-link-click&quot; data-octo-dimensions=&quot;link_type:self&quot; href=&quot;https://github.com/quietvoid&quot;&gt;@quietvoid&lt;/a&gt;!). In order to build a binary with support for HDR10+, see our &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/blob/master/Docs/PSY-Development.md&quot;&gt;PSY Development page&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;New parameter &lt;code&gt;--adaptive-film-grain&lt;/code&gt;, which helps remedy perceptually harmful grain patterns caused by extracting grain from blocks that are too large for a given video resolution. This parameter is enabled by default&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Quality &amp;amp; Performance&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Disabled SSIM-cost transform decisions while keeping SSIM-cost mode decisions, generally improving Tune 3&#39;s efficiency &amp;amp; consistency&lt;/li&gt;
+&lt;li&gt;Additional NEON optimizations for ARM platforms, providing a speed increase&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Documentation&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;All of the features present in this release have been documented, so associated documentation has been updated accordingly&lt;/li&gt;
+&lt;li&gt;Build documentation updated to reflect the HDR10+ build option&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Bug Fixes&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Disabled quantization matrices for presets 5 and higher due to a visual consistency bug (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;2339380901&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/psy-ex/svt-av1-psy/issues/56&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/psy-ex/svt-av1-psy/issues/56/hovercard&quot; href=&quot;https://github.com/psy-ex/svt-av1-psy/issues/56&quot;&gt;#56&lt;/a&gt;)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;Thanks for using SVT-AV1-PSY!&lt;/em&gt; &lt;g-emoji class=&quot;g-emoji&quot; alias=&quot;hearts&quot;&gt;♥️&lt;/g-emoji&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Full Changelog&lt;/strong&gt;: &lt;a href=&quot;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.1.0-A&quot;&gt;https://github.com/gianni-rosato/svt-av1-psy/commits/v2.1.0-A&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Linux builds: &lt;em&gt;(MD5: &lt;code&gt;8a801a369e20cd421badfc483b5c1e47&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Generic&lt;/li&gt;
+&lt;li&gt;x86-64-v3 (AVX2)&lt;/li&gt;
+&lt;li&gt;x86-64-v4 (compiler AVX512, disabled native AVX512)&lt;/li&gt;
+&lt;li&gt;RISC-V (RV64) &lt;em&gt;(MD5: &lt;code&gt;da95d67dafa0ae372bebff8e883547db&lt;/code&gt;)&lt;/em&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;macOS builds: &lt;em&gt;(MD5: &lt;code&gt;242febb82425f26c42008d1162ac7513&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;AArch64 (Apple Silicon)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Windows builds: &lt;em&gt;(MD5: &lt;code&gt;070a44d7187726c430f9fb3ca703e070&lt;/code&gt;)&lt;/em&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;x86-64-v3 (AVX2)&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>gianni-rosato</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/35711760?s=60&amp;v=4"/>
+  </entry>
+</feed>
+

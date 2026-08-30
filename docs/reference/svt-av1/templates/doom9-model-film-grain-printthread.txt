@@ -1,0 +1,317 @@
+# Source: https://forum.doom9.org/printthread.php?t=184502
+# Fetched: 2026-08-29 17:11:16 +08:00
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+<meta name="generator" content="vBulletin 3.8.11" />
+<title>Doom9's Forum -  Getting SVT-AV1 to Model Film Grain</title>
+<style type="text/css">
+<!--
+td, p, li, div
+{
+	font: 10pt verdana, geneva, lucida, 'lucida grande', arial, helvetica, sans-serif;
+}
+.smallfont
+{
+	font-size: 11px;
+}
+.tborder
+{
+	border: 1px solid #808080;
+}
+.thead
+{
+	background-color: #EEEEEE;
+}
+.page
+{
+	background-color: #FFFFFF;
+	color: #000000;
+}
+-->
+</style>
+</head>
+<body class="page">
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr valign="bottom">
+	<td><a href="https://forum.doom9.org/"><img src="images/misc/vbulletin3_logo_white.gif" alt="Doom9's Forum" border="0" /></a></td>
+	<td align="right">
+		<div class="smallfont"></div>
+		
+	</td>
+</tr>
+</table>
+
+<br />
+
+<div>
+	<a href="https://forum.doom9.org/index.php" accesskey="1"><strong>Doom9's Forum</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/index.php</em></span>)
+</div>
+<div>
+	- &nbsp; <a href="forumdisplay.php?f=84"><strong>Royalty free video codecs (VP8, VP9, AV1 and AV2)</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/forumdisplay.php?f=84</em></span>)
+</div>
+<div>
+	- &nbsp; - &nbsp;  <a href="showthread.php?t=184502" accesskey="3"><strong>Getting SVT-AV1 to Model Film Grain</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/showthread.php?t=184502</em></span>)
+</div>
+
+<br />
+
+<table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">wswartzendruber</td>
+			<td class="smallfont" align="right">22nd October 2022 00:08</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+			<div><strong>Getting SVT-AV1 to Model Film Grain</strong><br />&nbsp;</div>
+		
+		
+
+		<div>Does anyone know how to get SVT-AV1 to model film grain better than this?<br />
+<br />
+<a href="https://wswartzendruber.net/images/av1-discarding-grain.png" target="_blank">https://wswartzendruber.net/images/a...ding-grain.png</a><br />
+<br />
+The left half is the input and the right half is SVT-AV1.<br />
+<br />
+Command line:<br />
+<br />
+<div style="margin:20px; margin-top:5px">
+	<div class="smallfont" style="margin-bottom:2px">Code:</div>
+	<hr /><code style="margin:0px" dir="ltr" style="text-align:left">ffmpeg -i fringe-intro.mkv -color_primaries bt709 -color_trc bt709 -colorspace bt709 -pix_fmt yuv420p -f rawvideo - |&nbsp; &nbsp;  SvtAv1EncApp -i /dev/stdin --input-depth 8 -w 1920 -h 1080 --film-grain 16 --fps-num 24000 --fps-denom 1001 --crf 20 --preset 4 --tune 0 --tile-columns 2 --color-primaries bt709 --transfer-characteristics bt709 --matrix-coefficients bt709 -b video.ivf</code><hr />
+</div></div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">BlueSwordM</td>
+			<td class="smallfont" align="right">24th October 2022 06:41</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>Well for one, unless you want to use some exotic options or chunked encoding, you should use libsvtav1 within ffmpeg.<br />
+<br />
+Here is what I'd recommend if you want better detail retention in general.<br />
+Also, no need for tiles really at 1080p unless you code lossless.<br />
+<br />
+<div style="margin:20px; margin-top:5px">
+	<div class="smallfont" style="margin-bottom:2px">Code:</div>
+	<hr /><code style="margin:0px" dir="ltr" style="text-align:left">ffmpeg -i input.mkv -crf 20 -preset 4&nbsp; -svtav1-params tune=0:keyint=240:film-grain=16:film-grain-denoise=0 -pix_fmt yuv420p10le -colorspace 1 -color_primaries 1 -color_trc 1 -c:a copy output.mkv</code><hr />
+</div>This should help a decent bit, especially in fidelity driven encoding.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">wswartzendruber</td>
+			<td class="smallfont" align="right">24th October 2022 23:07</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>Is there a Linux binary somewhere that has SVT-AV1 built in?</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">benwaggoner</td>
+			<td class="smallfont" align="right">24th October 2022 23:33</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>The FGS features aren't really parts of the AV1 codec proper. Both analysis and playback are out of band of the encoder and decoder itself. On analysis, the grain needs to be modeled, parameterized, and removed. This part is <b>HARD</b>, and a good job often requires tuning. And grain can vary throughout a movie if shots came from different sources or have different effects applied, so a single tuning is going to be difficult.<br />
+<br />
+The grain parameters are put into a SEI message in the video elementary stream, which is then read by the player, random grain based on the parameters is generated, and then applied to the decoded frames. As architected, the same SEI message should work in other codecs. Also, since the grain is added as a post processing filter, the implementation can vary by manufacturer. There's been examples of some devices that decode AV1 but don't add the grain back. Another will keep randomizing the grain when the video is paused.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">wswartzendruber</td>
+			<td class="smallfont" align="right">25th October 2022 21:40</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					(Post 1977175)
+				</div>
+				<div style="font-style:italic">The FGS features aren't really parts of the AV1 codec proper. Both analysis and playback are out of band of the encoder and decoder itself. On analysis, the grain needs to be modeled, parameterized, and removed. This part is <b>HARD</b>, and a good job often requires tuning. And grain can vary throughout a movie if shots came from different sources or have different effects applied, so a single tuning is going to be difficult.<br />
+<br />
+The grain parameters are put into a SEI message in the video elementary stream, which is then read by the player, random grain based on the parameters is generated, and then applied to the decoded frames. As architected, the same SEI message should work in other codecs. Also, since the grain is added as a post processing filter, the implementation can vary by manufacturer. There's been examples of some devices that decode AV1 but don't add the grain back. Another will keep randomizing the grain when the video is paused.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Sections 5.9.30 and 6.8.20 of the AV1 specification detail film grain coefficients.<br />
+<br />
+&quot;SEI&quot; never appears in the specification, but I've seen this with HEVC and Dolby Vision. Is this a generic term?<br />
+<br />
+I recognize that grain synthesis is obviously not handled here using MDCT, but it is nonetheless part of the standard specification.<br />
+<br />
+<a href="https://aomediacodec.github.io/av1-spec/av1-spec.pdf" target="_blank">https://aomediacodec.github.io/av1-spec/av1-spec.pdf</a></div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">benwaggoner</td>
+			<td class="smallfont" align="right">25th October 2022 21:54</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>wswartzendruber</strong>
+					(Post 1977222)
+				</div>
+				<div style="font-style:italic">Sections 5.9.30 and 6.8.20 of the AV1 specification detail film grain coefficients.<br />
+<br />
+&quot;SEI&quot; never appears in the specification, but I've seen this with HEVC and Dolby Vision. Is this a generic term?</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Yes, a SEI is a standard MPEG/SMPTE way to put metadata into an elementary stream. IIRC AV1 in a MPEG-4 wrapper also supports SEI. SEI's is where HDR static and dynamic metadata live, and the source for that metadata when it is inserted into HDMI.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				I recognize that grain synthesis is obviously not handled here using MDCT, but it is nonetheless part of the standard specification.<br />
+<br />
+<a href="https://aomediacodec.github.io/av1-spec/av1-spec.pdf" target="_blank">https://aomediacodec.github.io/av1-spec/av1-spec.pdf</a>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Right. It is a normative part of the specification. But it's not an in-loop filter that impacts the fundamental pixels-bitstream-pixels codec. Its more akin to VC-1's post processing, which was defined normatively, but is optional to decoding.<br />
+<br />
+One can make an AV1 decoder that fully decodes but doesn't generate film grain. One can't make an AV1 decoder that doesn't do, say, in-loop deblocking, as that would mess with predictions and quality would get worse the farther into the GOP.<br />
+<br />
+And as it is out of loop, it is also available to arbitrary codecs that carry the correct metadata.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">quietvoid</td>
+			<td class="smallfont" align="right">25th October 2022 22:12</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>AV1 doesn't have SEI messages as found in typical MPEG codecs. It has metadata OBUs.<br />
+The only generic part is the syntax of the payload which can be reused in any codec supporting arbitrary payload messages such as SEI (though those aren't generic enough).<br />
+<br />
+And that syntax is what can be made into a specification, like the models for AV1 FGS: <a href="https://github.com/AOMediaCodec/afgs1-spec" target="_blank">https://github.com/AOMediaCodec/afgs1-spec</a></div>
+	</td>
+</tr>
+</table>
+<br />
+
+<br />
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr valign="top">
+	<td class="smallfont">All times are GMT +1. The time now is <span class="time">10:11</span>.</td>
+	<td align="right">
+		<div class="smallfont"></div>
+		
+	</td>
+</tr>
+</table>
+
+<p class="smallfont" align="center">
+	Powered by vBulletin&reg; Version 3.8.11<br />Copyright &copy;2000 - 2026, vBulletin Solutions Inc.
+	<br />
+	
+</p>
+
+</body>
+</html>

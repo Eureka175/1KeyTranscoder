@@ -1,0 +1,155 @@
+----- mikk9 @ 10/22/2022 22:09:51 -----
+Staxrip muxing is buggy, this is not QSVEnc related. See here last post: https://github.com/rigaya/QSVEnc/issues/87#issuecomment-1287835215
+
+Maybe this method works for you. AV1 has limited settings at the moment. 
+
+--gop-ref-dist
+--gop-len
+--quality
+--output-depth
+
+Some settings are supported according to feature check like mbbrc or extbrc but currently they have no effect. --max-bitrate is for VBR bitrate mode, I don't think this is supposed to work for CQP or ICQ. Lookahead is not supported in AV1 and HEVC. There are no b-frames in AV1 but --gop-ref-dist has a simillar effect, it's the equivalent of bframes. 
+
+
+
+
+----- swirtgen @ 10/22/2022 22:27:41 -----
+OK Thanks for your answer,
+Didn´t know that Staxrip has such Problems, using Staxrip for years with x264 and x265 and never had such Problems before.
+The last Encode I did leave a 2,7GB AV1 File in the Temp Folder and the result Mux was 1,4GB only....
+
+But Trying Handbrake lead into fail too - here it left me with a 36KB Encoded File :-(
+
+has try Staxrip with qp mode, but the output File was almost as big as the Input File,
+Feels a bit like "Hey, got an new Encoder that has a bettter Quality at the same Bitrate, but Bitrate is always higher, so Hey, got a new Encoder anyways"
+
+Also with HEVC in qp mode, I See that Bitrate raises up damn high at the beginning and fell down while encoding - with vbr und bufsize set....
+
+so, I will try ffmpeg direct.
+Hopefully it will help 
+
+----- rigaya @ 10/23/2022 00:41:29 -----
+At least I don't have trouble with command line below when using QSVEncC alone with Arc A380 AV1, getting around 5000kbps output.
+
+-c av1 --quality best --vbr 5000 --max-bitrate 15000
+
+```
+PG is not supported on this platform, switched to FF mode.
+cop.AUDelimiter value changed off -> auto by driver
+cop.PicTimingSEI value changed off -> auto by driver
+cop.SingleSeiNalUnit value changed off -> auto by driver
+cop3.DirectBiasAdjustment value changed off -> auto by driver
+cop3.GlobalMotionBiasAdjustment value changed off -> auto by driver
+QSVEncC (x64) 7.22 (r2912) by rigaya, Oct 22 2022 17:03:05 (VC 1933/Win)
+OS             Windows 11 x64 (22000) [UTF-8]
+CPU Info       12th Gen Intel Core i9-12900K [5.00GHz] (8P+8E,16C/24T) <DG2>
+GPU Info       Intel Arc A380  Graphics (128EU) 300-2450MHz (31.0.101.3491)
+Media SDK      QuickSyncVideo (hardware encoder) FF, 2nd GPU, API v2.07
+Async Depth    3 frames
+Hyper Mode     off
+Buffer Memory  d3d11, 17 work buffer
+Input Info     AviSynth+ 3.7.2 r3661(yv12)->nv12 [AVX2], 1920x1080, 30000/1001 fps
+AVSync         cfr
+Output         AV1(yuv420) main @ Level 4
+               1920x1080p 1:1 29.970fps (30000/1001fps)
+               avwriter: av1 => mp4
+Target usage   1 - best
+Encode Mode    Bitrate Mode - VBR
+Bitrate        5000 kbps
+Max Bitrate    15000 kbps
+VBV Bufsize    30000 kbps
+QP Limit       min: none, max: none
+Trellis        Auto
+Ref frames     4 frames
+GopRefDist     8, B-pyramid: on
+Max GOP Length 300 frames
+
+encoded 5203 frames, 168.80 fps, 5018.17 kbps, 103.85 MB
+encode time 0:00:30, CPU: 5.7%, GPU: 55.7%, VD: 87.9%
+frame type IDR   18
+frame type I     18,  total size    3.23 MB
+frame type P   5185,  total size  100.63 MB
+```
+
+Please make sure you've updated the driver to 3430 or above when using Arc GPU, below that the driver is unstable. (latest 3490 is recommended for now.)
+
+Note: --la-depth only works for --la which is only supported in H.264.
+
+
+
+----- swirtgen @ 10/23/2022 03:21:11 -----
+Yes the vbr mode is which I use for now. 
+But i figured out, that the bug must be somewhere in qsvenc.
+
+Spend the complete Night to test on my systems.
+
+Had no Problems with the nvenc on my 3050 (avc&hevc)
+No Problems with vce on my 5700G 
+And no problems with qsv on my j5005 
+
+Only problems with my j3455 but therefore with avc&hevc
+And now wirh the Arc 380Card with all three codecs.
+
+Had tryin to grab the encoded file from the temp folder and mux it with mkvtoolnix but the result is the same
+
+Encoded file is for example 2gb
+The muxed is only 1gb.
+
+Staxrip wont give me an error
+Only the filesize is a indicator for that something could not be right
+
+----- swirtgen @ 10/24/2022 10:31:25 -----
+Another Test,
+When I´m muxing with the setting ffmpeg>MKV the Files are Muxed with the complete encoded File but the Audio is complete out of sync.
+
+and it seems that are always the same Files are affected - When I Take 5 Files for Batch Encode 3 are good, the other 2 bad.
+in the Next Batch these 2 Files are badly Muxed after encoding again.
+
+Then in the Next Batch, they´re godd.... but therefore another Files are affected.
+
+As of now, this only Happen with QSVEnc and Staxrip on my A 380 or my J3455 
+
+----- rigaya @ 10/24/2022 13:04:34 -----
+I'm not sure about StaxRip usage, but if seems like it is a muxing issue, and not problem of QSVEnc itself.
+
+In that case, adding ```--output-format mp4``` to the [Encoder Options] > [Other] > [Custom] box might fix.
+
+----- swirtgen @ 10/24/2022 14:09:02 -----
+Yes, an Muxing issue but for me obviously with QSVEnc. All other Tools will work. VCEEnc and Nvenc works both flawlessly with Muxing. Seems like the AV1 File (or the HEVC FIle) that was produced has somewhat in it, that interrupts the Muxin process.
+
+As I say, when try muxing the Encoded File from the Staxrip Temp Folder, that has the correct size, the output file becomes corrupt. no matter if I mux with staxrip, or with MKVToolnix.
+
+Had try to let Staxrip mux in MP4 - but there´s no diffrence to MKV, so try to mux with the Option ffmpeg>MKV or also MP4 but then the Audio is async.
+
+so I stuck with command line at the moment, and then mux all together after all.
+
+Try to make a Batch File and search for command that I can copy Subtitles and Audio while encoding with QSVEnc.exe 
+
+----- henanzheng @ 10/28/2022 04:47:17 -----
+The video sources are different and the encoding formats are different. Now it is easy to encounter a problem, that is, vfr files. There are usually two situations:
+
+1. Interrupt the encoding process. The general prompt means that the encoding process cannot be decoded and is interrupted. Some of the -- avsw inputs will also be interrupted. The ffmpeg pipeline+-- avsw inputs are relatively stable, and some files cannot continue;
+
+2. Video and audio are not synchronized. Not all of them are like this. We haven't found a rule yet.
+
+Another problem with Intel is that when you try to transcode this problematic vfr file for many times, it is easy to lose the codec, and the computer can only restart.
+
+Usually, the command line operation is used.
+
+----- henanzheng @ 10/28/2022 04:51:17 -----
+NVEnc is relatively stable, but it also appears.
+
+----- swirtgen @ 10/28/2022 15:03:00 -----
+Yesterday got an 4K Movie, that encodes half with the within the CMD 
+then a MFX.... Error occured and the encoding has stopped.
+Encode the File with Nvenc in HEVC then with QSV in AV1 and it works.
+
+Today had an 1080p movie who is Async after encoding with cmd and mux with MKVToolnix.
+
+Had --avhw set. but found, that when the Arc Control was launched it can happen that the encoding Process won´t start cause the decoder won´t found. restart the PC and not launching Arc Control will solve this issue.
+
+
+----- rigaya @ 07/23/2024 09:54:17 -----
+I'll close this issue, as I think recent drivers don't have this kind of instability.
+
+

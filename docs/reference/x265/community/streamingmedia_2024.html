@@ -1,0 +1,1447 @@
+
+
+
+<!DOCTYPE html>
+
+<html>
+<head><title>
+	The State of Video Codecs 2024
+</title><meta charset="utf-8" /><meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=0, minimum-scale=1.0, maximum-scale=1.0" /><meta name="theme-color" content="#333333" /><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.13/css/all.css" integrity="sha384-DNOHZ68U8hZfKXOrtjWvjxusGo9WQnrNx2sqG0tfsghAvtVlRW3tvkXWZh58N9jp" crossorigin="anonymous" /><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.2/css/all.css" />
+    <script src="https://use.fontawesome.com/13ebcdf3dd.js"></script>
+	<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-97PEDY7QMK"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-97PEDY7QMK');
+</script>
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-13073004-2"></script>
+    <script defer>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'UA-13073004-2');
+    </script>
+
+
+    <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto|Roboto+Condensed|Oswald" />
+<script async="async" src="https://www.googletagservices.com/tag/js/gpt.js"></script>
+<script>
+    var googletag = googletag || {};
+    googletag.cmd = googletag.cmd || [];
+</script>
+
+<script>
+
+    googletag.cmd.push(function () {
+
+        var mapping = googletag.sizeMapping()
+            .addSize([0, 0], [320, 50])
+            .addSize([1057, 200], [728, 90]).build();
+
+        var mapping1 = googletag.sizeMapping()
+            .addSize([0, 0], [300, 250])
+            .addSize([700, 200], [970, 250]).build();
+
+
+
+        googletag.defineSlot('/1067009/StreamingMedia-SmallBoxes', [300, 250], 'div-gpt-ad-1541523286597-0').addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-SmallBoxes-Article', [300, 250], 'div-gpt-ad-1541523286597-1').addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-SmallBoxes-HomePage', [300, 250], 'div-gpt-ad-1541523286597-2').addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-Leaderboards', [728, 90], 'div-gpt-ad-1541523286597-3').defineSizeMapping(mapping).addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-Leaderboards-2', [728, 90], 'div-gpt-ad-1541523286597-4').defineSizeMapping(mapping).addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-300x100-1', [300, 100], 'div-gpt-ad-1541523286597-5').addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-300x100-2', [300, 100], 'div-gpt-ad-1541523286597-6').addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-300x100-3', [300, 100], 'div-gpt-ad-1541523286597-7').addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-300x100-4', [300, 100], 'div-gpt-ad-1541523286597-8').addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-300x100-5', [300, 100], 'div-gpt-ad-1541523286597-9').addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-300x100-6', [300, 100], 'div-gpt-ad-1610995301185-0').addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-300x100-7', [300, 100], 'div-gpt-ad-1618866787087-0').addService(googletag.pubads());
+        googletag.defineSlot('/1067009/StreamingMedia-Billboard', [970, 250], 'div-gpt-ad-1569599331675-0').defineSizeMapping(mapping1).addService(googletag.pubads());
+
+        googletag.defineSlot('/1067009/StreamingMedia-640x640', [640, 480], 'div-gpt-ad-1563376606160-0').defineSizeMapping(mapping1).addService(googletag.pubads());
+
+       
+
+        googletag.defineOutOfPageSlot('/1067009/StreamingMedia-Interstitial', 'div-gpt-ad-1541523286597-10').addService(googletag.pubads());
+        googletag.pubads().enableSingleRequest();
+        googletag.pubads().collapseEmptyDivs();
+        
+        googletag.pubads().setTargeting('SM_Topics', ['Encoding_Transcoding','Formats_Codecs_Protocols']); 
+
+        googletag.enableServices();
+    });
+</script>
+
+    <link href="/pages-styles?v=7-KvHsI5nXh4NmAO4IdMDrv_oq5pl_cS-xpQF8FR0NY1" rel="stylesheet"/>
+
+<link rel="alternate" type="application/rss+xml" title="Streaming Media Magazine Feed" href="http://feeds.feedburner.com/StreamingMediaMagazine-AllArticles/" />
+<!-- ** Start Meta **-->
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta http-equiv="content-language" content="en-US" />
+<meta name="title" content="The State of Video Codecs 2024">
+<meta name="description" content="It's been 3-plus years since the MPEG codec explosion that brought us VVC, LCEVC, and EVC. Rather than breathlessly trumpet every single-digit quality improvement or design win, I'll quickly get you up-to-speed on quality, playability, and usage of the most commonly utilized video codecs and then explore new codec-related advancements in business and technology.">
+<link rel="canonical" href="https://www.streamingmedia.com/Articles/ReadArticle.aspx?ArticleID=163422"/>
+<link rel="image_src" href="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/163777-codecs0-ORG.png"/>
+<meta name="keywords" content="Encoding/Transcoding,Formats/Codecs/Protocols">
+
+<!-- ** End Meta ** -->
+
+<!-- ** Start Open Graph Meta **-->
+<meta property="og:type" content="article"/>
+<meta property="og:title" content="The State of Video Codecs 2024"/>
+<meta property="og:description" content="It's been 3-plus years since the MPEG codec explosion that brought us VVC, LCEVC, and EVC. Rather than breathlessly trumpet every single-digit quality improvement or design win, I'll quickly get you up-to-speed on quality, playability, and usage of the most commonly utilized video codecs and then explore new codec-related advancements in business and technology."/>
+<meta property="og:url" content="https://www.streamingmedia.com/Articles/ReadArticle.aspx?ArticleID=163422"/>
+<meta property="og:image" content="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/163777-codecs0-ORG.png"/>
+<meta property="article:published_time" content="2024-04-04T11:55:00-04:00"/>
+<meta property="article:author" content="https://www.streamingmedia.com/Authors/4247-Jan-Ozer.htm"/>
+<meta property="fb:admins" content="1448114697"/>
+<meta property="fb:admins" content="1398034021"/>
+<meta property="fb:app_id" content="119574181444909"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="og:site_name" content="Streaming Media Magazine"/>
+<meta property="article:publisher" content="https://www.facebook.com/StreamingMedia/"/>
+<!-- ** End Open Graph Meta ** -->
+
+<!-- ** Start Twitter Card **-->
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/163777-codecs0-ORG.png"/>
+
+<meta name="twitter:title" content="The State of Video Codecs 2024"/>
+<meta name="twitter:description" content="It's been 3-plus years since the MPEG codec explosion that brought us VVC, LCEVC, and EVC. Rather than breathlessly trumpet every single-digit quality improvement or design win, I'll quickly get you up-to-speed on quality, playability, and usage of the most commonly utilized video codecs and then explore new codec-related advancements in business and technology."/>
+<meta name="twitter:site" content="https://www.StreamingMedia.com"/>
+<!-- ** End Twitter Card **-->
+<link href="/site-styles?v=ZxBOwEcwvLIFHxxGTsiFuk3Mv7ykQVWZxTdqrEg2VZs1" rel="stylesheet"/>
+</head>
+<body>
+	
+    
+<script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
+<script async="async" src="https://www.googletagservices.com/tag/js/gpt.js"></script>
+
+
+<style>
+    .content {
+        padding : 5px;
+	    max-height: 300px;
+	    width: 100%;
+	    overflow: hidden;
+	    transition: all .17s ease;
+        text-align: center;
+        display: none;
+        align-items: center;
+        position:relative;
+        top: 0
+
+    }
+
+    .content.expand  {
+	    width: 100%;
+	    max-height: 100%;
+        transition: all 1s ease;
+        position:relative;
+        top:0
+    }
+
+    .contentmobile {
+        padding : 5px;
+	    max-height: 100px;
+	    width: 100%;
+	    overflow: hidden;
+	    transition: all 1s ease;
+        text-align: center;
+        display: none;
+    }
+
+    .contentmobile.expand  {
+	    width: 100%;
+	    max-height: 250px;
+        transition: all 1s ease;
+        position:fixed;
+    }
+
+    
+
+
+
+    </style>
+
+
+    <div class="container1">
+
+
+     
+
+    <div id="content_type" style="text-align: center;background-color: black;" class="content">
+<!--	    <center>
+        <div id="down"><font style="font-size:23px;color:white;">&#9660 Scroll to Site &#9660</font></div>
+	    <!--<div class="inner-div" id="div-gpt-ad-1562088021964-0">-->
+	    </center>
+-->
+    </div>
+	
+	    </div>
+
+
+    <div id="bottom" style="background-color:white; height:0px"></div>
+
+
+    <script>
+        var expanded = true;
+        var broughtToTop = false;
+        var collapsed = false;
+
+        function createAd() {
+            adStr = '<center><div class="inner-div" id="div-gpt-ad-1569599331675-0"><script>googletag.cmd.push(function() { googletag.display("div-gpt-ad-1569599331675-0"); });';
+            adStr += '<\/script><\/div><\/center>';
+            $("#content_type").html(adStr)
+        }
+
+        function addMinutes(date, minutes) {
+            return new Date(date.getTime() + minutes*60000);
+        }
+
+        function waitForElement(elementPath, callBack){
+          window.setTimeout(function(){
+            if($(elementPath).length){
+              callBack(elementPath, $(elementPath));
+            }else{
+              waitForElement(elementPath, callBack);
+            }
+          },50)
+        }
+
+        function getCookie(cname) {
+          var name = cname + "=";
+          var decodedCookie = decodeURIComponent(document.cookie);
+          var ca = decodedCookie.split(';');
+          for(var i = 0; i <ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0) == ' ') {
+              c = c.substring(1);
+            }
+            if (c.indexOf(name) == 0) {
+              return c.substring(name.length, c.length);
+            }
+          }
+          return "";
+        }
+
+        function sameSite() {
+            var oldURL = document.referrer;
+            return oldURL.indexOf("www.speechtechmag.com") != -1;
+        }
+
+        function to_display() {
+            if (sameSite() || getCookie("streaming_visits") == "+1") {
+                return false;
+            }
+            else {
+                return true;
+            }
+        }
+
+        function getRandomInt(min, max) {       
+            // Create byte array and fill with 1 random number
+            var byteArray = new Uint8Array(1);
+            window.crypto.getRandomValues(byteArray);
+
+            var range = max - min + 1;
+            var max_range = 256;
+            if (byteArray[0] >= Math.floor(max_range / range) * range)
+                return getRandomInt(min, max);
+            return min + (byteArray[0] % range);
+        }
+
+        function random_precision(precision) {
+            var precision_1 = 10**(precision-1); // 2 decimals
+            var randomnum = Math.floor(Math.random() * (10 * precision_1 - 1 * precision_1) + 1 * precision_1) / (10 * precision_1);
+            return randomnum;
+        }
+
+        function to_display_chance(chance) {
+            var number = getRandomInt(0,100)/100;
+            if (number <= chance - .01) {
+                return true
+            }
+            else {
+                return false;
+            }
+
+        }
+
+
+
+        function waitForElementID(elementID, callBack){
+          window.setTimeout(function(){
+            if(document.querySelector(elementID) != null){
+              callBack(elementID, document.querySelector(elementID));
+            }else{
+              waitForElementID(elementID, callBack);
+            }
+          },50)
+        }
+
+        var checkScrollSpeed = (function(settings){
+            settings = settings || {};
+
+            var lastPos, newPos, timer, delta, 
+                delay = settings.delay || 50; // in "ms" (higher means lower fidelity )
+
+            function clear() {
+              lastPos = null;
+              delta = 0;
+            }
+
+            clear();
+
+            return function(){
+              newPos = window.scrollY;
+              if ( lastPos != null ){ // && newPos < maxScroll 
+                delta = newPos -  lastPos;
+              }
+              lastPos = newPos;
+              clearTimeout(timer);
+              timer = setTimeout(clear, delay);
+              return delta;
+            };
+        })();
+
+    
+        window.onscroll = function(){
+          console.log( checkScrollSpeed() );
+        }; 
+
+    
+
+
+        function addVisit() {
+            if (getCookie("streaming_visits") == "") {
+                var now = new Date();
+                var expireTime = addMinutes(now,30);
+                now.setTime(expireTime);
+                document.cookie = 'streaming_visits=+1;expires=' + now.toGMTString() + ';path=/';
+            }
+            else {
+                var visits = getCookie("streaming_visits");
+                if (visits == "1") {
+                    var now = new Date();
+                    var expireTime = addMinutes(now,30);
+                    now.setTime(expireTime);
+                    document.cookie = 'streaming_visits=+1;expires=' + now.toGMTString() + ';path=/';
+                }
+            
+            }
+        }
+
+        /*function waitForExpand(callBack) {
+            window.setTimeout(function(){
+            if(document.querySelector('.content').className == "content expand"){
+                callBack();
+            }else{
+              waitForExpand(callBack);
+            }
+          },50)
+
+            
+        }*/
+
+        function sleep(miliseconds) {
+            var currentTime = new Date().getTime();
+
+            while (currentTime + miliseconds >= new Date().getTime()) {
+            }
+        }
+
+
+        function getHeightExpand(callBack) {
+            window.setTimeout(function(){
+                if(document.querySelector('.content').className == "content expand"){
+                    return callBack();
+                }else{
+                  waitForExpand(callBack);
+                }
+            },50)
+        }
+
+// Does this next line control frequency of display? Changed from .2 to .7, 7-26-23, BS, then .7 to .99, 8-11-23
+
+        var to_dis = to_display_chance(.99);
+        var to_dis_main = to_display();
+        var to_dis_width = $(window).width() > 784
+
+
+        function manipulateAd() {
+            waitForElement(".content.expand", function () {
+                $('.content.expand').css('max-height', 300);
+                $(".content.expand").css("height", 300);
+                //$(".content").css("position", "relative");
+            });
+
+            waitForElement(".content", function () {
+
+
+                waitForElement(".inner-div", function () {
+
+                    waitForElementID('[id^="google_ads_iframe_/1067009/StreamingMedia-Billboard"]', function () {
+                        /*waitForExpand(function () {*/
+                        var window_height = 300
+                        console.log(window_height);
+                        if (window_height > 100) {
+                            console.log(window_height);
+                            var height = document.querySelector('.inner-div').offsetHeight;
+                            var top_pad = (window_height / 2 - height / 2);
+                            document.querySelector('[id^="google_ads_iframe_/1067009/StreamingMedia-Billboard"]').style.marginTop = top_pad + "px";
+                        }
+                        else {
+                            //document.querySelector('[id^="google_ads_iframe_/1067009/dCRM-Billboard"]').style.marginTop = 50 + "px";
+                        }
+
+                        /*});*/
+                    });
+                });
+
+            });
+
+            waitForElement(".content", function () {
+                $('.content').css('visibility', "visible");
+                $('.content').css('display', "block");
+                $("#ctl01").css("background", "white");
+                //$('.menu_main').css('display', "none");
+                //$('.menu_main').css('z-index', "0");
+                //$('.menu_secondary_top').css('display', "none");
+
+                document.querySelector('.content').classList.toggle("expand");
+                //$(".content").css("margin-bottom", 250);
+
+            });
+        }
+
+
+        $(document).ready(function () {
+            addVisit();
+            
+            if ((to_dis_main || to_dis) && to_dis_width) {
+
+                setTimeout(function () { createAd(); manipulateAd(); }, 1500);
+                
+
+
+                
+
+                
+            }
+        
+        
+        
+        });
+
+        var position = $(window).scrollTop(); 
+
+
+	    var scrollHeight = $(document).height();
+        var scrollPosition = $(window).height() + $(window).scrollTop();
+
+        var pastPoint = false;
+
+
+        $(document).keydown(function (e) {
+            $curHeight = parseInt($(".content.expand").css("height"));
+            var scroll = $(window).scrollTop();
+
+            var pixelDelta_keys = $(window).height() * 0.0679;
+
+
+            switch (e.which) {
+
+                case 38: // up
+                    if ((to_dis_main || to_dis) && to_dis_width) {
+                        if (scroll <= 30) {
+                            $(".content.expand").css("height", 300);
+                        }
+                        else if ($curHeight <= 300 && scroll <= 200) {
+                            $(".content.expand").css("height", $curHeight + pixelDelta_keys);
+                        }
+                        if ($curHeight > scroll) {
+                            //$('.content').css('position', "relative");
+                        }
+                    }
+                    break;
+
+
+                case 33: //page up
+                    if ((to_dis_main || to_dis) && to_dis_width) {
+                        if (scroll <= 330) {
+                            $(".content.expand").css("height", 300);
+                        }
+                    }
+                    break;
+
+                case 34: // page down
+                    if ((to_dis_main || to_dis) && to_dis_width) {
+                        if (!($(".menu_main_container.menu_topics").offset().top == scroll)) {
+                            //$("#ctl01").animate({ "margin-top": $marginTopofBody - 100 }, 1500);
+                            if ($curHeight > 20 && ($curHeight - $(window).scrollTop()) > 0) {
+                                $(".content.expand").animate({ "height": $curHeight - pixelDelta_keys }, 10);
+                            }
+                            if ($curHeight < scroll) {
+                                //$('.content').css('position', "fixed");
+                            }
+                        }
+                    }
+                    break;
+
+                case 40: // down
+                    if ((to_dis_main || to_dis) && to_dis_width) {
+                        if (!($(".menu_main_container.menu_topics").offset().top == scroll)) {
+                            //$("#ctl01").animate({ "margin-top": $marginTopofBody - 100 }, 1500);
+                            if ($curHeight > 20 && ($curHeight - $(window).scrollTop()) > 0) {
+                                $(".content.expand").animate({ "height": $curHeight - pixelDelta_keys }, 10);
+                            }
+                            if ($curHeight < scroll) {
+                                //$('.content').css('position', "fixed");
+                            }
+                        }
+                    }
+                    break;
+
+                default: return; // exit this handler for other keys
+            }
+        });
+
+
+        $('body').on('mousewheel', function (e) {
+            if ((to_dis_main || to_dis) && to_dis_width) {
+                $curHeight = parseInt($(".content.expand").css("height"));
+
+                var pixelDelta_mousewheel = $(window).height() * 0.1426
+
+
+                var scroll = $(window).scrollTop();
+                if (e.originalEvent.wheelDelta > 0) {
+                    console.log('up 3');
+                    if (scroll - pixelDelta_mousewheel <= 0) {
+                        $(".content.expand").css("height", 300);
+                    }
+                    else if ($curHeight <= 300 && scroll < 300) {
+                        $(".content.expand").css("height", $curHeight + pixelDelta_mousewheel);
+                    }
+
+
+
+                    if ($curHeight > scroll) {
+                        //$('.content').css('position', "relative");
+                    }
+                }
+                else {
+                    if (!($(".menu_main_container.menu_topics").offset().top == scroll) && $(window).width() > 875) {
+
+                        if ($curHeight > 20) {
+                            $(".content.expand").animate({ "height": $curHeight - pixelDelta_mousewheel }, 10);
+                        }
+                        if ($curHeight < scroll) {
+                            //$('.content').css('position', "fixed");
+                        }
+                    }
+                    console.log('down 3');
+                }
+            }
+        });
+
+
+        
+        $(window).scroll(function () {
+            if ((to_dis_main || to_dis) && to_dis_width) {
+                var scroll = $(window).scrollTop();
+
+                if (scroll == 0) {
+                    $(".content.expand").css("height", 300);
+                }
+
+
+
+
+
+                $curHeight = parseInt($(".content.expand").css("height"));
+
+                if (($curHeight - $(window).scrollTop()) <= 0) {
+                    $(".content.expand").css("height", 0);
+
+                }
+            }
+
+
+        //console.log("Window Scroll:");
+        //console.log($(window).scrollTop());
+
+        
+        /*if (expanded && (to_dis_main || to_dis)) {
+            $offsetAmn = $('#bottom').offset().top - ($('#bottom').offset().top * .10);
+        }
+        else {
+            $offsetAmn = $('#bottom').offset().top + 80;
+        }*/
+
+
+            if (expanded && (to_dis_main || to_dis)) {
+				
+                //expanded = document.querySelector('.content').classList.toggle("expand");
+                //$offsetAmn = $('#bottom').offset().top + 80;
+                
+                //$('.content').css('max-height', 100);
+                //$('.content').css('display', "none");
+
+
+                $curHeight = parseInt($(".content.expand").css("height"));
+                $marginTopofBody = parseInt($("#ctl01").css("margin-top"));
+
+                
+
+
+                var scroll = $(window).scrollTop();
+
+                
+
+                //console.log(checkScrollSpeed());
+
+
+                /*
+
+                if (scroll > position) {
+                    if (!($(".menu_main_container.menu_topics").offset().top == scroll) && $(window).width() > 875) {
+                        //$("#ctl01").animate({ "margin-top": $marginTopofBody - 100 }, 1500);
+                        if ($curHeight > 20) {
+                            $(".content.expand").animate({ "height": $curHeight - 100 }, 10);
+                        }
+
+
+                        if ($marginTopofBody > -200) {
+                            //$("#ctl01").css("margin-top", $marginTopofBody - checkScrollSpeed());
+                        }
+
+
+                    }
+
+                    else if ($(window).width() <= 875) {
+                        //$("#ctl01").animate({ "margin-top": $marginTopofBody - 100 }, 500);
+                    }
+                    else {
+                        if (($curHeight - 100) < 20 && !pastPoint) {
+                            //$('html, body').animate({ scrollTop: 140 }, 50);
+                            pastPoint = true
+                            $(".content.expand").css("position", "fixed");
+                        }
+                    }
+
+                    //$("#ctl01").css("margin-top", $marginTopofBody-100);
+
+                }
+
+                else {
+                    if (scroll == 0) {
+                        $(".content.expand").css("height", 250);
+                        $(".content.expand").css("position", "relative");
+                    }
+                    else if (scroll <= 100 && scroll != 0) {
+                        if ($curHeight <= 250) {
+                            $(".content.expand").css("height", $curHeight + 100);
+                        }
+                        $(".content.expand").css("position", "relative");
+                        //$("#ctl01").animate({ "margin-top": $marginTopofBody - 100 }, 1500);
+                        //$("#ctl01").css("margin-top", 0);
+                        pastPoint = false;
+
+                        if ($(window).width() <= 875) {
+                            //$("#ctl01").animate({ "margin-top": 0 }, 500);
+                        }
+
+                    }
+                }
+                */
+
+
+                
+
+                
+
+            
+		    }
+        
+        });
+
+    </script>
+</div>
+
+
+    <form method="post" action="/Articles/Editorial/Featured-Articles/The-State-of-Video-Codecs-2024-163422.aspx" id="ctl01">
+<div class="aspNetHidden">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="mW1rUvYIrNm/3BKc0JUOamYlBzWb4am07KiSfew3f9x+W4whM0y9atoQ7H29gjd6xXOUDZdG4GdbFkO/xo/ElEmXK7+msXw079so13YlMeo=" />
+</div>
+
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="28F6BF4E" />
+</div>
+        <div class="menu_secondary_top">
+<ul>
+<li><a href="https://www.streamingmedia.com/Conferences/Connect2026-November/" target="_blank" rel="noopener" title="Streaming Media Connect November 2026">Streaming Media Connect November 2026</a></li>
+<!--<li><a href="http://www.streamingmedia.com/Conferences/East2023" target="_blank" rel="noopener">Streaming Media East</a></li>--> <!--<li><a href="http://www.contentdeliverysummit.com" target="_blank" rel="noopener">Content Delivery Summit</a></li>--> <!--<li><a href="http://streamingmedia.com/west" target="_blank" rel="noopener">Streaming Media West</a></li>-->
+<li><a href="http://www.streamingmediaglobal.com/" target="_blank" rel="noopener">Europe Site</a></li>
+<!--<li><a href="//www.streamingmedia.com/Producer/" target="_blank" rel="noopener">Producer</a></li>-->
+<li><a href="https://www.streamingmedia.com/Sports/" target="_blank" rel="noopener">Sports Directory</a></li>
+<li><a href="https://www.streamingmedia.com/Sourcebook/" target="_blank" rel="noopener" style="color: yellow;">Sourcebook</a></li>
+<!--<li><a href="https://www.streamingmedia.com/Readers-Choice" target="_blank" rel="noopener" style="color: yellow;">Readers' Choice Awards</a></li>--></ul>
+</div>
+        <div id="NewsletterSticky_pnlNewsletterSticky" class="subscribe_newsletter_sticky">
+	
+    
+    <div class="subscribe_newsletter_sticky_detail">
+    <a href="/Newsletters/Default.aspx" style="color: #1a4455;">Get Streaming Media in your inbox - <span style="color: #f06b5a;font-weight: 700;">Sign up for free</span></a>
+    </div>
+<!--    <div class="subscribe_newsletter_sticky_form">
+        <div class="form">
+            <input type="email" id="txtSignupEmail" placeholder="Enter Email Address"><input type="button" id="btnEmailSubmit" value="GO">
+        </div>
+    </div>
+-->
+    <!-- <div class="subscribe_newsletter_sticky_close"><i class="fa fa-times" aria-hidden="true"></i></div> -->
+
+</div>
+
+        <header>
+            <div class="logo">
+                <a href="/Default.aspx">
+                    <img src="https://dzceab466r34n.cloudfront.net/StreamingMedia/TemplateImages/SM-Logo.svg" /></a>
+            </div>
+            <div class="advertisement ad_leaderboard">
+                <div id="div-gpt-ad-1541523286597-3">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1541523286597-3'); });
+    </script>
+
+</div>
+
+            </div>
+        </header>
+        <button class="menu_mobile_btn"><span>toggle menu</span></button>
+<div class="menu_main_wrap"><nav class="menu_main_container menu_topics">
+<ul class="menu_main">
+<li><a title="Live Streaming" href="/Categories/Live-Streaming_578.aspx">Live Streaming</a></li>
+<li><a href="/Categories/Encoding-Transcoding_422.aspx" title="Encoding/Transcoding">Encoding/Transcoding</a></li>
+<li><a href="/Categories/OTT-TV_430.aspx" title="OTT TV">OTT TV</a></li>
+<li><a href="/Categories/Formats-Codecs-Protocols_429.aspx" title="Formats/Codecs/Protocols">Formats/Codecs/Protocols</a></li>
+<!--<li><a title="Streaming Media Producer" href="//www.streamingmedia.com/Producer/">Streaming Media Producer</a></li>-->
+<li><a title="Products/Services" href="/Categories/Topics.aspx">Products/Services</a></li>
+<li><a title="Industry Verticals" href="/Categories/Industries.aspx">Industry Verticals</a></li>
+<li><a href="#">More Topics</a>
+<ul class="sub-menu">
+<li><a href="/Categories/Analytics_603.aspx" title="Analytics">Analytics</a></li>
+<li><a href="/Categories/Cloud-Video_604.aspx" title="Cloud Video">Cloud Video</a></li>
+<li><a href="/Categories/Streaming-Music_432.aspx" title="Streaming Music">Streaming Music</a></li>
+<li><a href="/Categories/Sports-eSports_602.aspx" title="Sports/eSports">Sports/eSports</a></li>
+<li><a title="Video Advertising" href="/Categories/Video-Advertising_427.aspx">Video Advertising</a></li>
+<li><a href="/Categories/Content-Protection_428.aspx" title="Content Protection">Content Protection</a></li>
+<li><a href="/Categories/Video-Production_421.aspx" title="Video Production">Video Production</a></li>
+<li><a title="Mobile Video" href="/Categories/Mobile-Video_431.aspx">Mobile Video</a></li>
+<li><a href="/Categories/Content-Delivery-Networks-CDN_419.aspx" title="Content Delivery Networks/CDN">Content Delivery Networks/CDN</a></li>
+<li><a href="/Categories/Legal-Issues_436.aspx" title="Legal Issues">Legal Issues</a></li>
+<li><a href="/Categories/VR-AR-MR_589.aspx" title="VR/AR/MR">VR/AR/MR</a></li>
+<li><a title="Products/Services" href="/Categories/Topics.aspx">Products/Services</a></li>
+<li><a title="Industry Verticals" href="/Categories/Industries.aspx">Industry Verticals</a></li>
+</ul>
+</li>
+</ul>
+</nav><nav class="menu_main_container menu_other">
+<ul class="menu_main">
+<li class="search"><a><i class="fa fa-search" aria-hidden="true"></i>&nbsp;Search</a>
+<div class="search_box"><input id="txtSearch" type="text" placeholder="press enter/return to search" /></div>
+</li>
+<li><a href="/">Home</a></li>
+<li><a href="#">Subscribe</a>
+<ul class="sub-menu">
+<li><a href="/Subscribe" title="Magazine">Magazine</a></li>
+<li><a href="/Newsletters" title="Online Video Newsletter">Newsletters</a></li>
+<li><a href="https://www.streamingmedia.com/Newsletters/SportsXtra.aspx" title="Live Sports Streaming Xtra">NEW! Live Sports Streaming Xtra</a></li>
+<li><a href="https://www.streamingmedia.com/Newsletters/CTVXtra.aspx" title="CTV Strategy Xtra">NEW! CTV Strategy Xtra</a></li>
+<li><a href="/Current_Issue" title="Download Current Issue">Download Current Issue</a></li>
+<li><a href="/Previous_Issue" title="Previous Issues">Previous Issues</a></li>
+<li><a href="/About/RSS" title="RSS Feeds">RSS Feeds</a></li>
+</ul>
+</li>
+<li><a href="#">News</a>
+<ul class="sub-menu">
+<li><a title="Online Video News" href="/OnlineVideoNews">Online Video News</a></li>
+<li><a title="Industry Announcements" href="/PressRelease">Industry Announcements</a></li>
+</ul>
+</li>
+<li><a href="#">In Depth</a>
+<ul class="sub-menu">
+<li><a href="/Articles/Features" title="Streaming Media Features">Features</a></li>
+<li><a href="/Articles/What_Is" title="What Is... Streaming Media">What Is...</a></li>
+<li><a href="/Articles/Spotlights" title="Spotlights">Spotlights</a></li>
+<li><a title="Video Short Cuts" href="/Articles/Short-Cuts">Video Short Cuts</a></li>
+<li><a href="/Articles/Blog" title="Streaming Media Blog">Blog</a></li>
+<li><a href="/Articles/Columns" title="Streaming Media Magazine Columns">Columns</a></li>
+</ul>
+</li>
+<li><a href="#" title="Whitepapers and Research">Whitepapers &amp; Research</a>
+<ul class="sub-menu">
+<li><a href="/Streaming-Media-Guides" title="Streaming Media Guides">Streaming Media Guides</a></li>
+<li><a href="/IndustryWhitepapers" title="Industry Whitepapers">Industry Whitepapers</a></li>
+<li><a href="/Research" title="Research Reports">Research Reports</a></li>
+</ul>
+</li>
+<li><a title="Webinars" href="/Webinars">Webinars</a></li>
+<li><a href="#">Video</a>
+<ul class="sub-menu">
+<li><a title="Latest Conference Videos" href="https://www.streamingmedia.com/videos">Latest Conference Videos</a></li>
+<li><a title="Video Tutorials" href="/Tutorials">Video Tutorials</a></li>
+<li><a title="Video Short Cuts" href="/Articles/Short-Cuts">Video Short Cuts</a></li>
+</ul>
+</li>
+<li><a href="#">Resources</a>
+<ul class="sub-menu">
+<li><a href="/Current_Issue" title="Current Issue">Current Issue</a></li>
+<li><a href="/Previous_Issue" title="Previous Issues">Previous Issues</a></li>
+<li><a href="/Sports" title="Streaming Media Sports Supplier Directory">Streaming Media Sports Supplier Directory</a></li>
+<li><a href="/Sourcebook" title="Streaming Media Directory and Sourcebook">Streaming Media Directory and Sourcebook</a></li>
+<li><a href="/Readers-Choice">Readers Choice Awards</a></li>
+<li><a href="/Articles/Editorial/Featured-Articles/Streaming-Medias-Trendsetting-Products-and-Services-of-2023-159036.aspx">Trendsetting Products</a></li>
+<li><a href="/PressRelease">Industry Announcements</a></li>
+</ul>
+</li>
+<li><a title="Surveys" href="/Surveys">Take a Survey</a></li>
+<li><a href="#">Conferences</a>
+<ul class="sub-menu">
+<li><a href="https://www.streamingmedia.com/Conferences/Connect2026-November/" target="_blank" rel="noopener" title="Streaming Media Connect November 2026">Streaming Media Connect November 2026 </a></li>
+<li><a href="https://www.streamingmedia.com/2025" target="_blank" rel="noopener" title="Streaming Media 2025">Streaming Media 2025</a></li>
+<!--<li><a href="http://www.streamingmedia.com/Conferences/East2023" target="_blank" rel="noopener" title="Streaming Media East">Streaming Media East</a></li>
+<li><a href="http://www.contentdeliverysummit.com" target="_blank" rel="noopener" title="Content Delivery Summit">Content Delivery Summit</a></li>
+<li><a href="http://streamingmedia.com/west" target="_blank" rel="noopener" title="Streaming Media West">Streaming Media West</a></li>
+<li><a href="http://www.streaming-forum.com" target="_blank" rel="noopener" title="Streaming Forum">Streaming Forum</a></li>--> <!--<li><a href="http://www.livestreamingsummit.com" target="_blank" rel="noopener" title="Live Streaming Summit">Live Streaming Summit</a></li>--> <!--<li><a href="https://www.streamingmedia.com/Conferences/East2020/OTTSummit.aspx" target="_blank" rel="noopener" title="OTT Summit">OTT Summit</a></li>--> <!--<li><a href="https://www.streamingmedia.com/Conferences/East2020/EsportsStreamingSummit.aspx" target="_blank" rel="noopener" title="Esports &amp; Sports Streaming Summit">Esports &amp; Sports Streaming Summit</a></li>--> <!--<li><a href="https://www.streamingmedia.com/Conferences/East2020/VES.aspx" target="_blank" rel="noopener" title="Video Engineering &amp; Technology Summit"><span>Video Engineering &amp; Technology Summit</span></a></li>-->
+<li><a href="/Conferences/" target="_blank" rel="noopener" title="Past Conferences"><span>Past Conferences</span></a></li>
+</ul>
+</li>
+<li><a href="#">About</a>
+<ul class="sub-menu"><!-- <li><a title="What Is Streaming?" href="/About/What_Is_Streaming">What Is Streaming?</a></li> -->
+<li><a title="About Streaming Media" href="/About/About_Us">About Us</a></li>
+<li><a title="Contact Streaming Media" href="/About/Contact_Us">Contact Us</a></li>
+<li><a title="How To Advertise in Streaming Media" href="/About/How_To_Advertise">How To Advertise</a></li>
+<li><a title="Streaming Media Sourcebook" href="/About/Sourcebook">Sourcebook</a></li>
+<li><a title="Streaming Media Media Kits" href="/About/How_To_Advertise">Media Kits</a></li>
+<li><a title="Editorial Calendar" href="https://www.streamingmedia.com/Editorial-Calendar">Editorial Calendar</a></li>
+<li><a title="Editorial Submissions" href="/About/Editorial_Submissions">Editorial Submissions</a></li>
+<li><a title="Reprints" href="/Files/Download/Reprints" target="_blank" rel="noopener">Reprints</a></li>
+<li><a title="Press Release Submissions" href="/PressRelease/AddPressRelease.aspx">Press Release Submissions</a></li>
+</ul>
+</li>
+</ul>
+</nav></div>
+        
+        <div class="marketing_menu">
+            <!--SURVEY--><!--<div class="container" style="text-align: center; line-height: 24px;"><strong><a href="https://srvy.pro/2ZH4UEQ/" target="_blank" rel="noopener">Take the State of Streaming Survey &amp; You Could Win an Apple Watch or a $100 gift card.</a></strong></div>--> <!--NEWSLETTER--> <!--<div class="container" style="text-align: center;"><a href="https://www.streamingmedia.com/Newsletters/"><strong>Stay up-to-date on everything streaming - Subscribe to Streaming Media Xtra today!</strong></a></div>--> <!--EVENT-->
+<div class="container" style="text-align: center;"><a href="https://www.streamingmedia.com/Conferences/Connect2026-November" target="_blank" rel="noopener"><strong>Streaming Media Connect</strong></a> back in November with a peek at&nbsp;<span>Building the 2027 Streaming Strategy Playbook</span>.<strong><br /><a href="https://secure.infotoday.com/RegForms/StreamingConnect/?Priority=TXT" target="_blank" rel="noopener">Save Your Free Seat</a></strong>!</div>
+<!--AWARDS--> <!--<div class="container" style="text-align: center;"><strong>The Streaming Media Readers' Choice Award voting CLOSES MONDAY. <br /><a href="https://www.streamingmedia.com/readers-choice" target="_blank" rel="noopener">Cast Your Vote Now!</a></strong></div>-->
+        </div>
+        <div class="wrapper">
+            
+    <section class="page">
+        <div class="page_wrapper">
+            <div class="article_single_subhead">
+                <div class="article_single_meta">
+                    <div id="MainContentPlaceHolder_pnlAuthorImage" class="article_single_auth_img">
+	
+                        <img id="MainContentPlaceHolder_imgAuthorImage" src="https://dzceab466r34n.cloudfront.net/Images/AuthorImages/121822-Jan-Ozer-ORG.jpg" />
+                    
+</div>
+                    <ul>
+                        <li class="article_single_date">
+                            April 4, 2024</li>
+                        
+                            <li>By
+                                <a href="https://www.streamingmedia.com/Authors/4247-Jan-Ozer.htm">Jan Ozer</a> Contributing Editor
+                            </li>
+                        
+                        <li>
+                            <a href="https://www.streamingmedia.com/Articles/MoreNews.aspx?ContextSubtypeID=434">Featured Articles</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="page_content">
+                
+                
+                <h1>
+                    The State of Video Codecs 2024</h1>
+
+                <div class="article_single_featured_img"><img src="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/163777-codecs0-ORG.png" alt="Article Featured Image" /></div>
+
+                <p><p class="SM_BodyCopy_wIndent ParaOverride-2"><span class="Drop-cap">I</span>t&rsquo;s been 3-plus years since the MPEG codec explosion that brought us VVC, LCEVC, and EVC. Rather than breathlessly trumpet every single-digit quality improvement or design win, I&rsquo;ll quickly get you up-to-speed on quality, playability, and usage of the most commonly utilized video codecs and then explore new codec-related advancements in business and technology.</p><p class="SM_BodyCopy_wIndent">A warning for the casual reader: The most significant codec-related occurrence in 2023 was the increased likelihood that you may have to pay to use them. I don&rsquo;t mean royalties on hardware or software decode; I mean content royalties. If the thought of that might keep you up at night, perhaps you should skip this article.</p><h2 class="SM_BodyCopy_wIndent">How Does It Perform?</h2>
+                <p class="SM_BodyCopy_wIndent">We adopt new codecs because they enable entry into new markets like HEVC and HDR and because they save us bandwidth costs. In May 2023, I gave a talk at Streaming Media East titled <a href="https://go2sm.com/choosing" target="_blank" rel="noopener" title="Choosing a Codec in 2023">Choosing a Codec in 2023</a>&nbsp;that included the chart shown in<span>&nbsp;</span><strong><span class="CharOverride-2">Figure 1</span></strong>. I covered mostly open source codecs like x264, x265, and libaom, along with LCEVC and the Fraunhofer version of VVC. Different versions of these codecs will deliver different results, as I&rsquo;ll discuss in a bit. All codecs are rated in comparison to x265, which is normalized at 100%, a useful presentation technique I borrowed from Moscow State University (MSU).</p><p class="SM_BodyCopy_wIndent"><img src="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/InlineImages/163779-codec1-ORG.png" alt="codec efficiency" width="616" height="378"></p><div id="_idContainer014" class="Basic-Text-Frame"><p class="SM_TableHeading ParaOverride-8"><strong><em><span class="CharOverride-7">Figure 1.&nbsp;</span>Relative codec performance</em></strong></p></div><p class="SM_BodyCopy_wIndent">There are many codec comparisons out there, and all present different results. At a high level,<span>&nbsp;</span><a id="_idTextAnchor001"></a>however, most show that if you abandon H.264 for any other codec, you can significantly reduce the bitrates of your videos while delivering the same or better quality. As it relates to HEVC and VP9, Bitmovin found these two codecs neck and neck in a <a href="https://go2sm.com/feldmann" target="_blank" rel="noopener" title="feldmann study">study from 2020</a>, particularly over a full bitrate ladder. My tests generally agree.</p><p class="SM_BodyCopy_wIndent">Figure 1 also shows that AV1 delivers meaningful savings over either HEVC or VP9, and VVC is more efficient than AV1. LCEVC performance depends on the base layer; with an HEVC base, it delivers about 22% greater quality than x265<span style="background-color: #d5d5d5;">.</span></p><h2 class="SM_BodyCopy_wIndent">Where Codecs Play</h2><p class="SM_BodyCopy_wIndent">While we love to compare codec quality, the most important adoption-related consideration is where the codec plays. Obviously, you only achieve bandwidth savings on devices that can actually decode and play the video encoded with that codec.</p><p class="SM_BodyCopy_wIndent">Typically, when analyzing playability, we consider three markets: brow&shy;ser, mobile, and living room. Their compatibility estimates are shown in<span>&nbsp;</span><strong><span class="CharOverride-2">Figure 2</span></strong>. Some of these estimates come from reputable sources, like Can I Use, which lists technologies that are compatible with other technologies, and <a href="https://go2sm.com/av1adoption" target="_blank" rel="noopener" title="ScientiaMobile">ScientiaMobile</a>, which tracks hardware support among mobile phones, at least for AV1 and HEVC.</p><p class="SM_TableHeading ParaOverride-8"><strong><em><span class="CharOverride-7"><img src="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/InlineImages/163780-codec2-ORG.png" alt="codec hardware support" width="413" height="167"></span></em></strong></p><p class="SM_TableHeading ParaOverride-8"><strong><em><span class="CharOverride-7">Figure 2.&nbsp;</span>Estimates of hardware support by device</em></strong></p><p class="SM_BodyCopy_wIndent">For datapoints not covered, I very politely asked <a href="https://bard.google.com" target="_blank" rel="noopener" title="Bard">Bard</a>&nbsp;for the estimated overall percentage of support for each codec and market. If you&rsquo;re reading this in<span>&nbsp;</span><span class="CharOverride-3">Stream</span><span class="CharOverride-3">ing Media</span>, my editors agreed it was useful information with all of the obvious caveats, and I hope you do as well.</p><p class="SM_BodyCopy_wIndent">Probably the biggest codec adoption news in 2023 was Apple adding AV1 decode to the iPhone 15 Pro and iPhone 15 Pro Max. While undoubtedly a positive step, it will take 1&ndash;2 years before this boosts the installed base of hardware AV1 support to a level that most publishers would find enticing.</p><p class="SM_BodyCopy_wIndent">As noted, when it comes to mobile, the table in Figure 2 covers hardware playback. But what about software? That&rsquo;s a fair question, particularly given that software playback can impact playback frame rate and battery life. As an example, <a href="https://go2sm.com/reels" target="_blank" rel="noopener" title="Meta deployed AV1 in Reels">Meta deployed AV1 in Reels</a>, although it took considerable development effort. YouTube has been shipping AV1-encoded video for years but doesn&rsquo;t appear to stream AV1 to phones without hardware support.</p><p class="SM_BodyCopy_wIndent">One vendor, India-based <a href="https://go2sm.com/mxplayer" target="_blank" rel="noopener" title="MX Player">MX Player</a>, is already deploying VVC to mobile devices with software decode, while several other vendors have released studies showing very high playback frame rates on iOS and Android devices (<a href="https://go2sm.com/vvcplayback" target="_blank" rel="noopener" title="playback frame rate summary">download a summary <span>here</span></a>). Still, most mainstream publishers tend to avoid deploying new codecs to mobile devices until hardware playback exists in a sufficiently large number of the installed base. The major exception here is LCEVC, which is an enhancement codec that plays efficiently on most platforms without hardware support<span style="background-color: #d5d5d5;">.</span></p><h2 class="SM_BodyCopy_wIndent">Who&rsquo;s Using What?</h2><p class="SM_BodyCopy_wIndent">It&rsquo;s always interesting to learn how each codec is currently being used and how publishers plan to use them in the future. In 2023, Telestream resurrected Encoding.com&rsquo;s always useful &ldquo;Global Media Format&rdquo; report, which details the codecs that Encoding.com produced for its clients in 2022. These numbers add up to 100%, representing 100% of the company&rsquo;s 2022 production (<strong><span class="CharOverride-2">Figure 3</span></strong>).</p><p class="SM_TableHeading ParaOverride-8"><strong><em><span class="CharOverride-7"><img src="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/InlineImages/163781-codec3-ORG.png" alt="codec distribution" width="596" height="170"></span></em></strong></p><p class="SM_TableHeading ParaOverride-8"><strong><em><span class="CharOverride-7">Figure 3.&nbsp;</span>Codec distribution for 2022 Telestream/Encoding.com encodes</em></strong></p><p class="SM_BodyCopy_wIndent">Note that WebM includes both VP8 and VP9, but predominantly VP9. As expected, AVC (H.264) dominates, followed by HEVC, which isn&rsquo;t surprising given premium content customers like TNT, Fox, Tubi, BBC, CNN, NBC, Peacock, and NBCUniversal. Note also that Encoding.com is now called Vantage Gateway.</p><p class="SM_BodyCopy_wIndent"><strong><span class="CharOverride-2">Figure 4</span></strong><span>&nbsp;</span>shows the estimated codec usage for VOD from <a href="https://go2sm.com/bvdr" target="_blank" rel="noopener" title="7th Annual Bitmovin Video Developer Report">The 7th Annual Bitmovin Video Developer Report</a>. This features the results of an industry survey as opposed to the &ldquo;Global Media Format&rdquo; report, which details actual production statistics.</p><p class="SM_TableHeading ParaOverride-8"><strong><em><span class="CharOverride-7"><img src="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/InlineImages/163782-codec4-ORG.png" alt="bitmovin video developer report" width="800" height="392"></span></em></strong></p><p class="SM_TableHeading ParaOverride-8"><strong><em><span class="CharOverride-7">Figure 4.&nbsp;</span>Current (in blue) and planned codec usage from &ldquo;The 7th Annual Bitmovin Video Developer Report&rdquo;</em></strong></p><p class="SM_BodyCopy_wIndent">The numbers here add up to more than 100% because respondents used more than a single codec. Numbers in blue are for codecs currently in production, while numbers in red are for codecs that are planned to be implemented within the next 24 months. Again, H.264 and H.265&rsquo;s related results are not surprising.</p><p class="SM_BodyCopy_wIndent">AV1 usage is an enigma. In <a href="https://go2sm.com/bvdr" target="_blank" rel="noopener" title="6th Annual Bitmovin Video Developer Report">The 6th Annual Bitmovin Video Developer Report</a>, 14% of respondents claimed they were using AV1, and 42% were planning to implement it within 12&ndash;24 months. In the current report, these numbers dropped to 8% and 32%. Absent a dramatic shift in the composition of the survey respondents, these numbers are tough to reconcile.</p><p class="SM_BodyCopy_wIndent">That said, AV1 isn&rsquo;t the only codec for which usage declined: VVC dropped from 15% currently in use and 29% planned to 7% in use and 12% planned. It may be that the streaming industry&rsquo;s ardor for new codec deployments is waning.</p><h2 class="SM_BodyCopy_wIndent">How Much Does It Cost?</h2><p class="SM_BodyCopy_wIndent">After quality and compatibility, most producers consider cost. This is where things get interesting. For years, the status quo has been this:</p><ul><li class="SM_BodyCopy_wIndent ParaOverride-3">All of the standards-based codecs, including H.264, HEVC, VVC, and LCEVC, are royalty bearing, with one or more patent pools and clear rate structures. However, the overwhelming majority of the royalties are applied to hardware and software playback devices, not content.</li><li class="SM_BodyCopy_wIndent ParaOverride-4">Google has maintained that VP9 is open source and royalty-free, and the Alliance for Open Media has done the same for AV1. However, in March 2020, patent pool administrator <a href="https://go2sm.com/sisvel" target="_blank" rel="noopener" title="sisvel codec patent pools">Sisvel announced two patent pools</a>, one each for VP9 and AV1. Under the license terms, however, Sisvel is only charging royalties on playback devices, not content.</li></ul><p class="SM_BodyCopy_wIndent">On Oct. 18, 2023, Avanci launched its <a href="https://go2sm.com/avanci" target="_blank" rel="noopener" title="Avanci Video platform">Avanci Video platform</a>, which is targeting video publishers for content-related royalties. Here&rsquo;s what we know from the <a href="https://avanci.com/video" target="_blank" rel="noopener" title="avanci faq">FAQ</a>:</p><p class="SM_Sub-Subhead ParaOverride-5"><em><span class="CharOverride-4">Who should obtain a license from Avanci Video?</span></em></p><p class="SM_BodyCopy_wIndent ParaOverride-6">Internet video streaming companies that are providing Internet video streaming services to its users using any of the five standards&mdash;H.265 (HEVC), H.266 (VVC), VP9, AV1, and MPEG-DASH&mdash;have the option to take a license from Avanci Video. Our licensing program is open to all internet video streaming companies including subscription-based entertainment services, ad-based video sharing sites, social media and video messaging platforms, and video conferencing providers.</p><p class="SM_BodyCopy_wIndent">You can see the codecs covered in the pool, which excludes H.264, likely because the 20-year patent protection on many of the related patents is starting to expire. There are 26 patent owners in the platform that own various patents in each of the listed technologies, including several from the Sisvel pools. Avanci does not provide the royalty rate.</p><p class="SM_BodyCopy_wIndent">Even before the Avanci announcement, it appeared as if codec-related patent owners were moving toward an effort to start charging content owners for codec usage. (See <a href="https://go2sm.com/avanci" target="_blank" rel="noopener" title="What Your Codec Will Cost You">What Your Codec Will Cost You: Robert J.L. Moore Talks Avanci Video Codec Patent Pool Launch</a><span>&nbsp;</span>for a discussion with attorney Robert J.L. Moore about the Avanci pool and previous efforts toward content royalties.) The bottom line is that prior to 2023, it was relatively safe to assume that publishers could use advanced codecs with little concern over the potential for codec royalties. Unfortunately, that is no longer the case.</p><h2 class="SM_BodyCopy_wIndent">AI Is Coming</h2><p class="SM_BodyCopy_wIndent">The last 12&ndash;14 months have been absolutely seismic with regard to the impact AI has had on our day-to-day lives, particularly at work. When will AI impact the codec space?</p><p class="SM_BodyCopy_wIndent">Well, it appears that it already has.<span>&nbsp;</span><strong><span class="CharOverride-2">Figure 5</span></strong>&nbsp;shows subjective results from the MSU Video Codecs Comparison 2022, which was released in November 2023. As with Figure 1, x265 is the reference codec at 100%, with others shown as more or less efficient. Smaller is better here, as you probably noticed, and the smallest goes to Tencent TVC, which is about 10% more efficient than Tencent&rsquo;s VVC codec (VVC is also H.266).</p><p class="SM_TableHeading ParaOverride-8"><strong><em><span class="CharOverride-7"><img src="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/InlineImages/163783-codec5-ORG.png" alt="msu video codecs comparison 2022" width="800" height="570"></span></em></strong></p><p class="SM_TableHeading ParaOverride-8"><strong><em><span class="CharOverride-7">Figure 5.&nbsp;</span>Tencent TVC, the highest-performing codec in a recent Moscow State University study, has an AI component.</em></strong></p><p class="SM_BodyCopy_wIndent">What is TVC? Here&rsquo;s what we know from a Tencent press release: &ldquo;TVC continues to overcome compression bottlenecks caused by long standard iteration,<span>&nbsp;</span><span class="CharOverride-3">optimize high encoding/decoding complexity introduced by new AI coding tools</span>, and meet customized encoding/decoding demand by thoroughly optimizing coding tools, fast algorithms, engineering and bitrate control.&rdquo; It&rsquo;s hard to discern the signal from the noise regarding how much AI is actually involved, but this isn&rsquo;t the only instance of AI popping up relating to codecs.</p><p class="SM_BodyCopy_wIndent"><a href="https://deeprender.ai" target="_blank" rel="noopener" title="Deep Render">Deep Render</a>&nbsp;is an AI startup focused on developing advanced video compression technologies. Founded in 2018 by two students from Imperial College London, Deep Render uses AI to intelligently analyze and reconstruct visual data to minimize artifacts at high compression rates. It claims that its codec already offers 5x smaller video file sizes, with a goal of up to 50x improvements. Deep Render unveiled its technology in 2022 and in 2023 raised $9 million in Series A funding. In addition, it was chosen as the winner of the 2023 Intel Startup Innovator Award. You can see a <a href="https://go2sm.com/deeprender" target="_blank" rel="noopener" title="Deep Render video">video about the company</a>.</p><p class="SM_BodyCopy_wIndent">Also worth tracking is the Moving Picture, Audio and Data Coding by Artificial Intelligence (MPAI) initiative, which was founded by Leonardo Chiariglione, who also founded MPEG. MPAI is focused on enhancing video-coding technologies through AI, particularly respecting the EVC codec.</p><p class="SM_BodyCopy_wIndent">What&rsquo;s impressive about MPAI is not the nuts and bolts of the target areas for enhancements, which are intra prediction, super resolution, and in-loop filtering. Rather, it&rsquo;s the big picture focuses of its research, which includes AI for health applications, AI for connected autonomous vehicles, and AI for the metaverse and human-machine communication (<strong><span class="CharOverride-2">Figure 6</span></strong>).</p><p class="SM_BodyCopy_wIndent"><img src="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/InlineImages/163784-codec6-ORG.png" alt="ai and codecs" width="800" height="265"></p><p class="SM_TableHeading ParaOverride-8"><strong><em><span class="CharOverride-7">Figure 6.&nbsp;</span>One MPAI standard involves connected autonomous vehicles.</em></strong></p><p class="SM_BodyCopy_wIndent">If you&rsquo;re a broadcast or media type, you&rsquo;re absolutely right to scoff at the idea that these AI-based development efforts will immediately impact your work, as it takes years for codecs to percolate through the cumbersome process of standards adoption and deployment in operating systems, browsers, and devices, not to mention encoders and transcoders. However, for closed applications like conferencing, autonomous vehicles, or even medical devices, where one vendor controls both the encode and decode sides of the equation, these codecs could be (like the mirror says) closer than they appear.</p>
+                
+                
+<div class="cta_magazine_subscription_wrap">
+    <div class="cta_magazine_subscription">
+        <div class="cta_magazine_subscription_img">
+<!--            <img src="https://dzceab466r34n.cloudfront.net/Images/SiteImages/168775-2025-Cover-Images---April-2025-ORG.png" alt="Streaming Covers">-->
+            <img src="https://dzceab466r34n.cloudfront.net/Images/SiteImages/457665-2026-Cover-Images-ORG.png" alt="Streaming Covers">
+        </div>
+        <div class="cta_magazine_subscription_details">
+            <div>
+                <div><span>Free</span></div>
+                <div>for qualified subscribers</div>
+            </div>
+            <a class="cta_magazine_subscription_btn_primary" href="/Subscribe" target="_blank">Subscribe Now</a>
+            <a class="cta_magazine_subscription_btn_secondary" href="/Current_Issue">Current Issue</a>
+            <a class="cta_magazine_subscription_btn_secondary" href="/Previous_Issue">Past Issues</a>
+        </div>
+    </div>
+</div>
+
+                
+<div id="disqus_thread" style="margin-bottom: 10px;"></div>
+<script defer>
+
+    var disqus_config = function () {
+        this.page.url = "https://www.streamingmedia.com/Articles/ReadArticle.aspx?ArticleID=163422";
+        this.page.identifier = 163422;
+    };
+
+    (function () { // DON'T EDIT BELOW THIS LINE
+        var d = document, s = d.createElement('script');
+        s.src = 'https://streaming-media.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+
+
+                
+        <div class="section_title">
+            Related Articles
+            
+        </div>
+        <section class="article_grid">
+    
+        <div class="article_grid_single">
+            <div>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkImageLink_0" href="https://www.streamingmedia.com/Articles/Editorial/Featured-Articles/The-State-of-Streaming-Codecs-2026-173838.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection"><img class="lazy" data-original="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/457842-so-codecs-cms-ORG.png" src="" /></a>
+            </div>
+            
+            <h3>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkArticleTitle_0" href="https://www.streamingmedia.com/Articles/Editorial/Featured-Articles/The-State-of-Streaming-Codecs-2026-173838.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection">The State of Streaming Codecs 2026</a></h3>
+            <p>
+                Streaming codec adoption used to be an engineering abstraction governed by RD curves, BD-rate tables, and roadmap slides that no one outside of R&D ever considered. Over the last 15 months, codec adoption decisions have morphed into a much broader discussion, involving C-level execs from finance and legal. While the precursors to this transition occurred pre-2025, the situation coalesced in 2025. During the same period, we saw one codec step to the front (AV1) and another shrink before our eyes (VVC). 
+            </p>
+            <div class="article_meta">
+                
+                <span class="article_date">
+                    26 Mar 2026</span>
+            </div>
+        </div>
+    
+        <div class="article_grid_single">
+            <div>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkImageLink_1" href="https://www.streamingmedia.com/Articles/Editorial/Featured-Articles/Buyers-Guide-Third-Party-Commercial-Streaming-Codecs-168649.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection"><img class="lazy" data-original="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/163777-codecs0-ORG.png" src="" /></a>
+            </div>
+            
+            <h3>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkArticleTitle_1" href="https://www.streamingmedia.com/Articles/Editorial/Featured-Articles/Buyers-Guide-Third-Party-Commercial-Streaming-Codecs-168649.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection">Buyers' Guide: Third-Party Commercial Streaming Codecs</a></h3>
+            <p>
+                For some streamers, open-source solutions meet all their needs. For others, commercial codecs deliver efficiency and optimizations that justify the cost. This article explores the factors that influence those decisions.
+            </p>
+            <div class="article_meta">
+                
+                <span class="article_date">
+                    24 Mar 2025</span>
+            </div>
+        </div>
+    
+        <div class="article_grid_single">
+            <div>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkImageLink_2" href="https://www.streamingmedia.com/Articles/News/Online-Video-News/Sustainability-Slips-Down-Industrys-Agenda-Says-Bitmovin-Video-Developer-Report-168080.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection"><img class="lazy" data-original="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/167926-bitmovin2-ORG.png" src="" /></a>
+            </div>
+            
+            <h3>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkArticleTitle_2" href="https://www.streamingmedia.com/Articles/News/Online-Video-News/Sustainability-Slips-Down-Industrys-Agenda-Says-Bitmovin-Video-Developer-Report-168080.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection">Sustainability Slips Down Industry’s Agenda Says Bitmovin Video Developer Report</a></h3>
+            <p>
+                The latest Video Developer Report compiled by Bitmovin shows sustainability slipping down the list of priorities, a casualty of the search for short term profit. The report made clear the industry's top priority is monetizing content more effectively with ad tech, which can be attributed to the huge spike in AVOD and FAST business models.
+            </p>
+            <div class="article_meta">
+                
+                <span class="article_date">
+                    19 Feb 2025</span>
+            </div>
+        </div>
+    
+        <div class="article_grid_single">
+            <div>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkImageLink_3" href="https://www.streamingmedia.com/Articles/News/Online-Video-News/H.267-A-Codec-for-(One-Possible)-Future-167889.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection"><img class="lazy" data-original="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/167739-h.267-cms-ORG.jpg" src="" /></a>
+            </div>
+            
+            <h3>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkArticleTitle_3" href="https://www.streamingmedia.com/Articles/News/Online-Video-News/H.267-A-Codec-for-(One-Possible)-Future-167889.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection">H.267: A Codec for (One Possible) Future</a></h3>
+            <p>
+                H.267 should be finalized between July and October 2028. If history holds, this means H.267 won't see meaningful deployment until 2034-2036, long after I hang up my keyboard. Here's a brief description of what the standard is designed to deliver and my free and totally unsolicited advice to the committees and technology developers that will create it.
+            </p>
+            <div class="article_meta">
+                
+                <span class="article_date">
+                    04 Feb 2025</span>
+            </div>
+        </div>
+    
+        <div class="article_grid_single">
+            <div>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkImageLink_4" href="https://www.streamingmedia.com/Articles/News/Online-Video-News/Interview-IP-Attorney-Robert-J.L.-Moore-Discusses-Video-Codec-IP-and-Patent-Monetization-Issues-163907.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection"><img class="lazy" data-original="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/164272-ozer-moore-ORG.png" src="" /></a>
+            </div>
+            
+            <h3>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkArticleTitle_4" href="https://www.streamingmedia.com/Articles/News/Online-Video-News/Interview-IP-Attorney-Robert-J.L.-Moore-Discusses-Video-Codec-IP-and-Patent-Monetization-Issues-163907.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection">Interview: IP Attorney Robert J.L. Moore Discusses Video Codec IP and Patent Monetization Issues</a></h3>
+            <p>
+                In this wide-ranging interview, Streaming Media's Jan Ozer and intellectual property attorney Robert Moore of Moore IP solutions delve into a number of topics related to video codec intellectual property issues and patent monetization, two constantly moving targets.
+            </p>
+            <div class="article_meta">
+                
+                <span class="article_date">
+                    06 May 2024</span>
+            </div>
+        </div>
+    
+        <div class="article_grid_single">
+            <div>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkImageLink_5" href="https://www.streamingmedia.com/Articles/Editorial/Featured-Articles/The-State-of-Video-Codecs-2023-158116.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection"><img class="lazy" data-original="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/152199-state-of-codecs-2023-ORG.png" src="" /></a>
+            </div>
+            
+            <h3>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkArticleTitle_5" href="https://www.streamingmedia.com/Articles/Editorial/Featured-Articles/The-State-of-Video-Codecs-2023-158116.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection">The State of Video Codecs 2023</a></h3>
+            <p>
+                Welcome to your codec update for 2023. I'm here to help you decide whether it's time to go all in on AV1, VVC, LCEVC, or EVC or whether it's better to stick with H.264, VP9, and HEVC. Along the way, I'll include 2022-2023 updates to identify significant changes that have occurred since last year.
+            </p>
+            <div class="article_meta">
+                
+                <span class="article_date">
+                    12 Apr 2023</span>
+            </div>
+        </div>
+    
+        <div class="article_grid_single">
+            <div>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkImageLink_6" href="https://www.streamingmedia.com/Articles/Editorial/Featured-Articles/The-State-of-Video-Codecs-2022-151189.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection"><img class="lazy" data-original="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/144674-State-of-Codecs-2021-ORG.png" src="" /></a>
+            </div>
+            
+            <h3>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkArticleTitle_6" href="https://www.streamingmedia.com/Articles/Editorial/Featured-Articles/The-State-of-Video-Codecs-2022-151189.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection">The State of Video Codecs 2022</a></h3>
+            <p>
+                With H.264 usage finally beginning to decline and several newer codecs ascendant, this 2022 codec update reports on the most significant announcements from the last year relating to H.264, VP9, HEVC, AV1, VVC, LCEVC, and EVC. 
+            </p>
+            <div class="article_meta">
+                
+                <span class="article_date">
+                    25 Mar 2022</span>
+            </div>
+        </div>
+    
+        <div class="article_grid_single">
+            <div>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkImageLink_7" href="https://www.streamingmedia.com/Articles/Editorial/Featured-Articles/Navigating-a-Multi-Codec-World-145580.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection"><img class="lazy" data-original="https://dzceab466r34n.cloudfront.net/Images/ArticleImages/136674-Multi-codec-world-ORG.jpg" src="" /></a>
+            </div>
+            
+            <h3>
+                <a id="MainContentPlaceHolder_ctl01_ctl00_rptArticles_lnkArticleTitle_7" href="https://www.streamingmedia.com/Articles/Editorial/Featured-Articles/Navigating-a-Multi-Codec-World-145580.aspx?utm_source=related_articles&amp;utm_medium=gutenberg&amp;utm_campaign=editors_selection">Navigating a Multi-Codec World</a></h3>
+            <p>
+                AVC led to format consolidation, but we've seen more fragmentation in recent years. Fortunately, the huge critical mass around AOMedia might lead to a simpler future.
+            </p>
+            <div class="article_meta">
+                
+                <span class="article_date">
+                    04 Mar 2021</span>
+            </div>
+        </div>
+    
+        
+        </section>
+    
+
+                
+        <div class="section_title">
+            Companies and Suppliers Mentioned
+        </div>
+        <section class="vendor_container">
+            <ul>
+    
+        <li>
+            <div id="pnlCategoryIndex">
+	
+                <a id="MainContentPlaceHolder_ctl02_ctl00_rptCompanies_lnkCompanyImage_0" title="Bitmovin" href="https://www.streamingmedia.com/Sourcebook/Bitmovin-8813.aspx"><img class="lazy" data-original="https://dzceab466r34n.cloudfront.net/Images/CompanyImages/439168-bitmovin-logo-horizontal-ORG.png" src="" /></a>
+            
+</div>
+        </li>
+    
+        <li>
+            <div id="pnlCategoryIndex">
+	
+                <a id="MainContentPlaceHolder_ctl02_ctl00_rptCompanies_lnkCompanyImage_1" title="Telestream" href="https://www.streamingmedia.com/Sourcebook/Telestream-5611.aspx"><img class="lazy" data-original="https://dzceab466r34n.cloudfront.net/Images/CompanyImages/103868-Telestream_Logo_NEW.jpg-ORG.jpg" src="" /></a>
+            
+</div>
+        </li>
+    
+        </ul>
+        </section>
+    
+
+            </div>
+
+            <div class="advertisement ad_leaderboard">
+                <div id="div-gpt-ad-1541523286597-4">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1541523286597-4'); });
+    </script>
+
+</div>
+
+            </div>
+        </div>
+        
+
+<div class="sidebar">
+    <div class="sidebar_item">
+        <div class="advertisement ad_box">
+            <div id="div-gpt-ad-1541523286597-0" style="height:250px;width:300px;">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1541523286597-0'); });
+    </script>
+
+</div>
+
+        </div>
+    </div>
+    <div class="sidebar_item">
+    <div style="width: 100%; margin: 3px auto; text-align: center; display: inline-block; height: 32px;">
+<div style="display: inline-block;"><a href="http://www.facebook.com/StreamingMedia" target="_new" rel="noopener"><img id="Streaming Media on Facebook" style="border: 0px solid; width: 32px; height: 32px;" src="https://dzceab466r34n.cloudfront.net/images_nl/sw/32x32_Circle_49_FB.png" alt="Streaming Media on Facebook" /></a></div>
+<div style="display: inline-block;"><a href="http://twitter.com/StreamingMedia" target="_new" rel="noopener"><img id="Streaming Media on Twitter" style="border: 0px solid; width: 32px; height: 32px;" src="https://dzceab466r34n.cloudfront.net/Images/OtherImages/160917-X-Logo-ORG.png" alt="Streaming Media on X" /></a></div>
+<div style="display: inline-block;"><a href="https://www.linkedin.com/groups/2972181/" target="_new" rel="noopener"><img id="Streaming Media on LinkedIn" style="border: 0px solid; width: 32px; height: 32px;" src="https://dzceab466r34n.cloudfront.net/images_nl/sw/32x32_Circle_49_LI.png" alt="Streaming Media on LinkedIn" /></a></div>
+<div style="display: inline-block;"><a href="http://www.youtube.com/user/streamingmediavideo" target="_new" rel="noopener"><img id="Streaming Media on YouTube" style="border: 0px solid; width: 32px; height: 32px;" src="https://dzceab466r34n.cloudfront.net/images_nl/sw/32x32_Circle_49_YT.png" alt="Streaming Media on YouTube" /></a></div>
+</div></div>
+    
+        <div class="sidebar_item">
+            <div class="section_title">
+                Streaming Media Guides
+            </div>
+            <ul>
+    
+        <li>
+            <a id="MainContentPlaceHolder__ctrl_0_ctl02_ctl00_rptIssues_lnkIssueImage_0" href="https://www.streamingmedia.com/SuperGuides/14708-Best-Practices-Localise-It---AI-Subbing-and-Dubbing.htm?utm_campaign=generateView&amp;utm_source=rightsidebar&amp;utm_medium=webpage&amp;utm_content=image"><img src="https://dzceab466r34n.cloudfront.net/Images/IssueImages/457962-Best-Practices-AI-Subbing--Dubbing-ORG.png" alt="" /></a>
+            <h2>
+                <a id="MainContentPlaceHolder__ctrl_0_ctl02_ctl00_rptIssues_lnkIssueTitle_0" href="https://www.streamingmedia.com/SuperGuides/14708-Best-Practices-Localise-It---AI-Subbing-and-Dubbing.htm?utm_campaign=generateView&amp;utm_source=rightsidebar&amp;utm_medium=webpage&amp;utm_content=text">Best Practices: Localise It - AI Subbing and Dubbing</a></h2>
+        </li>
+    
+        
+            <li>
+                <h2 style="text-align: right;">
+                    <a id="MainContentPlaceHolder__ctrl_0_ctl02_ctl00_rptIssues_lnkShowMore" href="/Archives/Default.aspx?ContextSubtypeID=437&amp;utm_source=rightsidebar&amp;utm_medium=show_more">More</a>
+                </h2>
+            </li>
+        
+        </ul>
+        </div>
+    
+
+    <div class="sidebar_item">
+        <div class="advertisement ad_box">
+            <div id="div-gpt-ad-1541523286597-1" style="height:250px;width:300px;">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1541523286597-1'); });
+    </script>
+
+</div>
+
+        </div>
+    </div>
+    
+        <div class="sidebar_item">
+            <div class="section_title">
+                Web Events
+            </div>
+            <ul>
+    
+        <li>
+            <h2>
+                <a id="MainContentPlaceHolder__ctrl_0_ctl04_ctl00_rptWebinars_lnkWebinarTitle_0" href="https://www.streamingmedia.com/Webinars/2363-First-Look-IBC-Streaming-Solutions.htm?utm_campaign=generateView&amp;utm_source=rightsidebar&amp;utm_medium=webpage&amp;utm_content=text">First Look: IBC Streaming Solutions</a></h2>
+            Coming September 03, 2026
+        </li>
+    
+        <li>
+            <h2>
+                <a id="MainContentPlaceHolder__ctrl_0_ctl04_ctl00_rptWebinars_lnkWebinarTitle_1" href="https://www.streamingmedia.com/Webinars/2364-Analytics-That-Matter-Turning-Viewer-Data-into-Actionable-Insights.htm?utm_campaign=generateView&amp;utm_source=rightsidebar&amp;utm_medium=webpage&amp;utm_content=text">Analytics That Matter: Turning Viewer Data into Actionable Insights</a></h2>
+            Coming September 24, 2026
+        </li>
+    
+        
+            <li>
+                <h2 style="text-align: right;">
+                    <a id="MainContentPlaceHolder__ctrl_0_ctl04_ctl00_rptWebinars_lnkShowMore" href="/Webinars/">More Web Events</a>
+                </h2>
+            </li>
+        
+        </ul>
+        </div>
+    
+
+    
+        <div class="highlight_item sidebar_item">
+            <div class="section_title">
+                Popular Articles
+            </div>
+            <ul>
+    
+        <li>
+            <div id="MainContentPlaceHolder__ctrl_0_PopularArticles_ctl00_rptArticles_pnlContextSubType_0" class="category_tag">
+	
+                <a id="MainContentPlaceHolder__ctrl_0_PopularArticles_ctl00_rptArticles_lnkContextSubType_0"></a>
+            
+</div>
+            <a href="https://www.streamingmedia.com/Articles/News/Online-Video-News/Codec-Wars-Get-Real-Lessons-from-Disneys-European-4K-Blackout-176155.aspx"><h2>Codec Wars Get Real: Lessons from Disney’s European 4K Blackout</h2></a>
+        </li>
+    
+        <li>
+            <div id="MainContentPlaceHolder__ctrl_0_PopularArticles_ctl00_rptArticles_pnlContextSubType_1" class="category_tag">
+	
+                <a id="MainContentPlaceHolder__ctrl_0_PopularArticles_ctl00_rptArticles_lnkContextSubType_1"></a>
+            
+</div>
+            <a href="https://www.streamingmedia.com/Articles/News/Online-Video-News/Instant-Replay-Streaming-Media-Connect-August-2026-176152.aspx"><h2>Instant Replay: Streaming Media Connect August 2026</h2></a>
+        </li>
+    
+        <li>
+            <div id="MainContentPlaceHolder__ctrl_0_PopularArticles_ctl00_rptArticles_pnlContextSubType_2" class="category_tag">
+	
+                <a id="MainContentPlaceHolder__ctrl_0_PopularArticles_ctl00_rptArticles_lnkContextSubType_2"></a>
+            
+</div>
+            <a href="https://www.streamingmedia.com/Articles/News/Online-Video-News/The-2026-Streaming-Media-Readers-Choice-Awards-Finalists-Revealed-176158.aspx"><h2>The 2026 Streaming Media Readers' Choice Awards Finalists Revealed</h2></a>
+        </li>
+    
+        <li>
+            <div id="MainContentPlaceHolder__ctrl_0_PopularArticles_ctl00_rptArticles_pnlContextSubType_3" class="category_tag">
+	
+                <a id="MainContentPlaceHolder__ctrl_0_PopularArticles_ctl00_rptArticles_lnkContextSubType_3"></a>
+            
+</div>
+            <a href="https://www.streamingmedia.com/Articles/Post/Blog/Why-Your-LLM-Thinks-The-Madison-Is-in-Wisconsin-176138.aspx"><h2>Why Your LLM Thinks “The Madison” Is in Wisconsin</h2></a>
+        </li>
+    
+        
+        </ul></div>
+    
+
+    <div class="sidebar_item">
+        <div class="advertisement ad_sponsor">
+            <div id="div-gpt-ad-1541523286597-5" style="height:100px;width:300px;">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1541523286597-5'); });
+    </script>
+
+</div>
+
+        </div>
+        <div class="advertisement ad_sponsor">
+            <div id="div-gpt-ad-1541523286597-6" style="height:100px;width:300px;">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1541523286597-6'); });
+    </script>
+
+</div>
+
+        </div>
+        <div class="advertisement ad_sponsor">
+            <div id="div-gpt-ad-1541523286597-7" style="height:100px;width:300px;">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1541523286597-7'); });
+    </script>
+
+</div>
+
+        </div>
+        <div class="advertisement ad_sponsor">
+            <div id="div-gpt-ad-1541523286597-8" style="height:100px;width:300px;">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1541523286597-8'); });
+    </script>
+
+</div>
+
+        </div>
+        <div class="advertisement ad_sponsor">
+            <div id="div-gpt-ad-1541523286597-9" style="height:100px;width:300px;">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1541523286597-9'); });
+    </script>
+
+</div>
+
+        </div>
+        <div class="advertisement ad_sponsor">
+            <div id="div-gpt-ad-1610995301185-0" style="height:100px;width:300px;">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1610995301185-0'); });
+    </script>
+
+</div>
+
+        </div>
+        <div class="advertisement ad_sponsor">
+            <div id="div-gpt-ad-1618866787087-0" style="height:100px;width:300px;">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1618866787087-0'); });
+    </script>
+
+</div>
+
+        </div>
+    </div>
+    
+        <div class="sidebar_item">
+            <div class="section_title">
+                Reports & Research
+            </div>
+            <ul>
+    
+        <li>
+            <a id="MainContentPlaceHolder__ctrl_0_SponsoredContent_ctl00_rptIssues_lnkIssueImage_0" href="https://www.streamingmedia.com/IndustryWhitepapers/14885-The-Rise-of-Discovery-Intelligence.htm?utm_campaign=generateView&amp;utm_source=righsidebar&amp;utm_medium=webpage&amp;utm_content=image"><img src="https://dzceab466r34n.cloudfront.net/Images/IssueImages/460337-Banner---Portrait-Mode-ORG.png" alt="" /></a>
+            <h2>
+                <a id="MainContentPlaceHolder__ctrl_0_SponsoredContent_ctl00_rptIssues_lnkIssueTitle_0" href="https://www.streamingmedia.com/IndustryWhitepapers/14885-The-Rise-of-Discovery-Intelligence.htm?utm_campaign=generateView&amp;utm_source=righsidebar&amp;utm_medium=webpage&amp;utm_content=text">The Rise of Discovery Intelligence</a></h2>
+        </li>
+    
+        <li>
+            <a id="MainContentPlaceHolder__ctrl_0_SponsoredContent_ctl00_rptIssues_lnkIssueImage_1" href="https://www.streamingmedia.com/IndustryWhitepapers/14688-Checklist-Report-Ultimate-Guide-to-Maximizing-the-Value-of-your-Content-Library.htm?utm_campaign=generateView&amp;utm_source=righsidebar&amp;utm_medium=webpage&amp;utm_content=image"><img src="https://dzceab466r34n.cloudfront.net/Images/IssueImages/457903-New-CacheFly-Issue-Image-ORG.jpg" alt="" /></a>
+            <h2>
+                <a id="MainContentPlaceHolder__ctrl_0_SponsoredContent_ctl00_rptIssues_lnkIssueTitle_1" href="https://www.streamingmedia.com/IndustryWhitepapers/14688-Checklist-Report-Ultimate-Guide-to-Maximizing-the-Value-of-your-Content-Library.htm?utm_campaign=generateView&amp;utm_source=righsidebar&amp;utm_medium=webpage&amp;utm_content=text">Checklist Report: Ultimate Guide to Maximizing the Value of your Content Library</a></h2>
+        </li>
+    
+        
+            <li>
+                <h2 style="text-align: right;">
+                    <a id="MainContentPlaceHolder__ctrl_0_SponsoredContent_ctl00_rptIssues_lnkShowMore" href="/Archives/Default.aspx?ContextSubtypeID=436&amp;utm_source=righsidebar&amp;utm_medium=show_more">More</a>
+                </h2>
+            </li>
+        
+        </ul>
+        </div>
+    
+
+    <div id="MainContentPlaceHolder__ctrl_0_pnlThirdBox" class="sidebar_item">
+	
+        <div class="advertisement ad_box">
+            <div id="div-gpt-ad-1541523286597-2" style="height:250px;width:300px;">
+		
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1541523286597-2'); });
+    </script>
+
+	</div>
+
+        </div>
+    
+</div>
+</div>
+
+		
+    </section>
+
+
+        </div>
+        <footer>
+            <div class="footer_wrapper">
+<div id="address" class="footer_section">
+<div><a href="/default.aspx"> <img src="https://dzceab466r34n.cloudfront.net/StreamingMedia/TemplateImages/smLogoWhite.svg" /></a></div>
+<p><span>StreamingMedia.com is the premier online destination for professionals seeking industry news, information, articles, directories and services.</span></p>
+<p>All Content Copyright &copy; 2009 - 2025<br /><a href="http://www.infotoday.com" target="_blank" rel="noopener">Information Today Inc. </a></p>
+<div style="width: 300px; margin: 10px auto; text-align: center; display: inline-block;">
+<div style="display: inline;"><a href="http://www.facebook.com/StreamingMedia" target="_new" rel="noopener"><img id="Streaming Media on Facebook" style="border: 0px solid; width: 32px; height: 32px;" src="https://dzceab466r34n.cloudfront.net/images_nl/sw/32x32_Circle_49_FB.png" alt="Streaming Media on Facebook" /></a></div>
+<div style="display: inline;"><a href="https://www.instagram.com/streamingmediamag/" target="_new" rel="noopener"><img id="Streaming Media on Instagram" style="border: 0px solid; width: 32px; height: 32px;" src="https://dzceab466r34n.cloudfront.net/images_nl/sw/32x32_Circle_49_IG.png" alt="Streaming Media on Instagram" /></a></div>
+<div style="display: inline;"><a href="http://twitter.com/StreamingMedia" target="_new" rel="noopener"><img id="Streaming Media on Twitter" style="border: 0px solid; width: 32px; height: 32px;" src="https://dzceab466r34n.cloudfront.net/Images/OtherImages/160917-X-Logo-ORG.png" alt="Streaming Media on X" /></a></div>
+<div style="display: inline;"><a href="https://www.linkedin.com/groups/2972181/" target="_new" rel="noopener"><img id="Streaming Media on LinkedIn" style="border: 0px solid; width: 32px; height: 32px;" src="https://dzceab466r34n.cloudfront.net/images_nl/sw/32x32_Circle_49_LI.png" alt="Streaming Media on LinkedIn" /></a></div>
+<div style="display: inline;"><a href="http://www.youtube.com/user/streamingmediavideo" target="_new" rel="noopener"><img id="Streaming Media on YouTube" style="border: 0px solid; width: 32px; height: 32px;" src="https://dzceab466r34n.cloudfront.net/images_nl/sw/32x32_Circle_49_YT.png" alt="Streaming Media on YouTube" /></a></div>
+</div>
+<p>Streaming Media Magazine<br />143 Old Marlton Pike<br />Medford, NJ 08055<br />(609) 654-6266</p>
+<p><a href="http://www.infotoday.com/privacy.shtml" target="_blank" rel="noopener">PRIVACY/COOKIES POLICY</a></p>
+</div>
+<div id="resources" class="footer_section">
+<h2>Resources</h2>
+<ul>
+<li><a href="/">Home</a></li>
+<li><a href="/Previous_Issue" title="SM Magazine"><em>SM</em>&nbsp;Magazine</a></li>
+<li><a href="/Previous_Issue" title="Digital Editions (PDF Download)"><em>SM</em> Digital Editions (PDF Download)</a></li>
+<li><a href="https://www.youtube.com/streamingmediavideo" title="Conference Videos">Conference Videos</a></li>
+<li><a href="/Tutorials" title="Video Tutorials">Video Tutorials</a></li>
+<li><a href="/Newsletters" title="Newsletters">Streaming Media Xtra</a></li>
+<li><a href="/Categories/Topics.aspx" title="Products/Services Topics">Streaming Media Topic Centers</a></li>
+<li><a href="/Categories/Industries.aspx" title="Industry Verticals">Streaming Media Industry Verticals</a></li>
+<li><a href="/Streaming-Media-Guides" title="Streaming Media Guides">Streaming Media Guides</a></li>
+<li><a href="/ReadersChoice" title="Readers Choice Awards">Readers Choice</a></li>
+<li><a href="/Sourcebook" title="Sourcebook">Sourcebook</a></li>
+<li><a href="/OnlineVideoNews" title="Online Video News">Online Video News</a></li>
+<li><a href="/Articles/Spotlights" title="Industry Spotlights">Spotlights</a></li>
+<li><a href="/About/About_Us" title="About Us">About StreamingMedia.com</a></li>
+<li><a href="/About/Contact_Us" title="Contact Us">Contact Us</a></li>
+</ul>
+</div>
+<div id="otherSites" class="footer_section">
+<h2>Other ITI Sites</h2>
+<ul>
+<li><a href="http://www.dbta.com/" target="_new">Database Trends and Applications</a></li>
+<li><a href="https://www.destinationcrm.com/" target="_new">DestinationCRM</a></li>
+<li><a href="https://www.enterpriseaiworld.com/" target="_new">Enterprise AI World</a></li>
+<li><a href="http://www.faulkner.com/" target="_new">Faulkner Information Services</a></li>
+<li><a href="http://www.InfoToday.com/" target="_new">InfoToday.com</a></li>
+<li><a href="http://www.InfoToday.eu/" target="_new">InfoToday Europe</a></li>
+<li><a href="http://www.kmworld.com/" target="_new">KMWorld</a></li>
+<li><a href="http://www.infotoday.com/cilmag/" target="_new">Online Searcher</a></li>
+<li><a href="http://www.SmartCustomerService.com/" target="_new">Smart Customer Service</a></li>
+<li><a href="http://www.speechtechmag.com/" target="_new">Speech Technology</a></li>
+<li><a href="http://europe.streamingmedia.com/" target="_new">Streaming Media Europe</a></li>
+<li><a href="http://www.streamingmedia.com/producer" target="_new">Streaming Media Producer</a></li>
+<li><a href="http://www.UnisphereResearch.com/" target="_new">Unisphere Research</a></li>
+</ul>
+</div>
+<p><br />&nbsp;<br />&nbsp;<br />&nbsp;<br />&nbsp;<br />&nbsp;</p>
+</div>
+        </footer>
+    </form>
+    <div id="div-gpt-ad-1541523286597-10">
+	
+    <script type="text/javascript">
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1541523286597-10'); });
+    </script>
+
+</div>
+
+    <script type="text/javascript" src="/js-scripts?v=gJuZerWoF9bloJ5YsN2h_ic24WgeqaHHOlPMKiAksZY1"></script>
+
+    <script defer type="text/javascript" src="/custom-scripts?v=s-C-Qezq-dTk6bK4PaXfRESFa8-wxN0_AahfJv60L2Y1"></script>
+
+    
+    
+    <script type="text/javascript" src="//s7.addthis.com/js/300/addthis_widget.js#pubid=itisharing" defer></script>
+
+</body>
+</html>

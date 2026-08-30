@@ -1,0 +1,882 @@
+<!doctype html>
+<!--
+  Minimal Mistakes Jekyll Theme 4.18.1 by Michael Rose
+  Copyright 2013-2019 Michael Rose - mademistakes.com | @mmistakes
+  Free for personal and commercial use under the MIT license
+  https://github.com/mmistakes/minimal-mistakes/blob/master/LICENSE
+-->
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8">
+
+<!-- begin _includes/seo.html --><title>SVT-AV1 V3.0 is Now Available | Alliance for Open Media</title>
+<meta name="description" content="         ">
+
+
+
+<meta property="og:type" content="article">
+<meta property="og:locale" content="en_US">
+<meta property="og:site_name" content="Alliance for Open Media">
+<meta property="og:title" content="SVT-AV1 V3.0 is Now Available">
+<meta property="og:url" content="http://aomedia.org/blog%20posts/SVT-AV1-V3_0-is-Now-Available/">
+
+
+  <meta property="og:description" content="         ">
+
+
+
+  <meta property="og:image" content="http://aomedia.org/assets/images/aomedia-logo-resources/aomedia_logo_rgb.png">
+
+
+
+
+
+  <meta property="article:published_time" content="2025-05-21T00:00:00+00:00">
+
+
+
+
+
+  
+
+  
+
+
+<link rel="canonical" href="http://aomedia.org/blog%20posts/SVT-AV1-V3_0-is-Now-Available/">
+
+
+
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    
+      "@type": "Person",
+      "name": null,
+      "url": "http://aomedia.org/"
+    
+  }
+</script>
+
+
+
+
+
+
+<!-- end _includes/seo.html -->
+
+
+<link href="/feed.xml" type="application/atom+xml" rel="alternate" title="Alliance for Open Media Feed">
+
+<!-- https://t.co/dKP3o1e -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script>
+  document.documentElement.className = document.documentElement.className.replace(/\bno-js\b/g, '') + ' js ';
+</script>
+
+<!-- For all browsers -->
+<link rel="stylesheet" href="/assets/css/main.css">
+
+<!--[if IE]>
+  <style>
+    /* old IE unsupported flexbox fixes */
+    .greedy-nav .site-title {
+      padding-right: 3em;
+    }
+    .greedy-nav button {
+      position: absolute;
+      top: 0;
+      right: 0;
+      height: 100%;
+    }
+  </style>
+<![endif]-->
+
+
+
+<script>
+/* toggle between hiding and showing the dropdown content */
+function toggleDropdwonByID(e) {
+  const dropID = e.target.getAttribute("data-dropID") ?
+    e.target.getAttribute("data-dropID") :
+    e.target.parentElement.getAttribute("data-dropID");
+
+  if (dropID) {
+    document.getElementById(dropID).classList.toggle("show");
+  }
+  
+  var dropdowns = document.getElementsByClassName("dropdown");
+  var i;
+  for (i = 0; i < dropdowns.length; i++) {
+    var openDropdown = dropdowns[i];
+    if (openDropdown.id != dropID ) {
+      openDropdown.classList.remove('show');
+    }
+  }
+  e.stopPropagation()
+} 
+
+// Close the dropdown menu if the user clicks outside of it
+window.onclick = function(event) {
+  if (!event.target.matches('.dropdown-btn')) {
+    var dropdowns = document.getElementsByClassName("dropdown");
+    var i;
+    for (i = 0; i < dropdowns.length; i++) {
+      var openDropdown = dropdowns[i];
+      if (openDropdown.classList.contains('show')) {
+        openDropdown.classList.remove('show');
+      }
+    }
+  }
+}
+</script>
+
+    <!-- start custom head snippets -->
+
+<!-- insert favicons. use https://realfavicongenerator.net/ -->
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+<meta name="msapplication-TileColor" content="#da532c">
+<meta name="theme-color" content="#ffffff">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/cookieconsent@3/build/cookieconsent.min.css" />
+<!-- end custom head snippets -->
+
+  </head>
+
+  <body class="layout--single wide">
+    <nav class="skip-links">
+  <h2 class="screen-reader-text">Skip links</h2>
+  <ul>
+    <li><a href="#site-nav" class="screen-reader-shortcut">Skip to primary navigation</a></li>
+    <li><a href="#main" class="screen-reader-shortcut">Skip to content</a></li>
+    <li><a href="#footer" class="screen-reader-shortcut">Skip to footer</a></li>
+  </ul>
+</nav>
+
+    <!--[if lt IE 9]>
+<div class="notice--danger align-center" style="margin: 0;">You are using an <strong>outdated</strong> browser. Please <a href="https://browsehappy.com/">upgrade your browser</a> to improve your experience.</div>
+<![endif]-->
+
+    
+
+<div class="masthead">
+  <div class="masthead__inner-wrap">
+    <div class="masthead__menu">
+      <nav id="site-nav" class="greedy-nav">
+        
+          <a class="site-logo" href="/"><img src="/assets/images/aomedia-icon-only.png" alt=""></a>
+        
+        <a class="site-title" href="/">
+          Alliance for Open Media
+          <span class="site-subtitle">An Alliance of Global Media Innovators</span>
+        </a>
+        <ul class="visible-links"><li class="masthead__menu-item"><button class="dropdown-btn" onclick="toggleDropdwonByID(event)" data-dropID="dropdown_1">
+                  About
+                  <i class="fa-solid fa-caret-down"></i>
+                </button>
+                <div class="dropdown" id="dropdown_1">
+                  <ul><li class="masthead__menu-item">
+                      <a href="/about/story/" >Story</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/about/faqs/" >FAQ</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/about/members/" >Members</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/about/organization/" >Organization</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/about/legal/" >Legal</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/about/contact/" >Contact</a>
+                    </li></ul>
+                </div>
+              </li><li class="masthead__menu-item">
+                <a href="/resources/The-Future-of-Innovation-is-Open" >The Future of Innovation is Open</a>
+              </li><li class="masthead__menu-item">
+                <a href="/av1-adoption-showcase/" >AV1 adoption</a>
+              </li><li class="masthead__menu-item"><button class="dropdown-btn" onclick="toggleDropdwonByID(event)" data-dropID="dropdown_4">
+                  Specifications
+                  <i class="fa-solid fa-caret-down"></i>
+                </button>
+                <div class="dropdown" id="dropdown_4">
+                  <ul><li class="masthead__menu-item">
+                      <a href="/specifications/" >All Specifications</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/specifications/av1/" >AV1</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="https://av2.aomedia.org/" >AV2</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/specifications/avif/" >AVIF</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/specifications/iamf/" >IAMF</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/specifications/oar/" >Open Audio Renderer (OAR)</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/specifications/id3-timed/" >ID3 Timed Metadata</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/specifications/afgs1/" >AFGS1</a>
+                    </li></ul>
+                </div>
+              </li><li class="masthead__menu-item"><button class="dropdown-btn" onclick="toggleDropdwonByID(event)" data-dropID="dropdown_5">
+                  Resources
+                  <i class="fa-solid fa-caret-down"></i>
+                </button>
+                <div class="dropdown" id="dropdown_5">
+                  <ul><li class="masthead__menu-item">
+                      <a href="/products/" >Products and services</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/oss/" >Open source</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/events/" >Videos and Webinars</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/resources/logo/" >Logo</a>
+                    </li></ul>
+                </div>
+              </li><li class="masthead__menu-item"><button class="dropdown-btn" onclick="toggleDropdwonByID(event)" data-dropID="dropdown_6">
+                  Get involved
+                  <i class="fa-solid fa-caret-down"></i>
+                </button>
+                <div class="dropdown" id="dropdown_6">
+                  <ul><li class="masthead__menu-item">
+                      <a href="/membership/" >Join</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/adopt/" >Adopt</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/contribute/" >Contribute</a>
+                    </li><li class="masthead__menu-item">
+                      <a href="/research/" >Research</a>
+                    </li></ul>
+                </div>
+              </li><li class="masthead__menu-item">
+                <a href="/news/" >News</a>
+              </li></ul>
+        
+        <button class="search__toggle" type="button">
+          <span class="visually-hidden">Toggle search</span>
+          <svg class="icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.99 16">
+            <path d="M15.5,13.12L13.19,10.8a1.69,1.69,0,0,0-1.28-.55l-0.06-.06A6.5,6.5,0,0,0,5.77,0,6.5,6.5,0,0,0,2.46,11.59a6.47,6.47,0,0,0,7.74.26l0.05,0.05a1.65,1.65,0,0,0,.5,1.24l2.38,2.38A1.68,1.68,0,0,0,15.5,13.12ZM6.4,2A4.41,4.41,0,1,1,2,6.4,4.43,4.43,0,0,1,6.4,2Z" transform="translate(-.01)"></path>
+          </svg>
+        </button>
+        
+        <button class="greedy-nav__toggle hidden" type="button">
+          <span class="visually-hidden">Toggle menu</span>
+          <div class="navicon"></div>
+        </button>
+        <ul class="hidden-links hidden"></ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+
+    <div class="initial-content">
+      
+
+
+  
+    
+
+
+
+<nav class="breadcrumbs">
+  <ol itemscope itemtype="https://schema.org/BreadcrumbList">
+    
+    
+    
+      
+        <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+          <a href="http://aomedia.org/" itemprop="item"><span itemprop="name">Home</span></a>
+          <meta itemprop="position" content="1" />
+        </li>
+        <span class="sep">></span>
+      
+      
+        
+        <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+          <a href="/categories/blog-posts" itemprop="item"><span itemprop="name">Blog posts</span></a>
+          <meta itemprop="position" content="2" />
+        </li>
+        <span class="sep">></span>
+      
+    
+      
+      
+        <li class="current">SVT-AV1 V3.0 is Now Available</li>
+      
+    
+  </ol>
+</nav>
+
+  
+
+
+<div id="main" role="main">
+  
+  <div class="sidebar sticky">
+  
+
+
+<div itemscope itemtype="https://schema.org/Person">
+
+  
+
+  <div class="author__content">
+    
+      <h3 class="author__name" itemprop="name"></h3>
+    
+    
+  </div>
+
+  <div class="author__urls-wrapper">
+    <button class="btn btn--inverse">Follow</button>
+    <ul class="author__urls social-icons">
+      
+
+      
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      <!--
+  <li>
+    <a href="http://link-to-whatever-social-network.com/user/" itemprop="sameAs" rel="nofollow noopener noreferrer">
+      <i class="fas fa-fw" aria-hidden="true"></i> Custom Social Profile Link
+    </a>
+  </li>
+-->
+    </ul>
+  </div>
+</div>
+
+  
+  </div>
+
+
+  <article class="page" itemscope itemtype="https://schema.org/CreativeWork">
+    <meta itemprop="headline" content="SVT-AV1 V3.0 is Now Available">
+    <meta itemprop="description" content="    ">
+    <meta itemprop="datePublished" content="2025-05-21T00:00:00+00:00">
+    
+
+    <div class="page__inner-wrap">
+      
+        <header>
+          <h1 id="page-title" class="page__title" itemprop="headline">SVT-AV1 V3.0 is Now Available
+</h1>
+          
+            <p class="page__meta">
+            
+              <i class="fas fa-fw fa-calendar-alt" aria-hidden="true"></i> <time datetime="2025-05-21T00:00:00+00:00">May 21, 2025</time> | 
+            
+            <i class="far fa-clock" aria-hidden="true"></i> 
+
+
+
+
+  2 minute read
+
+ 
+            </p>
+          
+        </header>
+      
+
+      <section class="page__content" itemprop="text">
+        
+        <picture class="picture-in-article align-center">
+  <source srcset="/assets/images/SVT-AV1-v3_0-Blog-Post.png.avif" type="image/avif" />
+  <img src="/assets/images/SVT-AV1-v3_0-Blog-Post.png" alt="SVT-AV1 v3.0 Blog Post" />
+</picture>
+
+<p>The AOMedia Software Implementation Working Group (SIWG) is excited to share
+SVT-AV1 V3.0, a major release that represents an important improvement in
+performance and includes a few key bug fixes. Scalable Video Technology (SVT)
+refers to the ability of an encoder to scale its performance according to the
+compute capabilities of the platform on which it is running, essentially
+allowing it to use the maximum amount of allocated resources to achieve the
+highest possible video quality. SVT-AV1 is an open-source, CPU-based AV1
+encoder. It is an AOMedia project that provides an AV1-compliant open-source
+encoder library.</p>
+
+<h2 id="why-is-this-update-important">Why is this update important?</h2>
+
+<p>The latest release of SVT-AV1 delivers significant performance improvements
+along with a major API update, including:</p>
+
+<ul>
+  <li>A clean-up of unused fields, use stdbool type, and redundant parameters in
+svt_av1_enc_init_handle</li>
+  <li>Repositioning the presets and removing one preset resulting in a max preset of
+M10 in the current version</li>
+  <li>Addition of a temporal layer and averageQP fields in output picture structure,
+along with an option to specify a QP offset for the startup GOP</li>
+</ul>
+
+<p>The API changes are not backwards compatible. More details about the changes can
+be found in issue
+<a href="https://gitlab.com/AOMediaCodec/SVT-AV1/-/issues/2217" target="_blank">2217</a>.</p>
+
+<p>The release also featured some key encoder updates, including:</p>
+
+<ul>
+  <li>Improved mid- and high-quality presets and quality vs. speed tradeoffs for
+fast-decode 2 mode:
+    <ul>
+      <li>~15-25% speedup for M3-M10 at the same quality levels</li>
+      <li>~1% BD-rate improvement for presets M0-M2</li>
+    </ul>
+  </li>
+  <li>Repositioning of the fast-decode 1 mode to produce ~10% decoder cycle
+reduction vs fast-decode 0 while reducing the BD-rate loss to ~1%</li>
+  <li>Further Arm Neon and SVE2 optimizations that improve high bit-depth encoding
+by an average of 10-25% for 480p-1080p resolutions beyond the
+architecture-agnostic algorithmic improvements since
+<a href="https://aomedia.org/blog%20posts/Software-Implementation-Working-Group-Releases-SVT-AV1-v2_3/" target="_blank">v2.3.0</a></li>
+  <li>Porting of several features from SVT-AV1-SPY fork to further improve the
+perceptual quality of tune 0 mode</li>
+  <li>Added lossless coding support and an avif mode to reduce resource utilization
+when encoding still images</li>
+</ul>
+
+<p>Finally, SVT-AV1 also released two follow-up minor releases v3.0.1 and v3.0.2
+that includes a cleanup build, bug fixes and documentation, specifically:</p>
+
+<ul>
+  <li>Removal of the third party cpuinfo code in favor of using one provided by the
+system. (For those without cpuinfo, it will be pulled and compiled into the
+library, similar to before)</li>
+  <li>Improved unit test coverage for Arm Neon and SVE2 code</li>
+  <li>Updated documentation</li>
+</ul>
+
+<h2 id="where-can-you-find-it">Where can you find it?</h2>
+
+<p>The latest SVT-AV1 release can be
+<a href="https://gitlab.com/AOMediaCodec/SVT-AV1/-/releases/v3.0.0" target="_blank">found on GitLab</a>.
+Please take a moment to give it a try and report feedback. Your input helps
+drive the continued improvements that benefit us all.</p>
+
+<p>Thank you to all the members of the Software Implementation Working Group and
+the vibrant open source community for their ongoing contributions. Your hard
+work makes these updates possible.</p>
+
+<p>Follow AOMedia on
+<a href="https://www.reddit.com/user/AllianceforOpenMedia/" target="_blank">Reddit</a>,
+<a href="https://www.linkedin.com/company/84062192/admin/page-posts/published/" target="_blank">LinkedIn</a>
+and <a href="https://www.instagram.com/allianceforopenmedia/" target="_blank">Instagram</a>.</p>
+
+        
+      </section>
+
+      <footer class="page__meta">
+        
+        
+
+
+  
+
+
+  
+  
+  
+
+  <p class="page__taxonomy">
+    <strong><i class="fas fa-fw fa-folder-open" aria-hidden="true"></i> Categories: </strong>
+    <span itemprop="keywords">
+    
+      
+      
+      <a href="/news/blog-posts" class="page__taxonomy-item" rel="tag">Blog Posts</a>
+    
+    </span>
+  </p>
+
+
+
+        
+          <p class="page__date"><strong><i class="fas fa-fw fa-calendar-alt" aria-hidden="true"></i> Updated:</strong> <time datetime="2025-05-21T00:00:00+00:00">May 21, 2025</time></p>
+        
+      </footer>
+
+      <section class="page__share">
+  
+    <h4 class="page__share-title">Share on</h4>
+  
+
+  <a href="https://twitter.com/intent/tweet?text=SVT-AV1+V3.0+is+Now+Available%20http%3A%2F%2Faomedia.org%2Fblog%2520posts%2FSVT-AV1-V3_0-is-Now-Available%2F" class="btn btn--twitter" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="Share on Twitter"><i class="fa-brands fa-square-x-twitter" aria-hidden="true"></i><span> Twitter</span></a>
+
+  <a href="https://www.facebook.com/sharer/sharer.php?u=http%3A%2F%2Faomedia.org%2Fblog%2520posts%2FSVT-AV1-V3_0-is-Now-Available%2F" class="btn btn--facebook" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="Share on Facebook"><i class="fab fa-fw fa-facebook" aria-hidden="true"></i><span> Facebook</span></a>
+
+  <a href="https://www.linkedin.com/shareArticle?mini=true&url=http%3A%2F%2Faomedia.org%2Fblog%2520posts%2FSVT-AV1-V3_0-is-Now-Available%2F" class="btn btn--linkedin" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="Share on LinkedIn"><i class="fab fa-fw fa-linkedin" aria-hidden="true"></i><span> LinkedIn</span></a>
+</section>
+
+
+      
+  <nav class="pagination">
+    
+      <a href="/newsletters/aom-decoder-april-2025/" class="pagination--pager" title="AOM Decoder April 2025
+">Previous</a>
+    
+    
+      <a href="/press%20releases/Pozalabs-Joins-the-Alliance-for-Open-Media/" class="pagination--pager" title="Pozalabs Joins the Alliance for Open Media
+">Next</a>
+    
+  </nav>
+
+    </div>
+
+    
+  </article>
+
+  
+  
+    <div class="page__related">
+      <h4 class="page__related-title">You may also enjoy</h4>
+      <div class="grid__wrapper">
+        
+          
+
+
+
+<div class="grid__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
+    
+    <h2 class="archive__item-title" itemprop="headline">
+      
+        <a href="/press%20releases/AOMedia-Publishes-Open-Audio-Renderer_OAR_v1-Advancing-Open-Spatial-Audio/" rel="permalink">Alliance for Open Media Publishes Open Audio Renderer (OAR) v1, Advancing Open Spatial Audio
+</a>
+      
+    </h2>
+    
+      <p class="page__meta"><i class="far fa-clock" aria-hidden="true"></i> 
+
+
+
+
+  2 minute read
+
+</p>
+    
+    
+      <p class="page__meta">
+        <i class="fas fa-fw fa-calendar-alt" aria-hidden="true"></i> <time datetime="2026-07-30T00:00:00+00:00">2026-07-30</time>
+      </p>
+    
+    <p class="archive__item-excerpt" itemprop="description">Reference implementation strengthens the open immersive audio ecosystem with
+production-ready rendering for loudspeakers and headphones
+
+</p>
+  </article>
+</div>
+
+        
+          
+
+
+
+<div class="grid__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
+    
+    <h2 class="archive__item-title" itemprop="headline">
+      
+        <a href="/blog%20posts/AV2-What-the-Final-Specification-Means-for-Implementers/" rel="permalink">AV2: What the Final Specification Means for Implementers
+</a>
+      
+    </h2>
+    
+      <p class="page__meta"><i class="far fa-clock" aria-hidden="true"></i> 
+
+
+
+
+  3 minute read
+
+</p>
+    
+    
+      <p class="page__meta">
+        <i class="fas fa-fw fa-calendar-alt" aria-hidden="true"></i> <time datetime="2026-07-27T00:00:00+00:00">2026-07-27</time>
+      </p>
+    
+    <p class="archive__item-excerpt" itemprop="description">The Alliance for Open Media has reached a significant milestone in open video
+coding with the official release of the AV2 specification.
+While the announceme...</p>
+  </article>
+</div>
+
+        
+          
+
+
+
+<div class="grid__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
+    
+    <h2 class="archive__item-title" itemprop="headline">
+      
+        <a href="/blog%20posts/AOMedia-Announces-Availability-of-Libaom-v3_14/" rel="permalink">AOMedia Video Codec Working Group Announces Availability of Libaom v3.14 “Pinkie Pie”
+</a>
+      
+    </h2>
+    
+      <p class="page__meta"><i class="far fa-clock" aria-hidden="true"></i> 
+
+
+
+
+  5 minute read
+
+</p>
+    
+    
+      <p class="page__meta">
+        <i class="fas fa-fw fa-calendar-alt" aria-hidden="true"></i> <time datetime="2026-07-23T00:00:00+00:00">2026-07-23</time>
+      </p>
+    
+    <p class="archive__item-excerpt" itemprop="description">The AOMedia Video Codec Working Group is pleased to announce that libaom v3.14,
+aka “Pinkie Pie,” is now available. This release makes available all the
+impr...</p>
+  </article>
+</div>
+
+        
+          
+
+
+
+<div class="grid__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
+    
+    <h2 class="archive__item-title" itemprop="headline">
+      
+        <a href="/press%20releases/Alliance-for-Open-Media-Releases-AV2-Codec/" rel="permalink">Alliance for Open Media Releases AV2 Codec, Advancing Next-Generation Open Video Coding
+</a>
+      
+    </h2>
+    
+      <p class="page__meta"><i class="far fa-clock" aria-hidden="true"></i> 
+
+
+
+
+  2 minute read
+
+</p>
+    
+    
+      <p class="page__meta">
+        <i class="fas fa-fw fa-calendar-alt" aria-hidden="true"></i> <time datetime="2026-06-06T00:00:00+00:00">2026-06-06</time>
+      </p>
+    
+    <p class="archive__item-excerpt" itemprop="description">Wakefield, Mass. – June 9, 2026 - The Alliance for Open Media (AOMedia)
+today announced the release of the AV2 specification. AOMedia is a standards
+organiza...</p>
+  </article>
+</div>
+
+        
+      </div>
+    </div>
+  
+  
+</div>
+
+    </div>
+
+    
+      <div class="search-content">
+        <div class="search-content__inner-wrap"><form onsubmit="return googleCustomSearchExecute();" id="cse-search-box-form-id">
+    <label class="sr-only" for="cse-search-input-box-id">
+      Enter your search term...
+    </label>
+    <input type="search" id="cse-search-input-box-id" class="search-input" tabindex="-1" placeholder="Enter your search term..." />
+  </form>
+  <div id="results" class="results">
+    <gcse:searchresults-only></gcse:searchresults-only>
+  </div></div>
+
+      </div>
+    
+
+    <div id="footer" class="page__footer">
+      <footer>
+        <!-- start custom footer snippets -->
+
+<!-- end custom footer snippets -->
+        <div class="page__footer-follow">
+  <ul class="social-icons">
+    
+      <li><strong>Follow:</strong></li>
+    
+
+    
+      
+        
+          <li><a href="https://www.linkedin.com/company/alliance-for-open-media/" rel="nofollow noopener noreferrer"><i class="fab fa-fw fa-linkedin" aria-hidden="true"></i> LinkedIn</a></li>
+        
+      
+        
+          <li><a href="https://www.youtube.com/@allianceforopenmedia2446" rel="nofollow noopener noreferrer"><i class="fa-brands fa-youtube" aria-hidden="true"></i> YouTube</a></li>
+        
+      
+        
+          <li><a href="https://www.reddit.com/user/AllianceforOpenMedia/" rel="nofollow noopener noreferrer"><i class="fa-brands fa-square-reddit" aria-hidden="true"></i> Reddit</a></li>
+        
+      
+        
+      
+        
+          <li><a href="https://github.com/AOMediaCodec" rel="nofollow noopener noreferrer"><i class="fab fa-fw fa-github" aria-hidden="true"></i> GitHub</a></li>
+        
+      
+        
+      
+        
+      
+    
+
+    <li><a href="/feed.xml"><i class="fas fa-fw fa-rss-square" aria-hidden="true"></i> RSS</a></li>
+  </ul>
+</div>
+
+<div class="page__footer-copyright">&copy; 2026 Alliance for Open Media &middot; All Rights Reserved &middot; Project of the <a href="http://www.jointdevelopment.org/">Joint Development Foundation</a> &middot; <a href="/terms-of-service/">Terms of Service</a></div>
+
+      </footer>
+    </div>
+
+    
+  <script src="/assets/js/main.min.js"></script>
+  <!--  <script src="https://kit.fontawesome.com/4eee35f757.js"></script> --!>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+
+<script>
+  (function () {
+    var cx = '002525345123710699578:jwp64obavqr';
+    var gcse = document.createElement('script');
+    gcse.type = 'text/javascript';
+    gcse.async = true;
+    gcse.src = 'https://cse.google.com/cse.js?cx=' + cx;
+    var s = document.getElementsByTagName('script')[0];
+    s.parentNode.insertBefore(gcse, s);
+  })();
+
+  function googleCustomSearchExecute() {
+    var input = document.getElementById('cse-search-input-box-id');
+    var element = google.search.cse.element.getElement('searchresults-only0');
+    if (input.value == '') {
+      element.clearAllResults();
+    } else {
+      element.execute(input.value);
+    }
+    return false;
+  }
+
+  
+</script>
+
+
+
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-HC39BSQZS1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-HC39BSQZS1', { 'anonymize_ip': false});
+</script>
+
+
+
+
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/cookieconsent@3/build/cookieconsent.min.js" data-cfasync="false"></script>
+<script>
+window.cookieconsent.initialise({
+  "palette": {
+    "popup": {
+      "background": "#222e5c",
+      "text": "#ffffff"
+    },
+    "button": {
+      "background": "#9cdbba",
+      "text": "#000000"
+    }
+  },
+  "theme": "edgeless",
+  "content": {
+    "href": "/terms-of-service/"
+  }
+});
+</script>
+
+
+  </body>
+</html>
+

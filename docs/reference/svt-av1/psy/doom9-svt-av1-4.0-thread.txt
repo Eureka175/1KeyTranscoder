@@ -1,0 +1,3597 @@
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+
+
+ 
+
+ 
+
+
+ 
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ SVT-AV1 v4.0 - Doom9's Forum 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Welcome to Doom9 's Forum, THE in-place to be for everyone interested in DVD conversion. 
+ Before you start posting please read the forum rules . By posting to this forum you agree to abide by the rules. 
+ Domains: forum.doom9.org / forum.doom9.net / forum.doom9.se 
+ 
+
+ 
+  
+ 
+ 
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+
+
+
+
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+   
+ Doom9's Forum 
+ > Video Encoding 
+
+
+ > Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+
+ 
+ 
+ 
+ 
+ SVT-AV1 v4.0
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ User Name 
+ 
+ Remember Me? 
+ 
+ 
+ Password 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Register 
+ 
+ 
+ FAQ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Search 
+ 
+ Today's Posts 
+ 
+ 
+ Mark Forums Read 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+
+
+
+
+
+
+
+
+
+ 
+
+ 
+ 
+
+ 
+
+
+
+
+
+
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ Thread Tools 
+ 
+ 
+ 
+ 
+ Search this Thread 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+ 
+ 
+
+
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 26th January 2026, 20:08
+ 
+ 
+ 
+ 
+  
+ # 1 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ charliebaby 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Jun 2020 
+ 
+ 
+ 
+ Posts: 54
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ SVT-AV1 v4.0 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ SVT-AV1 4.0 is out as the newest major feature release for this open-source AV1 video encoder that was originally started by Intel as an open-source project and now continuining on thanks to the Alliance For Open Media. 
+ 
+SVT-AV1 4.0 brings some API updates and with the breakage there yields the new 4.0 version. Exciting end-users though will be the continued performance improvements, ARM optimizations, and more with SVT-AV1 4.0: 
+ 
+ - Significant improvements in AVIF and still image modes 
+ ~5-8x speedup M11-M0 at the same quality levels with tune MS-SSIM 
+ ~5-8% BD-Rate improvements at the same complexity with tune MS-SSIM 
+ - Tradeoff improvements for the RTC modes: 
+ ~5-15% speedup at similar quality levels in --rtc mode across presets 7 - 11 
+ - Tradeoff improvements for the Random Access mode (VOD use case) showing a 10-25% speedup across presets M7 down to M0 for --fast-decode 1 and 2 
+ - Major feature updates for the visual quality mode with the completion porting all SVT-AV1-PSY applicable features for --tune vq for video and --tune iq for avif: 
+ Added AC Bias, a psychovisual feature that improves detail preservation and film grain retention 
+ - Update S-Frame support to allow setting it in a specific decode order option and with more qp options 
+ - Further Arm Neon and SVE2 optimizations that improve high bitdepth encoding by an average of ~5% in low resolutions 
+ 
+SVT-AV1 v4.0 + FFMPEG SVT-AV1 v4.0 
+ https://www.mediafire.com/file/20qru...v4.01.rar/file 
+ 
+SVT-AV1 v4.01 
+ 
+ https://www.mediafire.com/file/20qru...v4.01.rar/file 
+ 
+Test SVT-AV1 v4.0 PRESET-1 speed 10FPS encoding :-) 
+ 
+ https://prnt.sc/QCqv8TzwH0tG 
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Last edited by charliebaby; 31st January 2026 at 08:23 .
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ charliebaby 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by charliebaby 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 26th January 2026, 20:43
+ 
+ 
+ 
+ 
+  
+ # 2 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ Z2697 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Aug 2024 
+ Location: Between my two ears 
+ 
+ 
+ Posts: 1,270
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ That grain/noise on the background looks awful 
+Or what's under the grain. Looks blocky. 
+Is that grain synthetic?
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Last edited by Z2697; 27th January 2026 at 00:14 .
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ Z2697 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by Z2697 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 27th January 2026, 07:38
+ 
+ 
+ 
+ 
+  
+ # 3 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ rwill 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Dec 2013 
+ Location: Berlin, Germany 
+ 
+ 
+ Posts: 610
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ I don't see any grain, just a blocky background. Using Chrome here.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ My github... 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ rwill 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by rwill 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 27th January 2026, 20:05
+ 
+ 
+ 
+ 
+  
+ # 4 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ charliebaby 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Jun 2020 
+ 
+ 
+ 
+ Posts: 54
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by Z2697 
+ 
+ 
+ That grain/noise on the background looks awful 
+Or what's under the grain. Looks blocky. 
+Is that grain synthetic? 
+ 
+ 
+ 
+ 
+ lol that's how the film is originally, look at her face, the clarity, not the background
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ charliebaby 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by charliebaby 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 27th January 2026, 21:38
+ 
+ 
+ 
+ 
+  
+ # 5 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ Z2697 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Aug 2024 
+ Location: Between my two ears 
+ 
+ 
+ Posts: 1,270
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ Then there's a question of where did you get the source from. (It's Collide (2016)) https://slow.pics/c/gwJn0Pds 
+Her? Last time I checked, Anthony Hopkins is "he". 
+Or the female appearance in the background? What a blurry face has to look at?
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Last edited by Z2697; 27th January 2026 at 22:08 .
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ Z2697 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by Z2697 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 27th January 2026, 22:11
+ 
+ 
+ 
+ 
+  
+ # 6 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ charliebaby 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Jun 2020 
+ 
+ 
+ 
+ Posts: 54
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by Z2697 
+ 
+ 
+ Then there's a question of where did you get the source from. (It's Collide (2016)) https://slow.pics/c/gwJn0Pds 
+Her? Last time I checked, Anthony Hopkins is "he". 
+Or the female appearance in the background? What a blurry face has to look at? 
+ 
+ 
+ 
+ 
+ this is source BD = https://prnt.sc/X3LEQbI3bMwQ 
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ charliebaby 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by charliebaby 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 28th January 2026, 06:59
+ 
+ 
+ 
+ 
+  
+ # 7 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ rwill 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Dec 2013 
+ Location: Berlin, Germany 
+ 
+ 
+ Posts: 610
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ The Emperor's new clothes sure do look fantastic !
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ My github... 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ rwill 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by rwill 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 28th January 2026, 19:30
+ 
+ 
+ 
+ 
+  
+ # 8 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ GeoffreyA 
+ 
+ 
+ 
+
+ . 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jun 2024 
+ Location: South Africa 
+ 
+ 
+ Posts: 844
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by charliebaby 
+ 
+ 
+ lol that's how the film is originally, look at her face, the clarity, not the background 
+ 
+ 
+ 
+ 
+ AV1 can be pretty sharpany codec should bebut temporally, I've found a lot of strobing or flashing with grainy material. The forks are doing better, especially the HDR one.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ GeoffreyA 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by GeoffreyA 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 28th January 2026, 20:11
+ 
+ 
+ 
+ 
+  
+ # 9 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ VoodooFX 
+ 
+ 
+ 
+
+ Video damager 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Sep 2008 
+ 
+ 
+ 
+ Posts: 1,281
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ Is it still bad for < HD resolutions?
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ InpaintDelogo, DoomDelogo, JerkyWEB Fixer, Standalone Faster-Whisper - AI subtitling 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ VoodooFX 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by VoodooFX 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 28th January 2026, 21:15
+ 
+ 
+ 
+ 
+  
+ # 10 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ Z2697 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Aug 2024 
+ Location: Between my two ears 
+ 
+ 
+ Posts: 1,270
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ It can be good at any resolution, if you want to save data or in a bandwidth constrained situation, and don't care about details that much (or if you are bandwidth constrained, you can't). 
+If your goal is not something similar to that, it probably won't be good at any resolution. 
+That said, it's the current state of the encoder. It might change in the future.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Last edited by Z2697; 28th January 2026 at 23:15 .
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ Z2697 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by Z2697 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 29th January 2026, 14:34
+ 
+ 
+ 
+ 
+  
+ # 11 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ Boulder 
+ 
+ 
+ 
+
+ Pig on the wing 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Mar 2002 
+ Location: Finland 
+ 
+ 
+ Posts: 5,844
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by VoodooFX 
+ 
+ 
+ Is it still bad for < HD resolutions? 
+ 
+ 
+ 
+ 
+ I'd say that the -hdr fork with tune 0 and --max-32-tx-size 1 are the best bet for low resolutions.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ And if the band you're in starts playing different tunes 
+I'll see you on the dark side of the Moon... 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ Boulder 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by Boulder 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 29th January 2026, 15:16
+ 
+ 
+ 
+ 
+  
+ # 12 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ VoodooFX 
+ 
+ 
+ 
+
+ Video damager 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Sep 2008 
+ 
+ 
+ 
+ Posts: 1,281
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by Z2697 
+ 
+ 
+ It can be good at any resolution, if you want to save data or in a bandwidth constrained situation, and don't care about details that much (or if you are bandwidth constrained, you can't). 
+If your goal is not something similar to that, it probably won't be good at any resolution. 
+That said, it's the current state of the encoder. It might change in the future. 
+ 
+ 
+ 
+ 
+ MPEG1 is good too if you don't care about details that much .
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ InpaintDelogo, DoomDelogo, JerkyWEB Fixer, Standalone Faster-Whisper - AI subtitling 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ VoodooFX 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by VoodooFX 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 29th January 2026, 17:06
+ 
+ 
+ 
+ 
+  
+ # 13 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ Z2697 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Aug 2024 
+ Location: Between my two ears 
+ 
+ 
+ Posts: 1,270
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ What can I say, try it yourself. 
+ 
+BTW using MPEG1 is more like don't care about most of the details in my book.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ Z2697 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by Z2697 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 29th January 2026, 17:29
+ 
+ 
+ 
+ 
+  
+ # 14 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ VoodooFX 
+ 
+ 
+ 
+
+ Video damager 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Sep 2008 
+ 
+ 
+ 
+ Posts: 1,281
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ Not sure I see significant changes to that area (I already tested "AC Bias" in some nightly build). 
+By "bad" I meant - worse that x265.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ InpaintDelogo, DoomDelogo, JerkyWEB Fixer, Standalone Faster-Whisper - AI subtitling 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ VoodooFX 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by VoodooFX 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 29th January 2026, 20:04
+ 
+ 
+ 
+ 
+  
+ # 15 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ Z2697 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Aug 2024 
+ Location: Between my two ears 
+ 
+ 
+ Posts: 1,270
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ It's simple, lower your target bitrate (to maybe equivalent of x265 crf 25) and it's better than x265 at most if not any resolution, otherwise it's worse at most if not any resolution.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Last edited by Z2697; 29th January 2026 at 20:59 .
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ Z2697 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by Z2697 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 30th January 2026, 00:06
+ 
+ 
+ 
+ 
+  
+ # 16 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ VoodooFX 
+ 
+ 
+ 
+
+ Video damager 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Sep 2008 
+ 
+ 
+ 
+ Posts: 1,281
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by Z2697 
+ 
+ 
+ It's simple, lower your target bitrate (to maybe equivalent of x265 crf 25) and it's better than x265 at most if not any resolution, otherwise it's worse at most if not any resolution. 
+ 
+ 
+ 
+ 
+ It was bad even at that x265 crf bitrate...
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ InpaintDelogo, DoomDelogo, JerkyWEB Fixer, Standalone Faster-Whisper - AI subtitling 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ VoodooFX 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by VoodooFX 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 31st January 2026, 08:21
+ 
+ 
+ 
+ 
+  
+ # 17 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ charliebaby 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Jun 2020 
+ 
+ 
+ 
+ Posts: 54
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ new Version SVTAV1APP.EXE 4.0.1 
+ 
+ https://www.mediafire.com/file/20qru...v4.01.rar/file 
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ charliebaby 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by charliebaby 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ « 
+ Previous Thread 
+ |
+ Next Thread 
+ » 
+ 
+ 
+
+
+
+
+
+
+
+ 
+
+
+ 
+ 
+ Thread Tools 
+ Search this Thread 
+ 
+ 
+ 
+
+ 
+ 
+ 
+
+ Show Printable Version 
+ Email this Page 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Search this Thread : 
+ 
+ Advanced Search 
+ 
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Posting Rules
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ You may not post new threads 
+ You may not post replies 
+ You may not post attachments 
+ You may not edit your posts 
+ 
+ 
+ BB code is On 
+ Smilies are On 
+ [IMG] code is On 
+ HTML code is Off 
+ 
+ Forum Rules 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Forum Jump 
+ 
+ 
+ User Control Panel 
+ Private Messages 
+ Subscriptions 
+ Who's Online 
+ Search Forums 
+ Forums Home 
+ 
+ 
+ 
+ Announcements and Chat 
+     General Discussion 
+     News 
+     Forum / Site Suggestions & Help 
+ General 
+     Decrypting 
+     Newbies 
+     DVD2AVI / DGIndex 
+     Audio encoding 
+     Subtitles 
+     Linux, Mac OS X, & Co 
+ Capturing and Editing Video 
+     Avisynth Usage 
+     Avisynth Development 
+     VapourSynth 
+     Capturing Video 
+     DV 
+     HDTV / DVB / TiVo 
+     NLE - Non Linear Editing 
+     VirtualDub, VDubMod & AviDemux 
+     New and alternative a/v containers 
+ Video Encoding 
+     (Auto) Gordian Knot 
+     MPEG-4 ASP 
+     MPEG-4 Encoder GUIs 
+     MPEG-4 AVC / H.264 
+     High Efficiency Video Coding (HEVC) 
+     New and alternative video codecs 
+     MPEG-2 Encoding 
+     Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+ (HD) DVD, Blu-ray & (S)VCD 
+     One click suites for DVD backup and DVD creation 
+     DVD & BD Rebuilder 
+     (HD) DVD & Blu-ray authoring 
+     Advanced authoring 
+     IFO/VOB Editors 
+     DVD burning 
+ Hardware & Software 
+     Software players 
+     Hardware players 
+     PC Hard & Software 
+ Programming and Hacking 
+     Development 
+     Translations 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+
+
+
+
+ 
+ All times are GMT +1. The time now is 10:09 . 
+ 
+
+
+ 
+ 
+ 
+
+ 
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ doom9.org -
+ 
+ 
+ Archive -
+ 
+ 
+ 
+ Top 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+ 
+ 
+ Powered by vBulletin® Version 3.8.11 Copyright ©2000 - 2026, vBulletin Solutions Inc.
+ 
+ 
+
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+
+
+ 
+ 
+
+ 
+
+ 
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 

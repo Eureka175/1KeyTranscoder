@@ -1,0 +1,398 @@
+﻿ 
+Doom9's Forum - x265 Sharpness and Detail (Best Settings?) 
+Page 1 of 3 
+1 
+ 2 3 
+ > 
+Show 1000 post(s) from this thread on one page 
+Doom9's Forum 
+ ( https://forum.doom9.org/index.php )
+-   High Efficiency Video Coding (HEVC) 
+ ( https://forum.doom9.org/forumdisplay.php?f=81 )
+-   -   x265 Sharpness and Detail (Best Settings?) 
+ ( https://forum.doom9.org/showthread.php?t=184399 )
+HD MOVIE SOURCE 
+ 25th September 2022 18:02 
+x265 Sharpness and Detail (Best Settings?) 
+Hi,
+I'm looking to find settings that increase detail and sharpness. In turn, I'm also looking for settings that apply blurring or softness and can be turned off.
+Here are the settings that I know of so far that do this. subme=7 (A sharpener, detail increase)
+no-deblock / deblock (Blurring/detail loss the more deblock is used)
+no-sao / sao (High Blur)
+no-strong-intra-smoothing / strong-intra-smoothing (Smoother/Blur)
+psy-rd=-- & psy-rdoq= -- rdoq-level=-- (Detail increase as the cost of accuracy - Can look over-digital)
+These are all the detail increase settings that I know of so far. Are there any more? I saw some things on QBlur, I don't know what it does, because I haven't researched it. Just because blur is in the title made me think, but is this anything that controls sharpness and detail?
+Are there any more? My goal is to get the most detailed image possible use x265 (which is notorious for having a soft image). However, if anything goes over the top, like, giving an edge-enhanced look or heavy ringing, I will back off. The goal is maximum blur removal and ultra-high detail without looking overly digital, this is why I'm trying to back off from using psy-rd and rdoq, I just don't like the look personally.
+Thank you.
+benwaggoner 
+ 26th September 2022 21:12 
+[QUOTE=HD MOVIE SOURCE;1975282]Hi,
+I'm looking to find settings that increase detail and sharpness. In turn, I'm also looking for settings that apply blurring or softness and can be turned off.
+Here are the settings that I know of so far that do this. subme=7 (A sharpener, detail increase)
+no-deblock / deblock (Blurring/detail loss the more deblock is used)
+no-sao / sao (High Blur)
+no-strong-intra-smoothing / strong-intra-smoothing (Smoother/Blur)
+psy-rd=-- & psy-rdoq= -- rdoq-level=-- (Detail increase as the cost of accuracy - Can look over-digital)
+I am unaware of any evidence that --strong-intra-smoothing reduces visible detail in any scenario.
+Nor does --deblock if used appropriately. Both will reduce detail at moderate-low bitrates, as they reduce compression efficiency and drive QPs higher, which itself is a low-pass filter. The HEVC built-in deblocking filter is better turned than H.264's.
+--subme only goes up to 5 in --preset placebo. I've not seen visible quality improvements from using higher values.
+If you have sharp synthetic details (text, line art, noise-free anime), --tskip can increase detail.
+In theory --hme can help with very noisy content.
+--amp and --rect can improve detail by allowing TUs to better match the shape of content, for example encoding a mild horizontal curve as 32x8 instead of forcing it to be square.
+But in general, a lot of these things are controlled by the preset. It's best to pick the slowest preset that is fast enough, and start tweaking from there.
+Quote:
+These are all the detail increase settings that I know of so far. Are there any more? I saw some things on QBlur, I don't know what it does, because I haven't researched it. Just because blur is in the title made me think, but is this anything that controls sharpness and detail?
+That "blurrs" differences in QP to reduce quality fluctuations. It has no direct impact on sharpness.
+Quote:
+Are there any more? My goal is to get the most detailed image possible use x265 (which is notorious for having a soft image). However, if anything goes over the top, like, giving an edge-enhanced look or heavy ringing, I will back off. The goal is maximum blur removal and ultra-high detail without looking overly digital, this is why I'm trying to back off from using psy-rd and rdoq, I just don't like the look personally.
+I'd start doing a test encode at --preset slower --crf 18 --no-sao and see if the detail retention and file size are okay for you. If not, tweak from there. Jumping in with parameters without having some reference encodes to compare with the source and each other makes for a lot more work.
+BuccoBruce 
+ 29th September 2022 18:08 
+I'm going to second and expand upon benwaggoner's great advice.
+Don't turn deblock off completely
+Don't turn SAO off completely
+You will see more artifacts, or end up wasting bits trying to prevent them. It isn't 2015 anymore, they don't destroy detail or sharpness in most scenarios.
+For deblock, you should turn the strength down and turn the threshold up instead of disabling it outright. Start with --deblock -1:1 and work your way down/up from there to taste. I personally wouldn't go higher than 1 on the threshold, and I don't think I've seen any encodes "in the wild" with threshold >1 either. Some people use e.g. -2:0.
+For SAO, I'm not sure what the "best" option is, but I use --limit-sao --selective-sao 1 --sao-non-deblock to "reel it in" as opposed to turning it off completely, and it has been working well for me. Now that I look at the documentation, --selective-sao 3 might be a better choice. I'm not sure why you'd ever want SAO on non-reference slices though, so definitely use at least one of those two choices, or "2" if you don't want it on any reference B slices.
+--amp --rect and --tskip-fast are all indispensable for animated content, if you can stomach all the extra time they consume. I haven't tried them with live action content.
+--hme is pretty useful for getting away with using a lower subme and knocking slower presets down to --me umh at higher resolutions, although I personally haven't seen any benefit from using it at 1080p and below.
+benwaggoner 
+ 29th September 2022 23:27 
+--selective-sao 2 is the one you want, and should be the x265 default. SAO is designed around forward-prediction only, so 99% of the value is seen on just I and P frames. Applying it to B and b frames just slows the encode down a bit. In theory I could imagine --selective-sao 3 maybe helping a tiny bit in some odd scenarios, but don't have any evidence or examples of that.
+What impact have you found from --sao-non-deblock? I don't think I've ever tried it (which is pretty rare!). I'd presumed it was a quality-versus-performance tradeoff parameter.
+And yeah, cel animation and motion graphics require much different tuning that natural image content. Motion blur and noise make a huge difference compared to not having those.
+HD MOVIE SOURCE 
+ 1st October 2022 06:16 
+Thank you for the feedback guys, much appreciated. And yes, I have been encoding from the basic preset first and then adjusting from there.
+I personally can't stand using sao, its way too aggressively soft, I just don't think it's needed, at least on high bit-rate content like 4k UHD Blu-ray. Streaming maybe another matter or low bit-rates, but I will not use sao, that's the opposite direction I want to go.
+"-tskip can increase detail" --- Is this okay to use in grainy content too?
+"In theory --hme can help with very noisy content" --- This doesn't remove noise or grain though does it? as long as it doesn't remove anything, Ill try it.
+--amp and --rect I will look into, I know they add quite a bit of encoding time so I will have to think about these.
+Right now I'm encoding SolLevante from Netflix which is grain free but has ultra-fine details. When she dives down into the ocean, I want to retain as much of the ultra-fine detail that the source has. I also thinking about grain content also. i want to preserve as much grain as possible also, without blurring or blending anything.
+Ill run a few encodes with these new settings. Thank you.
+HD MOVIE SOURCE 
+ 2nd October 2022 04:45 
+Quote:
+Originally Posted by benwaggoner 
+ (Post 1975353)
+--subme only goes up to 5 in --preset placebo. I've not seen visible quality improvements from using higher values.
+If you have sharp synthetic details (text, line art, noise-free anime), --tskip can increase detail.
+In theory --hme can help with very noisy content.
+--amp and --rect can improve detail by allowing TUs to better match the shape of content, for example encoding a mild horizontal curve as 32x8 instead of forcing it to be square.
+But in general, a lot of these things are controlled by the preset. It's best to pick the slowest preset that is fast enough, and start tweaking from there.
+That "blurrs" differences in QP to reduce quality fluctuations. It has no direct impact on sharpness.
+I'd start doing a test encode at --preset slower --crf 18 --no-sao and see if the detail retention and file size are okay for you. If not, tweak from there. Jumping in with parameters without having some reference encodes to compare with the source and each other makes for a lot more work.
+Okay, I added tskip, hme amp, and rect to my encoding settings. The sharpness is off the chain right now. It's pin sharp. The facial detail on SolLevante looks as thought it was drawn with a pencil it looks that sharp.
+The biggest issue is the encoding time. It took about 16 hours just to encode SolLevante and that was about 4 minutes of content. I was encoding this in 2 and a half hours before these settings. I'm just using an old PC to encode with overnight. If I want to encode using these settings I will definitely have to get an optimized encoding PC.
+The settings I used that have an effect in detail. subme=7
+no-deblock
+no-sao
+no-strong-intra-smoothing
+psy-rd=0.00, psy-rdoq=0.00, rdoq-level=0
+(I dislike everything the RD and RDOQ does to the image, I think it makes the image look too digital, so I set those to 0 and get my detail with other settings that don't look digital)
+tskip
+hme
+amp
+rect
+The sharpness is extremely impressive, I didn't think x265 was capable of this level of detail. Thank you, now you'll have to send me an encoding PC LOL.
+benwaggoner 
+ 4th October 2022 02:21 
+Quote:
+Originally Posted by HD MOVIE SOURCE 
+ (Post 1975753)
+Okay, I added tskip, hme amp, and rect to my encoding settings. The sharpness is off the chain right now. It's pin sharp. The facial detail on SolLevante looks as thought it was drawn with a pencil it looks that sharp.
+The biggest issue is the encoding time. It took about 16 hours just to encode SolLevante and that was about 4 minutes of content. I was encoding this in 2 and a half hours before these settings. I'm just using an old PC to encode with overnight. If I want to encode using these settings I will definitely have to get an optimized encoding PC.
+The settings I used that have an effect in detail. subme=7
+no-deblock
+no-sao
+no-strong-intra-smoothing
+psy-rd=0.00, psy-rdoq=0.00, rdoq-level=0
+(I dislike everything the RD and RDOQ does to the image, I think it makes the image look too digital, so I set those to 0 and get my detail with other settings that don't look digital)
+tskip
+hme
+amp
+rect
+The sharpness is extremely impressive, I didn't think x265 was capable of this level of detail. Thank you, now you'll have to send me an encoding PC LOL.
+I'd start with just --preset slower --selective-sao 2 and adjust from there. --preset slower enables fast modes of the slower tools where available, and generally is targeting your kind of scenario overall.
+If that doesn't give you the detail you want, first try --no-sao.
+If you find --tskip helpful, try --tskip --tskip-fast.
+microchip8 
+ 4th October 2022 22:19 
+Quote:
+Originally Posted by HD MOVIE SOURCE 
+ (Post 1975753)
+Okay, I added tskip, hme amp, and rect to my encoding settings. The sharpness is off the chain right now. It's pin sharp. The facial detail on SolLevante looks as thought it was drawn with a pencil it looks that sharp.
+The biggest issue is the encoding time. It took about 16 hours just to encode SolLevante and that was about 4 minutes of content. I was encoding this in 2 and a half hours before these settings. I'm just using an old PC to encode with overnight. If I want to encode using these settings I will definitely have to get an optimized encoding PC.
+The settings I used that have an effect in detail. subme=7
+no-deblock
+no-sao
+no-strong-intra-smoothing
+psy-rd=0.00, psy-rdoq=0.00, rdoq-level=0
+(I dislike everything the RD and RDOQ does to the image, I think it makes the image look too digital, so I set those to 0 and get my detail with other settings that don't look digital)
+tskip
+hme
+amp
+rect
+The sharpness is extremely impressive, I didn't think x265 was capable of this level of detail. Thank you, now you'll have to send me an encoding PC LOL.
+I've no idea how you came to the conclusion that Psy setting make the image too "digital". Both psy-rd and psy-rdoq, at *high* values, virtually completely elliminate banding artifacts. So, either disable psy-rd/psy-rdoq and enjoy your banding or turn them on at high values and enjoy a clean, crisp image.
+I've been encoding for ages with high psy-rd/psy-rdoq and have yet to see it destroy detail or sharpness. At worse, it makes the image more "static".
+rwill 
+ 4th October 2022 22:25 
+Quote:
+Originally Posted by microchip8 
+ (Post 1975938)
+I've no idea how you came to the conclusion that Psy setting make the image too "digital". Both psy-rd and psy-rdoq, at *high* values, virtually completely elliminate banding artifacts. So, either disable psy-rd/psy-rdoq and enjoy your banding or turn them on at high values and enjoy a clean, crisp image.
+I've been encoding for ages with high psy-rd/psy-rdoq and have yet to see it destroy detail or sharpness. At worse, it makes the image more "static".
+Well he has not mentioned the bitrate, crf or qp he encodes at. For all we know he could be pushing 500Mbit/s and marvel at the transparent quality.
+HD MOVIE SOURCE 
+ 8th October 2022 01:52 
+Quote:
+Originally Posted by benwaggoner 
+ (Post 1975886)
+I'd start with just --preset slower --selective-sao 2 and adjust from there. --preset slower enables fast modes of the slower tools where available, and generally is targeting your kind of scenario overall.
+If that doesn't give you the detail you want, first try --no-sao.
+If you find --tskip helpful, try --tskip --tskip-fast.
+Thank you Ben.
+One thing I've noticed is that no-hme is used in all 10 presets by default. Is this because the encoding time added is huge by using hme? I have tried it on SolLevante, but it's a very short piece of material so I could get away with it. But, unless you have a supercomputer I don't think hme is even viable to setups like mine.
+I will run some speed tests on the other settings and see what I can get away with. As long as it can add detail and not take away with minimal impact on encoding time, I'm fine with that.
+I cannot encode a full movie using beyond medium. Medium and a movie of about 90 minutes is around 2 days. But, I am well aware my current encoding PC is woefully inadequate. However, for now I'm fine with it. I don't mind an encode taking 4 or 5 days, that's fine, but anything over a week is not something I can achieve right now. So I will test each setting to see the speed impact.
+Thanks.
+Quote:
+Originally Posted by rwill 
+ (Post 1975939)
+Well he has not mentioned the bitrate, crf or qp he encodes at. For all we know he could be pushing 500Mbit/s and marvel at the transparent quality.
+I'm encoding at uhd-bd=1 maxrate which is around 98 Mbps. That's my target bit-rate. I use Constant Rate Factor = 0. But that doesn't mean that you don't have bit-rate control. Bit-rates can still bit controlled by using vbv-maxrate=98000:vbv-bufsize=99000. When using maxrate with CFR it essentially becomes the target bit-rate, and buffsize basically turns into maxrate when compared to a 2-pass encode. I read this in the x265 docs, and since doing it my encodes look incredible.
+What this does is makes it so anything under my target bit-rates is essentially transparent, and anything getting up to 98 Mbps is so high in bit-rate that it basically transparent also.
+SolLevante was encoded using these settings and my final average bit-rate is 68.7 Mb/s. The average QP is 8.21.
+If you want to see my encode for SolLevate here it is: https://drive.google.com/file/d/1v8-...W0kKVV2St/view 
+Somebody mentioned banding in a previous comment. Using aq-mode=3 and aq strength of 1.6 removes banding entirely for me. I tested this over and over again and 1.6 gives you the lowest QP (highest quality possible). Going above 1.6 lowers the quality. With SolLevante using 1.6 and aq-mode=3 removes all banding on a professionally calibrated LGC9 OLED.
+benwaggoner 
+ 8th October 2022 23:13 
+Quote:
+Originally Posted by HD MOVIE SOURCE 
+ (Post 1976110)
+One thing I've noticed is that no-hme is used in all 10 presets by default. Is this because the encoding time added is huge by using hme? I have tried it on SolLevante, but it's a very short piece of material so I could get away with it. But, unless you have a supercomputer I don't think hme is even viable to setups like mine.
+The bigger reason is probably that --hme wasn't done the last time the presets were implemented. I honestly haven't seen that much benefit from using it for single-stream encoding. In theory it might help quality at UHD resolution with a lot of grain/noise.
+The primary use case for that the --hme infrastructure was built around was to encode lower resolutions of the bitrate ladder and use the analysis data from that to encode the next resolution up a lot faster.
+So 540 -> 1080 -> 2160 and 360 -> 720 -> 1440.
+Using the --hme command lets you emulate the quality impact of doing the above, but without the speed benefits. I'm not sure how much parallelism is implemented in there; the speed hit could be a lot less or even get faster with enough cores if properly threaded.
+--hme also allows for different search ranges and methods to be used for each resolution tier, which would allow for finer-grained quality and performance tuning.
+Quote:
+I cannot encode a full movie using beyond medium. Medium and a movie of about 90 minutes is around 2 days. But, I am well aware my current encoding PC is woefully inadequate. However, for now I'm fine with it. I don't mind an encode taking 4 or 5 days, that's fine, but anything over a week is not something I can achieve right now. So I will test each setting to see the speed impact.
+I find a high quality, high bitrate 4K HDR encode takes me about 24 hours per hour of source on my somewhat old workstation, using --pools to pin each encode to one socket of: "Intel(R) Xeon(R) Gold 6240 CPU @ 2.60GHz, 2594 Mhz, 18 Core(s), 36 Logical Processors."
+If I'm doing content-specific tuning, I can make it 2-3x faster without significant visible quality loss as I can turn off tools that don't help in that particular case. Things like --tu-inter/intra 4 and --tskip can help a lot with some content and do nothing for other content. 
+Quote:
+I'm encoding at uhd-bd=1 maxrate which is around 98 Mbps. That's my target bit-rate. I use Constant Rate Factor = 0. But that doesn't mean that you don't have bit-rate control. Bit-rates can still bit controlled by using vbv-maxrate=98000:vbv-bufsize=99000. When using maxrate with CFR it essentially becomes the target bit-rate, and buffsize basically turns into maxrate when compared to a 2-pass encode. I read this in the x265 docs, and since doing it my encodes look incredible.
+What this does is makes it so anything under my target bit-rates is essentially transparent, and anything getting up to 98 Mbps is so high in bit-rate that it basically transparent also.
+SolLevante was encoded using these settings and my final average bit-rate is 68.7 Mb/s. The average QP is 8.21.
+Yeah, a mean QP of ~8 is going to look really good almost irrespective of what you do! This is reliant on having a really high bitrate, though.
+Boulder 
+ 9th October 2022 09:37 
+If you are going to hit bitrates that high, why bother re-encoding at all?
+HD MOVIE SOURCE 
+ 10th October 2022 02:49 
+Quote:
+Originally Posted by Boulder 
+ (Post 1976197)
+If you are going to hit bitrates that high, why bother re-encoding at all?
+The original file of SolLevante from Netflix has a bit-rate of 1200 Mbps, which is not a re-encode.
+However, I have re-encoded many things like Big Buck Bunny, Tears of Steel, and others just for science, and just for fun. I like to see how close to the original source I can get.
+Quote:
+Originally Posted by benwaggoner 
+ (Post 1976174)
+Yeah, a mean QP of ~8 is going to look really good almost irrespective of what you do! This is reliant on having a really high bitrate, though.
+Yeah, it looks incredible. How do you know when it's a good time to use tskip? The settings do offer incredible detail, if it's possible to encode at 1 hour per day and use these settings that would be really cool.
+benwaggoner 
+ 10th October 2022 17:10 
+Quote:
+Originally Posted by HD MOVIE SOURCE 
+ (Post 1976238)
+The original file of SolLevante from Netflix has a bit-rate of 1200 Mbps, which is not a re-encode.
+However, I have re-encoded many things like Big Buck Bunny, Tears of Steel, and others just for science, and just for fun. I like to see how close to the original source I can get.
+That's an interesting mix of content. Sol Levante is one of the most challenging clips I've ever seen, and Big Buck Bunny one of the easiest. Neither are particularly representative of mainstream content. Tears of Steel is the most representative of typical TV/movie content, with a mix of live action and CGI.
+Quote:
+Yeah, it looks incredible. How do you know when it's a good time to use tskip? The settings do offer incredible detail, if it's possible to encode at 1 hour per day and use these settings that would be really cool.
+I use --tskip when there are very sharp visual elements with low noise. CGI, cel animation, text, titles, and credits all can benefit. Live action with some noise rarely gets as much value.
+In general, --tskip is useful in similar scenarios where --tu-inter/intra 4 are helpful. And the even slower --cu-lossless only really helps when --tskip is already helpful, or at extremely high bitrates.
+HD MOVIE SOURCE 
+ 10th October 2022 22:28 
+Quote:
+Originally Posted by benwaggoner 
+ (Post 1976271)
+That's an interesting mix of content. Sol Levante is one of the most challenging clips I've ever seen, and Big Buck Bunny one of the easiest. Neither are particularly representative of mainstream content. Tears of Steel is the most representative of typical TV/movie content, with a mix of live action and CGI.
+I use --tskip when there are very sharp visual elements with low noise. CGI, cel animation, text, titles, and credits all can benefit. Live action with some noise rarely gets as much value.
+In general, --tskip is useful in similar scenarios where --tu-inter/intra 4 are helpful. And the even slower --cu-lossless only really helps when --tskip is already helpful, or at extremely high bitrates.
+Though I have been encoding at 98 Mbps, SolLevante is definitely difficult content to encode. There's lots of complex movements, and I have seen artifacts in the past. While I was encoding that, I started from scratch and there must have been some odd settings that were causing issues because I never see any breakup now.
+I'd like to try a really slow encode one time with all the detail settings that you have provided just for fun. 
+I always though tskip was a speed increase, but it's definitely a speed loss. Is -tskip-fast a weaker version of tskip?
+Thanks for the help.
+benwaggoner 
+ 13th October 2022 17:55 
+Quote:
+Originally Posted by HD MOVIE SOURCE 
+ (Post 1976284)
+I always though tskip was a speed increase, but it's definitely a speed loss. Is -tskip-fast a weaker version of tskip?
+--tskip definitely slows things down. --tskip-fast reduced the speed impact, but can miss some cases where tranform skip would have been better that straight --tskip would have found. But you certainly get most of the benefit with a lot less of the speed hit using --tskip --tskip-fast.
+jpsdr 
+ 13th October 2022 18:40 
+I have an encode running and it will finish only on a few days, so i can't make tests right now (and also can't check the speed difference), so i'll ask... ;)
+Is tskip enabled in slower preset ? (Or in any preset)
+Is tskip significant, on 4k HDR 10 bits, on multipass encode, average 40000, maxrate 90000 vbv-buffsize 70000 ?
+In any case, from what i've understood, --tskip --tskip-fast will always be better than without tskip , if tskip is realy too slow. As i don't have tskip in my settings and i'm at 0,5fps encode speed, i'm not realy enthusiast reducing speed more... :(
+benwaggoner 
+ 14th October 2022 16:53 
+Quote:
+Originally Posted by jpsdr 
+ (Post 1976419)
+Is tskip enabled in slower preset ? (Or in any preset)
+Nope, not in any preset (it should be on for placebo at least, IMHO). You can see all the preset parameters here:
+https://x265.readthedocs.io/en/master/presets.html 
+Quote:
+Is tskip significant, on 4k HDR 10 bits, on multipass encode, average 40000, maxrate 90000 vbv-buffsize 70000 ?
+I doubt it'll make a visible difference at those bitrates. I certainly wouldn't consider using it until I was at least at --preset slower except for very specific content.
+Quote:
+In any case, from what i've understood, --tskip --tskip-fast will always be better than without tskip , if tskip is realy too slow. As i don't have tskip in my settings and i'm at 0,5fps encode speed, i'm not realy enthusiast reducing speed more... :(
+Tskip won't make things worse , but there is content where it'll burn a lot of CPU without offering appreciable benefit. For example, anywhere there is visible grain.
+jpsdr 
+ 14th October 2022 18:56 
+I am at preset slower with the bitrate i've told, so according your answer it will probably not make a visible difference. When your encode take between 10-15 days, and following this thread you realised that, maybe, you've missed an option to increase quality, you're very... (don't know how to translate, anyway) after having allready done around 3-4 files... :(
+But according your answer, it seems that i didn't miss so much, going a little more... :)
+As i denoised/degrain (so i'm not in the "bad case"), i, out of curiosity, when my encode will finish, make a quick test to see the effect on the speed.
+tormento 
+ 15th October 2022 21:58 
+What is the difference between tskip and tskip-fast? Why they can be used together? What will happen?
+benwaggoner 
+ 16th October 2022 22:02 
+Quote:
+Originally Posted by tormento 
+ (Post 1976514)
+What is the difference between tskip and tskip-fast? Why they can be used together? What will happen?
+--tskip-fast doesn't do anything if --tskip isn't on. If --tskip is on, it will do a slower, more thorough job without --tskip-fast than if it is on. For most content, --tskip is only occassionally helpful, and --tskip-fast catches most of those cases. --tskip by itself has a pretty big perf hit, So I recommend trying it with --tskip-fast first, and seeing if there is any benefit. If there is benefit, try without --tskip fast and see if there is additional benefit worth the slower encoding speed.
+benwaggoner 
+ 16th October 2022 22:03 
+In retrospect, it should have been implemented as --tskip 0, 1, or 2, following the other speed/quality ordinal parameters like --me, --subme, --limit-refs, etc.
+jpsdr 
+ 16th October 2022 22:12 
+I've made a very quick test on a 10 frames video, speed difference between with and without tskip is 0,52fps to 0,49fps, i can live with that... :)
+benwaggoner 
+ 18th October 2022 19:46 
+Quote:
+Originally Posted by jpsdr 
+ (Post 1976597)
+I've made a very quick test on a 10 frames video, speed difference between with and without tskip is 0,52fps to 0,49fps, i can live with that... :)
+I suspect the gap will be larger with a more representative number of frames. You need to encode a decent multiple of --keyint to get accurate performance numbers. 10 frames is less than default --rc-lookahead, and fps is typically way higher for the --rc-lookahead duration.
+--rc-lookahead is really a secret weapon for improving quality and reducing quality fluctuations with single-pass encoding.
+jpsdr 
+ 19th October 2022 18:52 
+Seeing the speed of a big real encode i've started, I think my true drop is 0,50 average to 0,42 average. It's allmost 20%... I'll check with --tskip-fast... If it catches allmost all the cases for a speed drop less significant, it will be enough for me. rc-lookahead is set to 48.
+HD MOVIE SOURCE 
+ 21st October 2022 11:16 
+Yeah, tskip is too impactful on performance with my current step, not the end of the world for me, I'm pretty happy with my current detail settings. I would use rect, amp, hme and tskip if I could, But a full movie is 2 days with my settings, and 20+ days with just adding these 4 settings, so that shows you how much impact they have, and how unoptimized my pc is for encoding, LOL.
+Because SolLevante is only around 4 thousand frames, I encoded that using the highest settings possible, placebo and hme / tskip and the quality is shockingly good. Took me 2 days, but I wanted to see it and it doesn't disappoint.
+Unless there's anymore settings that Ben is keeping secret from us, I think its about as good as it gets. haha...
+benwaggoner 
+ 22nd October 2022 00:35 
+Wow, those four commands should NOT cause encoding time to go up 10x! I haven't seen --hme really prove its value yet. Have you?
+You can get --amp and --rect with much less of a hit using --limit-refs 2 or 3
+And of course, add --tskip-fast with tskip
+jpsdr 
+ 23rd October 2022 19:22 
+@ benwaggoner 
+What do you know (brief/quick) of the new commited option ?
+benwaggoner 
+ 24th October 2022 02:15 
+Quote:
+Originally Posted by jpsdr 
+ (Post 1977081)
+@ benwaggoner 
+What do you know (brief/quick) of the new commited option ?
+A MCTF filter essentially removes psychovisually irrelevant detail, making the video easier to encode. So better quality at a fixed bitrate, lower bitrate for a fixed quality. It can be quite helpful for moderate-low bitrates.
+I've not tried this new implementation yet myself.
+jpsdr 
+ 24th October 2022 16:35 
+@ benwagonner 
+Sorry to bother you again... :D
+First, thank for explanation, i read the code of the commit, and from the few i understood, it adjusts, for each frame, according the content, the aq-mode. It seems indeed interesting.
+Also, if i understood properly, you just need to put --sbrc , no aq-mode is needed anymore.
+--hevc-aq and aq-mode are exclusive. Do you happend to know (by any chance), if there is one "better" than the other ? Or is it just 2 differents ways, but with no one realy better than anoter ?
+Don't tested yet --hevc-aq with sbrc , but from the few i understood, they should be also exclusive but see nothing about it in the commited code...
+benwaggoner 
+ 24th October 2022 21:23 
+Quote:
+Originally Posted by jpsdr 
+ (Post 1977141)
+@ benwagonner 
+Sorry to bother you again... :D
+First, thank for explanation, i read the code of the commit, and from the few i understood, it adjusts, for each frame, according the content, the aq-mode. It seems indeed interesting.
+Also, if i understood properly, you just need to put --sbrc , no aq-mode is needed anymore.
+That would be welcome! Different modes are appropriate for different kinds of content. And appropriate --aq-strength varies a lot too. 
+Quote:
+--hevc-aq and aq-mode are exclusive. Do you happend to know (by any chance), if there is one "better" than the other ? Or is it just 2 differents ways, but with no one realy better than anoter ?
+IIRC --aq-mode 4 is the final implementation of --hevc-aq.
+jpsdr 
+ 25th October 2022 17:13 
+Quote:
+Originally Posted by benwaggoner 
+ (Post 1977167)
+IIRC --aq-mode 4 is the final implementation of --hevc-aq.
+Ah... Ok...
+The, the choice would be between sbrc or aq-mode 5 , which are both adaptative AQ modes.
+benwaggoner 
+ 25th October 2022 21:46 
+Quote:
+Originally Posted by jpsdr 
+ (Post 1977218)
+Ah... Ok...
+The, the choice would be between sbrc or aq-mode 5 , which are both adaptative AQ modes.
+...assuming there is a build which has both --aq-mode 5 and sbrc. And that they mean the same things. That's the tricky thing with forks. I hope we can reunify everything useful back into mainline.
+jpsdr 
+ 26th October 2022 13:43 
+Now there is... :D
+benwaggoner 
+ 26th October 2022 20:10 
+Quote:
+Originally Posted by jpsdr 
+ (Post 1977259)
+Now there is... :D
+You mean this?
+https://github.com/jpsdr/x265 
+jpsdr 
+ 26th October 2022 21:57 
+Yes it is.
+tormento 
+ 27th October 2022 19:39 
+Quote:
+Originally Posted by benwaggoner 
+ (Post 1977225)
+...assuming there is a build which has both --aq-mode 5 and sbrc.
+You tried to play with 5? I am curious to read your findings about modes above 3.
+benwaggoner 
+ 28th October 2022 20:15 
+Quote:
+Originally Posted by tormento 
+ (Post 1977343)
+You tried to play with 5? I am curious to read your findings about modes above 3.
+I've found --aq-mode 4 to be a good default for SDR content at this point, at least in the context of all the other tuning I do, and with mezzaine quality sources.
+--aq-mode 2 does better for hdr still, at least in my target scenarios.
+tormento 
+ 30th October 2022 10:45 
+Quote:
+Originally Posted by benwaggoner 
+ (Post 1977423)
+I've found --aq-mode 4 to be a good default for SDR content at this point
+What about 5?
+benwaggoner 
+ 31st October 2022 03:44 
+Quote:
+Originally Posted by tormento 
+ (Post 1977483)
+What about 5?
+That's only in custom forks that I've not played with.
+All times are GMT +1. The time now is 09:23 . 
+Page 1 of 3 
+1 
+ 2 3 
+ > 
+Show 1000 post(s) from this thread on one page 
+Powered by vBulletin® Version 3.8.11
+Copyright ©2000 - 2026, vBulletin Solutions Inc.

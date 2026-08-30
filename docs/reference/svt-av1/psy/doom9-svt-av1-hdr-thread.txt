@@ -1,0 +1,4795 @@
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+
+
+ 
+
+ 
+
+
+ 
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Svt-av1-hdr - Doom9's Forum 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Welcome to Doom9 's Forum, THE in-place to be for everyone interested in DVD conversion. 
+ Before you start posting please read the forum rules . By posting to this forum you agree to abide by the rules. 
+ Domains: forum.doom9.org / forum.doom9.net / forum.doom9.se 
+ 
+
+ 
+  
+ 
+ 
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+
+
+
+
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+   
+ Doom9's Forum 
+ > Video Encoding 
+
+
+ > Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+
+ 
+ 
+ 
+ 
+ Svt-av1-hdr
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ User Name 
+ 
+ Remember Me? 
+ 
+ 
+ Password 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Register 
+ 
+ 
+ FAQ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Search 
+ 
+ Today's Posts 
+ 
+ 
+ Mark Forums Read 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+
+
+
+
+
+
+
+
+
+ 
+
+ 
+ 
+
+ 
+
+
+
+
+
+
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ Thread Tools 
+ 
+ 
+ 
+ 
+ Search this Thread 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+ 
+ 
+
+
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 10th May 2025, 22:05
+ 
+ 
+ 
+ 
+  
+ # 1 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ juliobbv 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jun 2024 
+ 
+ 
+ 
+ Posts: 28
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Svt-av1-hdr 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ Hi all, 
+ 
+I just wanted to present my personal project: SVT-AV1-HDR . As the name implies, this fork specializes in encoding HDR content, while also keeping the ability to encode SDR efficiently. 
+ 
+Basically, SVT-AV1-HDR is my spin on a psycho-visual AV1 encoder, based on SVT-AV1-PSY's 3.0.2 code base. Currently, the "big-shot" features are: 
+ 
+ PQ-optimized Variance Boost curve 
+A custom curve specifically designed for HDR video and images with a Perceptual Quantizer (PQ) transfer. 
+ 
+ Tune 3: Film Grain 
+An opinionated tune optimized for film grain retention and temporal consistency. The recommended CRF range to use tune 3 is 20 to 40. 
+ 
+These two features help AV1 close the video quality gap with HEVC, which is now rivaling x265 in the higher-bitrate (>10 Mbps) range , previously an long-standing AV1 issue. 
+ 
+There are also some additional features that were added to further improve image quality, like RDOQ adjustments, psy-rd modulation based on temporal layers; and the introduction of complex-HVS, which allows for greater detail retention at a moderate encode speed cost. 
+ 
+ Downloads 
+ 
+Currently, there are HandBrake and ffmpeg community builds with SVT-AV1-HDR available. 
+ 
+ Comparison 
+ 
+The most dramatic improvement can be seen when encoding 4K HDR content with moderate to heavy film grain. Comparing a tuned SVT-AV1 3.0.2 of a 2 minute UHD BD sample encode against SVT-AV1-HDR using film grain tune, SVT-AV1-HDR is able to deliver a video with comparable quality at only 56.6% of the size of SVT-AV1! (6 Mb/s vs 10.6 Mb/s) 
+ 
+It's worth mentioning that most of our testers preferred the SVT-AV1-HDR encode, as it had overall better film grain retention. 
+ 
+ Final notes 
+ 
+Given this is a personal project, SVT-AV1-HDR will have a more relaxed development cycle than -PSY. See this project as sharing with others what I use to encode my videos. Rebases onto mainline and bugfixes will be done on a best-effort basis (free time permitting). 
+ 
+Note that this project isn't meant to supersede any of the others. BlueSwordM's SVT-AV1-PSYEX will continue the usual -PSY's release cycle, and there will be cross-pollination between -PSYEX and -HDR. In fact, psy-rd modulation has been ported to -PSYEX, and complex-HVS came from -PSYEX! Additionally, I intend to make these improvements eventually find their way towards mainline SVT-AV1. 
+ 
+Please give SVT-AV1-HDR a try on your videos and images!
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Last edited by juliobbv; 10th May 2025 at 22:18 .
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ juliobbv 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by juliobbv 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 11th May 2025, 00:53
+ 
+ 
+ 
+ 
+  
+ # 2 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ Z2697 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Aug 2024 
+ Location: Between my two ears 
+ 
+ 
+ Posts: 1,270
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ I found that TF is beneficial to the grain / detail retention, somewhat contrary to popular belief
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ Z2697 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by Z2697 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 11th May 2025, 01:45
+ 
+ 
+ 
+ 
+  
+ # 3 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ juliobbv 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jun 2024 
+ 
+ 
+ 
+ Posts: 28
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by Z2697 
+ 
+ 
+ I found that TF is beneficial to the grain / detail retention, somewhat contrary to popular belief 
+ 
+ 
+ 
+ 
+ It might depend on what your other encoding settings are. Are you using strong psy-rd to account for the grain? I've found using any kind of TF will just soften the grain for TF-filtered frames, and create this weird "pulsing" effect where grain comes and goes over time upon playback. 
+ 
+Tune grain settings are meant to be used as a cohesive whole, helping maintain a consistent grain field, as long as bitrate isn't starved. I'd encourage giving tune grain a try, given the tests we've had so far.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Last edited by juliobbv; 11th May 2025 at 01:54 .
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ juliobbv 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by juliobbv 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 11th May 2025, 07:08
+ 
+ 
+ 
+ 
+  
+ # 4 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ juliobbv 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jun 2024 
+ 
+ 
+ 
+ Posts: 28
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ BTW: if someone can help me get the title fixed -- it should be "SVT-AV1-HDR" (in all caps). For some reason, the post editor kept modifying it to be lower case.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Last edited by juliobbv; 11th May 2025 at 07:13 .
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ juliobbv 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by juliobbv 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 11th May 2025, 17:33
+ 
+ 
+ 
+ 
+  
+ # 5 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ Boulder 
+ 
+ 
+ 
+
+ Pig on the wing 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Mar 2002 
+ Location: Finland 
+ 
+ 
+ Posts: 5,844
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ Is using tune 3 good also for grainy SDR content, or is it better to use the psyex fork (with tune 3 as well)?
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ And if the band you're in starts playing different tunes 
+I'll see you on the dark side of the Moon... 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ Boulder 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by Boulder 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 11th May 2025, 18:40
+ 
+ 
+ 
+ 
+  
+ # 6 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ juliobbv 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jun 2024 
+ 
+ 
+ 
+ Posts: 28
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by Boulder 
+ 
+ 
+ Is using tune 3 good also for grainy SDR content, or is it better to use the psyex fork (with tune 3 as well)? 
+ 
+ 
+ 
+ 
+ Tune 3 is also good for grainy SDR content, and you'll actually see that the psy-rd strength is adjusted to account for differences in transfer.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ juliobbv 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by juliobbv 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 12th May 2025, 11:50
+ 
+ 
+ 
+ 
+  
+ # 7 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ charliebaby 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Jun 2020 
+ 
+ 
+ 
+ Posts: 54
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ Hello, thank you. Do you have a SvtAv1EncApp.exe file for this version for Windows? I will try it. Thank you. Have a nice day.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ charliebaby 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by charliebaby 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 12th May 2025, 17:11
+ 
+ 
+ 
+ 
+  
+ # 8 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ benwaggoner 
+ 
+ 
+ 
+
+ Moderator 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jan 2006 
+ Location: Portland, OR 
+ 
+ 
+ Posts: 5,168
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ Good work! 
+ 
+I'm curious to what gets done differently for SDR versus HDR. And by HDR do you mean HDR-10, or do the optimizations also apply to Dolby Vision and HLG?
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ Ben Waggoner 
+Principal Video Specialist, Amazon Prime Video 
+ 
+ My Compression Book 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ benwaggoner 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ Visit benwaggoner's homepage! 
+ 
+ 
+ Find More Posts by benwaggoner 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 12th May 2025, 17:51
+ 
+ 
+ 
+ 
+  
+ # 9 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ juliobbv 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jun 2024 
+ 
+ 
+ 
+ Posts: 28
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by charliebaby 
+ 
+ 
+ Hello, thank you. Do you have a SvtAv1EncApp.exe file for this version for Windows? I will try it. Thank you. Have a nice day. 
+ 
+ 
+ 
+ 
+ Hi! As this is a personal project, I don't provide Windows binaries. That said, I know some people on the AV1 Discord servers who build the standalone App from source, maybe if you ask them nicely they'll build it for you. 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by benwaggoner 
+ 
+ 
+ Good work! 
+ 
+I'm curious to what gets done differently for SDR versus HDR. And by HDR do you mean HDR-10, or do the optimizations also apply to Dolby Vision and HLG? 
+ 
+ 
+ 
+ 
+ Thanks! There are optimizations that are applied across the board (SDR or HDR), some that apply to HLG, and some that are specific to the PQ transfer (HDR10 or Dolby Vision profile 10). 
+ 
+I'd say most of the gains over -PSY come from HDR10 PQ videos.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Last edited by juliobbv; 12th May 2025 at 18:27 .
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ juliobbv 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by juliobbv 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 13th May 2025, 05:01
+ 
+ 
+ 
+ 
+  
+ # 10 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ Kurt.noise 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Nov 2022 
+ Location: Aix en Provence, France 
+ 
+ 
+ Posts: 185
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by charliebaby 
+ 
+ 
+ Hello, thank you. Do you have a SvtAv1EncApp.exe file for this version for Windows? I will try it. Thank you. Have a nice day. 
+ 
+ 
+ 
+ 
+ x64 | x86 binaries
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ Kurt.noise 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by Kurt.noise 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 13th May 2025, 06:01
+ 
+ 
+ 
+ 
+  
+ # 11 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ charliebaby 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Jun 2020 
+ 
+ 
+ 
+ Posts: 54
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ Oh really that's very kind for the file thank you very much :-)
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ charliebaby 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by charliebaby 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 13th May 2025, 20:19
+ 
+ 
+ 
+ 
+  
+ # 12 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ benwaggoner 
+ 
+ 
+ 
+
+ Moderator 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jan 2006 
+ Location: Portland, OR 
+ 
+ 
+ Posts: 5,168
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by juliobbv 
+ 
+ 
+ Thanks! There are optimizations that are applied across the board (SDR or HDR), some that apply to HLG, and some that are specific to the PQ transfer (HDR10 or Dolby Vision profile 10). 
+ 
+I'd say most of the gains over -PSY come from HDR10 PQ videos. 
+ 
+ 
+ 
+ 
+ So some equivalent to the HEVC optimizations for PQ that adjust chroma and luma QP ratios based on actual luma (x265's --hdr10-opt)? Anything else interesting? 
+ 
+Given how late HDR-10 support was added in HEVC's development, I've been surprised it works as well as it did. The bitstream itself presumes that each unit of luma and chroma value is equivalent across the whole range. Which was never true of SDR gamma (not enough samples near black, more than needed near white), and not true in other ways for PQ and HLG.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ Ben Waggoner 
+Principal Video Specialist, Amazon Prime Video 
+ 
+ My Compression Book 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ benwaggoner 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ Visit benwaggoner's homepage! 
+ 
+ 
+ Find More Posts by benwaggoner 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 13th May 2025, 22:28
+ 
+ 
+ 
+ 
+  
+ # 13 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ juliobbv 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jun 2024 
+ 
+ 
+ 
+ Posts: 28
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by benwaggoner 
+ 
+ 
+ So some equivalent to the HEVC optimizations for PQ that adjust chroma and luma QP ratios based on actual luma (x265's --hdr10-opt)? Anything else interesting? 
+ 
+ 
+ 
+ 
+ Actually, -HDR disregards the usual QP offset lookup based on luma method (that both libaom and x265 use), and instead uses a novel approach that delegates such adjustment to Variance Boost, so both variance and luma are simultaneously considered for PQ. I've noticed that it works more effectively than treating variance and luma separately (by looking at aomanalyzer bit allocation and subjective quality inspection). 
+ 
+For chroma, a static frame-based chroma delta q adjustment is used to accommodate the wider color range of the BT.2020 color primaries. A similar (but smaller) adjustment is done for DCI-P3 and Display P3 content (mostly for AVIF). 
+ 
+-HDR also contains a small tweak to RDOQ that helps preserve the tint of near-monochrome scenes (where the chroma information would otherwise get inconsistently decimated, resulting in ugly color blotches), and a feature called "complex HVS" (from Blue's -PSYEX) helps psy-rd preserve significantly more visual energy (at a modest speed penalty). 
+ 
+Also, there's all the good stuff that comes from -PSY, which is listed in the repo's readme .
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ juliobbv 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by juliobbv 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 14th May 2025, 22:30
+ 
+ 
+ 
+ 
+  
+ # 14 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ ShortKatz 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Aug 2018 
+ Location: Germany 
+ 
+ 
+ Posts: 153
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ To be honest, I am getting a bit confused lately with all the different SVT-AV1 forks. Is it planned to also port your HDR work back to mainline SVT-AV1 at some time? So there is one maintained project that has all the good stuff in it.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ ShortKatz 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by ShortKatz 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 15th May 2025, 00:00
+ 
+ 
+ 
+ 
+  
+ # 15 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ benwaggoner 
+ 
+ 
+ 
+
+ Moderator 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jan 2006 
+ Location: Portland, OR 
+ 
+ 
+ Posts: 5,168
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by juliobbv 
+ 
+ 
+ Actually, -HDR disregards the usual QP offset lookup based on luma method (that both libaom and x265 use), and instead uses a novel approach that delegates such adjustment to Variance Boost, so both variance and luma are simultaneously considered for PQ. I've noticed that it works more effectively than treating variance and luma separately (by looking at aomanalyzer bit allocation and subjective quality inspection). 
+ 
+ 
+ 
+ 
+ Oh, nice way to approach the problem, as those are perceptually coupled. 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ For chroma, a static frame-based chroma delta q adjustment is used to accommodate the wider color range of the BT.2020 color primaries. A similar (but smaller) adjustment is done for DCI-P3 and Display P3 content (mostly for AVIF).
+ 
+ 
+ 
+ 
+ Nice tweaking it for different color spaces. Since chroma perception is also coupled with luma, it seems you could potential reuse some of the luma analysis earlier to do some dynamic chroma tuning. 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ -HDR also contains a small tweak to RDOQ that helps preserve the tint of near-monochrome scenes (where the chroma information would otherwise get inconsistently decimated, resulting in ugly color blotches), and a feature called "complex HVS" (from Blue's -PSYEX) helps psy-rd preserve significantly more visual energy (at a modest speed penalty).
+ 
+ 
+ 
+ 
+ Great! That color blotching has been an issue in PQ quite a bit, especially with skin tones. A chroma QP offset is helpful, but your approach sounds like it will be more bit efficient and likely more effective. QP offset needs are context-dependent, so needing a global constant per title is too coarse. 
+ 
+PQ is pretty different from SDR in a lot of subtle ways that can be optimized for. Like the upper range of the code value being used very rarely, top end varying, and having a tiny percentage of a title hit the top of the used code values in many cases. Assuming a more even distribution makes sense for SDR, but not PQ. And it's much more important to get accurate code values at the top of the used rate than it is in SDR, where 8-bit Y'=230 and =231 don't really look different. 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ Also, there's all the good stuff that comes from -PSY, which is listed in the repo's readme .
+ 
+ 
+ 
+ 
+ I will check it out.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ Ben Waggoner 
+Principal Video Specialist, Amazon Prime Video 
+ 
+ My Compression Book 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ benwaggoner 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ Visit benwaggoner's homepage! 
+ 
+ 
+ Find More Posts by benwaggoner 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 15th May 2025, 04:05
+ 
+ 
+ 
+ 
+  
+ # 16 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ juliobbv 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jun 2024 
+ 
+ 
+ 
+ Posts: 28
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by ShortKatz 
+ 
+ 
+ To be honest, I am getting a bit confused lately with all the different SVT-AV1 forks. Is it planned to also port your HDR work back to mainline SVT-AV1 at some time? So there is one maintained project that has all the good stuff in it. 
+ 
+ 
+ 
+ 
+ So, the TL;DR is there are two VQ improvement forks to keep track of. Blue's -PSYEX, and my HDR. -PSY is now discontinued. 
+ 
+I do intend to eventually mainstream as many of my (and other fork) changes as possible, but in all honesty, it might take a while to get there as I've been working on SVT-AV1 during my free time. It's safe to assume that the -HDR specific features might be mainstreamed sometime around early 2026 (after -PSY's Tune 4 gets incorporate into --avif).
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ juliobbv 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by juliobbv 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 15th May 2025, 04:21
+ 
+ 
+ 
+ 
+  
+ # 17 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ juliobbv 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jun 2024 
+ 
+ 
+ 
+ Posts: 28
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by benwaggoner 
+ 
+ 
+ PQ is pretty different from SDR in a lot of subtle ways that can be optimized for. Like the upper range of the code value being used very rarely, top end varying, and having a tiny percentage of a title hit the top of the used code values in many cases. Assuming a more even distribution makes sense for SDR, but not PQ. And it's much more important to get accurate code values at the top of the used rate than it is in SDR, where 8-bit Y'=230 and =231 don't really look different. 
+ 
+ 
+ 
+ 
+ Yep, PQ is a pain to optimize for, and there are more occurrences where naively optimizing for minimizing SSE distortion can visibly break perceptual quality. My hope is to explore improving smarter luma/chroma allocation for PQ content. AV1 can only do per-frame chroma delta q, which is a significantly big limitation. We'll need to make it up to that deficit with really smart heuristics. 
+ 
+At least right now, the static chroma offsets that -HDR applies are better than doing nothing at all.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ Last edited by juliobbv; 15th May 2025 at 07:07 .
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ juliobbv 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by juliobbv 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 16th May 2025, 19:24
+ 
+ 
+ 
+ 
+  
+ # 18 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ benwaggoner 
+ 
+ 
+ 
+
+ Moderator 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jan 2006 
+ Location: Portland, OR 
+ 
+ 
+ Posts: 5,168
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by juliobbv 
+ 
+ 
+ Yep, PQ is a pain to optimize for, and there are more occurrences where naively optimizing for minimizing SSE distortion can visibly break perceptual quality. My hope is to explore improving smarter luma/chroma allocation for PQ content. AV1 can only do per-frame chroma delta q, which is a significantly big limitation. We'll need to make it up to that deficit with really smart heuristics. 
+ 
+ 
+ 
+ 
+ Yeah, getting an encoder working in a "good enough" fashion is pretty easy. 
+ 
+Codec developers get to do comparisons as fixed QP with fixed GOP structures and say "up to 40% bitrate reduction!" Essential work, but only the first stage of making an encoder that materially outperforms the prior generation's already mature encoders at real-world scenarios. 
+ 
+Getting fluent enough delta QPs for all kinds of scenarios has wound up being the limiting factor in so many codecs. Back in VC1 we had to make WMV9 Advanced Profile just to get DeltaQP for I frames. And even then the RLE bitmask signaling had so much overhead at streaming bitrates it was often better to just not use it. And MPEG-4 Part 2 (ASP) had its bizarre limitation where delta QP could only be plus or minus even QP numbers from the frame QP, whcih was both limiting and a real pain to optimize for. 
+ 
+Have you looked at adaptive deadzones for your chroma QPs (or in general)? That's the way we got a lot of VC1 psychovisual improvements when we hit the deltaQP wall. Doing smart adaptive deadzone to lower QPs did a lot of heavy lifting in the latter years of WMV/VC1. 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ At least right now, the static chroma offsets that -HDR applies are better than doing nothing at all.
+ 
+ 
+ 
+ 
+ Yeah, it can feel like we're always slouching toward mediocrity with the tools and time we have. It can be nice to do a perspective check and compare the best encodes from a build a few years ago to now and see how much aggregate improvement there really has been.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ Ben Waggoner 
+Principal Video Specialist, Amazon Prime Video 
+ 
+ My Compression Book 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ benwaggoner 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ Visit benwaggoner's homepage! 
+ 
+ 
+ Find More Posts by benwaggoner 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 18th May 2025, 22:31
+ 
+ 
+ 
+ 
+  
+ # 19 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ juliobbv 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Jun 2024 
+ 
+ 
+ 
+ Posts: 28
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by benwaggoner 
+ 
+ 
+ Yeah, getting an encoder working in a "good enough" fashion is pretty easy. 
+ 
+Codec developers get to do comparisons as fixed QP with fixed GOP structures and say "up to 40% bitrate reduction!" Essential work, but only the first stage of making an encoder that materially outperforms the prior generation's already mature encoders at real-world scenarios. 
+ 
+ 
+ 
+ 
+ Yep, fixed QP scenarios is good for codec development, but once outside of that initial period, testing should move to AQ. Even then, codec development should consider AQ scenarios to some degree. 
+ 
+I actually made an entropy encoding improvement to AV2's superblock delta-q signaling, something that by definition requires testing with AQ on. 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by benwaggoner 
+ 
+ 
+ Have you looked at adaptive deadzones for your chroma QPs (or in general)? That's the way we got a lot of VC1 psychovisual improvements when we hit the deltaQP wall. Doing smart adaptive deadzone to lower QPs did a lot of heavy lifting in the latter years of WMV/VC1. 
+ 
+ 
+ 
+ 
+ Mainline SVT-AV1 (and -HDR) does have adaptive deadzone support if RDOQ is turned on (with the slower presets). However, this is guided by SSE, so this is a potential area of improvement. SVT-AV1 RDOQ in general needs some love I think. I'm confident there's still some performance left to squeeze here.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ juliobbv 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by juliobbv 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 21st May 2025, 17:57
+ 
+ 
+ 
+ 
+  
+ # 20 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ ShortKatz 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Aug 2018 
+ Location: Germany 
+ 
+ 
+ Posts: 153
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Quote: 
+ 
+ 
+ 
+ 
+ 
+ Originally Posted by juliobbv 
+ 
+ 
+ So, the TL;DR is there are two VQ improvement forks to keep track of. Blue's -PSYEX, and my HDR. -PSY is now discontinued. 
+ 
+I do intend to eventually mainstream as many of my (and other fork) changes as possible, but in all honesty, it might take a while to get there as I've been working on SVT-AV1 during my free time. It's safe to assume that the -HDR specific features might be mainstreamed sometime around early 2026 (after -PSY's Tune 4 gets incorporate into --avif). 
+ 
+ 
+ 
+ 
+ Thanks for that information. It's fine for me if it takes a while, just was curious what the future plan is. To merge all in mainstream at some point of time just seemed a nice step for me.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ ShortKatz 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by ShortKatz 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 14th June 2025, 17:26
+ 
+ 
+ 
+ 
+  
+ # 21 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ rwill 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Dec 2013 
+ Location: Berlin, Germany 
+ 
+ 
+ Posts: 610
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ Well I am somewhat confused now that I have been thinking about it for a while. 
+ 
+There is this SVT-AV1-HDR file here: 
+ 
+ https://github.com/juliobbv-p/svt-av...c/psy_rd.c#L54 
+ 
+Now the author is apparently some "Gianni Rosato" and he licensed it under BSD 2 Clause. 
+ 
+The code seems to be some reinterpretation of x264 code. So much I was aware of. 
+ 
+But looking closer at the comments of some functions, for example: 
+ 
+ 
+ Code: 
+ // in: a pseudo-simd number of the form x+(y<<EW)
+// return: abs(x)+(abs(y)<<16)
+static inline sum2_t abs2(sum2_t a)
+{
+ const sum2_t mask = (a >> (BITS_PER_SUM - 1)) & (((sum2_t)1 << BITS_PER_SUM) + 1);
+ const sum2_t s = (mask << BITS_PER_SUM) - mask;
+ return (a + s) ^ s;
+} 
+ This seems too close to x264's 
+ 
+ https://code.videolan.org/videolan/x...ype=heads#L255 
+ 
+ Code: 
+ // in: a pseudo-simd number of the form x+(y<<16)
+// return: abs(x)+(abs(y)<<16)
+static ALWAYS_INLINE sum2_t abs2( sum2_t a )
+{
+ sum2_t s = ((a>>(BITS_PER_SUM-1))&(((sum2_t)1<<BITS_PER_SUM)+1))*((sum_t)-1);
+ return (a+s)^s;
+} 
+ And its not just this one function, its really everywhere. 
+ 
+I sure do hope there are agreements in place with the x264 folks. 
+ 
+Otherwise, well, I am no lawyer, but x264 is licensed under the GPL and SVT-AV1-PSY and on relabeled the code to BSD, maybe a bad call? 
+ 
+Good luck royalty free AV1 enthusiasts.
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ My github... 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ rwill 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by rwill 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 16th July 2025, 06:59
+ 
+ 
+ 
+ 
+  
+ # 22 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ ShortKatz 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+
+ 
+   
+ Join Date: Aug 2018 
+ Location: Germany 
+ 
+ 
+ Posts: 153
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ I have made a patch to get all the changes for the HDR curve for Variance boost into current SVT-AV1. I tried to port all relevant patches from SVT-AV1-HDR, but I'm not sure if I transferred everything relevant. But it recognizes HDR material and then applies curve 3. I used HandBrake to test it. 
+ https://github.com/Nomis101/HandBrak...ontrib/svt-av1 
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ ShortKatz 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by ShortKatz 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 14th December 2025, 11:52
+ 
+ 
+ 
+ 
+  
+ # 23 
+ 
+ |   Link 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ charliebaby 
+ 
+ 
+ 
+
+ Registered User 
+ 
+ 
+
+ 
+ 
+   
+ 
+ 
+
+ 
+   
+ Join Date: Jun 2020 
+ 
+ 
+ 
+ Posts: 54
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ SvtAv1EncApp_3.1.3_HDR.exe for Windows :-) 
+ 
+ https://www.mediafire.com/file/4lahz...3_HDR.exe/file 
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ __________________ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ charliebaby 
+ 
+ 
+ View Public Profile 
+ 
+ 
+ 
+ 
+ 
+ Find More Posts by charliebaby 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ « 
+ Previous Thread 
+ |
+ Next Thread 
+ » 
+ 
+ 
+
+
+
+
+
+
+
+ 
+
+
+ 
+ 
+ Thread Tools 
+ Search this Thread 
+ 
+ 
+ 
+
+ 
+ 
+ 
+
+ Show Printable Version 
+ Email this Page 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Search this Thread : 
+ 
+ Advanced Search 
+ 
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Posting Rules
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ You may not post new threads 
+ You may not post replies 
+ You may not post attachments 
+ You may not edit your posts 
+ 
+ 
+ BB code is On 
+ Smilies are On 
+ [IMG] code is On 
+ HTML code is Off 
+ 
+ Forum Rules 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Forum Jump 
+ 
+ 
+ User Control Panel 
+ Private Messages 
+ Subscriptions 
+ Who's Online 
+ Search Forums 
+ Forums Home 
+ 
+ 
+ 
+ Announcements and Chat 
+     General Discussion 
+     News 
+     Forum / Site Suggestions & Help 
+ General 
+     Decrypting 
+     Newbies 
+     DVD2AVI / DGIndex 
+     Audio encoding 
+     Subtitles 
+     Linux, Mac OS X, & Co 
+ Capturing and Editing Video 
+     Avisynth Usage 
+     Avisynth Development 
+     VapourSynth 
+     Capturing Video 
+     DV 
+     HDTV / DVB / TiVo 
+     NLE - Non Linear Editing 
+     VirtualDub, VDubMod & AviDemux 
+     New and alternative a/v containers 
+ Video Encoding 
+     (Auto) Gordian Knot 
+     MPEG-4 ASP 
+     MPEG-4 Encoder GUIs 
+     MPEG-4 AVC / H.264 
+     High Efficiency Video Coding (HEVC) 
+     New and alternative video codecs 
+     MPEG-2 Encoding 
+     Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+ (HD) DVD, Blu-ray & (S)VCD 
+     One click suites for DVD backup and DVD creation 
+     DVD & BD Rebuilder 
+     (HD) DVD & Blu-ray authoring 
+     Advanced authoring 
+     IFO/VOB Editors 
+     DVD burning 
+ Hardware & Software 
+     Software players 
+     Hardware players 
+     PC Hard & Software 
+ Programming and Hacking 
+     Development 
+     Translations 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+
+
+
+
+ 
+ All times are GMT +1. The time now is 10:09 . 
+ 
+
+
+ 
+ 
+ 
+
+ 
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ doom9.org -
+ 
+ 
+ Archive -
+ 
+ 
+ 
+ Top 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+ 
+ 
+ Powered by vBulletin® Version 3.8.11 Copyright ©2000 - 2026, vBulletin Solutions Inc.
+ 
+ 
+
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+
+
+ 
+ 
+
+ 
+
+ 
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 

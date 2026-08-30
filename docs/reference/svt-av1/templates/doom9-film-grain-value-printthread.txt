@@ -1,0 +1,132 @@
+# Source: https://forum.doom9.org/printthread.php?t=185686
+# Fetched: 2026-08-29 17:08:51 +08:00
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+<meta name="generator" content="vBulletin 3.8.11" />
+<title>Doom9's Forum -  How do you decide which value for --film-grain to use?</title>
+<style type="text/css">
+<!--
+td, p, li, div
+{
+	font: 10pt verdana, geneva, lucida, 'lucida grande', arial, helvetica, sans-serif;
+}
+.smallfont
+{
+	font-size: 11px;
+}
+.tborder
+{
+	border: 1px solid #808080;
+}
+.thead
+{
+	background-color: #EEEEEE;
+}
+.page
+{
+	background-color: #FFFFFF;
+	color: #000000;
+}
+-->
+</style>
+</head>
+<body class="page">
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr valign="bottom">
+	<td><a href="https://forum.doom9.org/"><img src="images/misc/vbulletin3_logo_white.gif" alt="Doom9's Forum" border="0" /></a></td>
+	<td align="right">
+		<div class="smallfont"></div>
+		
+	</td>
+</tr>
+</table>
+
+<br />
+
+<div>
+	<a href="https://forum.doom9.org/index.php" accesskey="1"><strong>Doom9's Forum</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/index.php</em></span>)
+</div>
+<div>
+	- &nbsp; <a href="forumdisplay.php?f=84"><strong>Royalty free video codecs (VP8, VP9, AV1 and AV2)</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/forumdisplay.php?f=84</em></span>)
+</div>
+<div>
+	- &nbsp; - &nbsp;  <a href="showthread.php?t=185686" accesskey="3"><strong>How do you decide which value for --film-grain to use?</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/showthread.php?t=185686</em></span>)
+</div>
+
+<br />
+
+<table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">ShortKatz</td>
+			<td class="smallfont" align="right">11th August 2024 00:21</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+			<div><strong>How do you decide which value for --film-grain to use?</strong><br />&nbsp;</div>
+		
+		
+
+		<div>How do you decide for SVT-AV1 which value (strength) of --film-grain to use? The documentation recommends to use 8 as a starting point for normal amount of grain. [1] And 10-15 for more grainy movies. But what is &quot;a normal amount of grain&quot;? And how do I know if my movie needs more (or less) then 8?<br />
+And, by the way, what do you do if your movie contains different levels of grain? Some films use grain artistically. For example, to distinguish different time periods in the film that are connected to each other.<br />
+<br />
+[1] <a href="https://gitlab.com/AOMediaCodec/SVT-AV1/-/blob/master/Docs/CommonQuestions.md#practical-advice-on-grain-synthesis" target="_blank">https://gitlab.com/AOMediaCodec/SVT-...rain-synthesis</a></div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">Boulder</td>
+			<td class="smallfont" align="right">12th August 2024 12:09</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>IIRC, the intensity of the synthesized grain is dynamic and is based on the source characteristics. When I've tested the internal synthesis, I've used quite high values like 20 for standard non-full CGI sources and it looks quite good.<br />
+The psy branch of SVT-AV1 (<a href="https://github.com/gianni-rosato/svt-av1-psy" target="_blank">https://github.com/gianni-rosato/svt-av1-psy</a>) contains a smart, simple modification what comes to film grain synthesis - it uses a resolution dependent block for the analysis and reduces the probability of noticable grain patterns by a large amount. Using the psy mod is highly recommended in any case :)</div>
+	</td>
+</tr>
+</table>
+<br />
+
+<br />
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr valign="top">
+	<td class="smallfont">All times are GMT +1. The time now is <span class="time">10:08</span>.</td>
+	<td align="right">
+		<div class="smallfont"></div>
+		
+	</td>
+</tr>
+</table>
+
+<p class="smallfont" align="center">
+	Powered by vBulletin&reg; Version 3.8.11<br />Copyright &copy;2000 - 2026, vBulletin Solutions Inc.
+	<br />
+	
+</p>
+
+</body>
+</html>

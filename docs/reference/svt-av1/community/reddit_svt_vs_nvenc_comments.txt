@@ -1,0 +1,141 @@
+--- RottinGhoul (2024-02-21) score=1 ---
+Could you please try another thing?
+Try to put a specific file size to achieve and compare the nvenc result at slowest with the nearest filesize conversion you made before in that chart.
+
+--- Open-Dragonfly6825 (2024-01-11) score=2 ---
+Thank you very much for your comment. It is very useful.
+
+I use ffmpeg for video-related stuff, so I don't need a GUI (in fact, I trust the CLI more, now that I am used to it). However, I hadn't installed Vapoursynth yet. I guess it is time.
+
+--- NekoTrix (2024-01-11) score=2 ---
+They are not mainstream metrics so they are obviously harder to get, but there are patches on the internet to get ffmpeg to compile with support for a xpsnr filter, and a Windows build is available in the VVC discord server ([direct download link](https://cdn.discordapp.com/attachments/1005879365155958814/1188642032651075634/ffmpeg-vvc-2023-12-24.zip)). As for SSIMU2, there's a rust app (https://github.com/rust-av/ssimulacra2_bin) so if you can use cargo, you can compile it really easily. I believe there are some binaries on the AV1 Community discord server, the one affiliated to this subreddit. Else there's a zig implementation to be used directly with  Vapoursynth (https://github.com/dnjulek/vapoursynth-ssimulacra2), which I personally really fancy and used for that benchmark.
+
+Sure there's not any GUI for those metrics yet for the reason stated in the first few words of this comment, but it wouldn't be complicated to do so TBH and even then, it's not that difficult to set up manually. Vapoursynth is an essential tool for any video enthusiast so if you don't have it installed, you should do it.
+
+--- Open-Dragonfly6825 (2024-01-10) score=1 ---
+Is there any convenient way to measure the SSIMULACRA2 and XPSNR from two video sources (not images)? I cannot seem to find anything usable as-is.
+
+--- WESTLAKE_COLD_BEER (2023-12-24) score=1 ---
+Have you tried 2-pass encoding? It's supposed to improve quality in aomenc and vp9 even outside of the constrained bitrate modes, might be worth trying to squeeze some extra quality out of nvenc
+
+--- Yoshimo123 (2023-12-18) score=1 ---
+Thanks for the reminder. I'm getting weird numbers regardless of whether grain synthesis is on or off, so the issue lies somewhere else.
+
+--- asm-c (2023-12-18) score=3 ---
+Do note that grain synthesis interferes with VMAF scores and VMAF developers [recommend you disable it when calculating VMAF](https://github.com/Netflix/vmaf/issues/1192#issuecomment-1654243689).
+
+--- Big_Head8250 (2023-12-18) score=2 ---
+Thank you!
+
+--- Yoshimo123 (2023-12-18) score=2 ---
+You can find the nightly builds here: [https://github.com/HandBrake/HandBrake-snapshots](https://github.com/HandBrake/HandBrake-snapshots)  
+
+
+New AV1 was incorporated yesterday: https://github.com/HandBrake/HandBrake/commit/ed3e0d03c6a8a530800c48205b8dbec7d6876c9e
+
+--- Big_Head8250 (2023-12-18) score=1 ---
+Thank you for this feedback. 
+
+>After spending about a week straight comparing NVenc AV1 vs SVT I found that SV1 is IMMENSELY superior at low bitrates compared to NVenc
+
+If you ever decide to post these results, tag me because I am interested in what you found but also your methodology for testing.
+
+--- Big_Head8250 (2023-12-18) score=3 ---
+>I'm using Handbrake as well, but today's nightly build which has the new AV1 updates included
+
+Can you link to the nightly handbrake builds? That would be helpful.
+
+> Is there a particular setting you're using in handbrake to get accurate VMAF scores?
+
+No, I detailed anything special above and everything else was left at default. I think if I have time this weekend, I may drop in the [updated VMAF](https://github.com/Netflix/vmaf/releases/tag/v3.0.0) files into ffmetrics, but after reading the feedback here, will probably pivot to SSIMULACRA2. I'll need to read up on that first, I guess :)
+
+--- Big_Head8250 (2023-12-18) score=3 ---
+Thank you for taking the time to write this reply to my post. I wasn't originally planning on posting results to the internet. But frankly I found these results confounding. After one of the VMAF computes ended, I kind of blurted out, "well, that's just stupid!" So I decided to post and hope that I got some useful feedback. You've provided that, so thank you.
+
+I will try out your recommendations, both on quality metrics and for encode settings.
+
+--- Yoshimo123 (2023-12-18) score=2 ---
+I really appreciate your insight!
+
+--- NekoTrix (2023-12-18) score=4 ---
+You should always be using grain synth, however the strength to use is completely source dependent so you need to figure it out.
+
+If that can help you get started:
+--film-grain 1 to 6 for little grain
+--film-grain 7 to 15 is more pronounced and starts to be easily noticeable
+Higher grain strength when the content is extremely grainy.
+
+--film-grain-denoise controls if the video should be denoised prior to applying the grain back, and it's honestly pretty bad so leave it disabled. There are way better alternatives for higher quality denoising, including AI models accelerated by GPUs so don't bother with that.
+
+--- Yoshimo123 (2023-12-18) score=1 ---
+I've seen a lot of people recommend doing grain synthesis for high-quality, long-term storage, but I see you didn't include that here. What are your thoughts on using grain synthesis?
+
+--- Yoshimo123 (2023-12-18) score=2 ---
+I always get wonky VMAF scores when using FFMetrics with AV1 files. I've never been able to figure out what I'm doing wrong. H265 encodes work great though.
+
+--- Nadeoki (2023-12-18) score=3 ---
+SSIM / SSIMULACRA2 > VMAF
+
+--- Good_Honest_Jay (2023-12-18) score=3 ---
+Just my .02
+
+&#x200B;
+
+NVEnc vs SVT at higher bitrates i'd be pretty "okayish" with using NVenc to save time..  After spending about a week straight comparing NVenc AV1 vs SVT I found that SV1 is IMMENSELY superior at low bitrates compared to NVenc..      Since i'm more interested in finding the lowest bitrate to quality, SVT will always win here..  NVenc is pretty much already "maxed" out out of the gate due to the API, there's already little to no way to get extra quality out of it.   NVenc was never meant to be an archival/production tool to begin with (at least as far as I know).. It's best used as a way to offload CPU usage during streaming and it can't be matched in this regard but I can't take NVenc seriously as a movie archival tool, NVEnc Av1 is marginally better than the outgoing HVEC before it.    SVT is leaps and bounds better quality wise at a certain bitrate and lower, I found at around 2000 kbit/sec @ 1080p and lower birates, SVT just begins overtaking NVEnc by a lot in quality.
+
+--- NekoTrix (2023-12-18) score=3 ---
+I can give you some insight into the concepts behind those and how they seem to affect encoding in SVT-AV1, but not really talk about their actual implementation in the SVT-AV1 code as I simply cannot understand it atm.
+
+&#x200B;
+
+The temporal in temporal filtering refers to using information from multiple consecutive frames, for instance the similarities between frames, in order to improve efficiency. Temporal techniques include Motion Estimation, Predictive Frames, but here in SVT-AV1, it refers to some sort of filtering that happens over the amount of frames specified by lookahead and tends to blur stuff. It does improve efficiency at high CRF levels (say > 25), but tend to worsen efficiency at medium to high fidelity levels (CRF < 25). Many argue that even at low quality the blurring introduced is not perceptually worth it, especially in IRL content. Which is why it is often preferred to disable it entirely.
+
+&#x200B;
+
+Quantization matrices are used in the quantization step of the encoding process to improve compression by scaling transform coefficients and are straight up always beneficial in SVT-AV1 except in some extremely rare edge cases that shouldn't bother 99.9% of users.
+
+--- batter159 (2023-12-18) score=3 ---
+Post comparison screenshots, not just metrics.
+
+--- rubiconlexicon (2023-12-18) score=3 ---
+What do temporal filtering and quantization matrices do?
+
+--- NekoTrix (2023-12-18) score=10 ---
+VMAF is a stupid metric that can be biased by applying sharpening and contrast filters that according to Netflix "improve the subjective quality of videos".
+
+HW encoders rely on this information to "boost" metrics and that's why you will always see this metric and nothing else used in marketing slides by Nvidia and AMD to showcase how their HW encoders are so good. They are tuned in order to maximize VMAF scores at the cost of actual video quality, which is garbage unless going for very high bitrates where convergence happens.
+
+It is so wrong, that dropping 10 freaking values in CRF scale shouldn't result in only 2 more points, especially when the quality difference is visually striking.
+
+If it wasn't clear enough, VMAF scores are not a linear scale, so making direct comparisons of difference in scores and sizes is wrong.
+
+
+Now for my suggestions:
+
+- do not use mainstream metrics when doing comparisons. SSIMULACRA2 is the best usable metric at the moment, with XPSNR being second according to some early testing by the Av1ator and Rav1ator dev (I'm also a dev on the latter btw). Sure those are not integrated in any GUI at the moment, but as you are already a Linux user, I'm convinced you can figure this out with some time.
+
+- for long-term storing purposes, prefer using software encoders with the slowest speeds you can bear. You will be keeping these files for a long time, it is worth the computing time. To maximize quality, I can advise you to go preset 4, disable temporal filtering, switch to tune VQ, enable quantization matrices and set minimum QMs to 0. That translates to:
+```
+--preset 4 --enable-tf 0 --enable-qm 1 --qm-min 0 --tune 0
+```
+Or in ffmpeg terms:
+```
+preset=4:enable-tf=0:enable-qm=1:qm-min=0:tune=0
+```
+
+Happy encoding !
+
+--- rubiconlexicon (2023-12-18) score=6 ---
+I recently tested SVT vs NVENC with some 1080p60 lossless game capture (just subjective visual comparison), I found NVENC AV1 slowest (preset p7 + multipass fullres) to be worse than even SVT 1.7 preset 13 (+VQ tune) when file size-matched. Haven't had the chance to test SVT 1.8 since it's not in ffmpeg yet but obviously the defeat for NVENC would only be even more resounding then.
+
+Granted this was with VBR rate control. In CBR rate control, NVENC becomes much more competitive with SVT. Clearly Nvidia designed the encoder to be better at CBR, which makes sense since it is made for livestreaming primarily.
+
+--- AutoModerator (2023-12-18) score=1 ---
+r/AV1 is available on https://lemmy.world/c/av1 due to changes in Reddit policies.
+
+You can read more about it [here](https://archive.is/6IeXF).
+
+
+*I am a bot, and this action was performed automatically. Please [contact the moderators of this subreddit](/message/compose/?to=/r/AV1) if you have any questions or concerns.*
+
+

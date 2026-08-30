@@ -1,0 +1,15 @@
+===== POST 1 =====
+How do you decide for SVT-AV1 which value (strength) of --film-grain to use? The documentation recommends to use 8 as a starting point for normal amount of grain. [1] And 10-15 for more grainy movies. But what is "a normal amount of grain"? And how do I know if my movie needs more (or less) then 8?
+
+And, by the way, what do you do if your movie contains different levels of grain? Some films use grain artistically. For example, to distinguish different time periods in the film that are connected to each other.
+
+
+
+[1] https://gitlab.com/AOMediaCodec/SVT-...rain-synthesis</a
+
+===== POST 2 =====
+IIRC, the intensity of the synthesized grain is dynamic and is based on the source characteristics. When I've tested the internal synthesis, I've used quite high values like 20 for standard non-full CGI sources and it looks quite good.
+
+The psy branch of SVT-AV1 (https://github.com/gianni-rosato/svt-av1-psy) contains a smart, simple modification what comes to film grain synthesis - it uses a resolution dependent block for the analysis and reduces the probability of noticable grain patterns by a large amount. Using the psy mod is highly recommended in any case <img src="images/smilies/smile.gif" border="0" alt="" title="Smilie" class="inlineimg" /
+
+

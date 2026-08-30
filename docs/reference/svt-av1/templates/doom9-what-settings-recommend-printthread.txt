@@ -1,0 +1,1051 @@
+# Source: https://forum.doom9.org/printthread.php?t=185159
+# Fetched: 2026-08-29 17:09:54 +08:00
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+<meta name="generator" content="vBulletin 3.8.11" />
+<title>Doom9's Forum -  What settings do you recommend for SVT-AV1</title>
+<style type="text/css">
+<!--
+td, p, li, div
+{
+	font: 10pt verdana, geneva, lucida, 'lucida grande', arial, helvetica, sans-serif;
+}
+.smallfont
+{
+	font-size: 11px;
+}
+.tborder
+{
+	border: 1px solid #808080;
+}
+.thead
+{
+	background-color: #EEEEEE;
+}
+.page
+{
+	background-color: #FFFFFF;
+	color: #000000;
+}
+-->
+</style>
+</head>
+<body class="page">
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr valign="bottom">
+	<td><a href="https://forum.doom9.org/"><img src="images/misc/vbulletin3_logo_white.gif" alt="Doom9's Forum" border="0" /></a></td>
+	<td align="right">
+		<div class="smallfont"></div>
+		
+	</td>
+</tr>
+</table>
+
+<br />
+
+<div>
+	<a href="https://forum.doom9.org/index.php" accesskey="1"><strong>Doom9's Forum</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/index.php</em></span>)
+</div>
+<div>
+	- &nbsp; <a href="forumdisplay.php?f=84"><strong>Royalty free video codecs (VP8, VP9, AV1 and AV2)</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/forumdisplay.php?f=84</em></span>)
+</div>
+<div>
+	- &nbsp; - &nbsp;  <a href="showthread.php?t=185159" accesskey="3"><strong>What settings do you recommend for SVT-AV1</strong></a>
+	(<span class="smallfont"><em>https://forum.doom9.org/showthread.php?t=185159</em></span>)
+</div>
+
+<br />
+
+<table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">ShortKatz</td>
+			<td class="smallfont" align="right">4th November 2023 14:52</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+			<div><strong>What settings do you recommend for SVT-AV1</strong><br />&nbsp;</div>
+		
+		
+
+		<div>I only have experiences encoding my movie collection to HEVC. Now I want to start and get a bit more experiences with AV1. I use HandBrake to encode which uses SVT-AV1 (v.1.7.0). After a bit of experimenting I think preset 5 or 4 would be good for movie archiving. 4 takes around double as long as 5. I was wondering, is 4 that much better then 5 to invest the longer encoding time? What preset do you use?<br />
+<br />
+For HEVC I put together a set of parameters to pass to the encoder to improve quality, size and speed to my needs. For AV1 and would need to do this all again. Or is this not needed for AV1? A quick search in the internet gave me some parameters that are often used: <div style="margin:20px; margin-top:5px">
+	<div class="smallfont" style="margin-bottom:2px">Code:</div>
+	<hr /><code style="margin:0px" dir="ltr" style="text-align:left">enable-overlays=1:scd=1:enable-tf=0</code><hr />
+</div>.<br />
+What do you think, is this useful? This flags do increase file size a little bit. Or what do you recommend?</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">charliebaby</td>
+			<td class="smallfont" align="right">16th November 2023 16:12</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>hi I'm in the same situation as you, personally I do preset 4 at 5000kb/S it's magnificent and preset 4 is much better than 5 but 5 is not bad too it's up to you to see what you want is strange is that my 16 cores are only used at 30% I have to find a way to ensure that more CPU is used like at 80% like that the encoding time would be shorter</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">benwaggoner</td>
+			<td class="smallfont" align="right">16th November 2023 19:40</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>charliebaby</strong>
+					(Post 1993894)
+				</div>
+				<div style="font-style:italic">hi I'm in the same situation as you, personally I do preset 4 at 5000kb/S it's magnificent and preset 4 is much better than 5 but 5 is not bad too it's up to you to see what you want is strange is that my 16 cores are only used at 30% I have to find a way to ensure that more CPU is used like at 80% like that the encoding time would be shorter</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Don't assume that using more cores will always improve quality, as a lot of threading techniques can sacrifice some quality. Bigger frames certainly can increase core utilization, but lower resolutions can struggle to find enough to parallelize.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">ShortKatz</td>
+			<td class="smallfont" align="right">19th November 2023 23:21</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>charliebaby</strong>
+					(Post 1993894)
+				</div>
+				<div style="font-style:italic">hi I'm in the same situation as you, personally I do preset 4 at 5000kb/S it's magnificent and preset 4 is much better than 5 but 5 is not bad too it's up to you to see what you want is strange is that my 16 cores are only used at 30% I have to find a way to ensure that more CPU is used like at 80% like that the encoding time would be shorter</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Thanks for your recommendation , I will try 4 at 5000kb/s and see. There I found another suggestion of using 4: <a href="https://forum.jellyfin.org/t-encoding-discussion-megathread-ffmpeg-handbrake-av1-etc?pid=5312&amp;mode=threaded" target="_blank">https://forum.jellyfin.org/t-encodin...&amp;mode=threaded</a><br />
+<br />
+I also found this, and there seems just a little difference between 4 and 5: <a href="https://ottverse.com/analysis-of-svt-av1-presets-and-crf-values/" target="_blank">https://ottverse.com/analysis-of-svt...nd-crf-values/</a><br />
+<br />
+The difference between 4 and 5 according to this table are &quot;Filter intra&quot;, &quot;Difference-weighted prediction&quot;, &quot;Distance-weighted prediction&quot; and &quot;Restoration Filter - SG Filter&quot;: <a href="https://gitlab.com/AOMediaCodec/SVT-AV1/-/blob/master/Docs/CommonQuestions.md#what-presets-do" target="_blank">https://gitlab.com/AOMediaCodec/SVT-...hat-presets-do</a><br />
+But I have no clue what this is all doing.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">ShortKatz</td>
+			<td class="smallfont" align="right">25th November 2023 15:23</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>After some testing with different setting and sources, I'm now quite happy with the following settings in HandBrake:<br />
+<br />
+Codec: AV1 10bit (SVT)<br />
+CRF: 26<br />
+Preset: 5<br />
+Profile: main<br />
+Level: auto<br />
+Additional parameter: <i>enable-tf=0:film-grain-denoise=0:film-grain=8:mbr=10m</i> (for 2D/3D animation change film-grain from 8 to 4)<br />
+<br />
+The quality of the video is perfect (in some cases I like it more than the original), encoding is much faster than my x265 encodings and the file size is also smaller.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">Loomes</td>
+			<td class="smallfont" align="right">26th November 2023 14:19</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>ShortKatz</strong>
+					(Post 1994207)
+				</div>
+				<div style="font-style:italic">Additional parameter: <i>enable-tf=0:film-grain-denoise=0:film-grain=8:mbr=10m</i> (for 2D/3D animation change film-grain from 8 to 4)</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>By setting <i>film-grain-denoise=0</i> you are disabling <i>film-grain=8</i>, because <i>film-grain</i> sets the level of denoising and is not for preserving grain but the contrary, see <a href="https://gitlab.com/AOMediaCodec/SVT-AV1/-/blob/master/Docs/Parameters.md" target="_blank">https://gitlab.com/AOMediaCodec/SVT-.../Parameters.md</a> . The name &quot;film-grain&quot; is very misleading here and it would have been much more user friendly if the level of denoise would be set directly in <i>film-grain-denoise</i> like e.g. <i>film-grain-denoise=8</i>.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>ShortKatz</strong>
+					(Post 1994207)
+				</div>
+				<div style="font-style:italic">The quality of the video is perfect (in some cases I like it more than the original), encoding is much faster than my x265 encodings and the file size is also smaller.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>That's what I thought about preset 5 until I compared the result with preset 4 on my 48&quot; OLED. Preset 4 is significantly better. Did you try some AV1 hardware encoding by any chance? I got a A380 last week and the results with highest quality settings and the encoding speed are stunning.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">quietvoid</td>
+			<td class="smallfont" align="right">26th November 2023 19:40</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>film-grain-denoise doesn't disable film-grain, it disables encoding from the denoised image.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">Loomes</td>
+			<td class="smallfont" align="right">27th November 2023 14:27</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>quietvoid</strong>
+					(Post 1994256)
+				</div>
+				<div style="font-style:italic">film-grain-denoise doesn't disable film-grain, it disables encoding from the denoised image.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Okay, maybe I misread the parameter description but if <i>film-grain-denoise=0</i> disables denoising and <i>film-grain=n</i> sets the level of denoising, what exactly would be the purpose of &quot;<i>film-grain-denoise=0 film-grain=8</i>&quot; ? Or in other words: How exactly would it effect the encoding result?</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">quietvoid</td>
+			<td class="smallfont" align="right">27th November 2023 14:37</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>The denoising strength is still controlled by film-grain.<br />
+When disabling film-grain-denoise, it only encodes from the original image instead of the denoised result.<br />
+<br />
+It would probably end up higher bitrate if the source video is noisy.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">Loomes</td>
+			<td class="smallfont" align="right">27th November 2023 14:46</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>Does this mean &quot;film-grain-denoise=1 film-grain=8&quot; would be 2-step process? First, <i>film-grain-denoise=1</i> prepares a denoised image which is then encoded with <i>film-grain=8</i> ?</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">Loomes</td>
+			<td class="smallfont" align="right">27th November 2023 15:49</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>Thanks, I think I got it now. So <i>film-grain</i> foremost sets the level of grain in the video, which is also used as level for denoising if <i>film-grain-denoise=1</i>. Is that correct? If so, the parameter description is rather <br />
+<br />
+FilmGrain: Enable film grain [0: off, 1-50: level of film grain, also used as denoising strength if <i>film-grain-denoise=1</i>]<br />
+<br />
+Since there are levels from 1-50, it raises the question how to determine the level. Is this a pure subjective matter or is there some kind of technical indicator to determine the level? Thanks.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">quietvoid</td>
+			<td class="smallfont" align="right">28th November 2023 02:26</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>Usually the more noise there is, the higher film-grain would be.<br />
+I usually stay between 10-20.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">ShortKatz</td>
+			<td class="smallfont" align="right">28th November 2023 19:38</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>Setting <i>film-grain-denoise=0</i> and <i>film-grain=8</i> as a start is recommended in the SVT-AV1 CommonQuestions.<br />
+<a href="https://gitlab.com/AOMediaCodec/SVT-AV1/-/blob/master/Docs/CommonQuestions.md#practical-advice-on-grain-synthesis" target="_blank">https://gitlab.com/AOMediaCodec/SVT-...rain-synthesis</a><br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				As a general rule, a film-grain level of around 8 is sufficient for live action video with a normal amount of grain. Noisier video benefits from higher levels in the 10-15 range. 
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div><br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				If grain synthesis levels can be manually verified through subjective evaluation or high fidelity metrics, then passing film-grain-denoise=0 may result in higher fidelity by disabling source denoising.
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div><br />
+The effect of film-grain-denoise=0 can also be seen in this video starting at 9:00 min.<br />
+<a href="https://www.youtube.com/watch?v=5IV36FMpLqY" target="_blank">https://www.youtube.com/watch?v=5IV36FMpLqY</a></div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">benwaggoner</td>
+			<td class="smallfont" align="right">28th November 2023 21:08</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>Note that a lot of devices with AV1 decode don't support FGS, or have buggy implementations. It's not a safe &quot;always on&quot; feature at this point. Hopefully AVFG1 spec will catch on, and we can use FGS with VVC, and eventually a better version in AV2.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">Boulder</td>
+			<td class="smallfont" align="right">29th November 2023 07:59</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					(Post 1994375)
+				</div>
+				<div style="font-style:italic">Note that a lot of devices with AV1 decode don't support FGS, or have buggy implementations. It's not a safe &quot;always on&quot; feature at this point. Hopefully AVFG1 spec will catch on, and we can use FGS with VVC, and eventually a better version in AV2.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Then again, it is possible to remove the layer if it proves to be an issue.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">birdie</td>
+			<td class="smallfont" align="right">29th November 2023 21:02</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>ShortKatz</strong>
+					(Post 1994207)
+				</div>
+				<div style="font-style:italic">After some testing with different setting and sources, I'm now quite happy with the following settings in HandBrake:<br />
+<br />
+Codec: AV1 10bit (SVT)<br />
+CRF: 26<br />
+Preset: 5<br />
+Profile: main<br />
+Level: auto<br />
+Additional parameter: <i>enable-tf=0:film-grain-denoise=0:film-grain=8:mbr=10m</i> (for 2D/3D animation change film-grain from 8 to 4)<br />
+<br />
+The quality of the video is perfect (in some cases I like it more than the original), encoding is much faster than my x265 encodings and the file size is also smaller.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Looks like you've never been interested in transparent encoding.<br />
+<br />
+CRF 26 is a complete blurfest to me only useful for encoding anime.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">benwaggoner</td>
+			<td class="smallfont" align="right">30th November 2023 04:40</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>Boulder</strong>
+					(Post 1994396)
+				</div>
+				<div style="font-style:italic">Then again, it is possible to remove the layer if it proves to be an issue.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Sure, but that can utterly change the look, as the source is denoised to use FGS, with FGS to replace the removed noise. Encoding for FGS but playing back without it can look really smoothed out and unnatural, and certainly wouldn't match creative intent.<br />
+<br />
+If I can't count on FGS being used with AV1, I'd just encode AV1 without FGS. It'll increase the bitrate, but at least the visual appearance will be predictable.<br />
+<br />
+AV1 and AV1 + FGS can almost be thought of as different codecs, and absolutely require different encodes.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">Boulder</td>
+			<td class="smallfont" align="right">30th November 2023 06:24</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					(Post 1994446)
+				</div>
+				<div style="font-style:italic">Sure, but that can utterly change the look, as the source is denoised to use FGS, with FGS to replace the removed noise. Encoding for FGS but playing back without it can look really smoothed out and unnatural, and certainly wouldn't match creative intent.<br />
+<br />
+If I can't count on FGS being used with AV1, I'd just encode AV1 without FGS. It'll increase the bitrate, but at least the visual appearance will be predictable.<br />
+<br />
+AV1 and AV1 + FGS can almost be thought of as different codecs, and absolutely require different encodes.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Unfortunately with modern codecs, everything is quite smoothed out without FGS no matter what settings you use. Believe me..I have attempted to remove all the filtering in both parameters and code and still there is horrible flat area banding left even at very low quantizers (like Q12 for aomenc). And I see people are using something like Q24, which must mean that there are no details left in the encoded video :D<br />
+<br />
+FGS won't restore the details, in my opinion it just works very well at hiding the problems and fooling your brain into thinking that the material is sharper and more detailed than it is :)</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">benwaggoner</td>
+			<td class="smallfont" align="right">30th November 2023 19:02</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>Boulder</strong>
+					(Post 1994449)
+				</div>
+				<div style="font-style:italic">Unfortunately with modern codecs, everything is quite smoothed out without FGS no matter what settings you use. Believe me..I have attempted to remove all the filtering in both parameters and code and still there is horrible flat area banding left even at very low quantizers (like Q12 for aomenc). And I see people are using something like Q24, which must mean that there are no details left in the encoded video :D</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Too much PSNR tuning, and to a lesser degree VMAF, can cause the flattening. This can generally be addressed with AQ tuning. It's an encoder limitation, not a codec limitation.<br />
+<br />
+I've done comparisons between encoding AV1 with grain preservation without FGS versus FGS, and while grain preservation requires more bits than with FGS, with proper encoder and parameter tuning the perceptual results are pretty similar, and can match what's possible with x265.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				FGS won't restore the details, in my opinion it just works very well at hiding the problems and fooling your brain into thinking that the material is sharper and more detailed than it is :)
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>FGS is best thought of as a creative intent preservation feature. If the source is supposed to have grain texture, the exact temporal and spatial location of each grain particle isn't important. So we can synthesize grain to preserve a similar creative intent and feel without having to encode the exact random locations of all those particles distributed randomly on any given frame.<br />
+<br />
+And the metadata to describe the grain is a LOT more bitrate efficient than trying to encode all that high temporal and spatial frequency noise. For a premium quality experience, heavy grain can more than double the bitrate required compared the the same content without grain.<br />
+<br />
+Content is going to look very different if it originally had heavy grain, but it was removed presuming it would be added back, but it was not.<br />
+<br />
+There is one major flaw in the AV1 FGS implementation, in that grain particle size is rendered relative to display instead of content, so the size of a grain particle relative to the image changes. A fix for that is is in progress.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">ShortKatz</td>
+			<td class="smallfont" align="right">30th November 2023 23:06</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>birdie</strong>
+					(Post 1994434)
+				</div>
+				<div style="font-style:italic">Looks like you've never been interested in transparent encoding.<br />
+<br />
+CRF 26 is a complete blurfest to me only useful for encoding anime.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>I'm very interested in transparent encoding. Seems we have different CRF 26, it's not a bluffest for me.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">Boulder</td>
+			<td class="smallfont" align="right">1st December 2023 06:06</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					(Post 1994488)
+				</div>
+				<div style="font-style:italic">Too much PSNR tuning, and to a lesser degree VMAF, can cause the flattening. This can generally be addressed with AQ tuning. It's an encoder limitation, not a codec limitation.<br />
+<br />
+I've done comparisons between encoding AV1 with grain preservation without FGS versus FGS, and while grain preservation requires more bits than with FGS, with proper encoder and parameter tuning the perceptual results are pretty similar, and can match what's possible with x265.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Out of interest, which encoders have you been testing? Are all the current open source encoders based on the same source so they basically work the same way no matter what? At least aomenc and svt-av1 are both smoothing things very heavily, I'd say aomenc less when it is tamed in code and all temporal filtering is switched off in parameters.<br />
+<br />
+Funny thing is that with a very grainy source like &quot;Withnail and I&quot; Blu-ray, the grain is actually preserved quite nicely. I don't know if I should test adding grain before encoding and seeing what comes out :D</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">birdie</td>
+			<td class="smallfont" align="right">1st December 2023 07:13</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>ShortKatz</strong>
+					(Post 1994496)
+				</div>
+				<div style="font-style:italic">I'm very interested in transparent encoding. Seems we have different CRF 26, it's not a bluffest for me.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>I can assure you CRF 26 destroys fine details and smooths out everything to the point where e.g. sea waves turn into goo.<br />
+<br />
+Again, looks like you're not interested in transparent encoding by a long shot or maybe you have a completely different idea what it is.<br />
+<br />
+Transparent encoding is when your encode matches your source in terms of fine details 100%.<br />
+<br />
+Here, try to encode this <a href="https://mega.nz/file/bpEiVYrI#OOXM0w7nSrW9thBm5k8XJGvtyRMEsZUa774XITyF0cw" target="_blank">clip</a> at CRF 26 and then compare the result to the source. Pay extra attention to the sea and mountains.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">Boulder</td>
+			<td class="smallfont" align="right">1st December 2023 07:43</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>birdie</strong>
+					(Post 1994505)
+				</div>
+				<div style="font-style:italic">Transparent encoding is when your encode matches your source in terms of fine details 100%.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>And svt-av1 will not be able to do that even at CRF 12 :(</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">butterw2</td>
+			<td class="smallfont" align="right">1st December 2023 13:33</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div>Looking at the 1080p 900kbps samples here: <a href="http://download.opencontent.netflix.com/?prefix=AV1/Sparks/" target="_blank">http://download.opencontent.netflix....ix=AV1/Sparks/</a><br />
+<br />
+Does it make sense to use FGS if the source doesn't have grain ? I am not looking for transparency just a clean result.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">benwaggoner</td>
+			<td class="smallfont" align="right">1st December 2023 17:12</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>butterw2</strong>
+					(Post 1994517)
+				</div>
+				<div style="font-style:italic">Looking at the 1080p 900kbps samples here: <a href="http://download.opencontent.netflix.com/?prefix=AV1/Sparks/" target="_blank">http://download.opencontent.netflix....ix=AV1/Sparks/</a><br />
+<br />
+Does it make sense to use FGS if the source doesn't have grain ? I am not looking for transparency just a clean result.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>FGS won't do much if there isn't grain, but it can help with even light grain. But benefits are proportional to grain levels.</div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">ShortKatz</td>
+			<td class="smallfont" align="right">2nd December 2023 23:59</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>birdie</strong>
+					(Post 1994505)
+				</div>
+				<div style="font-style:italic">I can assure you CRF 26 destroys fine details and smooths out everything to the point where e.g. sea waves turn into goo.<br />
+<br />
+Again, looks like you're not interested in transparent encoding by a long shot or maybe you have a completely different idea what it is.<br />
+<br />
+Transparent encoding is when your encode matches your source in terms of fine details 100%.<br />
+<br />
+Here, try to encode this <a href="https://mega.nz/file/bpEiVYrI#OOXM0w7nSrW9thBm5k8XJGvtyRMEsZUa774XITyF0cw" target="_blank">clip</a> at CRF 26 and then compare the result to the source. Pay extra attention to the sea and mountains.</div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>Thanks for the file. I made an encode with CRF 26 and CRF 0. And yes, you are correct, there are differences with CRF 26 in the waves and the mountain, so it's not transparent. But this differences are so light that I can live with it.<br />
+I made a picture of the first frame.<br />
+<a href="https://www.swisstransfer.com/d/55586bc9-7c03-4fc4-ba64-9550b636182e" target="_blank">https://www.swisstransfer.com/d/5558...4-9550b636182e</a></div>
+	</td>
+</tr>
+</table>
+<br /><table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%">
+<tr>
+	<td class="page">
+
+		<table cellpadding="0" cellspacing="0" border="0" width="100%">
+		<tr valign="bottom">
+			<td style="font-size:14pt">birdie</td>
+			<td class="smallfont" align="right">19th December 2023 16:51</td>
+		</tr>
+		</table>
+
+		<hr />
+
+		
+		
+
+		<div><div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2">
+			<hr />
+			
+				<div>
+					Originally Posted by <strong>ShortKatz</strong>
+					(Post 1994594)
+				</div>
+				<div style="font-style:italic">Thanks for the file. I made an encode with CRF 26 and CRF 0. And yes, you are correct, there are differences with CRF 26 in the waves and the mountain, so it's not transparent. But this differences are so light that I can live with it.<br />
+I made a picture of the first frame.<br />
+<a href="https://www.swisstransfer.com/d/55586bc9-7c03-4fc4-ba64-9550b636182e" target="_blank">https://www.swisstransfer.com/d/5558...4-9550b636182e</a></div>
+			
+			<hr />
+		</td>
+	</tr>
+	</table>
+</div>The first frame for most codecs will have higher image quality/detail retention than consecutive frames because it's type I.<br />
+<br />
+Try frames other than I, that's P or B (depending on your compression settings and codec: for offline software codecs it's almost always B frames, hardware codecs are normally only P frames).</div>
+	</td>
+</tr>
+</table>
+<br />
+
+<br />
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr valign="top">
+	<td class="smallfont">All times are GMT +1. The time now is <span class="time">10:09</span>.</td>
+	<td align="right">
+		<div class="smallfont"></div>
+		
+	</td>
+</tr>
+</table>
+
+<p class="smallfont" align="center">
+	Powered by vBulletin&reg; Version 3.8.11<br />Copyright &copy;2000 - 2026, vBulletin Solutions Inc.
+	<br />
+	
+</p>
+
+</body>
+</html>

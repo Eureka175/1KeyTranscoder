@@ -1,0 +1,670 @@
+﻿ 
+VMAF-comparison: x265 vs other encoders - Doom9's Forum 
+Welcome to Doom9 's Forum, THE in-place to be for everyone interested in DVD conversion. 
+Before you start posting please read the forum rules . By posting to this forum you agree to abide by the rules. 
+Domains: forum.doom9.org / forum.doom9.net / forum.doom9.se 
+Doom9's Forum 
+ > Video Encoding 
+> High Efficiency Video Coding (HEVC) 
+VMAF-comparison: x265 vs other encoders
+User Name 
+Remember Me? 
+Password 
+Register 
+FAQ 
+Today's Posts 
+Search 
+Search Forums 
+Show Threads 
+Show Posts 
+Tag Search 
+Advanced Search 
+Go to Page... 
+Thread Tools 
+Search this Thread 
+11th April 2019, 12:38
+# 1 
+|   Link 
+Forteen88 
+Herr
+Join Date: Apr 2009
+Location: North Europe, too cold winters.
+Posts: 566
+VMAF-comparison: x265 vs other encoders 
+I found this quite new article which got a nice VMAF-comparison,
+https://unrealaussies.com/tech/nvenc...sions-for-x265 
+Does anyone else here got to the same conclusions?
+I'm most interested in HD-encoding at high-quality (like CRF 18@veryslow) for offline use, so I'd like some more data for it.
+EDIT: Never mind, this article isn't 'nice', since the source is game-video, not suited for VMAF!
+EDIT2: UPDATE! I wrote that "this article isn't 'nice', since the source is game-video, not suited for VMAF!" based upon the comments in this thread!
+BTW, it was I who contacted 'Agamemnus', the writer of this article, for him to know about this thread!
+Last edited by Forteen88; 8th June 2019 at 11:08 .
+Reason: added reply to Agamemnus, the writer of this article
+Forteen88 
+View Public Profile 
+Find More Posts by Forteen88 
+11th April 2019, 13:22
+# 2 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by Forteen88 
+I found this quite new article which got a nice VFMA-comparison,
+https://unrealaussies.com/tech/nvenc...sions-for-x265 
+Does anyone else here got to the same conclusions?
+I'm most interested in HD-encoding at high-quality (like CRF 18@veryslow) for offline use, so I'd like some more data for it.
+Note that the test is on gaming material in 1440p 60fps. Not even sure that the used VMAF algorithm is suitable for assessing that material. Also, I woudlnt think that x265 is tuned for that kind of material either, while NVENC most definitely is since they use gaming in their marketing material when they do comparisons. Even though nvenc has imroved alot, espcially the new turing version, I wouldnt base any conclusions regarding HD "film" offline encoding from those results.
+But on a more generell topic, I dont think x265 is that useable at crf18 veryslow for offline encoding for personal use; when reaching near visuall lossless quality, the bitrate saving isnt enough to justify the speed @ something like veryslow, compared to x264 for most film material. For me x265 makes the most sense for HDR, UHD, Streaming services and other bitrate starved scenarios.
+Last edited by excellentswordfight; 11th April 2019 at 13:38 .
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+11th April 2019, 13:26
+# 3 
+|   Link 
+Forteen88 
+Herr
+Join Date: Apr 2009
+Location: North Europe, too cold winters.
+Posts: 566
+@excellentswordfight. Thanks, I didn't look up what kind of source it was. I assumed it was a standard movie.
+And yeah, I was surprised that Turing (H.265 hardware encoding) got even better result than x265 at same bitrate.
+EDIT: I've seen that many people uses like CRF 16 with x264 for HD-videos, so I thought that I'd save some bitrate by setting it to CRF 18 and use x265 instead. Also, using 10-bit encode-setting on x264 isn't GPU-decodable, while x265 at 10-bit is.
+Last edited by Forteen88; 11th April 2019 at 23:27 .
+Forteen88 
+View Public Profile 
+Find More Posts by Forteen88 
+12th April 2019, 11:13
+# 4 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by Forteen88 
+EDIT: I've seen that many people uses like CRF 16 with x264 for HD-videos, so I thought that I'd save some bitrate by setting it to CRF 18 and use x265 instead. Also, using 10-bit encode-setting on x264 isn't GPU-decodable, while x265 at 10-bit is.
+If you wanna replace an encoding workflow that uses something like crf16 with x264, you are definitely aiming towards visually lossless compression. And when keeping that ammount a fidelity you will not get that big of an bitrate reduction, and it will be 15x slower (x265 veryslow vs x264 veryslow). The tradeoff is imo not worth it.
+Preset slow and accepting a bit of quality reduction, then it starting to makes more sense. Dont get me wrong, there are plenty of use cases for x265, and its up to each one to say if the compute time is worth the bitrate reduction. But I whouldnt compress a 1080p SDR library using x265.
+Last edited by excellentswordfight; 12th April 2019 at 11:24 .
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+12th April 2019, 18:31
+# 5 
+|   Link 
+Blue_MiSfit 
+Derek Prestegard IRL
+Join Date: Nov 2003
+Location: Los Angeles
+Posts: 6,031
+Yeah if you want absolutely transparent quality you're probably better off using x264 still unless time is of no object. 
+For the "almost transparent" use case, x265 absolutely crushes. You'll get very nice bitrate savings as long as you can spend a fair bit more compute.
+Typical web delivery is a few pegs below this - it tends to cap out at the "very good at a distance" level, and stay well above the "good enough" level (below which you start getting customer complaints).
+FWIW, I think VMAF is trained mostly for just below "almost transparent". I've seen things that have VMAF scores of ~99 but I would just barely call "almost transparent". This really makes sense, since streaming ABR ladders are not designed for archiving, or for critical viewing by me / other videophiles. They're designed for normal people, to prevent rebuffering, and offer a good experience under normal viewing conditions - not transparency. 
+That's why streaming providers cap out between 15 and 25 Mbps for 2160p and why UHD BluRay averages easily double that.
+Last edited by Blue_MiSfit; 13th April 2019 at 05:38 .
+Blue_MiSfit 
+View Public Profile 
+Find More Posts by Blue_MiSfit 
+12th April 2019, 18:38
+# 6 
+|   Link 
+dipje 
+Registered User
+Join Date: Oct 2014
+Posts: 259
+People seem to forget that the CRF from x264 isn't the same as x265's. Tune the value to the point where you think the quality is right on the edge of not acceptable, and then take some margin. Then do the same for the other codec and see if the smaller file size (if any ) is worth the encoding time.
+dipje 
+View Public Profile 
+Find More Posts by dipje 
+14th April 2019, 21:16
+# 7 
+|   Link 
+Forteen88 
+Herr
+Join Date: Apr 2009
+Location: North Europe, too cold winters.
+Posts: 566
+Quote:
+Originally Posted by Blue_MiSfit 
+Yeah if you want absolutely transparent quality you're probably better off using x264 still unless time is of no object. 
+For the "almost transparent" use case, x265 absolutely crushes. You'll get very nice bitrate savings as long as you can spend a fair bit more compute.
+...
+I'm good with "almost transparent" quality. Isn't x265 CRF 18@veryslow usually that?! Sometimes I use x265@CRF 19 --slower too.
+Forteen88 
+View Public Profile 
+Find More Posts by Forteen88 
+15th April 2019, 01:25
+# 8 
+|   Link 
+Blue_MiSfit 
+Derek Prestegard IRL
+Join Date: Nov 2003
+Location: Los Angeles
+Posts: 6,031
+That's up to you to decide.
+Blue_MiSfit 
+View Public Profile 
+Find More Posts by Blue_MiSfit 
+16th April 2019, 19:39
+# 9 
+|   Link 
+Forteen88 
+Herr
+Join Date: Apr 2009
+Location: North Europe, too cold winters.
+Posts: 566
+Quote:
+Originally Posted by Blue_MiSfit 
+That's up to you to decide.
+I was just wondering at which CRF-numbers that x265 "crushes" when encoding "almost transparent" HD-video (I assume that "crushes" means where x265 is great?! my native language isn't English).
+I thought about this comment of yours,
+Quote:
+For the "almost transparent" use case, x265 absolutely crushes.
+Forteen88 
+View Public Profile 
+Find More Posts by Forteen88 
+17th April 2019, 03:53
+# 10 
+|   Link 
+Blue_MiSfit 
+Derek Prestegard IRL
+Join Date: Nov 2003
+Location: Los Angeles
+Posts: 6,031
+Yep, I mean x265 is great for sure 
+To me, most 1080p content around 5-8 Mbps is "almost transparent", though it does depend. Really grainy content requires more, plus usually a grain tuning. In this area, x265 can excel. 
+Going up closer to BluRay levels, the benefits of HEVC at 1080p start to melt away. Heck, eventually even MPEG-2 (or MPEG-1) look just fine 
+Blue_MiSfit 
+View Public Profile 
+Find More Posts by Blue_MiSfit 
+17th April 2019, 10:00
+# 11 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by Forteen88 
+I was just wondering at which CRF-numbers that x265 "crushes" when encoding "almost transparent" HD-video (I assume that "crushes" means where x265 is great?! my native language isn't English).
+I thought about this comment of yours,
+CRF values between presets/settings are not comparable, so it cant really be answered without encoder settings as well.
+Just go ahead and try some presets and different CRF values and see what fits your need the best. And what I was trying to say earlier is that preset veryslow, is imo to slow if your not encoding at a bitrate starved level (which crf18 isnt), cause the speed penalty will imo not outweight the gains, but crf18 could still be absolutly perfect for preset medium etc. My "baseline" for x265 is preset slow and crf19, I then go from there depending on the resultats on the content. Cause if you are closer to say 10Mbps, then 5Mbps, for a normal blurayrip, there is a pretty high chance that x264 would give very comparable resaults much faster.
+Last edited by excellentswordfight; 17th April 2019 at 10:06 .
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+17th April 2019, 14:43
+# 12 
+|   Link 
+Forteen88 
+Herr
+Join Date: Apr 2009
+Location: North Europe, too cold winters.
+Posts: 566
+Quote:
+Originally Posted by excellentswordfight 
+CRF values between presets/settings are not comparable, so it cant really be answered without encoder settings as well.
+I meant my settings that I wrote earlier in this thread:
+Quote:
+x265 CRF 18@veryslow usually that?! Sometimes I use x265@CRF 19 --slower too.
+But I should've written it again there. I also set --no-sao and other minor settings too.
+Maybe I should set CRF 19 more often then.
+Thanks
+Last edited by Forteen88; 17th April 2019 at 15:03 .
+Forteen88 
+View Public Profile 
+Find More Posts by Forteen88 
+18th April 2019, 16:43
+# 13 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Quote:
+Originally Posted by excellentswordfight 
+Note that the test is on gaming material in 1440p 60fps. Not even sure that the used VMAF algorithm is suitable for assessing that material.
+VMAF was definitely not tested with 1440p, and had little to any game content in it. Game content is Weird, with a combination of continuous tone elements and super-sharp UHD, and often some aliasing.
+VMAF probably means SOMETHING with this kind of content, but I imagine the correlation with subjective quality is a lot weaker, and it's far from 100% even for movie content. VMAF is the least-bad objective metric we've had to date, and it's getting better, but like all machine learning systems, it's limited by what content it was trained against.
+VMAF's subjective correlation is also dropping as more an more encoders tune for VMAF instead of pure subjective quality. Once a metric becomes popular, it gets heavily optimized for. Optimizing for VMAF will make for a much better encoder than PSNR, but still will be inferior to pure subjective quality tuning. But that's super expensive, so VMAF is very helpful for early-stage iteration.
+Quote:
+Also, I woudlnt think that x265 is tuned for that kind of material either, while NVENC most definitely is since they use gaming in their marketing material when they do comparisons. Even though nvenc has imroved alot, espcially the new turing version, I wouldnt base any conclusions regarding HD "film" offline encoding from those results.
+I know that x265 got at least some game content for tuning (Twitch has a good library of test sources). But yeah, NVENC is almost certainly the #1 encoder for game streaming. I would still anticipate that x265 would outperform it at higher presets, though, because it uses lots of codec features NVEnc doesn't.
+using --tskip would probably help disproportionately with gaming content.
+Quote:
+But on a more generell topic, I dont think x265 is that useable at crf18 veryslow for offline encoding for personal use; when reaching near visuall lossless quality, the bitrate saving isnt enough to justify the speed @ something like veryslow, compared to x264 for most film material. For me x265 makes the most sense for HDR, UHD, Streaming services and other bitrate starved scenarios.
+The right test is quality @ speed, so perhaps x265 --preset slow versus x264 --preset veryslow?
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+26th April 2019, 11:08
+# 14 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by benwaggoner 
+The right test is quality @ speed , so perhaps x265 --preset slow versus x264 --preset veryslow?
+I agree, but I think x265 slow is generally about half the speed of x264 veryslow though. From what I've seen, veryslow is about the same speed as x265 medium. And medium isnt that great for HQ encodes imo, I dont think that x265 beat x264 for hq 1080p SDR encodes when tuned at the same speed.
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+26th April 2019, 16:53
+# 15 
+|   Link 
+Forteen88 
+Herr
+Join Date: Apr 2009
+Location: North Europe, too cold winters.
+Posts: 566
+Quote:
+Originally Posted by excellentswordfight 
+I agree, but I think x265 slow is generally about half the speed of x264 veryslow though. From what I've seen, veryslow is about the same speed as x265 medium. And medium isnt that great for HQ encodes imo, I dont think that x265 beat x264 for hq 1080p SDR encodes when tuned at the same speed.
+So for people with slow CPU:s or those that are doing lots of encodes, x264 seems to be the way to go for 1080p transparent-HQ-encodes.
+I'm going to buy one of the new AMD 7nm CPU:s that comes out this summer, so encoding-speed won't be that much of a big issue, although too many threads is not good for encoding.
+Last edited by Forteen88; 26th April 2019 at 16:57 .
+Forteen88 
+View Public Profile 
+Find More Posts by Forteen88 
+26th April 2019, 21:27
+# 16 
+|   Link 
+Motenai Yoda 
+Registered User
+Join Date: Jan 2010
+Posts: 704
+I don't get why you see x264 as better than x265, the results from the article you posted shows that x265_8_veryfast is way better (on the vmaf score) than x264_8_slow, and even x265_6_veryfast is better too.
+also without results about encoding speeds I would prefer hw encoding when gaming rather than heavily increase cpu load
+__________________
+powered by Google Translator
+Motenai Yoda 
+View Public Profile 
+Find More Posts by Motenai Yoda 
+27th April 2019, 12:56
+# 17 
+|   Link 
+Forteen88 
+Herr
+Join Date: Apr 2009
+Location: North Europe, too cold winters.
+Posts: 566
+Quote:
+Originally Posted by Motenai Yoda 
+I don't get why you see x264 as better than x265,
+If you read the other posts here, you'll see that the article I linked was bad, because they use gaming-video as source, which VMAF isn't optimized for.
+Also, I personally always prefer to use x265 over x264, since I'm in no hurry encoding fast (maybe I'll do that only when I GPU-encode in live video-capture).
+Last edited by Forteen88; 7th June 2019 at 20:02 .
+Forteen88 
+View Public Profile 
+Find More Posts by Forteen88 
+8th June 2019, 06:30
+# 18 
+|   Link 
+Agamemnus 
+Registered User
+Join Date: Jul 2010
+Posts: 5
+Quote:
+Originally Posted by Forteen88 
+EDIT: Never mind, this article isn't 'nice', since the source is game-video, not suited for VMAF!
+Rubbish. VMAF has better correlation with viewer experience than plenty of other methods. http://dx.doi.org/10.1145/3210424.3210434 These guys tested CS:GO, Diablo 3, DotA 2, FIFA 2017, H1Z1:JK, Hearthstone, Heroes of the Storm, League of Legends, Project Cars, PUBG, Starcraft 2 and World of Warcraft. Each game has 2 clips of it, each clip encoded with 24 different settings. Then compared the scores given by VMAF, PSNR, SSIM, STRREDOpt, BRISQUE, BIQI and NIQE.
+Have a read before you pretend to know what you're talking about.
+The only thing that's worth pointing out regarding your particular issue, is that the link you looked at is not relative to your query. All the tests I did are with single-pass ABR rc methods of encoding, because it's streaming oriented. NVENC can't do CRF at all. If you want to do offline encoding of HD video then it's not the right data for you because it's not testing CRF in the first place.
+Quote:
+FWIW, I think VMAF is trained mostly for just below "almost transparent".
+VMAF can be trained for whatever you like, Netflix has their preferred methods, occasionally other people train it differently. The idea of VMAF being trained for "almost lossless" is inherently inaccurate to the fact that VMAF may or may not be, depending on the model, the use case and the audience it was trained on.
+Quote:
+Originally Posted by excellentswordfight 
+CRF values between presets/settings are not comparable, so it cant really be answered without encoder settings as well.
+Just go ahead and try some presets and different CRF values and see what fits your need the best. And what I was trying to say earlier is that preset veryslow, is imo to slow if your not encoding at a bitrate starved level (which crf18 isnt), cause the speed penalty will imo not outweight the gains, but crf18 could still be absolutly perfect for preset medium etc. My "baseline" for x265 is preset slow and crf19, I then go from there depending on the resultats on the content. Cause if you are closer to say 10Mbps, then 5Mbps, for a normal blurayrip, there is a pretty high chance that x264 would give very comparable resaults much faster.
+This is the best advice I can see for the OP in this thread. There isn't some kind of magical answer, and the encoding time they're going to get will be crazy. The best way to get actual good encoding speeds in H.265 is to use SVT-HEVC and have an x-series or XEON 7th gen Intel CPU or more recent. And again, you can't have CRF with that encoder either, and if you could, it wouldn't be related to x265's just like libvpx-vp9's CRF isn't related to x265's nor x264's.
+Quote:
+Originally Posted by benwaggoner 
+VMAF was definitely not tested with 1440p, and had little to any game content in it. Game content is Weird, with a combination of continuous tone elements and super-sharp UHD, and often some aliasing.
+VMAF probably means SOMETHING with this kind of content, but I imagine the correlation with subjective quality is a lot weaker, and it's far from 100% even for movie content. VMAF is the least-bad objective metric we've had to date, and it's getting better, but like all machine learning systems, it's limited by what content it was trained against.
+It doesn't have to be, you can compare relative scores between encodes at the same resolution with any VMAF model, you just can't compare absolute scores cross-resolution with one single model, which I didn't do. The source code documentation makes this clear and the devs specifically answered this question when I asked them in the GitHub's issues. See the link I put above for how it correlates with game content. Model 0.6.1 may not have been trained on game content, but it still consistently performs spectacularly. Nothing stops somebody from making a model based solely on game content for VMAF, which I've thought about doing, but haven't yet found a game that doesn't already correlate with VMAF model 0.6.1 anyway. If you find one, and are able to show it, then I'd love to see it.
+Quote:
+Originally Posted by benwaggoner 
+VMAF's subjective correlation is also dropping as more an more encoders tune for VMAF instead of pure subjective quality. Once a metric becomes popular, it gets heavily optimized for. Optimizing for VMAF will make for a much better encoder than PSNR, but still will be inferior to pure subjective quality tuning. But that's super expensive, so VMAF is very helpful for early-stage iteration.
+Yes, encoders do that. As long as VMAF models are trained for correlation with subjective quality, then optimising for VMAF scores IS optimising for subjective quality.
+Agamemnus 
+View Public Profile 
+Find More Posts by Agamemnus 
+8th June 2019, 11:53
+# 19 
+|   Link 
+Agamemnus 
+Registered User
+Join Date: Jul 2010
+Posts: 5
+Quote:
+Originally Posted by Forteen88 
+I found this quite new article which got a nice VMAF-comparison,
+https://unrealaussies.com/tech/nvenc...sions-for-x265 
+Does anyone else here got to the same conclusions?
+I'm most interested in HD-encoding at high-quality (like CRF 18@veryslow) for offline use, so I'd like some more data for it.
+EDIT: Never mind, this article isn't 'nice', since the source is game-video, not suited for VMAF!
+EDIT2: UPDATE! I wrote that "this article isn't 'nice', since the source is game-video, not suited for VMAF!" based upon the comments in this thread!
+BTW, it was I who contacted 'Agamemnus', the writer of this article, for him to know about this thread!
+I saw your update, and you're right, you did go on the information that other people gave you. I may have reacted harshly.
+To answer your actual question, yes, NVENC HEVC is really really good, but sadly, for TV shows, one of it's weaknesses becomes particularly obvious. NVENC encoders produce slightly obvious artifacts in really dark scenes. If you're encoding your horror genre collection, then you'll notice it all the time.
+If you genuinely have absolutely NO ISSUE with time to encode, then x265 Slower is a fantastic preset. In my opinion, VerySlow does take longer but doesn't score higher and doesn't save bits. I don't know why, I have theories as to why, but I haven't proven them. Choose whatever CRF you think looks as good as you like it to look, and save a preset and keep it.
+VP9 is a good alternative, CRF 35-36 in libvpx-vp9 is approximately equal to x265 CRF 20. The encode time will do your head in though.
+If you have a CPU with some of the more recent instruction sets, like AVX-512, then you can get massive speed increases using Intel's SVT encoders. They have one for HEVC, one for VP9 and one for AV1. AV1 is the best, but it's feature set is still very immature. You can't use CRF for any of them, only QP, so file sizes for same-quality as your CRF encodes will be larger. But, if you have a good CPU, this is an awesome way to save a lot of time. These encoders are legit like 10x faster than common ones.
+I hope you find the answer you're looking for. Chances are, x265 Slower at the CRF you like will be good, it will just take ages to encode especially if you have a large collection.
+Agamemnus 
+View Public Profile 
+Find More Posts by Agamemnus 
+8th June 2019, 13:06
+# 20 
+|   Link 
+Forteen88 
+Herr
+Join Date: Apr 2009
+Location: North Europe, too cold winters.
+Posts: 566
+Quote:
+Originally Posted by Agamemnus 
+If you genuinely have absolutely NO ISSUE with time to encode, then x265 Slower is a fantastic preset.
+...
+...CRF 35-36 in libvpx-vp9 is approximately equal to x265 CRF 20. The encode time will do your head in though.
+I hope you find the answer you're looking for. Chances are, x265 Slower at the CRF you like will be good, it will just take ages to encode especially if you have a large collection.
+Thanks, I plan to do lots of encodes like that (benwaggoner here also recommended x265@Slower preset) when I buy the new AMD Ryzen 3000-series of CPU:s that is released next month. My GPU (NVidia GF 840M) doesn't have AV1 hardware-decoding (and I don't know if it got VP9 hardware-decoding), so I'll just stick with HEVC/H.265.
+And thanks for commenting on this thread.
+Last edited by Forteen88; 8th June 2019 at 13:10 .
+Forteen88 
+View Public Profile 
+Find More Posts by Forteen88 
+8th June 2019, 13:32
+# 21 
+|   Link 
+lvqcl 
+Registered User
+Join Date: Aug 2015
+Posts: 337
+Quote:
+Originally Posted by Forteen88 
+My GPU (NVidia GF 840M) doesn't have AV1 hardware-decoding (and I don't know if it got VP9 hardware-decoding), so I'll just stick with HEVC/H.265.
+Looks like this videocard doesn't have any video decoding capabilities.
+lvqcl 
+View Public Profile 
+Find More Posts by lvqcl 
+8th June 2019, 17:33
+# 22 
+|   Link 
+Forteen88 
+Herr
+Join Date: Apr 2009
+Location: North Europe, too cold winters.
+Posts: 566
+Quote:
+Originally Posted by lvqcl 
+Looks like this videocard doesn't have any video decoding capabilities.
+I think that it got partly hardware-decoding support, since MPC-HC says: "Playing [HW]" when I play x265/x264-video.
+I've read here that Nvidia GF 960 GTX or better (except Nvidia GF 980 GTX!) got FULL H.265/H.264 decoding-support.
+Or maybe it's my Intel i5-5200U integrated GPU that plays it?!
+EDIT: Oh, I read this, (my Nvidia GF 840M got GPU-codename 'GM108M'), and it seems to have partly HEVC-support,
+Quote:
+First generation Maxwell (GM10x)
+First generation Maxwell GM107/GM108 provides few consumer-facing additional features; Nvidia instead focused on power efficiency. Nvidia's video encoder, NVENC, is 1.5 to 2 times faster than on Kepler-based GPUs meaning it can encode video at 6 to 8 times playback speed. Nvidia also claims an 8 to 10 times performance increase in PureVideo Feature Set E video decoding due to the video decoder cache paired with increases in memory efficiency. However, HEVC is not supported for full hardware decoding, relying on a mix of hardware and software decoding. When decoding video, a new low power state "GC5" is used on Maxwell GPUs to conserve power.
+Last edited by Forteen88; 8th June 2019 at 21:03 .
+Forteen88 
+View Public Profile 
+Find More Posts by Forteen88 
+8th June 2019, 18:36
+# 23 
+|   Link 
+MatLz 
+I often say "maybe"...
+Join Date: Jul 2009
+Location: France
+Posts: 585
+Mine is GeForce Go 7600 .
+Is it good to decode video ?
+__________________
+We are spitting food to these hungry eyes.
+You see they ask, we know they are greedy of our rot.
+Better than to give jam to pigs. 
+x264 r2146 MOD 
+MatLz 
+View Public Profile 
+Visit MatLz's homepage! 
+Find More Posts by MatLz 
+8th June 2019, 19:14
+# 24 
+|   Link 
+Asmodian 
+Registered User
+Join Date: Feb 2002
+Location: San Jose, California
+Posts: 2,673
+LOL, no it is not. GPUs from 13 years ago don't have hardware decoding. It is only the last few generations that have had decent hardware decode chips. 
+Edit: We especially want H.265 hardware decoding, which is only on pretty new GPUs.
+__________________
+madVR options explained 
+Last edited by Asmodian; 8th June 2019 at 19:16 .
+Asmodian 
+View Public Profile 
+Find More Posts by Asmodian 
+8th June 2019, 20:52
+# 25 
+|   Link 
+lvqcl 
+Registered User
+Join Date: Aug 2015
+Posts: 337
+More recent list:
+https://developer.nvidia.com/video-e...support-matrix 
+lvqcl 
+View Public Profile 
+Find More Posts by lvqcl 
+8th June 2019, 21:22
+# 26 
+|   Link 
+Forteen88 
+Herr
+Join Date: Apr 2009
+Location: North Europe, too cold winters.
+Posts: 566
+Quote:
+Originally Posted by MatLz 
+Mine is GeForce Go 7600 .
+Is it good to decode video ?
+Oh, darn, I deleted the old Nvidia-list that showed support for your graphicscard! I thought that the new list that the new poster included would include your graphicscard.
+Here's the old list again,
+https://www.nvidia.com/docs/CP/11036...Comparison.pdf 
+Forteen88 
+View Public Profile 
+Find More Posts by Forteen88 
+8th June 2019, 21:44
+# 27 
+|   Link 
+nevcairiel 
+Registered Developer
+Join Date: Mar 2010
+Location: Hamburg/Germany
+Posts: 8,930
+Only NVIDIA GPUs with second-generation PureVideo HD (VP2) hardware or newer are supported by modern hardware acceleration, because first-gen PureVideo HD was only partial acceleration and required strong support from a host decoder.
+VP2 was introduced in the 8th generation (only some models of the 8th gen at that), 7th Generation like the Geforce Go 7600 does not have it yet.
+You may be able to find some older software that still implements support for the partial hardware acceleration somewhere, but most modern stuff has dropped it, since it hasn't been useful for over a decade now, and was very complicated to use.
+There is a handy list in the Linux driver README:
+http://us.download.nvidia.com/XFree8...rtedchips.html 
+Any card with VDPAU Feature Set A or higher is at least capable of some modern hardware decoding. For HEVC, you want a card with F or higher. The first cards ever with F are the 950 and 960.
+__________________
+LAV Filters - open source ffmpeg based media splitter and decoders
+Last edited by nevcairiel; 8th June 2019 at 21:52 .
+nevcairiel 
+View Public Profile 
+Find More Posts by nevcairiel 
+11th June 2019, 16:42
+# 28 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Quote:
+Originally Posted by Agamemnus 
+It doesn't have to be, you can compare relative scores between encodes at the same resolution with any VMAF model, you just can't compare absolute scores cross-resolution with one single model, which I didn't do. The source code documentation makes this clear and the devs specifically answered this question when I asked them in the GitHub's issues. See the link I put above for how it correlates with game content. Model 0.6.1 may not have been trained on game content, but it still consistently performs spectacularly. Nothing stops somebody from making a model based solely on game content for VMAF, which I've thought about doing, but haven't yet found a game that doesn't already correlate with VMAF model 0.6.1 anyway. If you find one, and are able to show it, then I'd love to see it.
+To compare different resolution encodes, you can just scale up everything to the highest resolution. Choice of scaling algorithm has some interesting impacts (as it should).
+Do you have some data on VMAF use for gaming content? It's not that I think it would be bad so much as it wouldn't be reliable . Games are interesting with important static elements that need to be very sharp, and also moving parts that likely have sharper edges than natural image content, and less/no motion blur.
+VMAF is definitely the least-bad metric we have, and keeps getting better. But it definitely has some significant limitations. For example: It doesn't discriminate well between higher quality encodes; it's most useful when there is significant visible degradation
+It doesn't detect banding well
+It doesn't catch visible artifacts in low luma SDR content
+It doesn't have an HDR mode
+It's not great at rating different flavors of adaptive quantization.
+In the end, it's a machine learning model, and so only as good as the content it was trained on. So it's going to be best at identifying the kinds of errors introduced by the encoder and the range of encoder settings that the test assets were created with.
+For example, I wouldn't expect VMAF to be particularly good for VVC until it's been trained some on VVC "style" artifacts.
+Quote:
+Yes, encoders do that. As long as VMAF models are trained for correlation with subjective quality, then optimising for VMAF scores IS optimising for subjective quality.
+Except you can't train for subjective quality. You train on how humans subjectively rated a test corpus. The farther you get from the kind of content (including encoding settings) used in the test corpus, the less applicable VMAF will be.
+The issue with targeting the metric isn't unique to VMAF. Encoders were over-tuned for PSNR for decades, assuming that was highly perceptually correlated. But PNSR really isn't THAT correlated. But because it was a marketable feature, lots of encoders wound up optimizing for it instead of subjective quality. This happens with any metric. And the better the metric is subjectively correlated, the less problematic this will be. But still, any metric based on an average of individual frame scores is going to underscore things like keyframe strobing and quality in the most difficult scenes.
+One novel thing about VMAF versus SSIM and PSNR is that it significantly evolved over time. So VMAFv5 scores will be a lot more meaningful than VMAFv1. We should get into the habit of indicating the VMAF version number when we share VMAF scores. It'll be interesting to rerun VMAF on old encodes and see how those scores have changed over time.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+13th June 2019, 22:04
+# 29 
+|   Link 
+Agamemnus 
+Registered User
+Join Date: Jul 2010
+Posts: 5
+Quote:
+Originally Posted by benwaggoner 
+To compare different resolution encodes, you can just scale up everything to the highest resolution. Choice of scaling algorithm has some interesting impacts (as it should).
+Sure, if you want to compare the projected quality of two different res encodes played back on same-res viewing to see which one rates better, that's exactly what you have to do. There's a massive discussion about how that's how Netflix chooses the stream version to send their customers, including the resolution, all referenced from the source code. The link that the OP referenced was a comparison between different encodes of a single res and he's only asking about which settings to use. While you're correct, it doesn't seem to be relevant to the OP's question, though I think if he was mainly limited by file-size/bandwidth or even encode time, then it could come into play for sure.
+Quote:
+Originally Posted by benwaggoner 
+Do you have some data on VMAF use for gaming content? It's not that I think it would be bad so much as it wouldn't be reliable . Games are interesting with important static elements that need to be very sharp, and also moving parts that likely have sharper edges than natural image content, and less/no motion blur.
+Yeah, there's a great study linked in the post you're quoting. http://dx.doi.org/10.1145/3210424.3210434 where they tested CS:GO, Diablo 3, DotA 2, FIFA 2017, H1Z1:JK, Hearthstone, Heroes of the Storm, League of Legends, Project Cars, PUBG, Starcraft 2 and World of Warcraft and compared scores from VMAF, PSNR, SSIM, STRREDOpt, BRISQUE, BIQI and NIQE. It doesn't win in every single possible circumstance, but it wins the vast majority. Using any of the alternatives they tested you would be less likely to get a more accurate prediction most of the time. My first tests (the ones that the OP linked) were on Overwatch, then I started doing Apex, and now I'm including Heroes of the Storm. I originally suspected that the movement styles of the 3 games would cause more differences than what it has turned out to be, but I'd rather know than not-know.
+Quote:
+Originally Posted by benwaggoner 
+VMAF is definitely the least-bad metric we have, and keeps getting better.
+To me, "least-bad" is just a rephrasing of "best that exists". I gave him the best possible advice I know of, if there's better out there, I'd love to hear it. Why would anybody give advice that isn't the based on the best results possible? Regardless, I've noticed that most people seem to think there's some decisive way to know which of two distortions are better than the other, and everybody keeps forgetting that every single human alive rates "video quality" differently. In answering questions like "which encode should I use?" there's always different answers from different people. All I can offer, is what basically comes down to "if you were to show the 2 resultant videos to a thousand people, here's the one that the majority will think is better". I can show that the answer will be accurate more often than any other method of working it out known to man. If a person doesn't want that answer, but wants to judge quality a particular way, then they're welcome to specify the judgement method. Without that, I don't know what other possible answer could be good when we know the one above. As far as I can tell, the world record time for the 100m sprint is the "least-bad" time. There's always a way to imagine it better, there's always a way to think it could be better, but until it's done, better doesn't exist. And I aim to give the best answer that exists. Originally I just wanted to know for myself, but so many people ask questions like this, it seems like something that needs to be spread. It's not an answer of "which is better decisively" but more of an answer to "which will most people perceive is better?", which seems fair, since knowing without perception implies a definition of quality, and quality has a varied definition. If a person asks the internet "which one will I think is better?", well then, I can give them the most likely answer, but I'll never be them and for all I know they're colour blind anyway.
+Quote:
+Originally Posted by benwaggoner 
+But it definitely has some significant limitations. For example: It doesn't discriminate well between higher quality encodes; it's most useful when there is significant visible degradation
+It doesn't detect banding well
+It doesn't catch visible artifacts in low luma SDR content
+It doesn't have an HDR mode
+It's not great at rating different flavors of adaptive quantization.
+To the best of my knowledge, it discriminates better between higher quality encodes than any other method that exists. If I'm wrong I'd love to see what does it better. Saying it doesn't do it well, is a repeat of the "least-bad" 100m world record sprint time train of thought, which again to me seems a pointless road to go down. You can say the 100m sprint record is not fast, but hey, it's still the world record so I can't tell you what the next record time will be until it happens. If I'm wrong, and there's a better method, then please show me, I'm extremely interested in this stuff and that's how I got onto doing the testing that I do, but I'm yet to see better than VMAF. The best point you list is the HDR mode, which is true, as far as I know it doesn't exist for VMAF. An interesting thing to note is that it actually ONLY works on luma, I don't think it even considers chroma at all. Could be wrong about that though. In my opinion it's amazing how well it correlates to viewer rating only considering the luma channel. In fact, it's amazing that it works that way at all. I've read explanations for it, but I don't know that they're true.
+Quote:
+Originally Posted by benwaggoner 
+In the end, it's a machine learning model, and so only as good as the content it was trained on. So it's going to be best at identifying the kinds of errors introduced by the encoder and the range of encoder settings that the test assets were created with.
+For sure, and the OP did link to that test I did asking about x265, which is indeed one of the encoders that generated distortions in the videos on which model 0.6.1 was trained on, and the model that I used in that article. So it's perfectly relevant. To your point though, I'm somewhat interested in training new models on VP9 and AV1, both the reference versions from Google and AOMedia, and the Intel software encoders. I'm not yet convinced that it needs to be done, but if anybody knows a test that shows another metric beats VMAF in these circumstances, then that would tip me over the edge and I'd start by the end of next month. As for VVC, I don't think the bitstream will even be finalised for another year, possibly 2, so we don't even have encoders for that yet, let alone testers. I know they've demonstrated progress encodes, but they may not be compatible by the time it's public anyway.
+Quote:
+Originally Posted by benwaggoner 
+Except you can't train for subjective quality. You train on how humans subjectively rated a test corpus. The farther you get from the kind of content (including encoding settings) used in the test corpus, the less applicable VMAF will be.
+Again what you're saying is correct. It just doesn't change the fact that it still does it better than any other method. As long as VMAF predicts human quality ratings for a video more accurately than any other thing in the world can do, then it's doing it's job correctly. Until it doesn't, there's literally no better way to predict which video will rate better. How do you answer a person's question on what good quality is by using something OTHER than the best possible method? If they want the information, I say give it, and don't give anything other than the best. It's not perfect, my dad has terrible eyesight and will sometimes watch a video that I think looks perfect and he'll think it's terrible, that he can't see a thing. Then on another video we'll reverse opinions. That's just a matter of chance and preference. The best answer you can give, is which one will MOST people think is better, and go with that. Any non-subjective predictor method, say objective, still needs to be constructed from an underlying assumption about what "quality" is. It's inevitable that one day a person will say "na that look horrible" no matter how you do it. What's important, is minimising the frequency of this happening.
+Quote:
+Originally Posted by benwaggoner 
+The issue with targeting the metric isn't unique to VMAF. Encoders were over-tuned for PSNR for decades, assuming that was highly perceptually correlated. But PNSR really isn't THAT correlated. But because it was a marketable feature, lots of encoders wound up optimizing for it instead of subjective quality. This happens with any metric. And the better the metric is subjectively correlated, the less problematic this will be. But still, any metric based on an average of individual frame scores is going to underscore things like keyframe strobing and quality in the most difficult scenes.
+This is kind of the clincher point. Encoders slowly begin to "cheat" by optimising for a score according to a metric. That's clearly something that is conceptually unsettling. But if the cheat sheet is RIGHT then it's fine. The creation of VMAF is kind of a consequence of this, in that the "cheat sheets" weren't getting enough right answers, so Netflix wanted a better one. In an interesting turn of events, this is exactly what needs to happen. Any business that cares about how good their videos look to their customers, wants to know exactly how much bandwidth they can save while keeping their viewers served with what THE VIEWER will think is the best quality they could get with their internet connection. The monetary side of it keeps it honest. A test that just enables the encoder team to say "look it's perfect at low bitrate" doesn't serve the interest of the streaming provider if the customers can tell it's not perfect. For the streaming provider to know if they can cut bandwidth AND make their customers happier than any other streaming provider, then BOOM, they make more money. This is the birth of VMAF, and it will be the cause of revisions to VMAF, and the cause of new models for new circumstances. Eventually, it will be the cause for replacements, more encoders, and even more metrics, to replace them all. This is what's good in my opinion. Currently, from what the devs are saying, they seem to agree that the temporal artifacts are the next main issue to deal with. There's some different types of temporal pooling you can use with VMAF scoring, they're even available in the FFMPEG filter, but they're all pretty much stock standard mathematical methods of averaging, I don't think they're particularly ingenious as of this point in time. Hopefully, that will change and their models will be updated, but I don't know how much they will care as long as it still correlates better than all alternatives.
+I actually have a sneaking suspicion that x264 and x265 are over-optimised for SSIM. There's occasions where a video at very high bitrates just keeps scoring higher and higher in SSIM with more and more encoder time or bitrate. I've sat with a few dozen people desperately trying to see the differences and we all swear blind that every single one looks perfect. Yet more encode time or bitrate keeps raising MS-SSIM. It's deceptive, but it's built into the encoders. What else could they have done? I dunno. They had to use what they had available over the decade/s of development so it's not surprising. However, I'm not sure how much I can prove this, there's notes in the version history about it, but it doesn't reveal the degree to which it happens. One thing that usually boggles some minds with VMAF is that if you compare a bit-for-bit copy of a video to itself, the score isn't perfect. This is fascinating to me, since it's model is created by machine learning, of course, humans are flawed. If you test 1000 people with placebos, sometimes a person will say they saw distortion where there was none. This gets built into the model, and as a result, when it says that a perfect copy scores 99/100, then what it's ACTUALLY telling you is that for every 20 people on average queried about the video, on average, 1 of them will say that it's not perfect. It's actually CORRECTLY predicting a non-perfect score on a perfect video! On some perfect videos, the score is only 98, and on others it's 99.5. This variation reveals something about the source footage, that there's aspects to it that viewers don't like or see as imperfections even though they're seeing the intended original. Can you just imagine applications for this fact??????
+Quote:
+Originally Posted by benwaggoner 
+One novel thing about VMAF versus SSIM and PSNR is that it significantly evolved over time. So VMAFv5 scores will be a lot more meaningful than VMAFv1. We should get into the habit of indicating the VMAF version number when we share VMAF scores. It'll be interesting to rerun VMAF on old encodes and see how those scores have changed over time.
+This I 100% agree with. I suspect that VMAF scores themselves will not exactly just go "up or down" in general over time, but, the correlation with subjective ratings is supposed to decisively go UP. I guess that's the goal of it's evolution. The VMAF scores will be closer and closer to opinion scores in more and more cases, for videos of which is was not trained on. That's the whole point of the thing. To be able to look at a new encoder or video type, or even just a new release movie, and be sure about how much bandwidth can be saved with scaling reduction in viewer perception of quality, before actually asking the viewers. This will enable better encoders, and keep the "cheat sheet" good. If it doesn't, then hopefully another metric will take over.
+I didn't start off including all the details I should have in my first tests, but I have been since, and I have a lot to publish, but work and stuff you know.... I will get it all out soon though, and, if you're interested in training GAME-SPECIFIC models, then the day may come soon, would you like to be contacted to be in the testing? I am most interested in testing under Twitch-streaming conditions, since Netflix seems to be all about the big TVs and phones for their own content. Like I said, it currently performs the best even on gaming content, but I'm open to the idea of a specifically trained model, and proving it's improved accuracy, if enough people are interested.
+Last edited by Agamemnus; 13th June 2019 at 22:10 .
+Agamemnus 
+View Public Profile 
+Find More Posts by Agamemnus 
+« 
+ Previous Thread 
+ |
+ Next Thread 
+ » 
+Thread Tools 
+Show Printable Version 
+Search this Thread 
+Advanced Search 
+Posting Rules
+You may not post new threads
+You may not post replies
+You may not post attachments
+You may not edit your posts
+BB code is On 
+Smilies are On 
+[IMG] code is On 
+HTML code is Off 
+Forum Rules 
+Forum Jump 
+User Control Panel 
+ Private Messages 
+ Subscriptions 
+ Who's Online 
+ Search Forums 
+ Forums Home 
+Announcements and Chat 
+     General Discussion 
+     News 
+     Forum / Site Suggestions & Help 
+ General 
+     Decrypting 
+     Newbies 
+     DVD2AVI / DGIndex 
+     Audio encoding 
+     Subtitles 
+     Linux, Mac OS X, & Co 
+ Capturing and Editing Video 
+     Avisynth Usage 
+     Avisynth Development 
+     VapourSynth 
+     Capturing Video 
+     DV 
+     HDTV / DVB / TiVo 
+     NLE - Non Linear Editing 
+     VirtualDub, VDubMod & AviDemux 
+     New and alternative a/v containers 
+ Video Encoding 
+     (Auto) Gordian Knot 
+     MPEG-4 ASP 
+     MPEG-4 Encoder GUIs 
+     MPEG-4 AVC / H.264 
+     High Efficiency Video Coding (HEVC) 
+     New and alternative video codecs 
+     MPEG-2 Encoding 
+     Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+ (HD) DVD, Blu-ray & (S)VCD 
+     One click suites for DVD backup and DVD creation 
+     DVD & BD Rebuilder 
+     (HD) DVD & Blu-ray authoring 
+     Advanced authoring 
+     IFO/VOB Editors 
+     DVD burning 
+ Hardware & Software 
+     Software players 
+     Hardware players 
+     PC Hard & Software 
+ Programming and Hacking 
+     Development 
+     Translations 
+All times are GMT +1. The time now is 09:25 .
+doom9.org -
+Archive -
+Top 
+Powered by vBulletin® Version 3.8.11
+Copyright ©2000 - 2026, vBulletin Solutions Inc.

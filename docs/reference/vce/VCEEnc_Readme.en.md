@@ -1,0 +1,187 @@
+
+# VCEEnc  
+by rigaya
+
+[![Build Windows Releases](https://github.com/rigaya/VCEEnc/actions/workflows/build_releases.yml/badge.svg)](https://github.com/rigaya/VCEEnc/actions/workflows/build_releases.yml)  [![Build Linux Packages](https://github.com/rigaya/VCEEnc/actions/workflows/build_packages.yml/badge.svg)](https://github.com/rigaya/VCEEnc/actions/workflows/build_packages.yml)  
+
+**[日本語版はこちら＞＞](./Readme.ja.md)**  
+
+This software is meant to investigate performance and image quality of HW encoder (VCE) of AMD.
+There are 2 types of software developed, one is command line version that runs independently, and the nother is a output plug-in of [Aviutl](http://spring-fragrance.mints.ne.jp/aviutl/).
+
+VCEEncC.exe … Command line version supporting transcoding.  
+VCEEnc.auo … Output plugin for [Aviutl](http://spring-fragrance.mints.ne.jp/aviutl/).  
+
+## Downloads & update history
+[rigayaの日記兼メモ帳＞＞](http://rigaya34589.blog135.fc2.com/blog-category-12.html)  
+[github releases](https://github.com/rigaya/VCEEnc/releases)  
+
+## Install
+[Install instructions for Windows and Linux](./Install.en.md).
+
+## Build
+[Build instructions for Windows and Linux](./Build.en.md)
+
+## System Requirements
+
+### Windows
+Windows 10/11 (x86/x64)  
+AviUtl 1.00/1.10  (VCEEnc.auo)  
+AviUtl 2.00 beta19 or later  (VCEEnc.auo2)  
+Hardware which supports VCE  
+  AMD GPU Radeon HD 7xxx or later  
+  AMD APU Trinity (2nd Gen) or later  
+AMD driver 25.10.2 or later  
+
+### Linux
+Debian/Ubuntu (x64)  
+  AMD GPU Radeon RX5xxx (RDNA1) or later  
+  AMD driver 25.20 or later  
+  It may be possible to run on other distributions (not tested).
+
+## Usage and options of VCEEncC
+[Option list and details of VCEEncC](./VCEEncC_Options.en.md)
+
+## Precautions for using VCEEnc
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+
+
+## Main usable functions
+### Common to VCEEnc / VCEEncC
+- Encoding using VCE/VCN
+   - H.264/AVC
+   - HEVC
+   - AV1
+- Each encode mode of VCE
+   - CQP       (fixed quantization)
+   - CBR       (Constant bitrate)
+   - VBR       (Variable bitrate)
+- supports setting of codec profile & level, SAR, colormatrix, maxbitrate, GOP len, etc...
+
+
+### VCEEncC
+- Supports hw decoding
+  - H.264 / AVC
+  - HEVC
+  - MPEG2
+  - VP9
+  - VC-1
+- Supports various formats such as avs, vpy, y4m, and raw
+- Supports demux/muxing using libavformat
+- Supports decode using libavcodec
+- Parallel encoding supporting multi GPU
+- Calculation of ssim/psnr of the encode
+- VPP (Video Pre-Processing) filters
+
+  | Category | Filters |
+  |:--|:--|
+  | Deinterlace | afs, bwdif, yadif, nnedi, rtgmc, kfm, decomb, onnx-deint |
+  | Inverse Telecine / Decimation | rff, ivtc, decimate, mpdecimate |
+  | Noise Reduction | knn, pmd, nlmeans, hqdn3d, smooth, denoise-dct, fft3d, msmooth, degrain, convolution3d |
+  | Resize | resize (various algorithms), descale, preprocess |
+  | Edge / Detail Enhancement | unsharp, edgelevel, warpsharp, maa, cas, msharpen, detailsharpen, enhance |
+  | Dehalo / Deringing | dehalo, finedehalo, hqdering, vinverse |
+  | Color Adjustment | tweak, curves, softlight, chromashift, colorfix |
+  | Color Space / HDR | colorspace, libplacebo-tonemapping |
+  | Debanding | deband, libplacebo-deband |
+  | Frame Interpolation | frc, rife-ov |
+  | Other | delogo, subburn, pad, overlay, rotate, transform, stab, deflicker, deblock, libplacebo-shader, onnx, anime4k-shader |
+
+### VCEEnc.auo (Aviutl plugin)
+- Audio encoding
+- Mux audio and chapter
+- afs (Automatic field shift) support
+
+![VCEEnc.auo](./data/VCEEnc_auo_stg_window_en.png)
+  
+
+## Supported HW Encode Codecs
+
+| GPU Arch | GPU Gen          | dGPU     | iGPU | VCE/VCN Gen | H.264 | HEVC | AV1 | 
+|:--   |:--                   |:--       |:--   |:--:         |:--:   |:--   |:--  |
+| GCN  | Southern/Sea Islands | HD7xxx, RX2xx | | VCE1, VCE2  | 8bit  |       |    |
+|      | Volcanic Islands     | RX3xx         | | VCE3        | 8bit  |       |    |
+|      | Polaris       | RX4xx, RX5xx  |        | VCE3.4      | 8bit  |  8bit |    |
+|      | Vega          | Vega          |        | VCE4        | 8bit  |  8bit |    |
+|      | Vega          |  | RyzenAPU(2xxx-3xxx) | VCN1        | 8bit  |  8bit |    |
+|      | Vega          |  | RyzenAPU(4xxx-5xxx) | VCN2        | 8bit  | 10bit |    |
+| RDNA | RDNA1         | RX5xxx      |          | VCN2        | 8bit  | 10bit |    |
+|      | RDNA2         | RX6xxx*      | Zen4 APU | VCN3        | 8bit  | 10bit |    |
+|      | RDNA3         | RX7xxx      |          | VCN4        | 8bit  | 10bit | 10bit |
+|      | RDNA4         | RX8xxx      |          | VCN5        | 8bit  | 10bit | 10bit |
+|      | RDNA4         | RX9xxx      |          | VCN5        | 8bit  | 10bit | 10bit |
+
+* RX 6400 and RX 6500 XT not supported, due to lack of HW Encoder on these cards.
+
+## Auto GPU selection in multi GPU envinronment
+VCEEncC will automatically select a GPU depending on the options used,
+when there are multiple GPUs available which support VCE/VCN.
+--device option can be used to specify on which GPU to run manually. 
+
+1. Select GPU which supports...  
+  Items below will be checked whether the GPU supports it or not  
+  - Codec, Profile, Level
+  - Additionally, below items will be checked if specified
+    - 10bit depth encoding
+    - HW decode
+  
+2. Prefer GPU which supports...  
+  - B frame support
+  
+3. If there are multiple GPUs which suports all the items checked in 1. and 2., GPU below will be prefered.  
+  - GPU which has low Video Engine(VE) utilization
+  - GPU which has low GPU core utilization
+  
+  The purpose of selecting GPU with lower VE/GPU ulitization is to assign tasks to mulitple GPUs
+  and improve the throughput of the tasks.  
+  
+  Please note that VE and GPU ulitization are check at the initialization pahse of the app,
+  and there are delays in values taken. Therefore, it is likely that the multiple tasks started at the same time
+  to run on the same GPU, and divided into multiple GPUs, even if the options are supported in every GPUs.
+
+## AMD Driver Requirements of previous versions
+
+| VCEEnc | required graphics driver version |
+|:---|:---|
+| VCEEnc 3.00 or later | AMD driver 17.1.1 (16.50.2611) or later |
+| VCEEnc 5.00 or later | AMD driver 19.7.1 or later |
+| VCEEnc 5.01 or later | AMD driver 19.12.1 or later |
+| VCEEnc 5.02 or later | AMD driver 20.2.1 or later |
+| VCEEnc 6.09 or later | AMD driver 20.11.2 or later |
+| VCEEnc 6.13 or later | AMD driver 21.6.1 or later |
+| VCEEnc 6.17 or later | AMD driver 21.12.1 or later |
+| VCEEnc 7.00 or later | AMD driver 22.3.1 or later |
+| VCEEnc 7.03 or later | AMD driver 22.7.1 or later |
+| VCEEnc 7.15 or later | AMD driver 22.12.1 or later |
+| VCEEnc 8.07 or later | AMD driver 23.1.2 or later |
+| VCEEnc 8.17 or later | AMD driver 23.5.2 or later |
+| VCEEnc 8.23 or later | AMD driver 24.6.1 or later |
+| VCEEnc 8.24 or later | AMD driver 24.9.1 or later |
+| VCEEnc 8.24 or later | AMD driver 24.9.1 or later |
+| VCEEnc 8.33 or later | AMD driver 25.1.1 or later |
+| VCEEnc 9.02 or later | AMD driver 25.10.2 or later |
+
+## VCEEnc source code
+- MIT license.
+- This program is based on samples of [AMD Media Framework](https://github.com/GPUOpen-LibrariesAndSDKs/AMF), and contains source code provided by
+  AMD Media Framework.
+  For these licenses, please see the header part of the corresponding source and VCEEnc_license.txt.
+- This software depends on
+  [ffmpeg](https://ffmpeg.org/),
+  [libplacebo](https://code.videolan.org/videolan/libplacebo),
+  [libhdr10plus](https://github.com/quietvoid/hdr10plus_tool),
+  [libdovi](https://github.com/quietvoid/dovi_tool),
+  [tinyxml2](http://www.grinninglizard.com/tinyxml2/),
+  [dtl](https://github.com/cubicdaiya/dtl),
+  [clRNG](https://github.com/clMathLibraries/clRNG),
+  [ttmath](http://www.ttmath.org/) &
+  [Caption2Ass](https://github.com/maki-rxrz/Caption2Ass_PCR).
+  For these licenses, please see the header part of the corresponding source and VCEEnc_license.txt.
+
+### About source code
+Windows ... VC build
+
+Character code: UTF-8-BOM  
+Line feed: CRLF  
+Indent: blank x4  
+

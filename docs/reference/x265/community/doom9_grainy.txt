@@ -1,0 +1,755 @@
+﻿ 
+Updated (Grainy Source): x264 vs x265 vs NVENC H.265 vs QSV H.265 [2-pass @ 5000kbps] - Doom9's Forum 
+Welcome to Doom9 's Forum, THE in-place to be for everyone interested in DVD conversion. 
+Before you start posting please read the forum rules . By posting to this forum you agree to abide by the rules. 
+Domains: forum.doom9.org / forum.doom9.net / forum.doom9.se 
+Doom9's Forum 
+ > Video Encoding 
+> High Efficiency Video Coding (HEVC) 
+Updated (Grainy Source): x264 vs x265 vs NVENC H.265 vs QSV H.265 [2-pass @ 5000kbps]
+User Name 
+Remember Me? 
+Password 
+Register 
+FAQ 
+Today's Posts 
+Search 
+Search Forums 
+Show Threads 
+Show Posts 
+Tag Search 
+Advanced Search 
+Go to Page... 
+Thread Tools 
+Search this Thread 
+13th July 2021, 00:19
+# 1 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Updated (Grainy Source): x264 vs x265 vs NVENC H.265 vs QSV H.265 [2-pass @ 5000kbps] 
+Update : Please see this post for updated encoding and five screenshots per encode
+Quote:
+OLD POST 
+Introduction 
+I've spent about 30 hours testing the same four minute clip of a very grainy source using 2-pass @ 4,500 kbps to control for size and bitrate (for comparisons), as well as a couple of CRF encodes thrown in to see what bitrate would be required (for x265). 
+The aim of my experiment is to keep the grain, or as much of it as possible - or perceivably possible -, for the bitrate allocated. I've spent about 80 hours reading threads on doom9 the x265 documentation over a two week period. However, I have played around with heavy noise removal using x265 and x264 built-in noise reduction. I have done this to see what sort of difference it makes to the grain quality (I apologise if that doesn't make sense to anyone else).
+For creating a 'perceived rating', I tested scenes with motion, darkness, detail, edge detail (plants in the corner), and other small details. All encodes were 10 bit to create a level playing field (as much as possible). The resolution is 1920x1080. Sensible flags, such as veryslow for x264 and tuning for grain, and not tuning for grain on x265 but using slow and changing options manually that should preserve more grain, but with speed optimisations (just to get a rough idea of the output).
+I did create a different thread with screenshots, but it went to moderation and was never seen again (I don't believe it broke the rules at all, as I read each one - I've not received a message or notification about the thread so assume it has been lost).
+Software/Hardware Versions 
+NVENC (Pascal 1080 and Turing 2080)
+x265 3.5 (3.5.0.9)
+x264 161 r3048 (10 bit)
+Results 
+From testing, I've found (perceived rating out of 10):
+x265
+- NVENC (Pascal): 6/10
+- NVENC (Turing): 6/10
+- x265: 3/10
+x264
+- NVENC (Pascal): 7/10
+- NVENC (Turing): 7/10
+- x264: 8/10
+NOTE: These are 2-pass where stated, or CRF. One of the CRF files has a bitrate of over 8mbps (x265) and is OK, but also very large. I have lost many of the logs - and please ignore the () after -x265 as that's for my own sanity to try and make sure the information is correct.
+Screenshots - SOURCE
+Screenshots - NVENC (Turing)
+Quote:
+--cqp 28 --codec h265 --preset P7 --output-depth 10 --profile main10 --level 4.1 --aq --aq-temporal --lookahead 32 --vpp-knn --mv-precision q-pel
+Screenshots - QSV (Gemini Lake Refresh - 'Gen 9.5')
+Quote:
+Don't currently have the information to hand. Will attempt to update post with info.
+Screenshots - x264
+Quote:
+--pass 2 --bitrate 4500 --preset slow --tune grain --output-depth 10 --profile high10 --level 4.1 --no-fast-pskip --nr 50 --aq-mode 2 --subme 9 --me umh --merange 30 --b-adapt 2 --bframes 4 --colorprim bt709 --colormatrix bt709 --transfer bt709 --deblock -3:-3
+Screenshots - x265 (test3)
+Quote:
+--pass 2 --bitrate 4500 --output-depth 10 --profile main10 --no-high-tier --psy-rd 3.5 --rdoq-level 1 --psy-rdoq 15 --rskip 2 --rskip-edge-threshold 2 --no-early-skip --me star --hme --colorprim bt709 --colormatrix bt709 --transfer bt709 --range limited --deblock -4:-4 --no-sao
+Screenshots - x265 (test4)
+Quote:
+--pass 2 --bitrate 4500 --output-depth 10 --profile main10 --no-high-tier --psy-rd 3.5 --rdoq-level 1 --psy-rdoq 15 --rskip 2 --rskip-edge-threshold 2 --no-early-skip --nr-inter 500 --me star --hme --colorprim bt709 --colormatrix bt709 --transfer bt709 --range limited --deblock -4:-4 --no-sao
+Screenshots - x265 (test6)
+Quote:
+--crf 24 --output-depth 10 --profile main10 --no-high-tier --rskip-edge-threshold 2 --nr-inter 2000 --hme --colorprim bt709 --colormatrix bt709 --transfer bt709 --range limited --deblock -4:-4 --no-sao
+Screenshots - x265 (test8)
+Quote:
+--pass 2 --bitrate 5250 --output-depth 10 --profile main10 --psy-rd 4 --psy-rdoq 15 --aq-strength 0.8 --colorprim bt709 --colormatrix bt709 --transfer bt709 --range limited --deblock -3:-3
+Screenshots - x265 (x265n)
+Quote:
+--pass 2 --bitrate 4500 --preset slow --output-depth 10 --profile main10 --rd 5 --psy-rd 2.15 --no-rect --aq-strength 0.6 --qcomp 0.65 --crf-max 0 --ipratio 1.35 --pbratio 1.25 --no-cutree --subme 4 --weightb --bframes 6 --rc-lookahead 30 --lookahead-slices 3 --colorprim bt709 --colormatrix bt709 --transfer bt709 --range limited --deblock -3:-3
+What I'm trying to understand, and I have read many, many threads, is why x265 appears to have such a problem with grain - even with a 10mbps 3-pass encode. The grain on x265 appears to be static, and tuning for grain seems to be counterproductive. I've read threads where it's stated that --tune grain isn't effective, but without an explanation.
+Conclusion 
+I hope this can lead to a discussion about the state of grain retention with x265 in 2021. It's come a long way in a relatively short period of time and much of the guidance and opinion appears to apply to older builds.
+Edit: I've not included screenshots as I believe this might have been the reason the previous thread (with about eight screenshots) was not allowed.
+Edit2: Included screenshots and basic information.
+Edit3: Updated top of post to reflect new encodes and screenshots
+Last edited by tonemapped; 17th July 2021 at 02:27 .
+Reason: Edited to ask users to see updated posts
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+13th July 2021, 10:16
+# 2 
+|   Link 
+Boulder 
+Pig on the wing
+Join Date: Mar 2002
+Location: Finland
+Posts: 5,844
+Screenshots should not be an issue, they are used all the time.
+It would be nice to see the command line parameters for x265. The presets definitely will smooth the image.
+__________________
+And if the band you're in starts playing different tunes
+I'll see you on the dark side of the Moon... 
+Boulder 
+View Public Profile 
+Find More Posts by Boulder 
+13th July 2021, 20:31
+# 3 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Quote:
+Originally Posted by Boulder 
+Screenshots should not be an issue, they are used all the time.
+It would be nice to see the command line parameters for x265. The presets definitely will smooth the image.
+Thank you for the reply. I'll try and get about 10 different screenshots and the cli used for each one shortly. At this point, I've added QSV into the mix and it seems to produce better results at the same bitrate, which is clearly absurd!
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+13th July 2021, 23:52
+# 4 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Have you tried --tune grain yet? That would be good for a baseline.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+14th July 2021, 01:58
+# 5 
+|   Link 
+Stereodude 
+Registered User
+Join Date: Dec 2002
+Location: Region 0
+Posts: 1,306
+How did you evaluate it? Pouring over stills or playing it back in motion at normal speed?
+Stereodude 
+View Public Profile 
+Find More Posts by Stereodude 
+14th July 2021, 04:34
+# 6 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Quote:
+Originally Posted by benwaggoner 
+Have you tried --tune grain yet? That would be good for a baseline.
+That was the first option I tried, but it looks atrocious. The grain became static and it looked worse than medium preset with no changes.
+Quote:
+Originally Posted by Stereodude 
+How did you evaluate it? Pouring over stills or playing it back in motion at normal speed?
+First stills, then watching a four minute clip on a 10 bit 4K calibrated monitor (workstation), and then on a TV from about 3m away.
+Last edited by tonemapped; 14th July 2021 at 04:50 .
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+14th July 2021, 08:41
+# 7 
+|   Link 
+Boulder 
+Pig on the wing
+Join Date: Mar 2002
+Location: Finland
+Posts: 5,844
+If you use x265 for any real work, you should use at least --preset slow as the base, I personally use --preset slower. Nevertheless, the source is very difficult. I wouldn't call it grain, it's more like that your source comes from a grainy original encoded at a lowish bitrate - just look at the dark flat areas near the top of the first image. What's the average bitrate of the source clip?
+Also try aq-mode 1 although I'm not sure it will help with this case since you use quite a low average bitrate. Out of interest, what kind of average bitrate would you get for CRF 19 and your test 8 command line?
+__________________
+And if the band you're in starts playing different tunes
+I'll see you on the dark side of the Moon... 
+Boulder 
+View Public Profile 
+Find More Posts by Boulder 
+14th July 2021, 13:29
+# 8 
+|   Link 
+fauxreaper 
+Registered User
+Join Date: Oct 2014
+Posts: 23
+Quote:
+Originally Posted by tonemapped 
+That was the first option I tried, but it looks atrocious. The grain became static and it looked worse than medium preset with no changes.
+I think that you shold try --ctu 16 --qg-size 8 --rskip 0 --no-early-skip --rdoq-level 1 with high --psy-rdoq.
+fauxreaper 
+View Public Profile 
+Find More Posts by fauxreaper 
+14th July 2021, 15:08
+# 9 
+|   Link 
+Emulgator 
+Big Bit Savings Now !
+Join Date: Feb 2007
+Location: close to the wall
+Posts: 2,106
+What Boulder said: Give the encoder time for precision ! I am using at least x264 veryslow, x265 slower and can suggest that with confidence.
+Seeing stills only...anyway for such content type I would call 4,5Mbps @ FHD starved for x264, wet patches coming up where HF coefficients had been dropped and LF coefficients sustain.
+If someone must have 4,5Mbps on that clip, 265 will try hard to impersonate grain and seems to do a bit better.
+test 3 and 4 are quite close for 4,5Mbps.
+(Parameter "tune grain" means encoder is allowed to throw in some calculation-cheap HF coefficients, not really encode whats given.
+Lots of Blu-ray encodes have introduced such morphing grain which often moves with Luma borders. Strange to the eye.) 
+NVEnc just slips off my table into the mud, happy to see QSV cope better.
+I would just give more bitrate and move on.
+Only if you need to sail along that cliff of damage for educational reasons, well...
+I would use zopti for that.
+__________________
+"To bypass shortcuts and find suffering...is called QUALity" (Die toten Augen von Friedrichshain) 
+"Data reduction ? Yep, Sir. We're that issue working on. Synce invntoin uf lingöage..." 
+Last edited by Emulgator; 14th July 2021 at 15:36 .
+Emulgator 
+View Public Profile 
+Find More Posts by Emulgator 
+14th July 2021, 15:53
+# 10 
+|   Link 
+Stereodude 
+Registered User
+Join Date: Dec 2002
+Location: Region 0
+Posts: 1,306
+I like these options for x265: -F 1 -p veryslow --no-sao
+I found -F 1 specifically to help with temporal grain issues (but it slows things down by reducing parallelism)
+Stereodude 
+View Public Profile 
+Find More Posts by Stereodude 
+14th July 2021, 17:04
+# 11 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Also, I strongly recommend you don't compare with --crf, as you wind up with output that varies in both quality and size. Better to use 2-pass encoding at the same average bitrate, so you're comparing quality at a given bitrate between encoders/modes.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+14th July 2021, 17:16
+# 12 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Some more notes looking over your bitrate comparisons
+x264's --nr and x265's --nr-inter are the same core algorithm underneath and use the same scale (x264 doesn't have a --nr-intra equivalent). Comparing 50 to 500 and 2000 is pretty different! If you are combining --tune grain with --nr-inter 2000, I'd absolutely expect to see the "frozen grain" you describe. The -nr-inter is essentially an adaptive deadzone for high frequency coefficients in predicted blocks. Which means it filters out small sharp details that vary from the pixels it predicts from. Using a --nr-intra at 25-50% the --nr-inter value can help stabilize things somewhat. I think the highest --nr-inter I've ever found useful was 750, and that was with some edge-case crazy content. I think 250 is about the highest I'd use for most 1080p encoding, grainy or otherwise.
+For a setting that can handle pretty grainy content well without losing too much speed or efficiency for normal content, I'd probably start with:
+--preset slower
+-F 2
+--aq-mode 1
+--aq-strength 0.5
+--cutree 0
+--ipratio 1.2
+--pbratio 1.1
+--qpstep 1
+--sao 0
+--psy-rd 2.0
+--psy-rdoq 5.0
+--recursion-skip 0
+--nr-intra 100
+--nr-inter 250
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+15th July 2021, 20:02
+# 13 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Quote:
+Originally Posted by Boulder 
+I wouldn't call it grain, it's more like that your source comes from a grainy original encoded at a lowish bitrate - just look at the dark flat areas near the top of the first image. What's the average bitrate of the source clip?
+About 17mbps. I've recently done some more QSV testing and found a some good quality encodes (relatively). I'll upload the screenshots and details when I have the info on me.
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+15th July 2021, 20:20
+# 14 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Quote:
+Originally Posted by Emulgator 
+anyway for such content type I would call 4,5Mbps @ FHD starved for x264, wet patches coming up where HF coefficients had been dropped and LF coefficients sustain.
+I only show x264 for comparison. With my eyes, the x264 bitrate-starved encode shows better results than the x265 encode. I generally encode using CRF but 2-pass for testing.
+Quote:
+Originally Posted by benwaggoner 
+Also, I strongly recommend you don't compare with --crf, as you wind up with output that varies in both quality and size. Better to use 2-pass encoding at the same average bitrate, so you're comparing quality at a given bitrate between encoders/modes.
+I lost some of the log files so only posted examples of those with logs. The x264 vs x265 at the same bitrate is a good example of 2-pass at the same bitrate, with reasonably comparable parameters (to a point).
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+16th July 2021, 12:11
+# 15 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+I'm currently working on some new comparisons, but keeping the logs and doing the following tests (all at 2-pass/QSV at CRF but same bitrate):
+▶ Nvidia NVENC H265 @ 5000kbps, P7, 10-bit
+▶ x264 @ 5000kbps, veryslow, 8-bit
+▶ x265 @ 5000kbps, slow, waggoner (settings suggested above), 10-bit [slow & veryslow is too slow to justify encoding, but doing so for testing] 
+▶ x265 @ 5000kbps, slow, grain, 10-bit [slow & veryslow is too slow to justify encoding, but doing so for testing] 
+▶ Intel QSV @ 5080kbps, ICQ, 'best quality', 10-bit [2-pass not available] 
+They are completing now, but it's 31°C in my office so might need to wait until later to do them all (it's hot).
+These should provide a fairer comparison, and the logs should be useful as well. I'm thinking of posting three screenshots per encode and would post the four minute clip but clearly copyright is an issue. I could technically cut 30 seconds from each one but then I wouldn't know where to upload it.
+Last edited by tonemapped; 16th July 2021 at 12:18 .
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+16th July 2021, 13:23
+# 16 
+|   Link 
+Emulgator 
+Big Bit Savings Now !
+Join Date: Feb 2007
+Location: close to the wall
+Posts: 2,106
+Code:
+I could technically cut 30 seconds from each one but then I wouldn't know where to upload it. 
+wetransfer.com, anything below 2GB per file is free and stays up for 1 week.
+zippyshare.com, below 500MB per file, stays up as long as there is a download now and then.
+__________________
+"To bypass shortcuts and find suffering...is called QUALity" (Die toten Augen von Friedrichshain) 
+"Data reduction ? Yep, Sir. We're that issue working on. Synce invntoin uf lingöage..." 
+Last edited by Emulgator; 16th July 2021 at 13:45 .
+Emulgator 
+View Public Profile 
+Find More Posts by Emulgator 
+16th July 2021, 14:38
+# 17 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Quote:
+Originally Posted by Emulgator 
+Code:
+I could technically cut 30 seconds from each one but then I wouldn't know where to upload it. 
+wetransfer.com, anything below 2GB per file is free and stays up for 1 week.
+zippyshare.com, below 500MB per file, stays up as long as there is a download now and then.
+Thank you. Does 30s comply with the rules? It seems many people upload ~2m of footage (from threads I've read).
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+16th July 2021, 18:54
+# 18 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+- Updated encodes with more screenshots.
+- Due to forum limit of 20 images per post, and there being 35 images to show, this is post one out of two.
+- I hope the formatting is clear. I tried to make the layout as simple as possible.
+1. ▶ source 
+Quote:
+bitrate: ~17mbps
+resolution: 1920*1080
+depth: 8-bit
+length: 00:04:05 (245s)
+2. ▶ nvenc-hevc -2pass-5000kbps-p7
+Quote:
+parameters: --vbr 5000 --codec h265 --preset P7 --output-depth 10 --profile main10 --level 4 --multipass 2pass-full --aq --aq-temporal --bframes 4 --lookahead 32 --colormatrix bt709 --colorprim bt709 --transfer bt709 --cabac
+Quote:
+frame type IDR 93
+frame type I 93, total size 15.36 MB
+frame type P 5784, total size 131.40 MB
+(not sure where the bframes went)
+Quote:
+depth: 10-bit
+time: 00:00:50 (50s)
+3. ▶ x264 -2pass-5000kbps-film-veryslow
+Quote:
+parameters: parameters: --pass 2 --bitrate 5000 --preset veryslow --tune film --profile high --level 4.1 --no-fast-pskip --nr 150 --aq-mode 2 --aq-strength 0.8 --subme 9 --bframes 6 --ref 4 --no-dct-decimate --colorprim bt709 --colormatrix bt709 --transfer bt709 --deblock -3:-3
+Quote:
+x264 [info]: frame I:51 Avg QP:28.56 size:141590
+x264 [info]: frame P:1586 Avg QP:31.48 size: 54644
+x264 [info]: frame B:4240 Avg QP:33.94 size: 13992
+Quote:
+depth: 8-bit
+time: 00:10:42 (642s)
+4. ▶ x264 -2pass-5000kbps-grain-veryslow
+Quote:
+parameters: --pass 2 --bitrate 5000 --preset veryslow --tune grain --profile high --level 4.1 --colorprim bt709 --colormatrix bt709 --transfer bt709 --deblock -3:-3
+Quote:
+x264 [info]: frame I:47 Avg QP:31.66 size: 79442
+x264 [info]: frame P:1584 Avg QP:32.91 size: 51823
+x264 [info]: frame B:4246 Avg QP:34.21 size: 16192
+Quote:
+depth: 8-bit
+time: 00:08:12 (492s)
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+16th July 2021, 19:00
+# 19 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+5. ▶ x265 -2pass-5000kbps-grain-slow
+Quote:
+parameters: --pass 2 --bitrate 5000 --preset slow --tune grain --output-depth 10 --profile main10 --level-idc 4 --no-high-tier --colorprim bt709 --colormatrix bt709 --transfer bt709 --range limited --deblock -3:-3
+Quote:
+x265 [INFO]: frame I: 103, Avg QP:33.96 kb/s: 13553.77
+x265 [INFO]: frame P: 1548, Avg QP:34.69 kb/s: 6417.86 
+x265 [INFO]: frame B: 4226, Avg QP:34.82 kb/s: 4287.61 
+Quote:
+depth: 10-bit
+time: 01:21:32 (4,892s)
+6. ▶ x265 -2pass-5000kbps-waggoner-slow (suggestions by Ben Waggoner)
+Quote:
+parameters: --pass 2 --bitrate 5000 --preset slow --output-depth 10 --profile main10 --level-idc 4 --no-high-tier --psy-rdoq 5 --rskip 0 --aq-mode 1 --aq-strength 0.5 --qpstep 1 --nr-intra 100 --nr-inter 250 --ipratio 1.2 --pbratio 1.1 --no-cutree --colorprim bt709 --colormatrix bt709 --transfer bt709 --range limited --deblock -3:-3 --no-sao
+Quote:
+x265 [INFO]: frame I: 103, Avg QP:31.05 kb/s: 18137.07
+x265 [INFO]: frame P: 1548, Avg QP:32.60 kb/s: 7904.58 
+x265 [INFO]: frame B: 4226, Avg QP:33.58 kb/s: 3617.51 
+Quote:
+depth: 10-bit
+time: 01:23:09 (4,989s)
+7. ▶ intel-hevc -qsv-qp30-icq
+Quote:
+parameters: icq, qp30, highest quality options (don't have specifics to hand) - overall bitrate: ~5080kbps (this shouldn't make a massive difference when comparing to the 2-pass encodes)
+Quote:
+frame type IDR 93
+frame type I 93, total size 15.36 MB
+frame type P 5784, total size 131.40 MB
+(not sure where the bframes went)
+Quote:
+depth: 10-bit
+time: 00:06:40 (400s) (Atom-based Pentium Silver J5005, so don't expect it to be fast!)
+8. ▶ x265 -2pass-5000kbps-boulder-slower (suggestions by Boulder)
+Quote:
+parameters: --pass 2 --bitrate 5000 --preset slower --output-depth 10 --profile main10 --level-idc 4 --no-high-tier --rd-refine --rskip 2 --rskip-edge-threshold 2 --limit-refs 0 --merange 58 --max-merge 2 --bframes 10 --ref 4 --colorprim bt709 --colormatrix bt709 --transfer bt709 --range limited --deblock -1:-1 --no-sao
+Quote:
+x265 [INFO]: frame I: 89, Avg QP:28.97 kb/s: 28745.94
+x265 [INFO]: frame P: 1497, Avg QP:31.49 kb/s: 11857.99
+x265 [INFO]: frame B: 4291, Avg QP:36.23 kb/s: 2116.03
+Quote:
+depth: 10-bit
+time: 04:01:40 (14,500s - that's four hours for a four minute clip!)
+Last edited by tonemapped; 17th July 2021 at 02:26 .
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+16th July 2021, 20:02
+# 20 
+|   Link 
+Boulder 
+Pig on the wing
+Join Date: Mar 2002
+Location: Finland
+Posts: 5,844
+Since your x265 don't have "regular" settings (--tune grain or --no-cutree are not very common), I cannot say anything about those QPs. They are rather high but that's probably because both encodes disable the cu-tree.
+How about with something like this: --preset slower --deblock -1:-1 --no-sao --merange 58 --rskip 2 --rskip-edge-threshold 2 --rd-refine --max-merge 2 --ref 4 --bframes 10 --limit-refs 0 ?
+__________________
+And if the band you're in starts playing different tunes
+I'll see you on the dark side of the Moon... 
+Boulder 
+View Public Profile 
+Find More Posts by Boulder 
+16th July 2021, 20:52
+# 21 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Quote:
+Originally Posted by Boulder 
+Since your x265 don't have "regular" settings (--tune grain or --no-cutree are not very common), I cannot say anything about those QPs. They are rather high but that's probably because both encodes disable the cu-tree.
+How about with something like this: --preset slower --deblock -1:-1 --no-sao --merange 58 --rskip 2 --rskip-edge-threshold 2 --rd-refine --max-merge 2 --ref 4 --bframes 10 --limit-refs 0 ?
+Happy to try that out, but it'll be 2-pass 5mbps to match the other encodes for comparison. I should have perhaps reserved two or three posts so I could add them all in one continuous go, or maybe create a new thread with five post reserved due to the post image limit. Not sure if moderators would be happy with that.
+One of the two x265 encodes is default --tune grain (with a couple of modifications such as deblock -3/-3, but nothing major) and the other is Ben Waggoner's suggestion higher up the thread.
+Last edited by tonemapped; 16th July 2021 at 21:12 .
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+17th July 2021, 02:27
+# 22 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Quote:
+Originally Posted by Boulder 
+Since your x265 don't have "regular" settings (--tune grain or --no-cutree are not very common), I cannot say anything about those QPs. They are rather high but that's probably because both encodes disable the cu-tree.
+How about with something like this: --preset slower --deblock -1:-1 --no-sao --merange 58 --rskip 2 --rskip-edge-threshold 2 --rd-refine --max-merge 2 --ref 4 --bframes 10 --limit-refs 0 ?
+Done. Added to the bottom of http://forum.doom9.net/showthread.ph...62#post1947762 
+For just over four hours of encoding time for four minutes of video, the results were not as good as hoped. The video seems to 'smear' grain into other grain.
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+17th July 2021, 10:08
+# 23 
+|   Link 
+Boulder 
+Pig on the wing
+Join Date: Mar 2002
+Location: Finland
+Posts: 5,844
+The difference between x264 and x265 is that the former creates blocking and the latter blurs when it's bitrate-starved and usually blocking doesn't seem as distracting. The QPs look quite high so the encode definitely is lacking bits. The encoding process is definitely very slow, so probably you're better off with x264 anyway.
+__________________
+And if the band you're in starts playing different tunes
+I'll see you on the dark side of the Moon... 
+Boulder 
+View Public Profile 
+Find More Posts by Boulder 
+17th July 2021, 17:50
+# 24 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Quote:
+Originally Posted by Boulder 
+The difference between x264 and x265 is that the former creates blocking and the latter blurs when it's bitrate-starved and usually blocking doesn't seem as distracting. The QPs look quite high so the encode definitely is lacking bits. The encoding process is definitely very slow, so probably you're better off with x264 anyway.
+That may be the case, but to my eyes some of the hardware-encoded (Intel) look better than software-encoded. This shouldn't be the case. Even with x264, it is possible to produce a visually appealing grainy encode with a relatively low bitrate (e.g. 3500kbps @ 720p). Is it perfect? No. But that's not the point.
+x265 is meant to bring improvements in size:compression/efficiency, amongst other features, and it's mature enough by now that grain retention should match that of x264's. x265 seems good for content with very, very light grain and content without grain. This is the most bizarre part to me. Even the --grain preset produces poor results.
+Again, the entire point of doing a 2-pass encode at 5mbps is to compare different codecs and encoding methods at the same bitrate using the same source. If the newest one loses to hardware encoding and its predecessor, that shows a problem. I do use crf for encoding the vast majority of content for storage, but that's not the point of this test.
+Last edited by tonemapped; 17th July 2021 at 18:01 .
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+17th July 2021, 20:51
+# 25 
+|   Link 
+Boulder 
+Pig on the wing
+Join Date: Mar 2002
+Location: Finland
+Posts: 5,844
+Unfortunately x265 is not tuned for grain retention. We have fought that issue for years but the devs have never considered it a high priority thing. The tunings are not revised at all, and the first three AQ modes were mostly just ported directly from x264 and then left as they are.
+The biggest issue with x265 is is that the most capable people left a long time ago and even patch validation has had issues with features getting worse with development.
+__________________
+And if the band you're in starts playing different tunes
+I'll see you on the dark side of the Moon... 
+Boulder 
+View Public Profile 
+Find More Posts by Boulder 
+17th July 2021, 22:36
+# 26 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Quote:
+Originally Posted by Boulder 
+Unfortunately x265 is not tuned for grain retention. We have fought that issue for years but the devs have never considered it a high priority thing. The tunings are not revised at all, and the first three AQ modes were mostly just ported directly from x264 and then left as they are.
+The biggest issue with x265 is is that the most capable people left a long time ago and even patch validation has had issues with features getting worse with development.
+Grain retention is great at ~9mbps, or even light grain at 3.5mbps for 1080p content. It's just high grain (as with the example) for low bitrate.
+For example, I recently encoded a few episodes of Charmed from Blu-ray using CRF 21 with only a few changes (no-sao, etc.) and the result is great and only ~1.2GB per episode instead of ~7GB. A little bit of quality is lost in dark areas, but that's less of a concern for me. Overall, I would say it's 90% of the quality for 1/7 of the size. x264 would have severely struggled to output a reasonable file with the same bitrate/CRF constraints, so there's definitely a use for it.
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+18th July 2021, 19:40
+# 27 
+|   Link 
+Boulder 
+Pig on the wing
+Join Date: Mar 2002
+Location: Finland
+Posts: 5,844
+I still wouldn't call that grain, it's much more like quantization noise to me. That is more difficult to encode in a nice way than true film grain as it gets ugly quite easily like you have proven here.
+__________________
+And if the band you're in starts playing different tunes
+I'll see you on the dark side of the Moon... 
+Boulder 
+View Public Profile 
+Find More Posts by Boulder 
+23rd July 2021, 22:04
+# 28 
+|   Link 
+Sulik 
+Registered User
+Join Date: Jan 2002
+Location: San Jose, CA
+Posts: 216
+Why no B-frames in the NVENC and QSV encodes ?
+Sulik 
+View Public Profile 
+Find More Posts by Sulik 
+23rd July 2021, 22:30
+# 29 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Quote:
+Originally Posted by Sulik 
+Why no B-frames in the NVENC and QSV encodes ?
+Not entirely sure. There was a message about b-frames not being supported on 'Gen 9.5' hardware (UHD 605, API 1.3x). On NVENC, I have no idea why b-frames weren't used. Either way, NVENC still produced some of the worst with over 20 tests of the same clip, compared to even QSV.
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+24th July 2021, 00:05
+# 30 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+IIIRC NVidia added support for B-frames with the RTX series.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+24th July 2021, 03:02
+# 31 
+|   Link 
+tonemapped 
+Video Fanatic
+Join Date: Jul 2021
+Location: Surrey
+Posts: 89
+Quote:
+Originally Posted by benwaggoner 
+IIIRC NVidia added support for B-frames with the RTX series.
+That was done on a Turing card, so should have support. I must have made a mistake. The rest of the encodes are of more importance, as NVENC smears grain/noise.
+tonemapped 
+View Public Profile 
+Find More Posts by tonemapped 
+Tags 
+grain , noise , nvenc , qsv , x265 
+« 
+ Previous Thread 
+ |
+ Next Thread 
+ » 
+Thread Tools 
+Show Printable Version 
+Search this Thread 
+Advanced Search 
+Posting Rules
+You may not post new threads
+You may not post replies
+You may not post attachments
+You may not edit your posts
+BB code is On 
+Smilies are On 
+[IMG] code is On 
+HTML code is Off 
+Forum Rules 
+Forum Jump 
+User Control Panel 
+ Private Messages 
+ Subscriptions 
+ Who's Online 
+ Search Forums 
+ Forums Home 
+Announcements and Chat 
+     General Discussion 
+     News 
+     Forum / Site Suggestions & Help 
+ General 
+     Decrypting 
+     Newbies 
+     DVD2AVI / DGIndex 
+     Audio encoding 
+     Subtitles 
+     Linux, Mac OS X, & Co 
+ Capturing and Editing Video 
+     Avisynth Usage 
+     Avisynth Development 
+     VapourSynth 
+     Capturing Video 
+     DV 
+     HDTV / DVB / TiVo 
+     NLE - Non Linear Editing 
+     VirtualDub, VDubMod & AviDemux 
+     New and alternative a/v containers 
+ Video Encoding 
+     (Auto) Gordian Knot 
+     MPEG-4 ASP 
+     MPEG-4 Encoder GUIs 
+     MPEG-4 AVC / H.264 
+     High Efficiency Video Coding (HEVC) 
+     New and alternative video codecs 
+     MPEG-2 Encoding 
+     Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+ (HD) DVD, Blu-ray & (S)VCD 
+     One click suites for DVD backup and DVD creation 
+     DVD & BD Rebuilder 
+     (HD) DVD & Blu-ray authoring 
+     Advanced authoring 
+     IFO/VOB Editors 
+     DVD burning 
+ Hardware & Software 
+     Software players 
+     Hardware players 
+     PC Hard & Software 
+ Programming and Hacking 
+     Development 
+     Translations 
+All times are GMT +1. The time now is 09:23 .
+doom9.org -
+Archive -
+Top 
+Powered by vBulletin® Version 3.8.11
+Copyright ©2000 - 2026, vBulletin Solutions Inc.

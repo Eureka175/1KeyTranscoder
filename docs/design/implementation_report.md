@@ -3,7 +3,7 @@
 > 状态：完成（全部测试通过）
 > 基线：git tag `pre_S1S5`（commit `4e3bc6a`）；物理备份
 > `backup/pre_S1S5_20260829_000550/`（64 个核心文件）
-> 关联设计文档：`docs/hardware_backend_design.md`（第 10 节最终定稿）
+> 关联设计文档：`hardware_backend_design.md`（同目录，第 10 节最终定稿）
 > 回滚方式：`git checkout pre_S1S5` 或从 backup 目录恢复
 
 ---
@@ -54,7 +54,7 @@ S1–S5 全部落地并通过 testsets 全量实测：
 | `tests/sony_selfcheck.py` | 详细 Sony 元数据对比（64 项），JSON+文本 log 入盘 |
 | `tests/run_selfcheck.py` | 自检运行器：主程序输出 + 内置校验 + 详细对比 |
 | `watchfolder.py` / `start.bat` | barebone watchfolder + 启动器 |
-| `docs/implementation_report.md` | 本文档 |
+| `docs/design/implementation_report.md` | 本文档 |
 
 ## 2. S1：A7M5 检查全通（lens item_type 补丁）
 
@@ -193,7 +193,7 @@ QSV 单文件端到端（A7M5 6s）：**41/0/0 + Gyroflow PASS**。
 | rigaya ms-elst 截断 | 已由 stts 补丁修复（管线内置，幂等） |
 | 降级梯/新控制台询问在素材集上未自然触发 | 代码路径经失败注入验证过 WARNING 序列；建议后续用强制失败做一次完整演练 |
 | `--jobs N` 并行 | 未做（后续项） |
-| DJI 专线 | 未做（按定稿预留） |
+| DJI 专线 | **已完成（§15）**：djmd/dbgi/tmcd 原生保留 + 载荷校验 + Gyroflow 逐帧四元数消费端校验 |
 
 ## 附录：关键命令
 
@@ -337,3 +337,38 @@ Gyroflow 全 PASS，两实例零干扰（8GB 显存无压力）。
 NVENC×2 ≈ 1.9×；新机（本机级）NVENC×1+QSV×1 ≈ 4×——建议
 `--jobs` 做成 per-backend 双参数（`--jobs-nvenc`/`--jobs-qsv`）
 或一个自适应档位开关。
+
+## 15. DJI 专线（Osmo Action / 无人机适配，2026-08-30）
+
+**检测**：数据流 `codec_tag_string == djmd` → 路由 `encode_one_dji_hw`
+（`core/batch_hw.py`），Sony/经典路径不受影响。
+
+**关键设计事实**：
+- DJI 文件的 `MP4Box -diso` XML 解析失败（隐藏 mjpeg 封面轨的样本条目
+  破坏 ElementTree）→ 轨道枚举全部走 **`MP4Box -info` 文本解析**
+  （`gpac.info`/`gpac.parse_info`，新增）；
+- mjpeg 封面与 udta/mdta **GPAC 26.02 不可寻址**（`-add src#5/#6`
+  报 "Cannot find track ID"；无 udta 复制选项）→ 按策略丢弃 + 显式日志；
+- DJI 陀螺仪 = djmd 轨内**逐帧四元数**（Gyroflow 官方支持 Action
+  4/5/6、Avata、Neo 等；镜头配置内嵌、无需同步、按帧索引对齐）；
+  Gyroflow 的 type-3 导出（camera data）携带 org_quat/stab_quat。
+
+**管线**：视频-only 硬编（复用降级梯/失败分类/strip 回退）→
+GPAC `-new`（编码视频 + 逐轨音频 + djmd/dbgi/tmcd 原生复制）→
+stts 时长修复（按产物自身 mvhd 时基）→ **dji check**（轨道清单、
+djmd/dbgi/tmcd 载荷 sha256+size+样本数、音频流、视频帧数/帧率
+[VFR 跳过]、movie 时基[信息性]）→ **Gyroflow 消费端校验**
+（type-2 机型/镜头配置 + type-3 逐帧四元数容差对比，机内防抖素材
+四元数为空时两侧相等即 PASS）→ report.json → 交付 + GC。
+
+**实测（本机）**：
+| 用例 | 后端 | 结果 |
+|---|---|---|
+| Action4 4K4:3 30fps（3.5s，Rocksteady 关） | NVENC | **15/0/0** + Gyroflow PASS（105 运动样本逐帧一致） |
+| Action4 4K4:3 60fps（5.5s） | NVENC | **15/0/0** + Gyroflow PASS（330 样本一致） |
+| Action4 两片段 | QSV | **15/0/0** + Gyroflow PASS |
+| 无人机 4K60 VFR（13.2s） | NVENC | **15/0/0** + Gyroflow PASS（790 样本一致；forcecfr 规范化） |
+
+**已知边界**：mjpeg 封面/udta 丢弃（GPAC 限制，日志显式）；
+`--check` 强度对 DJI 路径不生效（dji check 恒全量，Gyroflow 可用即跑）；
+movie 时基由 GPAC 取第一轨媒体时基（信息性对比，不影响四元数对齐）。

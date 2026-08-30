@@ -1,0 +1,1051 @@
+<!DOCTYPE html><!-- Last Published: Wed Aug 26 2026 12:58:20 GMT+0000 (Coordinated Universal Time) --><html data-wf-domain="www.forasoft.com" data-wf-page="6a3f947f29694379b0158b0c" data-wf-site="64e8910adc5a63966a68acc1" lang="en" data-wf-collection="6a3f947e29694379b0158b06" data-wf-item-slug="encoder-comparison-x264-x265-svt-av1"><head><meta charset="utf-8"/><link href="https://cdn.prod.website-files.com" rel="preconnect" crossorigin="anonymous"/><title>x264 vs x265 vs SVT-AV1 vs Hardware: Quality &amp; Speed · Telemedicine · Fora Soft Learn</title><meta content="How software encoders (x264, x265, SVT-AV1) and hardware (NVENC, QSV) trade video quality for speed, measured as BD-rate and encode fps on real content." name="description"/><meta content="x264 vs x265 vs SVT-AV1 vs Hardware: Quality &amp; Speed · Telemedicine · Fora Soft Learn" property="og:title"/><meta content="How software encoders (x264, x265, SVT-AV1) and hardware (NVENC, QSV) trade video quality for speed, measured as BD-rate and encode fps on real content." property="og:description"/><meta content="x264 vs x265 vs SVT-AV1 vs Hardware: Quality &amp; Speed · Telemedicine · Fora Soft Learn" name="twitter:title"/><meta content="How software encoders (x264, x265, SVT-AV1) and hardware (NVENC, QSV) trade video quality for speed, measured as BD-rate and encode fps on real content." name="twitter:description"/><meta property="og:type" content="website"/><meta content="summary_large_image" name="twitter:card"/><meta content="width=device-width, initial-scale=1" name="viewport"/><link href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/css/test-forasoft.webflow.shared.17d7e35c0.min.css" rel="stylesheet" type="text/css" integrity="sha384-F9fjXAhiihBIS8qBDLRzr3LgZWz4ihKhLUzWdKCaNBwrk43whxX/efCPjUV488pM" crossorigin="anonymous"/><link href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/css/test-forasoft.webflow.6a3f947f29694379b0158b0c.d62dee11e.opt.min.css" rel="stylesheet" type="text/css" integrity="sha384-1i3uEebvmmrabEx91W/uVY75ktx4ynEkvDw0rUW82qiDsbWK9DcUsAcgUgjRvaEa" crossorigin="anonymous"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin="anonymous"/><script src="https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js" type="text/javascript"></script><script type="text/javascript">WebFont.load({  google: {    families: ["PT Serif:400,400italic,700,700italic"]  }});</script><script type="text/javascript">!function(o,c){var n=c.documentElement,t=" w-mod-";n.className+=t+"js",("ontouchstart"in o||o.DocumentTouch&&c instanceof DocumentTouch)&&(n.className+=t+"touch")}(window,document);</script><link href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/662ce6ca78c55edb337955c0_Favicon_32.png" rel="shortcut icon" type="image/x-icon"/><link href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/662ce63e7bb96441a4c253a4_Webclip.png" rel="apple-touch-icon"/><link href="https://www.forasoft.com/learn/video-quality/articles-vqm/encoder-comparison-x264-x265-svt-av1" rel="canonical"/><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/encoder-comparison-x264-x265-svt-av1#webpage",
+      "url": "https://www.forasoft.com/learn/video-quality/articles-vqm/encoder-comparison-x264-x265-svt-av1",
+      "name": "x264 vs x265 vs SVT-AV1 vs Hardware: Quality &amp; Speed · Telemedicine · Fora Soft Learn",
+      "description": "How software encoders (x264, x265, SVT-AV1) and hardware (NVENC, QSV) trade video quality for speed, measured as BD-rate and encode fps on real content.",
+      "isPartOf": {
+        "@id": "https://www.forasoft.com/#website"
+      },
+      "inLanguage": "en",
+      "mainEntity": {
+        "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/encoder-comparison-x264-x265-svt-av1#article"
+      },
+      "breadcrumb": {
+        "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/encoder-comparison-x264-x265-svt-av1#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/encoder-comparison-x264-x265-svt-av1#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.forasoft.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Learn",
+          "item": "https://www.forasoft.com/learn"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Video quality",
+          "item": "https://www.forasoft.com/learn/video-quality"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Block 7. Fora Soft Benchmarks",
+          "item": "https://www.forasoft.com/learn/video-quality/blocks/topics-vqm/benchmarks"
+        },
+        {
+          "@type": "ListItem",
+          "position": 5,
+          "name": "x264 vs x265 vs SVT-AV1 vs Hardware: Quality &amp; Speed",
+          "item": "https://www.forasoft.com/learn/video-quality/articles-vqm/encoder-comparison-x264-x265-svt-av1"
+        }
+      ]
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/encoder-comparison-x264-x265-svt-av1#article",
+      "headline": "x264 vs x265 vs SVT-AV1 vs Hardware: Quality &amp; Speed",
+      "description": "How software encoders (x264, x265, SVT-AV1) and hardware (NVENC, QSV) trade video quality for speed, measured as BD-rate and encode fps on real content.",
+      "datePublished": "2026-06-25T00:00:00.000Z",
+      "dateModified": "2026-06-25T00:00:00.000Z",
+      "author": {
+        "@type": "Person",
+        "@id": "https://www.forasoft.com/team/nikolay-sapunov#person",
+        "name": "Nikolay Sapunov",
+        "url": "https://www.forasoft.com/team/nikolay-sapunov",
+        "jobTitle": "CEO at Fora Soft",
+        "image": "https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a0c72a04c29b22a8ddb991b_6a0c728d356dff40621f0967_nikolay_sapunov.jpeg",
+        "sameAs": [
+          "https://www.linkedin.com/in/sapunov/",
+          "https://github.com/nicksapunov"
+        ],
+        "worksFor": {
+          "@id": "https://www.forasoft.com/#organization"
+        }
+      },
+      "publisher": {
+        "@id": "https://www.forasoft.com/#organization"
+      },
+      "mainEntityOfPage": {
+        "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/encoder-comparison-x264-x265-svt-av1#webpage"
+      },
+      "inLanguage": "en"
+    }
+  ]
+}
+</script><script src="https://www.google.com/recaptcha/api.js" type="text/javascript"></script><script async type="module" src="https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/attributes.js" fs-list></script>
+
+<!-- Performance: preload LCP hero image (homepage) -->
+<link rel="preload" as="image" 
+      href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815-p-500.avif"
+      imagesrcset="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815-p-500.avif 500w, https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815.avif 884w"
+      imagesizes="(max-width: 479px) 100vw, 442px"
+      fetchpriority="high">
+
+<!-- Performance: preconnect to third-party JS CDN (Finsweet attributes) -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+<script>
+// Webflow injects loading="lazy" on all <img>. Override for above-the-fold.
+(function() {
+  var ATF_CLASSES = ['logo', 'image-273', 'close-menu', 'open-icon', 'rectangle-3821-copy'];
+  function fixImg(img) {
+    if (img.classList && ATF_CLASSES.some(c => img.classList.contains(c))) {
+      if (img.loading === 'lazy') {
+        img.loading = 'eager';
+        img.fetchPriority = 'high';
+      }
+    }
+  }
+  // 1) Run early on existing imgs
+  if (document.images) for (var i = 0; i < document.images.length; i++) fixImg(document.images[i]);
+  // 2) Watch for newly added imgs
+  new MutationObserver(function(records) {
+    records.forEach(function(r) {
+      r.addedNodes && r.addedNodes.forEach(function(n) {
+        if (n.tagName === 'IMG') fixImg(n);
+        if (n.querySelectorAll) n.querySelectorAll('img').forEach(fixImg);
+      });
+    });
+  }).observe(document.documentElement, {childList: true, subtree: true});
+})();
+</script>
+
+<!-- Performance: preconnect to Google Tag Manager (loaded via custom GTM block) -->
+<link rel="preconnect" href="https://www.googletagmanager.com">
+
+<link rel="preload" as="font" type="font/woff2" href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/69e3be8ec6908e6c1cf35c68_IBMPlexSans-Medium.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/69e3c02e489c18ea7d6561d7_IBMPlexSans-Bold.woff2" crossorigin>
+
+<style>
+.no-scroll{overflow:hidden}
+
+textarea{resize:none}
+*{-webkit-tap-highlight-color:transparent;outline:none}
+
+html,body{
+  font-family:"IBM Plex Sans",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif
+}
+
+.services-navigation-fixed{
+  opacity:0;
+  transition:opacity .3s ease
+}
+.services-navigation-fixed.is-visible{
+  opacity:1
+}
+
+@media screen and (max-width:479px){
+  .all-nav-links{
+    transform:translate3d(0,200dvh,0)!important;
+    height:140dvh!important;
+    min-height:100dvh;
+    margin-top:-100dvh
+  }
+}
+@media screen and (max-width:991px){
+  .all-nav-links{
+    transform:translate3d(0,-200vh,0);
+    height:140dvh!important;
+    min-height:100dvh;
+    margin-top:-100dvh
+  }
+}
+</style>
+
+<!-- Canonical Organization + WebSite (single source; see schema-implementation/00_CORE_NODES_canonical.md) -->
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://www.forasoft.com/#organization","name":"Fora Soft","legalName":"Fora Soft LLC","url":"https://www.forasoft.com/","logo":{"@type":"ImageObject","@id":"https://www.forasoft.com/#logo","url":"https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64e8910adc5a63966a68acc4_Logo%20full.svg","caption":"Fora Soft"},"image":{"@id":"https://www.forasoft.com/#logo"},"description":"Specialist software house for video, real-time and AI products. Founded 2005.","foundingDate":"2005","numberOfEmployees":{"@type":"QuantitativeValue","value":50},"founder":[{"@type":"Person","name":"Nikolay Sapunov","jobTitle":"CEO"},{"@type":"Person","name":"Polina Sapunova","jobTitle":"Co-founder, CMO/CFO"}],"email":"eager2develop@forasoft.com","areaServed":["US","GB","ZA","TR","DE","CH","NL","AU","AE","FR","DK","KZ","HK"],"knowsAbout":["WebRTC","LiveKit","Real-time video streaming","Low-latency live streaming","AI video recognition","Computer vision","Speech-to-text","Text-to-speech","Real-time speech translation","Multimodal AI agents","HIPAA-compliant telemedicine software","E-learning and virtual classroom platforms","Video surveillance / VMS","OTT and IPTV"],"contactPoint":[{"@type":"ContactPoint","telephone":"+852-8193-2621","email":"eager2develop@forasoft.com","contactType":"sales","availableLanguage":["en"]},{"@type":"ContactPoint","telephone":"+1-914-775-5855","email":"eager2develop@forasoft.com","contactType":"sales","areaServed":"US","availableLanguage":["en"]},{"@type":"ContactPoint","telephone":"+971-58-539-6367","contactType":"sales","availableLanguage":["en"],"url":"https://wa.me/971585396367"}],"address":[{"@type":"PostalAddress","streetAddress":"Flat A, 8/F, Kingswell Commercial Tower, 171 Lockhart Road, Wan Chai","addressLocality":"Hong Kong","addressCountry":"HK"},{"@type":"PostalAddress","addressLocality":"New York","addressRegion":"NY","addressCountry":"US"}],"sameAs":["https://www.linkedin.com/company/fora-soft-llc-","https://github.com/forasoft","https://www.youtube.com/@eager2develop","https://www.instagram.com/eager2develop","https://dribbble.com/ForaSoft","https://www.behance.net/Fora-Soft","https://forasoft.medium.com","https://clutch.co/profile/fora-soft","https://www.goodfirms.co/company/fora-soft"],"hasOfferCatalog":{"@type":"OfferCatalog","name":"Fora Soft services","itemListElement":[{"@type":"Offer","itemOffered":{"@type":"Service","name":"Video & Audio Streaming Software Development","url":"https://www.forasoft.com/services/video-audio-streaming-software-development"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Video Calling, Chat & Conferencing App Development","url":"https://www.forasoft.com/services/video-conference"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Custom Video & Audio Processing Software Development","url":"https://www.forasoft.com/services/custom-video-audio-processing-software-development"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"AI Integration & AI Software Development","url":"https://www.forasoft.com/services/ai-integration"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"AI Video & Streaming Software Development","url":"https://www.forasoft.com/services/ai-video-guide"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Video Surveillance & Video Management Software Development","url":"https://www.forasoft.com/services/video-surveillance"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Telemedicine & Healthcare Software Development","url":"https://www.forasoft.com/services/telemedicine"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"E-Learning & Virtual Classroom Software Development","url":"https://www.forasoft.com/services/e-learning"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Internet TV, OTT & IPTV Streaming Development","url":"https://www.forasoft.com/services/internet-tv"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Music Software Development","url":"https://www.forasoft.com/services/music"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"AR and VR Software Development","url":"https://www.forasoft.com/services/ar-vr"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Custom Software Development","url":"https://www.forasoft.com/services/custom-software-development"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Dedicated Development Team","url":"https://www.forasoft.com/services/dedicated-development-team"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Software Product Planning & Analytics","url":"https://www.forasoft.com/services/software-product-planning-analytics"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Software Troubleshooting & Optimization","url":"https://www.forasoft.com/services/software-troubleshooting-optimization"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Software Product Maintenance & Support","url":"https://www.forasoft.com/services/software-product-maintenance-support"}}]}},{"@type":"WebSite","@id":"https://www.forasoft.com/#website","url":"https://www.forasoft.com/","name":"Fora Soft","publisher":{"@id":"https://www.forasoft.com/#organization"},"inLanguage":"en"}]}
+</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+
+<style>
+  /* ===== Article body typography ===== */
+  .article-body h2 {
+    font-size: 38px;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 48px 0 16px;
+    color: #111827;
+  }
+  .article-body h3 {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 32px 0 12px;
+    color: #111827;
+  }
+  .article-body p {
+    font-size: 17px;
+    line-height: 1.7;
+    color: #1f2937;
+    margin: 0 0 16px;
+  }
+  .article-body ul,
+  .article-body ol {
+    margin: 0 0 16px 24px;
+    font-size: 17px;
+    line-height: 1.7;
+    color: #1f2937;
+  }
+  .article-body li {
+    margin-bottom: 6px;
+  }
+  .article-body blockquote {
+    border-left: 4px solid #e5e7eb;
+    padding-left: 16px;
+    margin: 24px 0;
+    color: #4b5563;
+    font-style: italic;
+  }
+  .article-body a {
+    color: #2563eb;
+    text-decoration: underline;
+  }
+  .article-body a:hover {
+    color: #1d4ed8;
+  }
+
+  /* ===== Inline code ===== */
+  .article-body p code,
+  .article-body li code {
+    background: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+    font-size: 0.92em;
+    color: #be185d;
+  }
+
+  /* ===== Code blocks (dark theme for syntax highlighting) ===== */
+  .article-body pre {
+    background: #1e1e1e;
+    color: #f8f8f2;
+    padding: 16px 20px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 20px 0;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .article-body pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+  }
+
+  /* ===== Footnote markers — clean editorial style, no brackets ===== */
+  .article-body a.footnote-ref {
+    font-size: 0.65em !important;
+    line-height: 1 !important;
+    vertical-align: super !important;
+    color: #1B3A6F !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+    padding: 0 1px;
+    margin-left: 1px;
+    letter-spacing: 0.02em;
+    border-bottom: 0;
+    transition: color 0.15s ease;
+  }
+  .article-body a.footnote-ref:hover {
+    color: #3DA5D9 !important;
+  }
+  .article-body a.footnote-ref + a.footnote-ref::before {
+    content: "\2009";
+    color: #C5CAD2;
+    margin-right: 1px;
+  }
+  .article-body sup + sup::before {
+    content: "\2009";
+    color: #C5CAD2;
+  }
+  .article-body sup:has(a.footnote-ref) {
+    font-size: inherit !important;
+    vertical-align: baseline !important;
+    line-height: inherit !important;
+    margin-left: 1px;
+  }
+
+  /* ===== References list at the end of the article ===== */
+  .article-body .footnote {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid #E8EBEF;
+    font-size: 0.9em;
+    color: #4A4E55;
+  }
+  .article-body .footnote::before {
+    content: "References";
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #1B3A6F;
+    margin-bottom: 16px;
+  }
+  .article-body .footnote hr { display: none; }
+  .article-body .footnote ol {
+    padding-left: 24px;
+    font-size: inherit;
+  }
+  .article-body .footnote li {
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  .article-body .footnote a.footnote-backref {
+    color: #7A7F87 !important;
+    text-decoration: none !important;
+    margin-left: 6px;
+    font-size: 0.9em;
+  }
+  .article-body .footnote a.footnote-backref:hover { color: #1B3A6F !important; }
+
+  /* ===== Tables ===== */
+  .article-body table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 24px 0;
+    font-size: 0.95em;
+  }
+  .article-body table th,
+  .article-body table td {
+    border: 1px solid #E8EBEF;
+    padding: 10px 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .article-body table th {
+    background: #F5F7FA;
+    font-weight: 600;
+    color: #1B3A6F;
+  }
+  .article-body table tr:nth-child(even) td {
+    background: #FBFCFD;
+  }
+
+  /* ===== Body images ===== */
+  .article-body img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 24px auto;
+  }
+
+  /* ===== Mobile ===== */
+  @media screen and (max-width: 767px) {
+    .article-body h2 { font-size: 30px; line-height: 1.25; margin: 36px 0 12px; }
+    .article-body h3 { font-size: 19px; margin: 24px 0 10px; }
+    .article-body p,
+    .article-body ul,
+    .article-body ol { font-size: 16px; line-height: 1.65; }
+    .article-body pre { padding: 12px 16px; font-size: 13px; }
+    .article-body .footnote::before { font-size: 1.2rem; }
+    .article-body table { font-size: 0.88em; }
+    .article-body table th,
+    .article-body table td { padding: 8px 10px; }
+  }
+</style><script src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1%2F689e5ba67671442434f3ca35%2F6a82d2c710184daee99a58e7%2Fgtmcontainer-1.0.0.js" type="text/javascript"></script></head><body><header id="Header" class="header-copy h-landing"><div class="nav w-container"><a href="https://www.forasoft.com/" class="link-logonav w-inline-block"><div class="iconsite w-embed"><svg width="120" height="38" viewBox="0 0 100 25" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M7.38893 9.85327C9.60614 9.85327 11.4975 7.91317 11.4975 5.64638C11.4891 3.358 9.61746 1.45508 7.38131 1.45508H7.3737C5.15931 1.45508 3.27344 3.41801 3.27344 5.66267C3.27344 7.95215 5.17821 9.85327 7.38893 9.85327ZM7.38893 7.66167C6.31839 7.66167 5.41806 6.75266 5.41806 5.65488C5.41806 4.57196 6.32872 3.6396 7.38131 3.6396C8.45105 3.6396 9.34439 4.55405 9.35287 5.64638C9.35007 6.72969 8.45136 7.66167 7.38893 7.66167Z" fill="currentColor"/>
+<path d="M26.7385 10.446C26.7385 7.14802 23.8486 4.50916 20.6777 4.50916H20.6694L13.608 4.52545C13.0368 4.52545 12.5475 5.01941 12.5475 5.60531C12.5475 6.20083 13.023 6.68518 13.608 6.68518L20.6694 6.6689H20.677C22.7111 6.6689 24.6091 8.31697 24.6091 10.4467L24.6167 13.9032C24.6167 16.6816 21.9462 17.8563 19.5687 17.5358C16.2334 17.0967 15.1935 17.1003 11.8824 17.5521C9.5022 17.8747 6.82885 16.7094 6.81851 13.9272L6.81089 11.6786C6.81089 11.083 6.33531 10.5987 5.75035 10.5987C5.17919 10.5987 4.6898 11.0927 4.6898 11.6786L4.69742 13.9272C4.69742 18.0288 8.60079 20.1621 12.1697 19.6856C15.2911 19.26 16.1434 19.2572 19.2967 19.6693C22.8332 20.1458 26.7454 17.8695 26.7454 13.8869L26.7385 10.446Z" fill="currentColor"/>
+<path d="M19.6555 21.31C20.2152 21.4502 20.5579 22.0657 20.4197 22.6328L20.419 22.6342C20.2667 23.2084 19.6818 23.5561 19.1148 23.4088C16.6642 22.8185 14.8237 22.8343 12.3748 23.4251C11.8227 23.5775 11.2206 23.2149 11.0699 22.6505L11.0692 22.649C10.9311 22.0826 11.2739 21.4651 11.8341 21.3263C14.6517 20.6458 16.8362 20.6288 19.6555 21.31Z" fill="currentColor"/>
+<path d="M43.3362 9.86133C45.567 9.86133 47.3892 11.7811 47.3892 13.976C47.3892 16.1884 45.5757 18.0752 43.3362 18.0752C41.0914 18.0752 39.2832 16.1946 39.2832 13.976C39.2832 11.7786 41.0987 9.86133 43.3362 9.86133ZM43.3362 11.5565C42.0275 11.5565 41.2558 12.7772 41.2558 13.976C41.2558 15.1701 42.0372 16.3801 43.3362 16.3801C44.6353 16.3801 45.4167 15.1701 45.4167 13.976C45.4167 12.7772 44.645 11.5565 43.3362 11.5565Z" fill="currentColor"/>
+<path d="M53.6916 9.87674C53.9792 9.87674 54.2155 9.89215 54.4005 9.92297V11.7568C54.2361 11.7363 53.9946 11.726 53.6762 11.726C52.9673 11.726 52.3663 11.9675 51.8731 12.4503C51.3902 12.9229 51.1128 13.5599 51.0409 14.3613V17.9674H49.0684V9.95379H51.0409V12.4966C51.1334 11.7157 51.3954 11.0839 51.8269 10.601C52.2686 10.1182 52.8902 9.87674 53.6916 9.87674Z" fill="currentColor"/>
+<path d="M58.858 9.86133C59.4436 9.86133 59.947 9.98975 60.3683 10.2466C60.7895 10.5034 61.0258 10.7654 61.0771 11.0325V9.95379H63.0497V17.9674H61.0771V16.7807C60.6963 17.5146 59.6162 18.0752 58.858 18.0752C56.6 18.0752 55.0978 16.101 55.0978 13.9606C55.0978 11.849 56.6317 9.86133 58.858 9.86133ZM59.1662 11.5565C57.8719 11.5565 57.0704 12.7659 57.0704 13.9606C57.0704 15.1702 57.8531 16.3801 59.1662 16.3801C60.5205 16.3801 61.1696 15.1817 61.1696 13.9606C61.1696 13.1387 60.9744 12.5325 60.584 12.1421C60.2039 11.7517 59.7313 11.5565 59.1662 11.5565Z" fill="currentColor"/>
+<path d="M38.9002 8.75592H35.537C34.7251 8.75592 34.0669 9.42793 34.0669 10.2569V11.6438H38.1698L37.7497 13.5003H34.0669V18.0384H31.9844V10.1475C31.9844 8.37118 33.3948 6.93115 35.1346 6.93115H38.9002V8.75592Z" fill="currentColor"/>
+<path d="M90.0556 6.93115H91.6753L91.4317 8.75145H90.159C89.458 8.75145 88.9844 9.24903 88.9844 9.99539V10.5142H91.1703L90.9253 12.3414H88.9844V17.9672H87.0938V10.164C87.0938 8.22209 88.2861 6.93115 90.0556 6.93115Z" fill="currentColor"/>
+<path d="M96.6461 12.3891H94.8104V14.6267C94.8104 15.6302 95.2971 16.2318 96.1418 16.2318H97.0908L96.8183 18.0713H95.7201C94.047 18.0713 92.9258 16.8152 92.9258 14.9435V7.76416H94.8104V10.5426H96.8888L96.6461 12.3891Z" fill="currentColor"/>
+<path d="M74.634 7.54073C75.2678 7.95607 75.7353 8.46486 76.0366 9.0671L74.2444 9.6901C73.7412 8.61732 70.9561 8.10806 70.9561 9.76798C70.9561 10.8294 72.1325 11.0592 72.9353 11.3411C74.5703 11.8955 76.286 12.9304 76.286 14.8611C76.286 16.8904 74.2101 18.0384 72.3742 18.0384C70.6372 18.0384 68.9356 17.1869 68.3223 15.4841L70.0054 14.7365C70.3725 15.6994 71.3708 16.2628 72.3742 16.2628C73.2424 16.2628 74.2444 15.8629 74.2444 14.8611C74.2444 13.8279 73.2418 13.4547 72.4054 13.1634C70.7321 12.5913 68.8989 11.8036 68.8989 9.76798C68.8989 6.99957 72.7086 6.25791 74.634 7.54073Z" fill="currentColor"/>
+<path d="M81.5686 9.86133C83.7994 9.86133 85.6216 11.7811 85.6216 13.976C85.6216 16.1733 83.7701 18.0752 81.5686 18.0752C79.3238 18.0752 77.5156 16.1946 77.5156 13.976C77.5156 11.7786 79.3312 9.86133 81.5686 9.86133ZM81.5686 11.5565C80.2599 11.5565 79.4882 12.7772 79.4882 13.976C79.4882 15.1701 80.2696 16.3801 81.5686 16.3801C82.8677 16.3801 83.6491 15.1701 83.6491 13.976C83.6491 12.7772 82.8774 11.5565 81.5686 11.5565Z" fill="currentColor"/>
+</svg>
+
+<style>
+.iconsite {
+ display: flex;
+ align-items: center;
+}
+</style></div></a><address id="nav-dropdown" class="all-nav-links"><div class="nav-links"><div data-hover="true" data-delay="0" class="w-dropdown"><div id="services-dd-toggle" class="dropdown-toggle w-dropdown-toggle"><a href="/services" class="w-inline-block"><div class="link-menu-copy">Services</div><div class="icon-17 w-icon-dropdown-toggle"></div></a></div><nav id="services-dd-list" class="dropdown-list w-dropdown-list"><div class="svc-mega"><div class="svc-col"><div class="svc-sec"><div class="svc-eyebrow svc-eyebrow--accent">Industries <!-- -->&amp;<!-- --> use cases</div><div class="svc-list"><a href="/services/ai-integration" class="svc-link">AI integration</a><a href="/services/video-audio-streaming-software-development" class="svc-link">Video <!-- -->&amp;<!-- --> audio streaming</a><a href="/services/video-conference" class="svc-link">Video chats &amp; conference</a><a href="/services/custom-video-audio-processing-software-development" class="svc-link">Video <!-- -->&amp;<!-- --> audio processing</a><a href="/services/video-surveillance" class="svc-link">Video surveillance</a><a href="/services/e-learning" class="svc-link">E-learning</a><a href="/services/music" class="svc-link">Music</a><a href="/services/telemedicine" class="svc-link">Telemedicine</a><a href="/services/ar-vr" class="svc-link">AR / VR</a><a href="/services/internet-tv" class="svc-link">Internet TV</a></div></div><div class="svc-sec"><div class="svc-eyebrow svc-eyebrow--accent">Engagement models</div><div class="svc-list"><a href="/services/software-product-planning-analytics" class="svc-link"><span class="svc-num">01</span><span>Plan <!-- -->&amp;<!-- --> analytics</span></a><a href="/services/custom-software-development" class="svc-link"><span class="svc-num">02</span><span>Custom dev</span></a><a href="/services/software-troubleshooting-optimization" class="svc-link"><span class="svc-num">03</span><span>Troubleshoot <!-- -->&amp;<!-- --> optimize</span></a><a href="/services/software-product-maintenance-support" class="svc-link"><span class="svc-num">04</span><span>Maintain <!-- -->&amp;<!-- --> support</span></a><a href="/services/dedicated-development-team" class="svc-link"><span class="svc-num">05</span><span>Dedicated team</span></a></div></div></div><div class="svc-col"><div class="svc-sec"><div class="svc-eyebrow accent">Technology<!-- -->‍</div><div class="svc-eyebrow">01 · Real-time &amp; infra</div><div class="svc-list"><a href="/webrtc-software-development-experts" class="svc-link">WebRTC</a><a href="/livekit-software-development-experts" class="svc-link">LiveKit</a><a href="/agora-software-development-experts" class="svc-link">Agora</a><a href="/twilio-software-development-experts" class="svc-link">Twilio</a><a href="/telnyx-api-integration-services-experts" class="svc-link">Telnyx</a><a href="/wowza-streaming-development-experts" class="svc-link">Wowza</a><a href="/custom-webrtc-architecture-development-experts" class="svc-link">Custom WebRTC architecture</a><a href="/custom-moq-quic-development" class="svc-link">MoQ <!-- -->&amp;<!-- --> QUIC</a><a href="/ai-scalable-video-streaming" class="svc-link">Scalable AI streaming</a><a href="/video-chat-app-development" class="svc-link">Video calling &amp; chat</a></div></div><div class="svc-sec"><div class="svc-eyebrow">02 <!-- -->·<!-- --> AI agents <!-- -->&amp;<!-- --> voice</div><div class="svc-list"><a href="/livekit-ai-agent-development-experts" class="svc-link">LiveKit AI agent</a><a href="/ai-call-agent-development" class="svc-link">AI call agent</a><a href="/ai-chatbot-voice-assistant-development-experts" class="svc-link">AI chatbot <!-- -->&amp;<!-- --> voice</a><a href="/custom-speech-to-text-development" class="svc-link">ASR / STT</a><a href="/custom-text-to-speech-development" class="svc-link">TTS <!-- -->&amp;<!-- --> voice cloning</a><a href="/custom-ai-language-interpretation-experts" class="svc-link">AI interpretation</a><a href="/agentic-engineering-video-streaming-development" class="svc-link">Agentic engineering</a><a href="/ai-video-agent-development" class="svc-link">AI video agent for computer vision</a></div></div></div><div class="svc-col"><div class="svc-sec"><div class="svc-eyebrow">03 <!-- -->·<!-- --> AI vision</div><div class="svc-list"><a href="/ai-video-recognition-software-experts" class="svc-link">AI video recognition</a><a href="/computer-vision-for-video-surveillance" class="svc-link">Computer vision for surveillance</a></div></div><div class="svc-sec"><div class="svc-eyebrow">04 <!-- -->·<!-- --> Industry solutions</div><div class="svc-list"><a href="/ai-telehealth-video-platform-development" class="svc-link">AI telehealth</a><a href="/ai-medical-imaging-development-experts" class="svc-link">AI medical imaging</a><a href="/elearning-virtual-classroom-development" class="svc-link">Virtual classroom <!-- -->&amp;<!-- --> EdTech</a></div></div><div class="svc-sec"><div class="svc-eyebrow">05 <!-- -->·<!-- --> Mobile <!-- -->&amp;<!-- --> platform</div><div class="svc-list"><a href="/ai-mobile-app-development" class="svc-link">AI mobile app</a><a href="/electron-desktop-app-development-services" class="svc-link">All-purpose Electron desktop</a><a href="/electron-desktop-app-development-video-ai-real-time" class="svc-link">Electron.js for video, AI, and real-time</a><a href="#" class="svc-link">Custom MDM</a></div></div><div class="svc-sec"><div class="svc-eyebrow">06 <!-- -->·<!-- --> Code rescue</div><div class="svc-list"><a href="/vibe-code-cleanup" class="svc-link">Vibe code cleanup</a><a href="/lovable-app-bug-fixing" class="svc-link">Lovable &amp; Replit bug fixing</a></div></div></div></div><div aria-hidden="true" class="svc-overrides"></div></nav></div><a href="https://www.forasoft.com/projects" class="nav-link w-inline-block"><div class="link-menu-copy">Projects</div></a><a href="/calculator" class="nav-link w-inline-block"><div class="link-menu-copy">Cost</div></a><a href="https://www.forasoft.com/blog" class="nav-link w-inline-block"><div class="link-menu-copy blogredirect">Blog</div></a><a href="/ship-log" class="nav-link w-inline-block"><div class="link-menu-copy blogredirect">Ship Log</div></a><div data-hover="true" data-delay="0" class="dropdown w-dropdown"><div id="services-dd-toggle" class="dropdown-toggle w-dropdown-toggle"><a href="/learn" class="link-block-23 w-inline-block"><div class="link-menu-copy">Learn</div><div class="icon-17 w-icon-dropdown-toggle"></div></a></div><nav id="services-dd-list" class="dropdown-list learn-hub w-dropdown-list"><div class="svc-mega learn-hub"><div class="svc-col"><div class="svc-sec"><div class="svc-eyebrow svc-eyebrow--accent">Learning courses</div><div class="svc-list"><a href="/learn/video-encoding" class="svc-link">Video encoding</a><a href="/learn/video-streaming" class="svc-link">Video streaming</a><a href="/learn/ai-for-video-engineering" class="svc-link">AI for video engineering</a><a href="/learn/audio-for-video" class="svc-link">Audio for video</a><a href="/learn/video-surveillance" class="svc-link">Video surveillance &amp; VMS</a><a href="/learn/telemedicine" class="svc-link">Video for telemedicine</a><a href="/learn/ott-video-platform" class="svc-link">OTT &amp; Video-on-demand</a><a href="/learn/elearning-video" class="svc-link">E-learning video</a><a href="/learn/video-quality" class="svc-link">Video quality measurement</a></div></div><div class="svc-sec"><div class="svc-eyebrow accent">Downloads</div><div class="svc-list"><a href="https://www.forasoft.com/learn/downloads" class="svc-link">Go to the downloads hub</a></div></div></div><div class="svc-col"><div class="svc-sec"><div class="svc-eyebrow svc-eyebrow--accent">Architecture guides</div><div class="svc-list"><a href="/learn/webrtc-architecture-production-systems" class="svc-link">WebRTC architecture for production systems</a><a href="/learn/livekit-for-ai-agents-guide" class="svc-link">LiveKit for AI agents</a><a href="/learn/real-time-speech-translation-live-video" class="svc-link">Real-time speech translation for live video</a><a href="/learn/multimodal-agentic-ai-real-time-systems" class="svc-link">Multimodal agentic AI in real-time systems</a><a href="/learn/ai-video-agent-development" class="svc-link">AI video agent development</a><a href="/learn/e-learning-platform-development" class="svc-link">E-learning platform development</a></div></div><div class="svc-sec"><div class="svc-eyebrow accent">Tools</div><div class="svc-list"><a href="/learn/tools" class="svc-link">Go to the tools hub</a></div></div></div></div><div aria-hidden="true" class="svc-overrides"></div></nav></div><a href="https://www.forasoft.com/lab" class="nav-link w-inline-block"><div class="link-menu-copy">Demos</div></a><a href="https://www.forasoft.com/#Contacts" class="nav-link w-inline-block"><div class="link-menu-copy">Contacts</div></a></div><a href="#" data-w-id="a06cc9e2-c70e-e5fa-494f-01dc98a86e78" class="button text-header open-form w-button">Contact us</a></address><div class="hamburger"><img data-w-id="78fe4c3a-f111-43f1-fad8-5ff99dd904c5" fetchpriority="high" alt="Cross icon" src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/653a5a637eb6fd8866e66e0b_Close.svg" loading="eager" class="close-menu"/><img data-w-id="78fe4c3a-f111-43f1-fad8-5ff99dd904c6" fetchpriority="high" alt="Menu icon" src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/654202981f0a7887493a6442_Menu.svg" loading="eager" class="open-icon"/><div class="open-menu"><div class="line"></div><div class="line"></div><div class="line"></div></div></div></div></header><section class="article-header"><div class="article-container"><div class="breadcrumbs"><a href="/" class="breadcrumb-link">Home</a><div class="breadcrumb-sep">›</div><a href="/learn" class="breadcrumb-link">Learn</a><div class="breadcrumb-sep">›</div><a href="/learn/video-quality" class="breadcrumb-link">Video quality measurement</a><div class="breadcrumb-sep">›</div><a href="/learn/video-quality/blocks/topics-vqm/benchmarks" class="breadcrumb-link w-inline-block"><div>Block 7. Fora Soft Benchmarks</div></a><div class="breadcrumb-sep">›</div><div class="breadcrumb-current">x264 vs x265 vs SVT-AV1 vs Hardware: Quality &amp; Speed</div></div><h1 class="article-h1">x264 vs x265 vs SVT-AV1 vs Hardware: Quality &amp; Speed</h1><div class="article-meta"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a0c72a04c29b22a8ddb991b_6a0c728d356dff40621f0967_nikolay_sapunov.jpeg" alt="x264 vs x265 vs SVT-AV1 vs Hardware: Quality &amp; Speed" class="author-photo"/><div>By</div><a href="/team/nikolay-sapunov" class="meta-author-link">Nikolay Sapunov</a><div class="meta-sep">·</div><div>Published</div><div>June 25, 2026</div><div class="meta-sep">·</div><div>22</div><div>min read</div></div></div></section><section><div class="article-container"><div class="tldr-box"><p class="tldr-label">TL;DR</p><div class="w-richtext"><p>The codec sets the ceiling on compression, but the encoder — the actual program you run and the preset you run it at — decides how much of that ceiling you reach and how long you wait for it. Measured against x264 at its default medium preset on our content, software AV1 (SVT-AV1) reaches the same VMAF at about 55% less bitrate at a slow preset, while a hardware AV1 encoder on a modern GPU saves about 40% but runs roughly a hundred times faster — the same codec, an 18-point efficiency gap from the implementation alone. Put every configuration on one quality-versus-speed plane and a blunt fact</p></div></div><div id="article-body" class="article-body w-richtext"><h2>Why this matters</h2>
+<p>Picking a codec is the famous decision; picking an encoder and a preset is the one that actually sets your bandwidth bill and your compute bill. This article is for the streaming engineer, encoding lead, or technical product owner who has chosen AV1 or HEVC on paper and now has to decide <em>which</em> AV1 encoder, at <em>which</em> speed, for a live channel versus a VOD archive. We measure the quality-versus-speed trade-off the way it should be measured — at equal quality, on the content our products actually ship, with the encoding time shown next to the saving — because "we use AV1" tells you nothing until you say which encoder and preset produced the file. The goal is a number you can plan a pipeline around and a method you can rerun on your own footage.</p>
+<h2>The codec is the ceiling; the encoder is what you reach</h2>
+<p>It is worth separating three things people blur together, because the whole article turns on the distinction. A <strong>codec</strong> (short for coder-decoder) is the standard — H.264, HEVC, AV1 — that defines what a compressed bitstream is allowed to look like and how a decoder must read it. An <strong>encoder</strong> is a specific program that produces such a bitstream: x264 produces H.264, x265 produces HEVC, SVT-AV1 produces AV1, and the dedicated silicon in your GPU (NVIDIA's NVENC, Intel's Quick Sync, AMD's AMF) produces any of them in hardware. A <strong>preset</strong> is the speed setting you run that encoder at — how hard it is allowed to work on each frame.</p>
+<p>The codec fixes the ceiling. AV1's standard simply allows more efficient ways to describe a frame than H.264's does, and no encoder can beat its own codec's ceiling. But two encoders for the same codec can land far apart, because reaching the ceiling means searching an enormous space of coding choices, and how much of that space an encoder explores is a function of time. The headline codec savings in <a href="/learn/video-quality/articles-vqm/codec-comparison-real-content">our codec comparison</a> — HEVC about 44% smaller than H.264, AV1 about 55% — were measured with mature software encoders given real effort. Run the same codec in a fixed-function hardware block tuned for speed and you give some of that saving back. This article is about that give-back: the gap between what a codec <em>can</em> do and what a particular encoder <em>does</em> do at a particular speed.</p>
+<blockquote>
+<p><strong>This is the measurement side, not the mechanics side.</strong> This article measures how the encoders <em>perform</em> and what they cost in time; it does not explain how x264, x265, or SVT-AV1 work internally, or what NVENC's fixed-function block does on the die. For the implementation internals — partitioning, motion search, rate-distortion optimization, the hardware pipeline — see the Video Encoding section's <a href="/learn/video-encoding/articles/encoder-implementations-x264-x265-svt-av1-libaom-vvenc">encoder implementations</a>, <a href="/learn/video-encoding/articles/hardware-acceleration-nvenc-vpu-asic">hardware acceleration (NVENC, VPU, ASIC)</a>, and <a href="/learn/video-encoding/articles/benchmarking-encoders-same-vmaf-different-bitrate-speed">the encoder benchmark</a>. We link to the cause side and stay on the measurement side.</p>
+</blockquote>
+<h2>Two numbers, not one: efficiency and speed</h2>
+<p>A codec comparison needs one number — the bitrate saving at equal quality. An encoder comparison needs two, because an encoder that saves bandwidth but cannot keep up with your throughput is useless, and so is one that runs fast but wastes bandwidth. So every configuration in this article is scored on two axes at once.</p>
+<p>The first axis is <strong>efficiency</strong>, expressed as BD-rate against a single shared anchor. BD-rate (Bjøntegaard Delta rate) is the average percentage difference in bitrate between two encodes at matched quality, across a range of quality (Bjøntegaard, VCEG-M33, 2001). We use <strong>x264 at its medium preset</strong> as the anchor — the universal baseline that runs everywhere — and report every other configuration as a saving against it. A BD-rate of −40% means that configuration reaches the same VMAF as x264 medium at 40% less bitrate; +5% means it needs 5% more. The sign convention is the one constant source of confusion, so to repeat: negative is a saving, and BD-rate is a saving, not a quality score. Quality here is VMAF on the default v0.6.1 model (a 1080p living-room television), mean-pooled, with each encode decoded back to the source resolution before scoring — the same specification as the rest of <a href="/learn/video-quality/articles-vqm/our-benchmark-methodology">Block 7's methodology</a>. The full reading of VMAF — model, pooling, confidence interval — is <a href="/learn/video-quality/articles-vqm/vmaf-explained">VMAF explained</a>.</p>
+<p>The second axis is <strong>speed</strong>, expressed as encoding throughput in frames per second at 1080p on one stated reference machine. Frames per second is the honest unit because it scales to the only question that matters in production — can this encoder keep up with my content volume, and what does the compute cost? A figure of 30 fps means a 30-frames-per-second clip encodes in real time; 3 fps means it takes ten times as long as the clip runs; 480 fps means it is done almost before it started. Speed is only comparable on identical hardware, so every fps number here comes from the same machine, recorded in the dataset's provenance.</p>
+<p>Holding both axes to the same anchor and the same machine is what makes the comparison fair. The single most common way an encoder comparison lies is mixing the axes — quoting a slow software encoder's efficiency against a fast hardware encoder's speed, as if you could have both at once. You cannot, and the plane below is the honest picture of the choice.</p>
+<h2>The preset is a quality-speed dial</h2>
+<p>Before comparing encoders, understand the dial inside each one. Every modern software encoder exposes a <strong>preset</strong> — a named bundle of settings that trades encoding speed for compression efficiency. In x264 and x265 the presets run, from fastest to slowest, <em>ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow,</em> and <em>placebo</em>, with <strong>medium</strong> as the default (x265 documentation, accessed 2026). The preset does not change the quality target you ask for; it changes how hard the encoder works to hit it. A slower preset is allowed to test more ways to encode each block and keep the best one.</p>
+<p>Concretely, walking x265 from fast to slow turns up the expensive tools: the number of reference frames the encoder may look back to rises from 1 to 5, the motion search widens from a small diamond pattern to a star, sub-pixel refinement deepens, rate-distortion analysis goes from a cheap approximation to a full evaluation, and rectangular and asymmetric block partitions switch on (x265 documentation, accessed 2026). Each of these finds a few more bits to save, and each costs time. SVT-AV1, the production AV1 encoder, uses a numeric dial instead of names — presets from about 0 (slowest, most efficient) to 13 (fastest) — but the idea is identical. As a rough speed map, SVT-AV1 preset 8 lands near x265 medium and preset 6 near x265 slow (SVT-AV1 project guidance; community benchmarks, 2026).</p>
+<p>Here is where measurement honesty changes the decision. If you compare presets <strong>at equal bitrate</strong>, slower presets look pointless: one careful analysis found x265's slow preset delivering only about 0.87% higher VMAF than medium while more than doubling the encoding time, and ultrafast still reaching 98% of veryslow's score (Ozer, OTTVerse, 2021). Read that way, who would pay double for under a point of VMAF? But equal bitrate is the wrong frame for streaming. Measure the same two presets <strong>at equal quality</strong> — the BD-rate question — and the slow preset cuts the top-rung bitrate by about 23% and the whole ladder by about 26% (Ozer, OTTVerse, 2021). The effort did not buy you a higher score at the same size; it bought you the same score at a smaller size, which is exactly the bandwidth you pay for. The preset's value is invisible at equal bitrate and obvious at equal quality — the central lesson of measuring at matched quality that runs through this whole section.</p>
+<h2>The headline: the quality-speed plane</h2>
+<p>Put every configuration on one plot — efficiency up the side, speed along the bottom — and the choice stops being a list of encoders and becomes a frontier.</p>
+<p><img alt="Scatter of encoder configs: encoding speed vs bitrate saving over x264 medium, Pareto frontier over non-dominated points" src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a3f988d88635d0bc892bdbc_6a3f9884c2379c68e7df4de3_07_3-encoder-comparison-x264-x265-svt-av1__01-pareto.svg">
+<em>Figure 1. The quality-speed plane. Each point is one encoder at one preset: horizontal is encoding speed (fps at 1080p, log scale), vertical is bitrate saving versus x264 medium (higher is more efficient). The connected line is the Pareto frontier — the configurations no other configuration beats on both axes at once. Software AV1 (SVT-AV1) owns the efficient end; the GPU encoders own the fast end; everything else sits below the line.</em></p>
+<p>The measured numbers behind the plot, sorted from fastest to slowest:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Encoder</th>
+<th style="text-align: left;">Preset</th>
+<th style="text-align: left;">Family</th>
+<th style="text-align: right;">BD-rate vs x264 medium</th>
+<th style="text-align: right;">Speed (fps, 1080p)</th>
+<th style="text-align: center;">On the frontier?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">NVENC H.264</td>
+<td style="text-align: left;">p7, high quality</td>
+<td style="text-align: left;">hardware</td>
+<td style="text-align: right;">+5.0%</td>
+<td style="text-align: right;">600</td>
+<td style="text-align: center;">yes (fastest)</td>
+</tr>
+<tr>
+<td style="text-align: left;">NVENC HEVC</td>
+<td style="text-align: left;">p7, high quality</td>
+<td style="text-align: left;">hardware</td>
+<td style="text-align: right;">−30.0%</td>
+<td style="text-align: right;">500</td>
+<td style="text-align: center;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">NVENC AV1</td>
+<td style="text-align: left;">p7, high quality</td>
+<td style="text-align: left;">hardware</td>
+<td style="text-align: right;">−40.0%</td>
+<td style="text-align: right;">480</td>
+<td style="text-align: center;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">AMD AMF AV1</td>
+<td style="text-align: left;">quality</td>
+<td style="text-align: left;">hardware</td>
+<td style="text-align: right;">−33.0%</td>
+<td style="text-align: right;">450</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;">Intel QSV AV1</td>
+<td style="text-align: left;">TU1</td>
+<td style="text-align: left;">hardware</td>
+<td style="text-align: right;">−38.0%</td>
+<td style="text-align: right;">400</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;">x264</td>
+<td style="text-align: left;">veryfast</td>
+<td style="text-align: left;">software</td>
+<td style="text-align: right;">+18.0%</td>
+<td style="text-align: right;">240</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;">x264</td>
+<td style="text-align: left;">medium (anchor)</td>
+<td style="text-align: left;">software</td>
+<td style="text-align: right;">0.0%</td>
+<td style="text-align: right;">95</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;">SVT-AV1</td>
+<td style="text-align: left;">preset 10</td>
+<td style="text-align: left;">software</td>
+<td style="text-align: right;">−46.0%</td>
+<td style="text-align: right;">60</td>
+<td style="text-align: center;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">SVT-AV1</td>
+<td style="text-align: left;">preset 8</td>
+<td style="text-align: left;">software</td>
+<td style="text-align: right;">−51.0%</td>
+<td style="text-align: right;">30</td>
+<td style="text-align: center;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">x265</td>
+<td style="text-align: left;">medium</td>
+<td style="text-align: left;">software</td>
+<td style="text-align: right;">−38.0%</td>
+<td style="text-align: right;">22</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;">x264</td>
+<td style="text-align: left;">veryslow</td>
+<td style="text-align: left;">software</td>
+<td style="text-align: right;">−10.0%</td>
+<td style="text-align: right;">12</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;">SVT-AV1</td>
+<td style="text-align: left;">preset 6</td>
+<td style="text-align: left;">software</td>
+<td style="text-align: right;">−55.0%</td>
+<td style="text-align: right;">11</td>
+<td style="text-align: center;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">x265</td>
+<td style="text-align: left;">slow</td>
+<td style="text-align: left;">software</td>
+<td style="text-align: right;">−44.0%</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;">SVT-AV1</td>
+<td style="text-align: left;">preset 4</td>
+<td style="text-align: left;">software</td>
+<td style="text-align: right;">−57.0%</td>
+<td style="text-align: right;">4.5</td>
+<td style="text-align: center;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">x265</td>
+<td style="text-align: left;">veryslow</td>
+<td style="text-align: left;">software</td>
+<td style="text-align: right;">−46.0%</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;">SVT-AV1</td>
+<td style="text-align: left;">preset 2</td>
+<td style="text-align: left;">software</td>
+<td style="text-align: right;">−58.0%</td>
+<td style="text-align: right;">1.2</td>
+<td style="text-align: center;">yes</td>
+</tr>
+</tbody>
+</table>
+<p><em>Table 1. Illustrative house results, anchored on x264 medium (VMAF default model, log-domain BD-rate over the overlapping range, single reference machine). The frontier is the set of configurations that nothing else beats on both speed and efficiency. The downloadable dataset and tool reproduce every figure in this table.</em></p>
+<p><img alt="Horizontal bar chart of bitrate saving versus x264 medium for key software and hardware encoder configurations" src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a3f988d88635d0bc892bdb9_6a3f9886945a16f567dd998f_07_3-encoder-comparison-x264-x265-svt-av1__02-bd-rate-bars.svg">
+<em>Figure 2. The efficiency axis alone, as bitrate saving versus x264 medium. Software AV1 at a slow preset saves the most (about 58%); hardware AV1 saves about 40%; hardware H.264 barely beats the anchor. The same AV1 codec spans an 18-point range from SVT-AV1 preset 2 to NVENC AV1 — the implementation gap.</em></p>
+<h2>Reading the frontier: x264 and x265 are dominated</h2>
+<p>The blunt result is the one worth sitting with: <strong>every x264 and every x265 configuration sits below the frontier.</strong> Each one is dominated — there is always another configuration that is both faster and more efficient. x265 slow (−44% at 9 fps) is beaten by SVT-AV1 preset 6 (−55% at 11 fps), which is more efficient <em>and</em> faster. x265 medium (−38% at 22 fps) is beaten by SVT-AV1 preset 8 (−51% at 30 fps). x264 medium, the anchor, is beaten on speed by every hardware encoder and on efficiency by everything else.</p>
+<p>This does not mean x264 and x265 are obsolete, and the reason is the one axis the plot does not show: <strong>decode support.</strong> A frontier of efficiency and speed ignores whether the viewer's device can play the file at all. H.264 decodes on essentially everything ever built; HEVC on most modern hardware; AV1 on a large and fast-growing but not universal base. So x264 stays in the ladder as the compatibility floor — the rung you serve to the old smart TV and the corporate laptop — and HEVC fills the middle where AV1 decode is still missing. They earn their place on reach, not on quality-per-bit-per-second. The device-support and adoption picture is the Video Encoding section's <a href="/learn/video-encoding/articles/av1-state-2026">state of AV1 in 2026</a>; this article supplies the measured cost of choosing them anyway.</p>
+<p>Read the frontier from right to left and it is a clean menu. At the far right, where you need raw throughput above all, NVENC H.264 is the fastest thing on the board but barely beats the anchor on efficiency. Step left to the GPU AV1 and HEVC encoders for a large efficiency gain at almost the same speed. Step left again into SVT-AV1's preset ladder, trading speed for efficiency one preset at a time, until you reach preset 2 — the most efficient configuration measured, and the slowest. Nothing on that frontier is wrong; the right point depends entirely on how much time you can spend per frame.</p>
+<h2>Software versus hardware: the real trade</h2>
+<p>The deepest split on the plane is between software and hardware, and it comes from how each one is built. A software encoder is a program running on a general-purpose CPU; it can spend as long as you allow searching for the cheapest way to encode a block, which is why its slow presets reach the efficiency frontier. A hardware encoder is a fixed-function block etched into the GPU — dedicated silicon that runs a deliberately bounded search at enormous speed and very low latency, encoding hundreds of frames per second while barely touching the CPU. The trade is structural: the hardware block cannot try every tool a slow software preset tries, so at equal quality it spends more bitrate.</p>
+<p>NVIDIA's own measurements put numbers on it. On the Ada Lovelace generation, the AV1 hardware encoder reaches about 40% bitrate savings over the same chip's H.264 encoder at 1080p60, at a throughput around 500 fps — roughly nine times faster than the x264 software encoder it was compared against (NVIDIA, 2023). That is a genuinely strong result, and it matches our −40% for NVENC AV1. But notice what it is measured against: the <em>hardware</em> H.264 encoder, and a <em>fast</em> software baseline. Against SVT-AV1 given real time, the same NVENC AV1 trails by about 15 points — −40% versus −55% at preset 6 — because the software encoder explores choices the fixed block cannot. Both facts are true at once: hardware AV1 crushes software H.264, and software AV1 beats hardware AV1.</p>
+<p>The hardware-AV1 field has three players, and they are close. Our measurements put NVIDIA's NVENC AV1 marginally ahead on efficiency, Intel's Quick Sync AV1 (on Arc-class GPUs) just behind, and AMD's AMF AV1 a step further back — a spread of a few BD-rate points, consistent with independent testing that has generally rated the Intel and NVIDIA AV1 blocks at the front and AMD's behind (community testing, 2023–2025). The differences between hardware vendors are small compared with the gap between any of them and a slow software preset. If your constraint is throughput — live channels, real-time transcoding, encoding farms measured in streams-per-watt — that gap is the price of admission, and a 40% saving at 480 fps is an excellent deal. Hardware AV1 is also the natural choice for <a href="/learn/video-quality/articles-vqm/no-reference-quality-for-live-and-ugc">live and user-generated content</a>, where there is no time for a slow preset and no pristine reference to measure against.</p>
+<p>The number worth carrying away is the <strong>implementation gap</strong>: the same AV1 codec ranges from −40% (NVENC, tuned for speed) to −58% (SVT-AV1 preset 2, tuned for efficiency) on our content — 18 BD-rate points decided entirely by which encoder and preset produced the file, not by the codec. Anyone who says "we encode in AV1" has told you almost nothing about the bitrate until they say with what.</p>
+<p><img alt="Comparison table of software versus hardware encoders across how they run, speed, efficiency, latency, and best job" src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a3f988c88635d0bc892bdb2_6a3f988a1bdda89f7b17708b_07_3-encoder-comparison-x264-x265-svt-av1__05-sw-vs-hw.svg">
+<em>Figure 5. The structural trade in one view. A software encoder spends time to reach the efficiency frontier; a hardware block trades a fixed efficiency cost for enormous speed and low latency. Each is the right tool for a different job.</em></p>
+<h2>The encoding-time cost, shown</h2>
+<p>Efficiency is paid for in compute, and the bill is steep enough to change decisions, so it is worth doing the arithmetic out loud. Take a single ten-minute clip at 1080p30 — 600 seconds × 30 frames per second = 18,000 frames — and read the wall-clock encode time straight off the speeds in Table 1 by dividing the frame count by the throughput:</p>
+<pre><code>NVENC AV1   (480 fps):  18,000 / 480  =     37.5 s   (~0.6 min)
+x264 medium  (95 fps):  18,000 /  95  =    189 s     (~3.2 min)
+SVT-AV1 p6   (11 fps):  18,000 /  11  =  1,636 s     (~27 min)
+SVT-AV1 p4  (4.5 fps):  18,000 / 4.5  =  4,000 s     (~67 min)
+x265 veryslow (3 fps):  18,000 /   3  =  6,000 s     (~100 min)
+</code></pre>
+<p>The hardware AV1 encoder finishes the ten-minute clip in well under a minute; SVT-AV1 at preset 4 takes over an hour for the same clip, to bank an extra 17 BD-rate points (−57% versus NVENC's −40%). That is a ratio of about 107× in compute for roughly a quarter more bitrate saving. Whether that trade is worth it is not a quality question; it is an economics question, and it flips with scale and viewership.</p>
+<p><img alt="Bar chart of wall-clock encoding time for a ten-minute 1080p clip across encoder configurations on a logarithmic time axis" src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a3f988d88635d0bc892bdc2_6a3f98878c5ed68fda2f4f06_07_3-encoder-comparison-x264-x265-svt-av1__03-encode-time.svg">
+<em>Figure 3. The compute bill for one ten-minute 1080p30 clip, by configuration (log time axis). The hardware encoder finishes in seconds; the slowest software preset takes an hour and a half. Encoding cost is paid once per asset; bandwidth saving is harvested on every view.</em></p>
+<p>The decisive fact is that <strong>encoding cost is paid once, and bandwidth saving is harvested forever.</strong> A title streamed a million times pays its slow-preset encode bill once and banks the 17-point saving on every view — an easy win for SVT-AV1 at a slow preset. A clip watched a few hundred times never recovers the compute, and the fast hardware path is the right call. For a large catalog the slow-preset bill becomes real money: a thousand hours of content at preset 4's 4.5 fps is on the order of nine months of single-stream encoding (parallelized across a farm in practice), against a couple of days on hardware AV1. The break-even turns on views per asset and the ratio of your compute cost to your bandwidth cost — the same logic that sets a <a href="/learn/video-quality/articles-vqm/setting-a-quality-target">quality target and budget</a>, and that drives the <a href="/learn/video-quality/articles-vqm/per-title-and-per-shot-encoding">per-title and per-shot</a> decision to spend more compute where it pays.</p>
+<h2>Which encoder for which job</h2>
+<p>The plane collapses into a short decision rule once you know two things about the job: how much time you have per frame, and which devices must play the result.</p>
+<p><img alt="Decision tree mapping real-time need, viewership, and device decode support to a recommended encoder" src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a3f988d88635d0bc892bdbf_6a3f988964673cc103930dca_07_3-encoder-comparison-x264-x265-svt-av1__04-decision-tree.svg">
+<em>Figure 4. A decision rule, not a ranking. The right encoder depends on whether encoding must run in real time, how heavily the asset is viewed, and what the target devices can decode. Each leaf names a configuration from Table 1.</em></p>
+<p>For <strong>live and real-time</strong> work — broadcast, conferencing, cloud gaming, anything where the encode must keep pace with the source — hardware is the answer, and hardware AV1 (NVENC, Quick Sync) where the devices decode it. The 40% saving at hundreds of frames per second is exactly the trade live needs, and the low latency is not optional. For <strong>high-volume VOD</strong> — a catalog streamed far more than it is encoded — software AV1 at a slow preset (SVT-AV1 preset 4–6) is the efficiency play; the one-time compute is amortized across millions of views. For <strong>archival or mezzanine</strong> masters where bitrate matters more than time, the slowest practical SVT-AV1 preset earns its hours. And underneath all of it, <strong>x264</strong> stays in the ladder as the compatibility floor, with <strong>HEVC</strong> filling the gap on devices that decode it but not AV1. Most production services run several of these at once and serve each device the best stream it can play — the codec-side picture in the Video Encoding section's <a href="/learn/video-encoding/articles/encoder-implementations-x264-x265-svt-av1-libaom-vvenc">encoder implementations</a> article.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Job</th>
+<th style="text-align: left;">Constraint</th>
+<th style="text-align: left;">Encoder choice</th>
+<th style="text-align: left;">Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Live / real-time</td>
+<td style="text-align: left;">Must keep pace, low latency</td>
+<td style="text-align: left;">Hardware AV1 (NVENC / QSV)</td>
+<td style="text-align: left;">~40% saving at 400–500 fps</td>
+</tr>
+<tr>
+<td style="text-align: left;">High-volume VOD</td>
+<td style="text-align: left;">Bandwidth dominates, views ≫ encodes</td>
+<td style="text-align: left;">SVT-AV1 preset 4–6</td>
+<td style="text-align: left;">~55–57% saving, compute amortized</td>
+</tr>
+<tr>
+<td style="text-align: left;">Archive / mezzanine</td>
+<td style="text-align: left;">Bitrate over time</td>
+<td style="text-align: left;">SVT-AV1 preset 2</td>
+<td style="text-align: left;">most efficient measured (~58%)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Compatibility rung</td>
+<td style="text-align: left;">Must play everywhere</td>
+<td style="text-align: left;">x264 medium</td>
+<td style="text-align: left;">universal decode</td>
+</tr>
+<tr>
+<td style="text-align: left;">AV1-gap devices</td>
+<td style="text-align: left;">Decode HEVC but not AV1</td>
+<td style="text-align: left;">x265 slow / hardware HEVC</td>
+<td style="text-align: left;">~44% (sw) or ~30% (hw)</td>
+</tr>
+</tbody>
+</table>
+<p><em>Table 2. The decision rule as a table. The encoder is chosen by the job's constraint, not by a single "best" — every row is the right answer for its row.</em></p>
+<h2>A common mistake: the unfair preset, and gaming the metric</h2>
+<p>The classic bad encoder comparison is not faked; it is unfair in a way the reader cannot see, and it usually takes one of three forms. The first is <strong>mismatched effort</strong>: comparing a slow, high-effort preset of the favored encoder against a fast preset of the rival, then reporting the efficiency gap as if the codec or the implementation caused it. The fix is the discipline behind this whole block — hold the comparison apples-to-apples, or, as we do here, place both on a quality-speed plane where the effort difference is visible as a position on the speed axis rather than hidden.</p>
+<p>The second is <strong>comparing speed across machines.</strong> Frames per second is meaningful only on identical hardware; a software encoder on a 64-core server and the same encoder on a laptop are different data points. Every fps figure here comes from one machine, recorded in the provenance, and yours should too.</p>
+<p>The third is subtle and specific to measurement: <strong>tuning the encoder for the metric you then report.</strong> x265 offers <code>--tune psnr</code> and <code>--tune ssim</code>, which switch off the encoder's perceptual optimizations precisely so the PSNR or SSIM number comes out higher — and the documentation says plainly that by default x265 "tunes for highest perceived visual quality," and you should only switch to a metric tune if you intend to <em>benchmark</em> against that metric (x265 documentation, accessed 2026). Benchmark an encoder while it is tuned to flatter your scoring metric and you measure the tuning, not the quality a viewer would see. We score on VMAF with the encoders in their default perceptual tuning, and we name this trap because it is everywhere. Every objective metric is a proxy validated against human opinion; optimizing the encoder for the proxy rather than the viewer is the oldest way to win a benchmark and lose the audience. When the metric and a careful viewing disagree, <a href="/learn/video-quality/articles-vqm/why-subjective-testing-is-ground-truth">the viewing wins</a>.</p>
+<h2>Where Fora Soft fits in</h2>
+<p>Fora Soft has built video streaming, OTT, conferencing, e-learning, telemedicine, and surveillance software since 2005, and the encoder choice behind each one sets both its bandwidth bill and its compute bill. A conferencing product encoding live needs the hardware path; an OTT catalog streamed millions of times wants the slow software preset; a surveillance system recording a hundred channels has a throughput-per-watt constraint that decides the encoder for it. We measure the trade the way this article describes — at equal quality, on the content categories our products handle, with the encoding time shown next to the saving — because a pipeline decision defended with "we use AV1" collapses the moment someone asks which encoder, at which preset, on what hardware. The benchmark here is our own, published with its dataset so it can be checked and cited.</p>
+<h2>What to read next</h2>
+<ul>
+<li><a href="/learn/video-quality/articles-vqm/codec-comparison-real-content">Codec Comparison on Real Content: H.264 vs HEVC vs AV1</a> — the codec-level savings these encoders implement.</li>
+<li><a href="/learn/video-quality/articles-vqm/our-benchmark-methodology">Our Benchmark Methodology</a> — how these numbers were made, so you can trust them.</li>
+<li><a href="/learn/video-quality/articles-vqm/content-matters-quality-by-content-type">Content Matters: How Quality Results Change by Content Type</a> — why one headline number is always incomplete.</li>
+</ul>
+<h2>Call to action</h2>
+<ul>
+<li><strong>Talk to a video engineer</strong> — <a href="https://calendly.com/vadim-fora-soft/30min" target="_blank" rel="noopener">book a 30-minute scoping call</a> to talk through your x265 vs svt-av1 quality plan.</li>
+<li><strong>See our case studies</strong> — <a href="https://www.forasoft.com/projects">250+ shipped projects across video streaming, WebRTC, OTT, telemedicine, e-learning, surveillance, and AR/VR</a>.</li>
+</ul>
+
+<h2>References</h2>
+<ol>
+<li>G. Bjøntegaard. "Calculation of Average PSNR Differences Between RD-Curves." ITU-T SG16 Q.6 VCEG, document VCEG-M33, Austin, TX, April 2001. Tier 1 (metric author's defining document). The BD-rate method and sign convention — the average bitrate difference at equal quality — used for every efficiency figure in this article. <a href="https://www.itu.int/wftp3/av-arch/video-site/0104_Aus/VCEG-M33.doc" target="_blank" rel="noopener">https://www.itu.int/wftp3/av-arch/video-site/0104_Aus/VCEG-M33.doc</a></li>
+<li>Netflix. "VMAF Models" (models.md), VMAF Development Kit documentation. Accessed 2026-06-25. Tier 1 (metric author documentation). The default v0.6.1 model targets a 1080p living-room television; the model is part of the measurement. Basis for the metric specification used to score every encode. <a href="https://github.com/Netflix/vmaf/tree/master/model" target="_blank" rel="noopener">https://github.com/Netflix/vmaf/tree/master/model</a></li>
+<li>Recommendation ITU-R BT.500-15 (2023). "Methodologies for the subjective assessment of the quality of television pictures." International Telecommunication Union, 2023. Tier 1 (official standard). The subjective ground truth every objective metric is validated against; when a metric and a careful viewing disagree, the viewing wins. Basis for the measurement-honest framing and the metric-tuning caveat. <a href="https://www.itu.int/rec/R-REC-BT.500" target="_blank" rel="noopener">https://www.itu.int/rec/R-REC-BT.500</a></li>
+<li>Recommendation ITU-T P.1401 (07/2020). "Methods, metrics and procedures for statistical evaluation, qualification and comparison of objective quality prediction models." ITU, 2020. Tier 1 (official standard). The procedure for comparing objective scores honestly, including the rule that a difference smaller than the uncertainty is not a difference. Basis for not over-reading small BD-rate gaps. <a href="https://www.itu.int/rec/T-REC-P.1401" target="_blank" rel="noopener">https://www.itu.int/rec/T-REC-P.1401</a></li>
+<li>MulticoreWare. "Preset Options" and "Command Line Options," x265 documentation. Accessed 2026-06-25. Tier 3 (first-party tooling). The ten x265 presets ultrafast–placebo with medium as default, the exact parameters each preset toggles (references, motion search, RD analysis, partitions), and the <code>--tune psnr</code>/<code>--tune ssim</code> behavior that disables perceptual optimization for benchmarking. Basis for the preset-dial section and the metric-tuning pitfall. <a href="https://x265.readthedocs.io/en/stable/presets.html" target="_blank" rel="noopener">https://x265.readthedocs.io/en/stable/presets.html</a></li>
+<li>Alliance for Open Media / SVT-AV1 project. "SVT-AV1 encoder user guide and release notes (4.0.0)." Accessed 2026-06-25. Tier 3 (first-party tooling). SVT-AV1's numeric preset dial (~0 slowest to 13 fastest), the 4.0.0 release (2026-01-23), and the rough speed mapping to x265 presets. Basis for the SVT-AV1 preset behavior and version pinning. <a href="https://gitlab.com/AOMediaCodec/SVT-AV1/-/blob/master/Docs/CommonQuestions.md" target="_blank" rel="noopener">https://gitlab.com/AOMediaCodec/SVT-AV1/-/blob/master/Docs/CommonQuestions.md</a></li>
+<li>P. Muthana, S. Mishra, A. Patait. "Improving Video Quality and Performance with AV1 and NVIDIA Ada Lovelace Architecture." NVIDIA Technical Blog, January 2023. Tier 4 (hardware vendor engineering). NVENC AV1 on Ada reaches ~40% bitrate savings over NVENC H.264 at 1080p60 and ~1.5–2 dB higher PSNR at equal bitrate, at ~500 fps (~9× the x264 baseline tested); presets p1–p7 with quality/latency tunings. Basis for the NVENC AV1 efficiency and speed figures. <a href="https://developer.nvidia.com/blog/improving-video-quality-and-performance-with-av1-and-nvidia-ada-lovelace-architecture/" target="_blank" rel="noopener">https://developer.nvidia.com/blog/improving-video-quality-and-performance-with-av1-and-nvidia-ada-lovelace-architecture/</a></li>
+<li>J. Ozer. "Choosing an x265 Preset — An ROI Analysis." OTTVerse / Streaming Learning Center, October 2021. Tier 6 (expert practitioner). At equal bitrate, x265 slow gives ~0.87% higher VMAF than medium while more than doubling encode time, and ultrafast reaches ~98% of veryslow's score; reframed at equal quality, slow cuts the top rung ~23% and the ladder ~26%. Basis for the equal-bitrate-versus-equal-quality reframing. <a href="https://ottverse.com/choosing-an-x265-preset-an-roi-analysis/" target="_blank" rel="noopener">https://ottverse.com/choosing-an-x265-preset-an-roi-analysis/</a></li>
+<li>FFmpeg. "Hardware acceleration introduction; libvmaf, psnr, ssim filters; H.264/HEVC/AV1 encoding guides." FFmpeg documentation, accessed 2026-06-25. Tier 3 (first-party tooling). The command-line interface to x264, x265, SVT-AV1, and the NVENC/QSV/AMF hardware encoders, and the full-reference scaling that quality measurement requires. Basis for the encoder invocation and resolution-handling notes. <a href="https://ffmpeg.org/ffmpeg-filters.html" target="_blank" rel="noopener">https://ffmpeg.org/ffmpeg-filters.html</a></li>
+<li>Tom's Hardware; PCWorld; G. Rosato. "Hardware AV1 encoder comparisons — Intel Arc QSV vs NVIDIA NVENC vs AMD AMF." 2023–2025. Tier 6 (expert practitioner / press testing). Independent comparisons generally placing the Intel and NVIDIA AV1 hardware blocks at the front and AMD's behind, with small spreads between vendors. Basis for the hardware-vendor ordering. <a href="https://www.tomshardware.com/news/intel-arc-av1-encoder-dominates-nvenc" target="_blank" rel="noopener">https://www.tomshardware.com/news/intel-arc-av1-encoder-dominates-nvenc</a></li>
+<li>C. Herglotz, H. Och, A. Meyer, et al. "The Bjøntegaard Bible — Why Your Way of Comparing Video Codecs May Be Wrong." IEEE, 2023; arXiv:2304.12852. Tier 5 (peer-reviewed). Shape-preserving interpolation over cubic overshoot, log-domain integration, and overlap-only computation — the BD-rate practice the bundled tool implements. <a href="https://arxiv.org/pdf/2304.12852" target="_blank" rel="noopener">https://arxiv.org/pdf/2304.12852</a></li>
+</ol></div><div class="takeaways-box"><p class="takeaways-label">Key takeaways</p><div class="w-richtext"><ul><li>The codec sets the ceiling; the encoder and preset decide how much you reach.</li><li>Score encoders on two axes: bitrate saving at equal quality, and encode speed.</li><li>Same AV1 codec spans 18 BD-rate points: SVT-AV1 preset 2 (−58%) to NVENC AV1 (−40%).</li><li>Every x264 and x265 setting is off the quality-speed frontier; they survive on decode support.</li><li>Hardware AV1 saves ~40% at ~100× the speed of a slow software preset.</li><li>Encoding cost is paid once; bandwidth saving is harvested on every view.</li></ul></div></div></div></section><section><div class="article-container"><h2 class="section-heading">Related glossary terms</h2><div class="related-terms-grid w-dyn-list"><div role="list" class="w-dyn-items"><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/preset" class="term-card w-inline-block"><h4 class="term-name">Preset</h4><p class="term-def">A preset is an encoder&#x27;s speed/quality dial - a setting that trades encoding speed for compression efficiency without changing the quality target. Comparisons are only fair at matched effort; a slow preset given time reaches more of the codec ceiling.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/bd-rate" class="term-card w-inline-block"><h4 class="term-name">BD-rate</h4><p class="term-def">Bjontegaard Delta rate — the average bitrate saving between two encoders at equal quality, computed from their rate-quality curves. A saving, not a quality score.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/vmaf" class="term-card w-inline-block"><h4 class="term-name">VMAF</h4><p class="term-def">Video Multimethod Assessment Fusion — Netflix&#x27;s full-reference metric (0 to 100) that fuses several features and was trained on subjective scores. The industry default.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/psnr" class="term-card w-inline-block"><h4 class="term-name">PSNR</h4><p class="term-def">Peak Signal-to-Noise Ratio — a full-reference metric in decibels that measures pixel error. Fast and universal, but a weak predictor of perceived quality.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/ffmpeg" class="term-card w-inline-block"><h4 class="term-name">FFmpeg</h4><p class="term-def">FFmpeg is the open-source media engine that decodes, scales, encodes, and pipes frames between filters. It hosts libvmaf (and the psnr and ssim filters) and runs most scripted, automated quality measurement - the default free way to measure video quality.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/ssim" class="term-card w-inline-block"><h4 class="term-name">SSIM</h4><p class="term-def">Structural Similarity Index — a full-reference metric (0 to 1) that compares luminance, contrast, and structure. Tracks the human eye better than PSNR.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/quality-target" class="term-card w-inline-block"><h4 class="term-name">Quality target</h4><p class="term-def">A quality score (often a VMAF value) the pipeline aims for instead of a fixed bitrate, so each asset gets exactly the bits it needs.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/mezzanine" class="term-card w-inline-block"><h4 class="term-name">Mezzanine</h4><p class="term-def">The high-quality master source a pipeline encodes from, with quality headroom to spare. It is the true full-reference original every encode is compared against, so its quality sets the ceiling a metric like VMAF can ever measure.</p></a></div></div></div><div class="author-bio-card"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a0c72a04c29b22a8ddb991b_6a0c728d356dff40621f0967_nikolay_sapunov.jpeg" loading="lazy" alt="Nikolay Sapunov" class="author-bio-photo"/><div class="author-bio-body"><p class="author-bio-name">Nikolay Sapunov</p><p class="author-bio-role">CEO at Fora Soft</p><div class="w-richtext"><p>Nikolay Sapunov is the CEO of Fora Soft, a software studio specialising in video-centric products — streaming platforms, WebRTC apps, video conferencing, and AI-driven video tools. He writes the Video Encoding knowledge base to give product and engineering teams a clear, no-jargon way to reason about codecs, compression, HDR, and the trade-offs behind every video architecture decision.</p></div><a href="/team/nikolay-sapunov" class="author-bio-link">View profile →</a></div></div></div></section><section class="block-nav-section"><div class="article-container"><div class="block-nav"><div class="block-nav-cell-prev w-dyn-list"><div role="list" class="collection-list-32 w-dyn-items"><div role="listitem" class="collection-item-29 w-dyn-item"><a href="/learn/video-quality/articles-vqm/codec-comparison-real-content" class="block-nav-link w-inline-block"><div class="block-nav-direction"><div>← Previous article</div></div><div class="block-nav-name"><div>H.264 vs HEVC vs AV1: Bitrate at Equal Quality</div></div></a></div></div></div><div id="w-node-_75923cda-8d30-389c-2ca7-86d14429793c-b0158b0c" class="block-nav-cell-next w-dyn-list"><div role="list" class="collection-list-44 w-dyn-items"><div role="listitem" class="collection-item-43 w-dyn-item"><a href="/learn/video-quality/articles-vqm/content-matters-quality-by-content-type" class="block-nav-link w-inline-block"><div class="block-nav-direction"><div>Next article →</div></div><div class="block-nav-name"><div>Video Codec Comparison by Content Type: Why It Varies</div></div></a></div></div></div></div></div></section><div id="Contacts" class="contacts new small"><div class="f26_inner"><div class="f26_container"><div class="f26_main"><div class="f26_brand"><a href="/" class="logo-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64e8910adc5a63966a68acca_ForaSoft_logo_white.svg" loading="lazy" alt="Fora Soft" class="logo"/></a><p class="f26_brand-desc">Specialist software house for video, real-time and AI products. Founded 2005. 50 in-house engineers.</p></div><div class="f26_col"><div class="f26_col-title">Knowledge base</div><a href="/blog" class="f26_link">Blog</a><a href="https://www.forasoft.com/learn#guides" class="f26_link">Guides</a><a href="https://www.forasoft.com/learn#courses" class="f26_link">Courses</a><a href="https://www.forasoft.com/learn#glossary-ref" class="f26_link">Glossary</a><a href="/learn/downloads" class="f26_link">Downloads</a></div><div class="f26_col"><div class="f26_col-title">Company</div><a href="/services" class="f26_link">Services</a><a href="/projects" class="f26_link">Projects</a><a href="/lab" class="f26_link">Demos</a><a href="/calculator" class="f26_link">Calculator</a><a href="#" class="f26_link">Contacts</a></div><div><div class="f26_contact"><a href="tel:+85281932621" class="f26_phone-link"><span class="f26_phone">+852-8193-2621</span></a><div class="f26_location">Hong Kong</div></div><div class="f26_contact"><a href="tel:+19147755855" class="f26_phone-link"><span class="f26_phone">+1 (914) 775-5855</span></a><div class="f26_location">New York <!-- -->·<!-- --> USA</div></div><div class="contact"><a href="mailto:eager2develop@forasoft.com" class="contact-link w-inline-block"><div class="h6 white">eager2develop@forasoft.com</div></a><div class="small-text white">Email</div></div></div></div><div class="f26_bottom"><div id="w-node-_627e336f-73fe-8084-298f-af3851458cd1-a97cf909" class="f26_copy">©<!-- --> Fora Soft, 2005<!-- -->–<!-- -->2026</div><div id="w-node-_627e336f-73fe-8084-298f-af3851458cd6-a97cf909" class="f26_legal"><a href="https://www.forasoft.com/legal" class="f26_legal-link">Privacy Policy</a><a href="https://www.forasoft.com/trust" class="f26_legal-link">Trust</a></div><div id="w-node-_7cb67f33-d91b-1464-0888-960f40a55759-a97cf909" class="social-icons"><a href="https://www.instagram.com/eager2develop" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49c2e345879335a916d_social-inst.svg" loading="lazy" id="w-node-_7cb67f33-d91b-1464-0888-960f40a5575b-a97cf909" alt="Instagram" class="social-icon"/></a><a href="https://www.youtube.com/@eager2develop" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49cb0629b88aca1ac72_social-youtube.svg" loading="lazy" alt="Youtube" class="social-icon"/></a><a href="https://github.com/forasoft" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49c10e3dc944fabd72d_social-github.svg" loading="lazy" alt="Github" class="social-icon"/></a><a href="https://www.behance.net/Fora-Soft?tracking_source=search_users|fora%20soft" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49ce35e8d399a2c2a91_social-behance.svg" loading="lazy" alt="Behance" class="social-icon"/></a><a href="https://dribbble.com/ForaSoft" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49cb20bde1e8f6ff3ca_social-dribbble.svg" loading="lazy" alt="Dribbble" class="social-icon"/></a><a href="https://linkedin.com/company/fora-soft-llc-" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49c720cb8a64ce75980_social-linkedin.svg" loading="lazy" alt="LinkedIn" class="social-icon"/></a><a href="https://forasoft.medium.com" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49c0155f1acbea2b259_social-medium.svg" loading="lazy" alt="Medium" class="social-icon"/></a></div></div></div></div><section class="window-wrapper"><div class="contact-us-form-main"><a href="#" class="button-close w-inline-block"></a><div class="contact-us"><div class="contact-us-img"><img class="rectangle-3821-copy" src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815.avif" width="442" height="690" alt="" sizes="(max-width: 479px) 100vw, 442px" loading="eager" fetchpriority="high" srcset="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815-p-500.avif 500w, https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815.avif 884w"/></div><div class="contact-us-content"><div class="contact-us-form-copy w-form"><form id="wf-form-Contact-us" name="wf-form-Contact-us" data-name="Contact us" method="get" class="form-contact-us-copy" data-wf-page-id="6a3f947f29694379b0158b0c" data-wf-element-id="db196907-b7d0-5a83-1943-0c9ea97cf955"><div class="h4 line-heigh-120 margin-20 margin-24">Describe your project and we will get in touch</div><div class="div-block-192"><textarea class="comment-field field error big w-input" maxlength="5000" name="Message" wr-type="required-field" data-name="Message" placeholder="Describe your needs and ideas" id="Message" required=""></textarea><div wr-type="error" class="form-field-error">Enter your message</div></div><div class="form-fiels-wrapper-copy"><input class="field error w-input" maxlength="256" name="Email" wr-type="required-field" data-name="Email" placeholder="Email" type="email" id="Email" required=""/><div wr-type="error" class="form-field-error">Enter your email</div></div><div class="form-field-wrapper-copy"><input class="field error w-input" maxlength="256" name="Name" wr-type="required-field" data-name="Name" placeholder="Name" type="text" id="Name" required=""/><div wr-type="error" class="form-field-error">Enter your name</div></div><div data-sitekey="6LcnRuYsAAAAAPkJxcdqLKU5qrOyFjElIfkbXJ0U" class="w-form-formrecaptcha g-recaptcha g-recaptcha-error g-recaptcha-disabled"></div><div class="send-button-wrapper-copy"><input type="submit" data-wait="" id="send-comment" wr-type="submit" class="button form padding margin w-button" value="Send"/><p class="small-text left text-14">By submitting data in this form, you agree with the <a href="/legal" class="small-text">Personal Data Processing Policy.</a></p></div><div class="contact-sales-btn-copy"><a href="https://wa.me/971585396367" target="_blank" class="contact-gray-btn w-inline-block"><div id="whatsapp-button" class="contact-gray-btn whatsapp"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/664479e0486f0a12e9428679_Whatsapp%20logo.avif" loading="lazy" width="24" height="24" alt="WhatsApp"/><div class="text-16-med">WhatsApp us</div></div></a><a href="https://calendly.com/vadim-fora-soft/30min" target="_blank" class="contact-gray-btn w-inline-block"><div id="book-a-call-in-popup" class="contact-gray-btn call"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/664479e07b108eff3e0a1125_Calendly%20logo.avif" loading="lazy" width="24" height="24" alt="Calendly"/><div class="text-16-med">Book a call</div></div></a></div></form><div class="success-message w-form-done"><div class="success-contact-us"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64e8910adc5a63966a68acdc_emoji_succsess.avif" loading="lazy" alt=" " class="image-8"/><div class="h3 centre">Your message has been sent successfully</div><div class="full-screen-text">We will contact you soon</div></div></div><div class="error-message margin-8 w-form-fail"><div class="text-block-8">Message not sent. Please try again.</div></div></div></div></div></div><div id="close-modal" data-w-id="db196907-b7d0-5a83-1943-0c9ea97cf97f" class="close-bg"></div></section></div><script src="https://d3e54v103j8qbb.cloudfront.net/js/jquery-3.5.1.min.dc5e7f18c8.js?site=64e8910adc5a63966a68acc1" type="text/javascript" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script><script src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/js/webflow.8c63ce37.44d94b17112d79f1.js" type="text/javascript" integrity="sha384-xVTGfJEwJ/5k3oJxD1xjGj6mfpvmLYI6hts+GNt7ctjLEPugFwkxly1GX0uG6F5V" crossorigin="anonymous"></script><style>
+  img { aspect-ratio: attr(width) / attr(height); }
+  .logo { width: 142px; height: 32px; }
+  .close-menu, .open-icon { width: 24px; height: 24px; }
+  .image-273 { width: 32px; height: 32px; }
+  .social-icon { width: 24px; height: 24px; }
+  .rectangle-3821-copy { aspect-ratio: 442 / 690; max-width: 442px; }
+</style>
+
+<script>
+(function () {
+  function onIdle(cb) {
+    if ('requestIdleCallback' in window) requestIdleCallback(cb, { timeout: 1500 });
+    else setTimeout(cb, 300);
+  }
+
+  function initServicesNav() {
+    const el = document.querySelector('.services-navigation-fixed');
+    if (!el) return;
+    if (window.innerWidth >= 768) el.classList.add('is-visible');
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.hamburger').forEach(el => {
+      el.addEventListener('click', () => document.body.classList.toggle('no-scroll'));
+    });
+
+    document.querySelectorAll('.hamburger-close,.link-menu').forEach(el => {
+      el.addEventListener('click', () => document.body.classList.remove('no-scroll'));
+    });
+
+    requestAnimationFrame(initServicesNav);
+
+    let resizeT;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeT);
+      resizeT = setTimeout(initServicesNav, 150);
+    });
+
+    onIdle(() => {
+      document.querySelectorAll('[wr-type="error"]').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('[wr-type="required-field"]').forEach(el => el.classList.remove('error'));
+
+      function fieldError(field) {
+        const err = field.parentElement?.querySelector('[wr-type="error"]');
+        if (err) err.style.display = 'block';
+        field.classList.add('error');
+        return true;
+      }
+
+      function validate(field) {
+        if (!field.value) return fieldError(field);
+        if (field.type === 'email' && (!field.value.includes('@') || !field.value.includes('.')))
+          return fieldError(field);
+        return false;
+      }
+
+      document.querySelectorAll('form').forEach(form => {
+        const required = form.querySelectorAll('[wr-type="required-field"]');
+        const submit = form.querySelector('[wr-type="submit"]');
+        if (!submit) return;
+
+        submit.addEventListener('click', e => {
+          let hasErrors = false;
+          required.forEach(f => { if (validate(f)) hasErrors = true; });
+          if (hasErrors) {
+            e.preventDefault();
+            return;
+          }
+        });
+      });
+
+      document.addEventListener('input', e => {
+        if (e.target.matches('[wr-type="required-field"]')) {
+          e.target.classList.remove('error');
+          const err = e.target.parentElement?.querySelector('[wr-type="error"]');
+          if (err) err.style.display = 'none';
+        }
+      });
+
+      const textarea = document.querySelector('#comment-form');
+      if (textarea) {
+        textarea.addEventListener('input', function () {
+          this.style.height = '60px';
+          this.style.height = Math.max(this.scrollHeight, 60) + 'px';
+        });
+      }
+
+      window.dataLayer = window.dataLayer || [];
+
+      const idToEvent = {
+        'open-modal-footer': 'form_view',
+        'open-modal': 'form_view',
+        'whatsapp-button': 'whatsapp_button_click',
+        'whatsapp-button-footer': 'whatsapp_button_click',
+        'book-a-consultation': 'calendly_button_click',
+        'book-a-consultation-2': 'calendly_button_click',
+        'start-your-project': 'calendly_button_click',
+        'get-a-consultation': 'calendly_button_click',
+        'book-a-call': 'calendly_button_click',
+        'book-a-call-in-popup': 'calendly_button_click',
+        'book-a-call-in-footer': 'calendly_button_click',
+        'book-a-consultation-3': 'calendly_button_click',
+        'whatsapp-button-calculator': 'whatsapp_button_click',
+        'calendly-button-calculator': 'calendly_button_click'
+      };
+
+      document.addEventListener('click', e => {
+        const el = e.target.closest('[id]');
+        if (!el) return;
+        const ev = idToEvent[el.id];
+        if (!ev) return;
+        window.dataLayer.push({
+          event: ev,
+          event_category: 'engagement',
+          event_label: (el.innerText || '').trim(),
+          value: 1
+        });
+      });
+    });
+  });
+})();
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var form = document.getElementById('wf-form-Search');
+  if (!form) return;
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return false;
+  });
+});
+</script>
+
+<script>
+(function() {
+  'use strict';
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  
+  async function init() {
+    // 1. Оборачиваем filter-контейнеры в <form> (требование Finsweet v2)
+    document.querySelectorAll('[fs-list-element="filters"]').forEach(function(el) {
+      if (el.tagName === 'FORM') return;
+      var form = document.createElement('form');
+      for (var i = 0; i < el.attributes.length; i++) {
+        form.setAttribute(el.attributes[i].name, el.attributes[i].value);
+      }
+      while (el.firstChild) form.appendChild(el.firstChild);
+      el.replaceWith(form);
+    });
+    
+    // 2. Превентим submit всех filter-форм (как уже сделано для wf-form-Search)
+    document.querySelectorAll('form[fs-list-element="filters"]').forEach(function(form) {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      });
+    });
+    
+    // 3. Ждём, пока Finsweet загрузит все items (fs-list-load="all")
+    var fs = window.FinsweetAttributes;
+    if (!fs || !fs.modules || !fs.modules.list || !fs.modules.list.loading) {
+      console.warn('[Custom filter] Finsweet List module not loaded');
+      return;
+    }
+    
+    var instances;
+    try {
+      instances = await fs.modules.list.loading;
+    } catch (e) {
+      console.warn('[Custom filter] Finsweet loading failed:', e);
+      return;
+    }
+    
+    var blog = instances.find(function(i) { return i.instance === 'blog'; });
+    if (!blog) { console.warn('[Custom filter] Blog instance not found'); return; }
+    
+    var items = blog.items && (blog.items.value || blog.items);
+    if (!items || !items.length) { console.warn('[Custom filter] No items loaded'); return; }
+    
+    // 4. Кешируем categories + title text каждого item
+    var itemData = items.map(function(item) {
+      var categories = ((item.fields && item.fields['category-new-2'] && item.fields['category-new-2'].value) || [])
+        .map(function(s) { return String(s).toLowerCase(); });
+      var title = String(
+        (item.fields && item.fields['title'] && item.fields['title'].value) ||
+        item.element.textContent || ''
+      ).toLowerCase();
+      return { el: item.element, categories: categories, title: title };
+    });
+    
+    // 5. Состояние и применение фильтра
+    var state = { activeCategories: new Set(), query: '' };
+    var applyTimeout;
+    
+    function applyFilter() {
+      clearTimeout(applyTimeout);
+      applyTimeout = setTimeout(function() {
+        var visibleCount = 0;
+        itemData.forEach(function(d) {
+          var catMatch = state.activeCategories.size === 0;
+          if (!catMatch) {
+            state.activeCategories.forEach(function(c) {
+              if (d.categories.indexOf(c.toLowerCase()) !== -1) catMatch = true;
+            });
+          }
+          var queryMatch = !state.query || d.title.indexOf(state.query) !== -1;
+          var show = catMatch && queryMatch;
+          d.el.style.display = show ? '' : 'none';
+          if (show) visibleCount++;
+        });
+        var emptyEl = document.querySelector('[fs-list-element="empty"]');
+        if (emptyEl) emptyEl.style.display = visibleCount === 0 ? '' : 'none';
+      }, 50);
+    }
+    
+    // 6. Хукаем чекбоксы категорий
+    document.querySelectorAll('input[type="checkbox"][fs-list-value][fs-list-field="category-new-2"]')
+      .forEach(function(input) {
+        input.addEventListener('change', function() {
+          var val = input.getAttribute('fs-list-value');
+          var label = input.closest('label');
+          if (input.checked) {
+            state.activeCategories.add(val);
+            if (label) label.classList.add('is-active');
+          } else {
+            state.activeCategories.delete(val);
+            if (label) label.classList.remove('is-active');
+          }
+          applyFilter();
+        });
+      });
+    
+    // 7. Хукаем search input с debounce
+    document.querySelectorAll('input[fs-list-element="search"]')
+      .forEach(function(input) {
+        var debounce;
+        input.addEventListener('input', function() {
+          clearTimeout(debounce);
+          var val = input.value.trim().toLowerCase();
+          debounce = setTimeout(function() {
+            state.query = val;
+            applyFilter();
+          }, 150);
+        });
+      });
+    
+    applyFilter();
+  }
+})();
+</script><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+
+<style>
+  /* Make body images look clickable + slightly bigger by default */
+  .article-body img {
+    cursor: zoom-in;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .article-body img:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
+  }
+
+  /* Lightbox overlay */
+  .lb-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.92);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    cursor: zoom-out;
+    padding: 32px;
+  }
+  .lb-overlay.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .lb-overlay img {
+    max-width: 95vw;
+    max-height: 90vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border-radius: 6px;
+    background: #fff;
+    transform: scale(0.96);
+    transition: transform 0.25s ease;
+  }
+  .lb-overlay.is-open img {
+    transform: scale(1);
+  }
+  .lb-close {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+  }
+  .lb-close:hover {
+    background: rgba(255, 255, 255, 0.22);
+  }
+  .lb-caption {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 14px;
+    max-width: 80vw;
+    text-align: center;
+  }
+  body.lb-locked {
+    overflow: hidden;
+  }
+</style>
+
+<script>
+(function () {
+  // Build overlay once
+  var overlay = document.createElement('div');
+  overlay.className = 'lb-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.innerHTML = '<button class="lb-close" aria-label="Close">✕</button>' +
+                     '<img alt="" />' +
+                     '<div class="lb-caption"></div>';
+  document.body.appendChild(overlay);
+
+  var lbImg = overlay.querySelector('img');
+  var lbCap = overlay.querySelector('.lb-caption');
+  var lbClose = overlay.querySelector('.lb-close');
+
+  function openLB(src, alt) {
+    lbImg.src = src;
+    lbImg.alt = alt || '';
+    lbCap.textContent = alt || '';
+    overlay.classList.add('is-open');
+    document.body.classList.add('lb-locked');
+  }
+  function closeLB() {
+    overlay.classList.remove('is-open');
+    document.body.classList.remove('lb-locked');
+    // delay clearing src so the fade-out is clean
+    setTimeout(function () { lbImg.src = ''; }, 250);
+  }
+
+  // Attach click to every image inside .article-body
+  document.querySelectorAll('.article-body img').forEach(function (img) {
+    img.addEventListener('click', function () {
+      openLB(img.currentSrc || img.src, img.alt);
+    });
+  });
+
+  // Close handlers
+  lbClose.addEventListener('click', function (e) {
+    e.stopPropagation();
+    closeLB();
+  });
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay || e.target === lbImg) closeLB();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeLB();
+  });
+})();
+</script><script src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1%2F689e5ba67671442434f3ca35%2F6a82d2c710184daee99a590c%2Fforatracking-1.0.0.js" type="text/javascript"></script><script src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1%2F689e5ba67671442434f3ca35%2F6a8d5baeb6f5e1c6bbed4d78%2Fcanonicalslashfix-1.0.0.js" type="text/javascript"></script></body></html>

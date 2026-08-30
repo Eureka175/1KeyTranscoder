@@ -1,0 +1,837 @@
+﻿ 
+x265 and preset influence with CRF ? - Doom9's Forum 
+Welcome to Doom9 's Forum, THE in-place to be for everyone interested in DVD conversion. 
+Before you start posting please read the forum rules . By posting to this forum you agree to abide by the rules. 
+Domains: forum.doom9.org / forum.doom9.net / forum.doom9.se 
+Doom9's Forum 
+ > Video Encoding 
+> High Efficiency Video Coding (HEVC) 
+x265 and preset influence with CRF ?
+User Name 
+Remember Me? 
+Password 
+Register 
+FAQ 
+Today's Posts 
+Search 
+Search Forums 
+Show Threads 
+Show Posts 
+Tag Search 
+Advanced Search 
+Go to Page... 
+Thread Tools 
+Search this Thread 
+3rd December 2017, 20:52
+# 1 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+x265 and preset influence with CRF ? 
+Hi,
+I would like to encode some Blu ray to x265 and I read some informations on Google about presets but never the same result.
+So does preset with CRF have an influence on the quality or only on the bitrate ? Medium seems to be a good choice but if slow gives a better quality I may use it.
+Thank you !
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+3rd December 2017, 21:39
+# 2 
+|   Link 
+sneaker_ger 
+Registered User
+Join Date: Dec 2002
+Posts: 5,181
+Preset has influence on both speed and quality. But you can have same quality with medium as with e.g. slow - you just need more bitrate.
+Step 1: choose preset according to speed you are willing to accept
+Step 2: adjust CRF until you have quality/bitrate you are willing to accept (strictly speaking CRF also has some impact on speed so you may need to repeat the process)
+sneaker_ger 
+View Public Profile 
+Find More Posts by sneaker_ger 
+3rd December 2017, 22:15
+# 3 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Thank you !
+Medium's speed is good for me, slow is a little bit "slow" and slower is too slow. What is the vein approximatively between preset and CRF ? For example is Medium / CRF18 similar to Slow / CRF20 or more ? I know it's related to my choice but I would like to know a base to start.
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+5th December 2017, 19:55
+# 4 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+I have found this on the FFMPEG website ( https://trac.ffmpeg.org/wiki/Encode/H.265 ) :
+Quote:
+Choose a preset. The default is medium. The preset determines how fast the encoding process will be  at the expense of compression efficiency. Put differently, if you choose ultrafast, the encoding process is going to run fast, but the file size will be larger when compared to medium. The visual quality will be the same. Valid presets are ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow and placebo.
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+5th December 2017, 21:31
+# 5 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+This does not apply to x265. It did not even really apply to x264.
+However, in x265 the files do not even get bigger with faster presets, they mostly get smaller.
+Generally speaking, results with medium look good, fast is still ok, but you should not go faster than that.
+Make a few comparisons, you will see why.
+The speed drops significantly if you go to slow, yes - but it is worth it. Slow (and the slower presets) keep(s) considerably more detail.
+In my humble opinion, slow is the sweetspot for quality/speed. Others see slower as that sweetspot, I think because it makes pretty much full use of x265's efficiency potential.
+I linked my personal table here, maybe it helps you too:
+https://forum.doom9.org/showthread.p...10#post1820010 
+Essentially, you can't really go wrong with slow, a CRF below 20 and --no-sao. But again, this is just my opinion based on my personal findings and some good advice here. 
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+5th December 2017, 22:34
+# 6 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Thank you, I'll look at it 
+Just a point : why do you use 10bit with 8bit sources ?
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+6th December 2017, 04:24
+# 7 
+|   Link 
+Asmodian 
+Registered User
+Join Date: Feb 2002
+Location: San Jose, California
+Posts: 2,673
+It is less significant with x265 but 10bit encoding is more efficient.
+http://x264.nl/x264/10bit_02-ateme-w..._bandwidth.pdf 
+__________________
+madVR options explained 
+Asmodian 
+View Public Profile 
+Find More Posts by Asmodian 
+6th December 2017, 13:35
+# 8 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+I didn't know, thank you for the link 
+So 10bit is more efficient but I need to know if all my players are able to read 10bit sources...
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+7th December 2017, 00:16
+# 9 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Quote:
+Originally Posted by Nico8583 
+I didn't know, thank you for the link 
+So 10bit is more efficient but I need to know if all my players are able to read 10bit sources...
+Lots of mobile HEVC decoders don't support 10-bit decode. The current major chipsets do, but there are a lot deployed that don't.
+10-bit is also somewhat more memory and power intensive to decode.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+7th December 2017, 08:17
+# 10 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Thank you for this information.
+So 10bit is more efficient but you don't recommend to use it for more compatibility ?
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+7th December 2017, 11:11
+# 11 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+I would never encode to x265 in 8bit.
+Some months back, I made a few 8bit vs. 10bit encoding comparisons - same CRF and settings.
+I admit, that was still using x265 2.3 and things might have improved a bit since.
+However, gradations were much, much better with 10bit encoding.
+I always saw ugly banding in 8bit, even down to CRF13 and even with --tune grain.
+I did only compare with the medium preset though - things might be better for 8bit with slow, slower, veryslow...
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+7th December 2017, 15:25
+# 12 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Quote:
+Originally Posted by Nico8583 
+Thank you for this information.
+So 10bit is more efficient but you don't recommend to use it for more compatibility ?
+I think 10bit has less of a quality impact in HEVC than it does in H.264.
+I'd suggest using 10-bit when its known all target devices support it. But that's not a safe assumption outside of Smart TVs.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+11th December 2017, 22:31
+# 13 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Thank you, I'll try both.
+I've used a simple commandline : x265-8b.exe Video.avs --preset medium --keyint 240 --crf 20 --output Video.hevc
+I get an error message : x265 [error]: yuv: width, height, and FPS must be specified
+The same commandline with x264.exe works very well : x264.exe Video.avs --preset slow --keyint 240 --crf 22 --output Video.264
+x265 doesn't include a decoder ? How can I use Avisynth script as input ? 
+Thank you !
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+11th December 2017, 23:01
+# 14 
+|   Link 
+sneaker_ger 
+Registered User
+Join Date: Dec 2002
+Posts: 5,181
+Official x265 cli does indeed not directly support AviSynth input. You can use e.g. avs2pipemod:
+avs2pipemod.exe -y4mp "input.avs" | x265.exe - --y4m -o "output.265"
+sneaker_ger 
+View Public Profile 
+Find More Posts by sneaker_ger 
+12th December 2017, 00:12
+# 15 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Thank you ! With avs2pipemod.exe, is it necessary to install Avisynth or is it "include" with the exe ?
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+12th December 2017, 00:14
+# 16 
+|   Link 
+sneaker_ger 
+Registered User
+Join Date: Dec 2002
+Posts: 5,181
+You still need to have AviSynth installed. Not included.
+sneaker_ger 
+View Public Profile 
+Find More Posts by sneaker_ger 
+12th December 2017, 00:20
+# 17 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Thank you very much, I was using avs2yuv but it doesn't work with 64 bit DLL plugin. With avs2pipemod, there is a 32 and 64 bit version.
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+12th December 2017, 00:26
+# 18 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+A last question : is it possible to use 2pass encoding with CRF ? If yes, is it a good choice to do a slow-firstpass then a second pass ? Or is it better to increase the preset (from medium to slow) ?
+Thank you.
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+12th December 2017, 00:38
+# 19 
+|   Link 
+sneaker_ger 
+Registered User
+Join Date: Dec 2002
+Posts: 5,181
+Quote:
+Originally Posted by Nico8583 
+A last question : is it possible to use 2pass encoding with CRF ?
+Yes.
+Quote:
+Originally Posted by Nico8583 
+If yes, is it a good choice to do a slow-firstpass then a second pass ? Or is it better to increase the preset (from medium to slow) ?
+I'm inclined to say single pass CRF with higher preset is best use of cpu time.
+sneaker_ger 
+View Public Profile 
+Find More Posts by sneaker_ger 
+12th December 2017, 09:23
+# 20 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+I did not know that is possible.
+However, what would be the benefit?
+Isn't one of the reasons to use a CRF instead of a bitrate target to be freed from any bitrate constraints?
+I thought CRF uses whatever bitrate necessary for each moment to achieve a certain degree of quality...
+If CRF uses whatever is needed - what difference would a 2pass encode even make?
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+12th December 2017, 10:42
+# 21 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by jd17 
+I did not know that is possible.
+However, what would be the benefit?
+Isn't one of the reasons to use a CRF instead of a bitrate target to be freed from any bitrate constraints?
+I thought CRF uses whatever bitrate necessary for each moment to achieve a certain degree of quality...
+If CRF uses whatever is needed - what difference would a 2pass encode even make?
+CRF with maxrate and bufsize constrains would imo only make sense for big streaming services, the use of CRF there would not be to increase quality but to lower filesize (i.e. storage cost) without much of an quality loss for low complexity material.
+So for 1080p24 streaming it would look something like this
+Code:
+--crf 20 --vbv-maxrate 9000 --vbv-bufsize 12000 --keyint 48 --min-keyint 24 --rc-lookahead 48 
+And agree, I dont see a good reason for 2pass CRF even if it's possible.
+Nico8583, what are kind of playback environment are you aiming for? It sounds like CRF encoding with the lowest preset you find tolerable is what you are looking for. I would start at preset slow crf 18 and go from there.
+Last edited by excellentswordfight; 12th December 2017 at 10:59 .
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+12th December 2017, 19:10
+# 22 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Thank to all 
+excellentswordfight, I want to play some Blu ray to x265 movies stored to my NAS on a Samsung 55" TV with a HTPC or a Zidoo X9S. I think to go to CRF18 and Slow preset.
+Is the number of threads has an impact to quality ? I can encode on a 4 cores but perhaps I can access to a 16 cores (2 x Intel Xeon 8 cores).
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+12th December 2017, 21:02
+# 23 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Maybe this helps, I created some statistics for my encodes... 
+Average bitrate of 28 CRF19 / slow / no-sao / 10bit Blu-ray encodes ("regular" movies for me):
+5613 kbit/s 
+That average does include two movies with extreme grain, 14300 and 19000 kbit/s.
+Excluding them in the average brings it down to:
+4766 kbit/s 
+Lowest bitrate encode is 2572 kbit/s.
+Average bitrate of 27 CRF17 / slow / no-sao / 10bit Blu-ray encodes ("reference" movies for me = very good image quality):
+6902 kbit/s 
+One high grain movie is included (12194 kbit/s).
+Average without it:
+6699 kbit/s 
+Lowest bitrate encode is 3777 kbit/s.
+These numbers might not seem very low, but you have to consider that these are extremely high quality, transparent or near transparent encodes.
+Calculating a similar average for transparent x264 encodes would result in something like 12000-16000 kbit/s.
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+12th December 2017, 21:11
+# 24 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Thank you for these informations 
+Could you give an example of command line ? And why no-sao gives a better quality ? All fast presets use no-sao but all slow preset use sao.
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+12th December 2017, 21:16
+# 25 
+|   Link 
+sneaker_ger 
+Registered User
+Join Date: Dec 2002
+Posts: 5,181
+Quote:
+Originally Posted by Nico8583 
+Is the number of threads has an impact to quality ?
+More threads can hurt quality but it should be negligible for most users. I would leave threads/pools at auto.
+sneaker_ger 
+View Public Profile 
+Find More Posts by sneaker_ger 
+12th December 2017, 21:23
+# 26 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Quote:
+Originally Posted by sneaker_ger 
+More threads can hurt quality but it should be negligible for most users. I would leave threads/pools at auto.
+I let it to auto and x265 detects 4, 8 or 16 threads.
+I read more threads can hurt quality with x264 but I didn't know with x265, so it's the same, thank you. Do you know a document about that ( threads number vs quality) ?
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+13th December 2017, 10:09
+# 27 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Nico8583 
+Could you give an example of command line ?
+I use Handbrake, Hybrid or both for my encodes. I see no drawbacks in doing that. It makes things comfortable and saves me some time.
+That being said, there are no changes to the x265 defaults in my encodes apart from:
+--output-depth 10
+--preset slow
+--no-sao
+--crf 17 / 19
+--keyint 240 (for 23.976p / 24p movies)
+--min-keyint 24 (for 23.976p / 24p movies)
+Quote:
+And why no-sao gives a better quality ?
+I suggest you make a few comparisons yourself.
+Here are links to some old stills I created:
+https://forum.doom9.org/showpost.php...9&postcount=17 
+They were done with preset medium, but that does not matter since you can just compare sample 4 and 5 to see the impact of sao and look at sample 1 for reference.
+The difference between --sao and --no-sao would be similar with slow encodes.
+The gist for me:
+--sao = blurred, smoothed
+--no-sao = detailed, grain retention, much closer to the source
+(People around here sometimes translate SAO to "smooth all objects" for fun. You might understand why... )
+Quote:
+All fast presets use no-sao but all slow preset use sao.
+Only ultrafast and superfast disable --sao by default. I think the reason for that is, that encoding without --sao is also a bit quicker. It's not much but every little bit counts for these "extreme" presets.
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+13th December 2017, 10:35
+# 28 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Thank you, I'll look at it when I'll be at home.
+Do you have made new tests with newer version of x265 ? It seems there are some improvments with sao, no ?
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+13th December 2017, 10:55
+# 29 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+To my knowledge, nothing changed since 2.4 regarding sao.
+https://x265.readthedocs.io/en/defau...easenotes.html 
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+13th December 2017, 22:20
+# 30 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+You're right 
+I'm going to make some tests like you with a short Blu ray movie (8bit vs 10bit, medium vs slow, sao vs no-sao, CRF18 vs CRF20...)
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+14th December 2017, 10:50
+# 31 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Have fun testing and let us know how it goes! 
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+14th December 2017, 22:38
+# 32 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+No problem, I'll let you know 
+Another question : Handbrake adds no-strong-intra-smoothing and no-rect with all profiles, do you let it or do you remove it ?
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+15th December 2017, 08:34
+# 33 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Nico8583 
+Another question : Handbrake adds no-strong-intra-smoothing and no-rect with all profiles, do you let it or do you remove it ?
+Really? Are you sure?
+If so, it must be a recent development...
+What HandBrake build do you use?
+I specifically tested no-strong-intra-smoothing vs. strong-intra-smoothing and actually preferred the latter:
+https://forum.doom9.org/showthread.p...42#post1811742 
+I will have a look at some recent files I encoded once I get home.
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+15th December 2017, 12:38
+# 34 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+I'm using Handbrake 1.0.7 (2017040900) and I choose H.265 MKV 1080p30 preset as base but when I choose every preset and change to x265 it adds automatically these parameters.
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+15th December 2017, 13:13
+# 35 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Ah... I have never used any of the HandBrake presets (I thought you referred to fast, medium, slow etc. before), I created my own ones...
+I can send you a screenshot later if you like.
+I'd also recommend using the latest nightly, which includes x265 2.6.
+1.07 is still 2.3 I think.
+Last edited by jd17; 15th December 2017 at 13:30 .
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+15th December 2017, 13:40
+# 36 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Even if I don't choose a preset it adds "strong-intra-smoothing=0:rect=0" (Extra options) to x265 options. I can remove it of course.
+Thank you for the screenshot, I'll look at it when you could add it 
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+15th December 2017, 13:45
+# 37 
+|   Link 
+Arhu 
+Registered User
+Join Date: Nov 2003
+Posts: 12
+Quote:
+Originally Posted by jd17 
+I suggest you make a few comparisons yourself.
+(..)
+The gist for me:
+--sao = blurred, smoothed
+--no-sao = detailed, grain retention, much closer to the source
+I've been in your footsteps, by the way, but my conclusions are slightly different for sao:
+--no-sao = dirty, edged, artificial grain
+--sao = more accurate representation of the source
+There has been talk by a few users in the baseline settings thread that --no-sao may have looked better before (version < 2.5) but maybe doesn't anymore. I only started my encoding tests with 2.5 so I wouldn't know myself, just that I prefer --sao.
+Also worth testing: --aq-mode 1 (default) vs. --aq-mode 3. I prefer the latter because the default often produced artifacts in dark areas for me even with lower CRF values.
+Arhu 
+View Public Profile 
+Find More Posts by Arhu 
+15th December 2017, 14:03
+# 38 
+|   Link 
+jd17 
+Registered User
+Join Date: Jun 2017
+Posts: 89
+Quote:
+Originally Posted by Arhu 
+my conclusions are slightly different for sao
+Sure!
+This is why everyone should do a few simple comparisons themselves. 
+Quote:
+There has been talk by a few users in the baseline settings thread that --no-sao may have looked better before (version < 2.5) but maybe doesn't anymore. I only started my encoding tests with 2.5 so I wouldn't know myself, just that I prefer --sao.
+The only recent change to --sao I know of happened in 2.4.
+I tested and compared 2.3 and 2.4 both with and without --sao and came to the same conclusion.
+For my content (non-anime), I definitely prefer --no-sao, be it 2.3 or 2.4.
+Quote:
+Also worth testing: --aq-mode 1 (default) vs. --aq-mode 3. I prefer the latter because the default often produced artifacts in dark areas for me even with lower CRF values.
+Do you encode in 8bit or 10bit?
+jd17 
+View Public Profile 
+Find More Posts by jd17 
+15th December 2017, 15:11
+# 39 
+|   Link 
+Arhu 
+Registered User
+Join Date: Nov 2003
+Posts: 12
+Quote:
+The only recent change to --sao I know of happened in 2.4.
+2.5 introduced new lambda tables for 10 bit though, which could perhaps account for the difference? *shrugs*
+Quote:
+Originally Posted by jd17 
+Do you encode in 8bit or 10bit?
+10 bit, although the same goes for 12 bit.
+I did experiment with 8 bit for some time because I thought 10 bit encoding had a bug in x265, which turned out to be a dithering related ffmpeg issue but was mostly just a display problem (later fixed by Ma0).
+Anyway, it also depends on the display setting. I have an 8-bit LCD display and don't really see anything wrong with --aq-mode 1 when using the display's default SRGB setting (so I guess it's working as intended), but in "movie mode" with elevated chroma artifacts become visible in dark scenes around the edges of moving, brighter objects. Looks like mosquito noise or ringing. --aq-mode 3 helped with these artifacts much more than a CRF reduction did.
+Arhu 
+View Public Profile 
+Find More Posts by Arhu 
+15th December 2017, 18:10
+# 40 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Thank you for your participation, it's good to have opinions on the subject 
+I do all my tests with 2.6 so I can't compare with 2.3 and 2.4.
+x265 documentation about aq-mode : 
+Quote:
+Adaptive Quantization operating mode. Raise or lower per-block quantization based on complexity analysis of the source image. The more complex the block, the more quantization is used. This offsets the tendency of the encoder to spend too many bits on complex areas and not enough in flat areas.
+0. disabled
+1. AQ enabled (default)
+2. AQ enabled with auto-variance
+3. AQ enabled with auto-variance and bias to dark scenes. This is recommended for 8-bit encodes or low-bitrate 10-bit encodes, to prevent color banding/blocking.
+So I may try with aq-mode=3 also 
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+15th December 2017, 18:12
+# 41 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Quote:
+Originally Posted by excellentswordfight 
+CRF with maxrate and bufsize constrains would imo only make sense for big streaming services, the use of CRF there would not be to increase quality but to lower filesize (i.e. storage cost) without much of an quality loss for low complexity material.
+maxrate and bufsize are important to anyone who is trying to limit worst-case bitrate or decoder complexity. x265 sets them by default for the specified or assigned Profile @ Level. But reducing them further can yield a smoother bitrate and also make things easier for software decoders. Also, some applications like UHD Blu-ray will require lower values than Profile @ Level define.
+Quote:
+And agree, I dont see a good reason for 2pass CRF even if it's possible.
+I could see a 2-pass with CRF useful if there is a max file size target that also needs to be hit. A first pass would be enough if the file size was small enough. If it's too big, do a second pass with --bitrate set.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+15th December 2017, 18:16
+# 42 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Quote:
+Originally Posted by Nico8583 
+I let it to auto and x265 detects 4, 8 or 16 threads.
+I read more threads can hurt quality with x264 but I didn't know with x265, so it's the same, thank you. Do you know a document about that ( threads number vs quality) ?
+It can be complicated, and isn't nearly as big an issue as originally. Quality hit mainly comes from increased --frame-threads, which used to sometimes cause some rate control issues. It's at least a lot improved now.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+15th December 2017, 18:27
+# 43 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Thanks for the advices benwaggoner 
+About maxrate and bufsize, how can we determine the values to use ?
+About 2pass CRF, is it possible to do a second pass without "prepare" it (so without using stats or other parameter) ?
+Thank you !
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+1st January 2018, 23:05
+# 44 
+|   Link 
+Nico8583 
+Registered User
+Join Date: Jan 2010
+Location: France
+Posts: 850
+Any suggestion about maxrate and bufsize ? 
+Nico8583 
+View Public Profile 
+Find More Posts by Nico8583 
+2nd January 2018, 05:45
+# 45 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Quote:
+Originally Posted by Nico8583 
+Any suggestion about maxrate and bufsize ? 
+Setting bufsize to maxrate * max GOP duration isn't a bad starting point, as long as the result is less than the max allowed for profile@level. That would be for file-based playback.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+« 
+ Previous Thread 
+ |
+ Next Thread 
+ » 
+Thread Tools 
+Show Printable Version 
+Search this Thread 
+Advanced Search 
+Posting Rules
+You may not post new threads
+You may not post replies
+You may not post attachments
+You may not edit your posts
+BB code is On 
+Smilies are On 
+[IMG] code is On 
+HTML code is Off 
+Forum Rules 
+Forum Jump 
+User Control Panel 
+ Private Messages 
+ Subscriptions 
+ Who's Online 
+ Search Forums 
+ Forums Home 
+Announcements and Chat 
+     General Discussion 
+     News 
+     Forum / Site Suggestions & Help 
+ General 
+     Decrypting 
+     Newbies 
+     DVD2AVI / DGIndex 
+     Audio encoding 
+     Subtitles 
+     Linux, Mac OS X, & Co 
+ Capturing and Editing Video 
+     Avisynth Usage 
+     Avisynth Development 
+     VapourSynth 
+     Capturing Video 
+     DV 
+     HDTV / DVB / TiVo 
+     NLE - Non Linear Editing 
+     VirtualDub, VDubMod & AviDemux 
+     New and alternative a/v containers 
+ Video Encoding 
+     (Auto) Gordian Knot 
+     MPEG-4 ASP 
+     MPEG-4 Encoder GUIs 
+     MPEG-4 AVC / H.264 
+     High Efficiency Video Coding (HEVC) 
+     New and alternative video codecs 
+     MPEG-2 Encoding 
+     Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+ (HD) DVD, Blu-ray & (S)VCD 
+     One click suites for DVD backup and DVD creation 
+     DVD & BD Rebuilder 
+     (HD) DVD & Blu-ray authoring 
+     Advanced authoring 
+     IFO/VOB Editors 
+     DVD burning 
+ Hardware & Software 
+     Software players 
+     Hardware players 
+     PC Hard & Software 
+ Programming and Hacking 
+     Development 
+     Translations 
+All times are GMT +1. The time now is 09:22 .
+doom9.org -
+Archive -
+Top 
+Powered by vBulletin® Version 3.8.11
+Copyright ©2000 - 2026, vBulletin Solutions Inc.

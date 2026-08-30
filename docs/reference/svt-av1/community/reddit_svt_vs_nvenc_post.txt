@@ -1,0 +1,52 @@
+TITLE: SVT vs NVENC comparisons for AV1
+URL: https://www.reddit.com/r/AV1/comments/18l0k07/svt_vs_nvenc_comparisons_for_av1/
+I've been looking to re-encode my blu-ray collection. I ran some tests this weekend and thought I'd share. I'm not trying to make any statements here, I just wanted to run my own VMAF tests.
+
+The movie is a 1080p Blu-ray of Oppenheimer (2023). Bluray disc ripped via LibreDrive using MakeMKV. 
+
+- Video: Feature film only 
+- Audio: English Audio Dolby DTS-HD Master Audio 7.1. 
+- Subtitles: English, regular and forced only. 
+
+I didn't copy anything else into the MKV container.
+
+Did a basic transcode into AV1 using a slightly modified version of handbrake. Handbrake is v. 1.17.5 but I replaced the version of ffmpeg in the Flatpak with the latest SVT-AV1 1.8.0 version of ffmpeg, [as detailed here](https://old.reddit.com/r/AV1/comments/18gd70x/svtav1_180_released/). I didn't use any special settings or do anything with grain. This was just for comparisons. Oh, here are the basic specs for my system:
+
+- OS: Ubuntu 23.10
+- CPU: 13th Gen Intel i7-13700KF
+- GPU: NVIDIA GeForce RTX 4070
+- Memory: 32GB
+
+VMAF Stuff:
+
+- Program: FFMetrics
+- Pooling: Harmonic Mean
+- Model: VMAF v. 0.6.1
+- yuv420p
+
+With that out of the way, here is the sauce:
+
+| ID #      | RF/CQ        | Preset/Speed | Size (GB) | Hours to Transcode | VMAF Rating | 8/10 bit |
+| --------- | ------------ | ------------ | --------- | ------------------ | ----------- | -------- |
+| 0         | Original Rip |              | 42        | N/A                | 100%        | 8        |
+| **SVT**   |              |              |           |                    |             |          |
+| 1         | 30           | 8            | 1.9       | 0.5                | 91%         | 10       |
+| 2         | 30           | 6            | 3.1       | 1.5                | 92%         | 10       |
+| 3         | 0            | 0            | Aborted   | 42                 | Aborted     | 10       |
+| 4         | 20           | 8            | 3.8       | 0.5                | 93.1%       | 10       |
+| 5         | 18           | 4            | 4.3       | 8                  | 94.2%       | 10       |
+|           |              |              |           |                    |             |          |
+|           |              |              |           |                    |             |          |
+| **NVENC** |              |              |           |                    |             |          |
+| 6         | 33           | Slowest      | 2.5       | 10 min             | 92.7%       | 10       |
+| 7         | 30           | Slowest      | 3.6       | 12 min             | 93.4%       | 10       |
+| 8         | 35           | Slowest      | 2.1       | 11 min             | 92.0%       | 10       |
+| 9         | 18           | Slowest      | 14.3      | 12 min             | 94.9%       | 10       |
+| 10        | 0            | Slowest      | 17.0      | 13 min             | 99.9%       | 8        |
+| 11        | 15           | Slowest      | 4.3       | 13 min             | 94.8%       | 8        |
+
+Any encode that would take longer than overnight was aborted.  If the encode takes longer than "overnight", it isn't realistic for my use case.
+
+Anyway, that is it. I'm open to all comments, suggestions, questions, feedback for how to do this better in the future, etc.
+
+

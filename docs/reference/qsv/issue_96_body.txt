@@ -1,0 +1,25 @@
+TITLE: QSVEnc AV1 with Staxrip is very buggy, or I´m doing something wrong
+STATE: closed  comments: 11  created: 10/22/2022 19:25:24  closed: 07/23/2024 09:54:17
+=====BODY=====
+Had Problems with vbr encoding (vbv Bufsize and Maxrate will result in encoding Audio Only)
+QP Encoding with Maxrate starts with a very High Bitrate (Well above from what I Set as Maxrate) and will fall down at the end
+Some Movies won´t encode complete
+Some Movies encode but will not be Muxed 
+
+and so on and so on
+
+using the latest QSVEnc with the newest Intel Drivers on the Arc A 380 GPU.
+
+Is there a Site to See Options for AV1 Only? 
+Which Options will work? - Lookahead, Bframes and so on?
+
+My Setting is normally
+
+--quality best --vbv-bufsize 4000 --max-bitrate 3000 -la-depth 75 --fallback-rc --vbr 3000
+
+for the HEVC Encoder it will work flawlessly (although on my j3455 System (Apollo Lake) there are uncomplete Encoded Videos too)
+but for the AV1 the Settings won´t work at all.
+ 
+
+
+

@@ -1,0 +1,703 @@
+# Source: https://www.hwcooling.net/wp-content/uploads/2023/03/amd-ryzen-9-7950x-g328.html
+# Fetched: 2026-08-29 17:11:48
+
+﻿<!DOCTYPE
+    html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
+>
+
+<!-- ::::::::::::::::::::::::::: -->
+<!-- ::                       :: -->
+<!-- ::  (C) Lukáš Prvý 2011  :: -->
+<!-- ::                       :: -->
+<!-- ::  LukasPrvy@email.cz   :: -->
+<!-- ::                       :: -->
+<!-- ::::::::::::::::::::::::::: -->
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <title>
+            AV1 video encoding [sec.] – lower is better
+        </title>
+        <meta
+            http-equiv="content-type"
+            content="text/html; charset=utf-8"
+        />
+        <meta
+            http-equiv="X-UA-Compatible"
+            content="IE=EmulateIE9"
+        />
+        <script
+            src="/grafy_3/framework/js/framework/common.js"
+            type="text/javascript"
+        ></script>
+        <script
+            src="/grafy_3/framework/js/plugins/head/head.load.min.js"
+            type="text/javascript"
+        ></script>
+        <script type="text/javascript">
+
+            // styles
+            fw.link(
+
+                // plugins
+                '/grafy_3/framework/css/plugins/farbtastic/farbtastic.css',
+
+                // global styles
+                '/grafy_3/framework/css/framework/common.css',
+
+                // windows
+                '/grafy_3/framework/css/framework/popup/popup.css',
+                '/grafy_3/framework/css/framework/popup/templates.css',
+
+                // controls
+                '/grafy_3/framework/css/framework/controls/common.css',
+                '/grafy_3/framework/css/framework/controls/button/button.css',
+                '/grafy_3/framework/css/framework/controls/combobox/combobox.css',
+                '/grafy_3/framework/css/framework/controls/checkbox/checkbox.css',
+
+                // themes
+                '/grafy_3/framework/css/framework/popup/themes.css',
+                '/grafy_3/framework/css/framework/controls/button/themes.css',
+                '/grafy_3/framework/css/framework/controls/combobox/themes.css',
+                '/grafy_3/framework/css/framework/controls/checkbox/themes.css',
+
+                // charts
+                '/grafy_3/framework/css/framework/graph/graph.css'
+            );
+
+            // scripts
+            head.js(
+
+                // plugins
+                '/grafy_3/framework/js/plugins/jquery/jquery.min.js',
+                '/grafy_3/framework/js/plugins/jquery/jquery.ui.min.js',
+                '/grafy_3/framework/js/plugins/jquery/jquery.cookie.min.js',
+                '/grafy_3/framework/js/plugins/jquery/jquery.json.min.js',
+                '/grafy_3/framework/js/plugins/jquery/jquery.hoverintent.min.js',
+                '/grafy_3/framework/js/plugins/jquery/jquery.translate.min.js',
+                '/grafy_3/framework/js/plugins/farbtastic/jquery.farbtastic.min.js',
+
+                // helpers
+                '/grafy_3/framework/js/framework/utils/utils.js',
+                '/grafy_3/framework/js/framework/colors/colors.js',
+
+                // windows
+                '/grafy_3/framework/js/framework/popup/popup.js',
+                '/grafy_3/framework/js/framework/popup/templates/templates.js',
+                '/grafy_3/framework/js/framework/popup/templates/colorpicker.js',
+                '/grafy_3/framework/js/framework/popup/templates/setup.js',
+                '/grafy_3/framework/js/framework/popup/templates/help.js',
+
+                // controls
+                '/grafy_3/framework/js/framework/controls/controls.js',
+                '/grafy_3/framework/js/framework/controls/combobox/combobox.js',
+                '/grafy_3/framework/js/framework/controls/button/button.js',
+                '/grafy_3/framework/js/framework/controls/checkbox/checkbox.js',
+
+                // charts
+                '/grafy_3/framework/js/framework/graph/graph.js'
+            );
+
+            // init
+            head.ready(function() {
+                $(function() {
+                    fw.init();
+                    fw.popup.init();
+                    fw.controls.init();
+                    fw.graph.add({
+                        hash: '699497610c2f57f16a8063624da289d2',
+                        differences: 'False',
+                        records: [
+                            ['---', 'Intel', '539', '19043', '06/17/2021', '8 (16)', 'Rocket Lake', '14 nm', 'DDR4-3600', 'Core i9'],
+                            ['137,6', 'AMD', '449', '19043', '06/23/2021', '12 (24)', 'Vermeer', '7 nm', 'DDR4-3600', 'Ryzen 9'],
+                            ['---', 'Intel', '488', '19043', '06/19/2021', '10 (20)', 'Comet Lake', '14 nm', 'DDR4-3600', 'Core i9'],
+                            ['---', 'AMD', '599', '19043', '06/30/2021', '16 (32)', 'Vermeer', '7 nm', 'DDR4-3600', 'Ryzen 9'],
+                            ['---', 'Intel', '175', '19043', '6/19/2021', '6 (12)', 'Rocket Lake', '14 nm', 'DDR4-3600', 'Core i5'],
+                            ['---', 'Intel', '156', '19043', '07/21/2021', '6 (12)', 'Comet Lake', '14 nm', 'DDR4-3600', 'Core i5'],
+                            ['---', 'Intel', '374', '19043', '06/17/2021', '8 (16)', 'Rocket Lake', '14 nm', 'DDR4-3600', 'Core i7'],
+                            ['---', 'AMD', '276', '19043', '07/30/2021', '8 (16)', 'Matisse', '7 nm', 'DDR4-3600', 'Ryzen 7'],
+                            ['---', 'AMD', '229', '19043', '08/16/2021', '6 (12)', 'Vermeer', '7 nm', 'DDR4-3600', 'Ryzen 5'],
+                            ['---', 'AMD', '199', '19043', '08/19/2021', '6 (12)', 'Matisse', '7 nm', 'DDR4-3600', 'Ryzen 5'],
+                            ['109,4', 'Intel', '589', '19043', '10/28/2021', '16 (24)', 'Alder Lake', '7 nm', 'DDR5-5200', 'Core i9'],
+                            ['474,1', 'Intel', '90', '19043', '11/30/2021', '4 (8)', 'Comet Lake', '14 nm', 'DDR4-3600', 'Core i3'],
+                            ['228,7', 'Intel', '206', '19043', '12/30/2021', '6 (12)', 'Alder Lake', '7 nm', 'DDR4-3600', 'Core i5'],
+                            ['330,6', 'Intel', '104', '19043', '02/17/2022', '4 (8)', 'Alder Lake', '7 nm', 'DDR4-3600', 'Core i3'],
+                            ['189,6', 'AMD', '299', '19043', '02/28/2022', '8 (16)', 'Vermeer', '7 nm', 'DDR4-3600', 'Ryzen 7'],
+                            ['757,4', 'Intel', '80', '19043', '03/30/2022', '2 (4)', 'Alder Lake', '7 nm', 'DDR4-3600', 'Pentium'],
+                            ['211,8', 'AMD', '299', '19043', '04/16/2022', '8 (16)', 'Vermeer', '7 nm', 'DDR4-3600', 'Ryzen 7'],
+                            ['265,7', 'AMD', '199', '19043', '04/22/2022', '6 (12)', 'Vermeer', '7 nm', 'DDR4-3600', 'Ryzen 5'],
+                            ['197,1', 'AMD', '449', '19043', '08/17/2022', '8 (16)', 'Vermeer', '7 nm', 'DDR4-3600', 'Ryzen 7'],
+                            ['111,5', 'AMD', '549', '19043', '09/21/2022', '12 (24)', 'Raphael', '5 nm', 'DDR5-6000', 'Ryzen 9'],
+                            ['208,8', 'AMD', '299', '19043', '09/27/2022', '6 (12)', 'Raphael', '5 nm', 'DDR5-6000', 'Ryzen 5'],
+                            ['78,8', 'Intel', '589', '19045', '10/20/2022', '24 (32)', 'Raptor Lake', '7 nm', 'DDR5-6000', 'Core i9'],
+                            ['121,1', 'Intel', '319', '19045', '11/31/2022', '14 (20)', 'Raptor Lake', '7 nm', 'DDR5-6000', 'Core i5'],
+                            ['95,8', 'Intel', '409', '19045', '11/31/2022', '16 (24)', 'Raptor Lake', '7 nm', 'DDR5-6000', 'Core i7'],
+                            ['219,3', 'AMD', '229', '19045', '01/15/2023', '6 (12)', 'Raphael', '5 nm', 'DDR5-5200', 'Ryzen 5'],
+                            ['158,7', 'AMD', '399', '19045', '01/20/2023', '8 (16)', 'Raphael', '5 nm', 'DDR5-6000', 'Ryzen 7'],
+                            ['316,9', 'Intel', '109', '19045', '01/29/2023', '4 (8)', 'Raptor Lake', '7 nm', 'DDR5-5200', 'Core i3'],
+                            ['179,8', 'Intel', '196', '19045', '01/25/2023', '10 (16)', 'Raptor Lake', '7 nm', 'DDR5-5200', 'Core i5'],
+                            ['87,3', 'AMD', '699', '19045', '01/23/2023', '16 (32)', 'Raphael', '5 nm', 'DDR5-6000', 'Ryzen 9']
+                        ],
+                        percents: [
+                            null,
+                            [0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 80, 345, 166, 240, 138, 550, 154, 193, 143, 81, 152, 57, 88, 70, 159, 115, 230, 131, 63],
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            [0, 126, 0, 0, 0, 0, 0, 0, 0, 0, 100, 433, 209, 302, 173, 692, 194, 243, 180, 102, 191, 72, 111, 88, 200, 145, 290, 164, 80],
+                            [0, 29, 0, 0, 0, 0, 0, 0, 0, 0, 23, 100, 48, 70, 40, 160, 45, 56, 42, 24, 44, 17, 26, 20, 46, 33, 67, 38, 18],
+                            [0, 60, 0, 0, 0, 0, 0, 0, 0, 0, 48, 207, 100, 145, 83, 331, 93, 116, 86, 49, 91, 34, 53, 42, 96, 69, 139, 79, 38],
+                            [0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 33, 143, 69, 100, 57, 229, 64, 80, 60, 34, 63, 24, 37, 29, 66, 48, 96, 54, 26],
+                            [0, 73, 0, 0, 0, 0, 0, 0, 0, 0, 58, 250, 121, 174, 100, 399, 112, 140, 104, 59, 110, 42, 64, 51, 116, 84, 167, 95, 46],
+                            [0, 18, 0, 0, 0, 0, 0, 0, 0, 0, 14, 63, 30, 44, 25, 100, 28, 35, 26, 15, 28, 10, 16, 13, 29, 21, 42, 24, 12],
+                            [0, 65, 0, 0, 0, 0, 0, 0, 0, 0, 52, 224, 108, 156, 90, 358, 100, 125, 93, 53, 99, 37, 57, 45, 104, 75, 150, 85, 41],
+                            [0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 41, 178, 86, 124, 71, 285, 80, 100, 74, 42, 79, 30, 46, 36, 83, 60, 119, 68, 33],
+                            [0, 70, 0, 0, 0, 0, 0, 0, 0, 0, 56, 241, 116, 168, 96, 384, 107, 135, 100, 57, 106, 40, 61, 49, 111, 81, 161, 91, 44],
+                            [0, 123, 0, 0, 0, 0, 0, 0, 0, 0, 98, 425, 205, 297, 170, 679, 190, 238, 177, 100, 187, 71, 109, 86, 197, 142, 284, 161, 78],
+                            [0, 66, 0, 0, 0, 0, 0, 0, 0, 0, 52, 227, 110, 158, 91, 363, 101, 127, 94, 53, 100, 38, 58, 46, 105, 76, 152, 86, 42],
+                            [0, 175, 0, 0, 0, 0, 0, 0, 0, 0, 139, 602, 290, 420, 241, 961, 269, 337, 250, 141, 265, 100, 154, 122, 278, 201, 402, 228, 111],
+                            [0, 114, 0, 0, 0, 0, 0, 0, 0, 0, 90, 391, 189, 273, 157, 625, 175, 219, 163, 92, 172, 65, 100, 79, 181, 131, 262, 148, 72],
+                            [0, 144, 0, 0, 0, 0, 0, 0, 0, 0, 114, 495, 239, 345, 198, 791, 221, 277, 206, 116, 218, 82, 126, 100, 229, 166, 331, 188, 91],
+                            [0, 63, 0, 0, 0, 0, 0, 0, 0, 0, 50, 216, 104, 151, 86, 345, 97, 121, 90, 51, 95, 36, 55, 44, 100, 72, 145, 82, 40],
+                            [0, 87, 0, 0, 0, 0, 0, 0, 0, 0, 69, 299, 144, 208, 119, 477, 133, 167, 124, 70, 132, 50, 76, 60, 138, 100, 200, 113, 55],
+                            [0, 43, 0, 0, 0, 0, 0, 0, 0, 0, 35, 150, 72, 104, 60, 239, 67, 84, 62, 35, 66, 25, 38, 30, 69, 50, 100, 57, 28],
+                            [0, 77, 0, 0, 0, 0, 0, 0, 0, 0, 61, 264, 127, 184, 105, 421, 118, 148, 110, 62, 116, 44, 67, 53, 122, 88, 176, 100, 49],
+                            [0, 158, 0, 0, 0, 0, 0, 0, 0, 0, 125, 543, 262, 379, 217, 868, 243, 304, 226, 128, 239, 90, 139, 110, 251, 182, 363, 206, 100]
+                        ],
+                        criteria: [
+                            'Value',
+                            'Brand',
+                            'Price (VAT incl.) €',
+                            'Windows 10 build',
+                            'Testing date',
+                            'Cores (and threads)',
+                            'Codename',
+                            'Manufacturing node',
+                            'RAM',
+                            'CPU class'
+                        ],
+                        order: [
+                            [0, 2, 3, 4, 5, 6, 7, 8, 9, 21, 28, 23, 10, 19, 22, 1, 25, 27, 14, 18, 20, 16, 24, 12, 17, 26, 13, 11, 15],
+                            [3, 7, 8, 9, 28, 19, 1, 25, 14, 18, 20, 16, 24, 17, 0, 2, 4, 5, 6, 21, 23, 10, 22, 27, 12, 26, 13, 11, 15],
+                            [15, 11, 13, 26, 5, 4, 27, 9, 17, 12, 8, 24, 7, 14, 20, 16, 22, 6, 25, 23, 1, 18, 2, 0, 19, 21, 10, 3, 28],
+                            [5, 4, 9, 8, 7, 6, 2, 0, 3, 10, 19, 1, 14, 18, 20, 16, 12, 17, 13, 11, 15, 21, 28, 23, 22, 25, 27, 24, 26],
+                            [24, 25, 28, 27, 26, 13, 14, 15, 16, 17, 6, 0, 2, 1, 3, 5, 7, 8, 18, 9, 19, 20, 21, 10, 11, 23, 22, 12, 4],
+                            [27, 2, 19, 1, 22, 23, 10, 3, 28, 15, 21, 26, 13, 11, 5, 8, 9, 4, 20, 24, 12, 17, 6, 0, 7, 25, 14, 18, 16],
+                            [10, 12, 13, 15, 2, 5, 11, 9, 7, 28, 19, 25, 20, 24, 21, 23, 22, 27, 26, 4, 6, 0, 3, 8, 1, 14, 18, 16, 17],
+                            [2, 5, 4, 6, 0, 11, 28, 19, 25, 20, 24, 9, 7, 3, 8, 21, 23, 10, 22, 1, 27, 14, 18, 16, 12, 17, 26, 13, 15],
+                            [2, 5, 4, 6, 0, 9, 7, 3, 8, 1, 14, 18, 16, 12, 17, 13, 11, 15, 10, 27, 24, 26, 21, 28, 23, 19, 22, 25, 20],
+                            [26, 13, 11, 5, 4, 22, 27, 12, 6, 23, 2, 0, 21, 10, 15, 9, 8, 20, 24, 17, 7, 25, 14, 18, 16, 3, 28, 19, 1]
+                        ],
+                        sorting: {
+                            by: 0, 
+                            way: 1
+                        }
+                    });
+                    fw.graph.init();
+                });
+            });
+        </script>
+
+        <!-- colors -->
+
+        <style type="text/css">
+            div.fw_graph .color_0 {
+                background: #808080;
+                color: #FFFFFF;
+            }
+
+            div.fw_graph .color_1 {
+                background: #BDD7EE;
+                color: #000000;
+            }
+
+            div.fw_graph .color_2 {
+                background: #F36523;
+                color: #FFFFFF;
+            }
+        </style>
+    </head>
+    <body class="autosize">
+        <noscript>
+            To view the charts, you need to enable JavaScript.
+        </noscript>
+
+        <!-- chart -->
+
+        <div
+            class="fw_graph hash_699497610c2f57f16a8063624da289d2 textshadow"
+            style="visibility: hidden"
+        >
+            <h2>
+                AV1 video encoding [sec.] – lower is better
+            </h2>
+
+            <!-- records -->
+
+            <div class="records">
+                <div class="record hash_bcd3aa0f4f07b47034be950a9a41b69b id_5">
+                    <span class="label">
+                        Intel Core i5-10400F
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 reset_padding overflow_hidden" style="width: 0;">
+                            <span class="text">
+                                ---
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_05c689caff8ed430a7a75343e509138b id_4">
+                    <span class="label">
+                        Intel Core i5-11400F
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 reset_padding overflow_hidden" style="width: 0;">
+                            <span class="text">
+                                ---
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_8c650906ecd613c9d520ec712c988451 id_6">
+                    <span class="label">
+                        Intel Core i7-11700KF
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 reset_padding overflow_hidden" style="width: 0;">
+                            <span class="text">
+                                ---
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_59319d617c7740587fda9f45d0cc18c6 id_2">
+                    <span class="label">
+                        Intel Core i9-10900K
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 reset_padding overflow_hidden" style="width: 0;">
+                            <span class="text">
+                                ---
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_a2698f57ff4bdcd0844cf48cf64a7f5b id_0">
+                    <span class="label">
+                        Intel Core i9-11900K
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 reset_padding overflow_hidden" style="width: 0;">
+                            <span class="text">
+                                ---
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_592a270387330133cb71527e0649d351 id_9">
+                    <span class="label">
+                        AMD Ryzen 5 3600
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 reset_padding overflow_hidden" style="width: 0;">
+                            <span class="text">
+                                ---
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_5f4028caea3e57c4dffcd1af80088837 id_8">
+                    <span class="label">
+                        AMD Ryzen 5 5600X
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 reset_padding overflow_hidden" style="width: 0;">
+                            <span class="text">
+                                ---
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_736aceccb8f59dccbb03bce23746433b id_7">
+                    <span class="label">
+                        AMD Ryzen 7 3700X
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 reset_padding overflow_hidden" style="width: 0;">
+                            <span class="text">
+                                ---
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_1bfda836d6e8952c01291121d56763b9 id_3">
+                    <span class="label">
+                        AMD Ryzen 9 5950X
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 reset_padding overflow_hidden" style="width: 0;">
+                            <span class="text">
+                                ---
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_5116c34ec24ececf06f044c8d2abccf6 id_21">
+                    <span class="label">
+                        Intel Core i9-13900K
+                    </span>
+                    <span class="bar">
+                        <span class="color_1 overflow" style="width: 10.4%">
+                            <span class="text">
+                                78,8
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_01ca797670cff77aefecf406c696d252 id_28">
+                    <span class="label">
+                        AMD Ryzen 9 7950X
+                    </span>
+                    <span class="bar">
+                        <span class="color_2 overflow" style="width: 11.53%">
+                            <span class="text">
+                                87,3
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_284fdc01bb3bac6e7a65038618037060 id_23">
+                    <span class="label">
+                        Intel Core i7-13700K
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 overflow" style="width: 12.65%">
+                            <span class="text">
+                                95,8
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_e5eb6bbd300cd2fde699458bab8b8768 id_10">
+                    <span class="label">
+                        Intel Core i9-12900K
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 overflow" style="width: 14.44%">
+                            <span class="text">
+                                109,4
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_c54cf5bc44e9f1fafda8d376ace6211b id_19">
+                    <span class="label">
+                        AMD Ryzen 9 7900X
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 overflow" style="width: 14.72%">
+                            <span class="text">
+                                111,5
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_51b762957525a78888d5a135f2175787 id_22">
+                    <span class="label">
+                        Intel Core i5-13600K
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 overflow" style="width: 15.99%">
+                            <span class="text">
+                                121,1
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_110b386589eafb07d24d63146d15706e id_1">
+                    <span class="label">
+                        AMD Ryzen 9 5900X
+                    </span>
+                    <span class="bar">
+                        <span class="color_0 overflow" style="width: 18.17%">
+                            <span class="text">
+                                137,6
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_93cd89462cc2b863c52ebf01002f6016 id_25">
+                    <span class="label">
+                        AMD Ryzen 7 7700X
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 20.95%">
+                            <span class="text">
+                                158,7
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_2cf3d7c061702324244492fc46066ab0 id_27">
+                    <span class="label">
+                        Intel Core i5-13400F (C0)
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 23.74%">
+                            <span class="text">
+                                179,8
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_690b0b7726bcbacd84d90c96372df07a id_14">
+                    <span class="label">
+                        AMD Ryzen 7 5800X
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 25.03%">
+                            <span class="text">
+                                189,6
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_b8e150cc47eecef5e26908cb9b2a7b29 id_18">
+                    <span class="label">
+                        AMD Ryzen 7 5800X3D
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 26.02%">
+                            <span class="text">
+                                197,1
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_49ccb7ab912be04113c19aa16a2afa29 id_20">
+                    <span class="label">
+                        AMD Ryzen 5 7600X
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 27.57%">
+                            <span class="text">
+                                208,8
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_5502005ec7b7f7caad778f7df35ad192 id_16">
+                    <span class="label">
+                        AMD Ryzen 7 5700X
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 27.96%">
+                            <span class="text">
+                                211,8
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_8b385fb442c6185909c83b462816d876 id_24">
+                    <span class="label">
+                        AMD Ryzen 5 7600
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 28.95%">
+                            <span class="text">
+                                219,3
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_c4caa0e4f1166fa65342e570824e9bf9 id_12">
+                    <span class="label">
+                        Intel Core i5-12400 (C0)
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 30.2%">
+                            <span class="text">
+                                228,7
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_0da519a9b5488fcaec840a167acbe94f id_17">
+                    <span class="label">
+                        AMD Ryzen 5 5600
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 35.08%">
+                            <span class="text">
+                                265,7
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_1421467ad3f27df9b3565bcc9b4a3433 id_26">
+                    <span class="label">
+                        Intel Core i3-13100F
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 41.84%">
+                            <span class="text">
+                                316,9
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_e160abab68cc4b8af7b9be2b579dea71 id_13">
+                    <span class="label">
+                        Intel Core i3-12100F
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 43.65%">
+                            <span class="text">
+                                330,6
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_add7edebd759f31719a424eace1a1280 id_11">
+                    <span class="label">
+                        Intel Core i3-10105F
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 62.6%">
+                            <span class="text">
+                                474,1
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <div class="record hash_7a0b0b12c725430075f8427540dae363 id_15">
+                    <span class="label">
+                        Intel Pentium G7400
+                    </span>
+                    <span class="bar">
+                        <span class="color_0" style="width: 100%">
+                            <span class="text">
+                                757,4
+                            </span>
+                        </span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- controls -->
+
+            <div class="controls">
+
+                <!-- criteria -->
+
+                <div class="fw_controls_combobox theme_default enabled_true name_by reversed fw_intent css">
+                    <div class="text">
+                        Value
+                    </div>
+                    <div class='ico'></div>
+                    <div class="list">
+                        <ul>
+                            <li>
+                                <a href="#">
+                                    Value
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#">
+                                    Brand
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#">
+                                    Price (VAT incl.) €
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#">
+                                    Windows 10 build
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#">
+                                    Testing date
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#">
+                                    Cores (and threads)
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#">
+                                    Codename
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#">
+                                    Manufacturing node
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#">
+                                    RAM
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#">
+                                    CPU class
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- order -->
+
+                <div class="fw_controls_combobox theme_default enabled_true name_way reversed fw_intent css">
+                    <div class="text">
+                        Ascending
+                    </div>
+                    <div class='ico'></div>
+                    <div class="list">
+                        <ul>
+                            <li>
+                                <a href="#">
+                                    Descending
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#">
+                                    Ascending
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- settings -->
+
+                <div class="fw_controls_button theme_default enabled_true fw_popup_setup">
+                    Settings...
+                </div>
+
+                <!-- help -->
+
+                <div class="fw_controls_button theme_default enabled_true fw_popup_help">
+                    ?
+                </div>
+            </div>
+            <img
+                class="wattermark"
+                src="/grafy_3/framework/img/framework/graph/wattermark.png"
+            />
+        </div>
+    </body>
+</html>
+

@@ -1,0 +1,1488 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <title>Сравнения видео кодеков (без потерь, MPEG-4, MPEG-4 AVC...) / MSU Video Codec Comparison </title>
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-NLMKK23');</script>
+<!-- End Google Tag Manager -->
+<meta name="keywords" content="архиватор,компрессор,сжатие,книга,статья,кодек,аудио,видео,сравнение,архивация,кодирование,теория информации,фрактал,вейвлет,Хаффмен,Лемпел-Зив,арифметическое кодирование,pkzip,rar,winrar,ace,winace,ha,eri,bmf,ybs,7-zip,uharc,ppmd,ppmonstr,ppmn,arj,gzip,ha,acb,rk,zip,arc,lzh,lha,bzip,bzip2,pdf,RLE,Lempel-Ziv,LZ,LZW,LZ77,arithmetic,coding,transform,pack,context modeling,sources,download,benchmark,BWT,Burrows-Wheeler Transform,MTF,distance coding,PPM,Prediction by Partial Matching,LPC,Linear Prediction Coding,ADPCM,audio,video,image,JPEG,MPEG,MP3,wavelet,jpg,png,gif,DCT,Discrete Cosine Transform,subband coding,quantization,fractal,CTW,SPIHT,LOCO,JPEG-LS,EZW">
+
+<link href="//fonts.googleapis.com/css?family=Roboto:400,500,700&display=swap" rel="stylesheet">
+
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=1">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=1">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=1">
+<link rel="manifest" href="/site.webmanifest?v=1">
+<link rel="mask-icon" href="/safari-pinned-tab.svg?v=1" color="#5bbad5">
+<link rel="shortcut icon" href="/favicon.ico?v=1">
+<meta name="msapplication-TileColor" content="#da532c">
+<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#ffffff">
+
+<meta http-equiv="Content-Type" content="text/html; charset=Windows-1251" /> 
+
+<meta name="HandheldFriendly" content="true" />
+<meta name="MobileOptimized" content="320" />
+<meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, width=device-width, user-scalable=no" />
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script src="/js/all.js"></script>
+
+<link href="/css/all.css?v=2" rel="stylesheet" type="text/css" />
+<link href="/css/lang_ru.css" rel="stylesheet" type="text/css" />
+<!--[if IE]>
+   <link rel="stylesheet" type="text/css" href="/css/ie.css" />
+<![endif]-->
+
+</head>
+
+<body text="#000000" bgcolor="#E9E9E9" background="/images/m_backgrnd.gif">
+ <!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NLMKK23"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+    (function (d, w, c) {
+        (w[c] = w[c] || []).push(function() {
+            try {
+                w.yaCounter42270449 = new Ya.Metrika({
+                    id:42270449,
+                    clickmap:true,
+                    trackLinks:true,
+                    accurateTrackBounce:true,
+                    webvisor:true,
+                    trackHash:true
+                });
+            } catch(e) { }
+        });
+
+        var n = d.getElementsByTagName("script")[0],
+            s = d.createElement("script"),
+            f = function () { n.parentNode.insertBefore(s, n); };
+        s.type = "text/javascript";
+        s.async = true;
+        s.src = "https://d31j93rd8oukbv.cloudfront.net/metrika/watch_ua.js";
+
+        if (w.opera == "[object Opera]") {
+            d.addEventListener("DOMContentLoaded", f, false);
+        } else { f(); }
+    })(document, window, "yandex_metrika_callbacks");
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/42270449" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->
+ 	<div id="wrapper-top">
+		<header id="head">
+			<div id="logo"><a href="/"></a></div>
+			<h1>Всё о сжатии данных, изображений и видео</h1>
+			<div id="lang">
+				<a href="/index_en.htm">
+					EN
+				</a>
+			</div>
+		</header>
+
+		<input type="checkbox" role="button" id="menuToggle" name="menuToggle" />
+		<label for="menuToggle" id="menuMask"></label>
+		
+		<label for="menuToggle" id="menuControl">Меню</label>
+
+ 		<div id="wrapper-middle">
+
+		<div id="leftcol" class="menucol flagedlinks">
+			<div>
+				<h1>
+	<a href="/video/index_ru.htm" class="only-ru">Видео</a>
+	<a href="/video/" class="only-en">Video</a>
+</h1>
+<h2>
+	<a href="/video/codec_comparison/index.html" class="only-ru">Сравнения кодеков</a>
+	<a link="red" vlink="#cecece" alink="#ff0000" href="/video/codec_comparison/index_en.html" class="only-en">MSU Video Codecs Comparisons</a>
+</h2>
+<ul class="first-level">
+    <li><b><a href="/video/codec_comparison/2025/" class="link-en">2025</a></b></li>
+    <li><a link="red" vlink="#cecece" alink="#ff0000" href="/video/codec_comparison/2025/call_for_codecs.html"  class="link-en">- Call for Codecs</a></li>
+    <li><a href="/video/codec_comparison/2025/hardware_report.html" class="link-en">- Hardware report</a></li>
+    <li><a href="/video/codec_comparison/2025/main_report.html"   style="color: #FF0000; text-decoration: none" class="link-en">- FullHD/Subjective  report</a></li>
+
+    <li><b><a href="/video/codec_comparison/2023/" class="link-en">2023-2024</a></b></li>
+    <li><a href="/video/codec_comparison/2023/call_for_codecs.html" class="link-en">- Call for Codecs</a></li>
+    <li><a href="/video/codec_comparison/2023/main_report.html" class="link-en">- FullHD/Subjective  report</a></li>
+    <li><a href="/video/codec_comparison/2023/hardware_report.html" class="link-en">- Hardware report</a></li>
+    <li><a href="/video/codec_comparison/2023/4k_report.html" class="link-en">- 4K 10-bit report</a></li>
+    <li><a href="/video/codec_comparison/2023/4k_hardware_report.html" class="link-en">- Hardware 4K 10-bit report</a></li>
+    
+    <li><b><a href="/video/codec_comparison/2022/" class="link-en">2022</a></b></li>
+    <li><a href="/video/codec_comparison/2022/call_for_codecs.html" class="link-en">- Call for Codecs</a></li>
+    <li><a href="/video/codec_comparison/2022/ultrafast_report.html" class="link-en">- Hardware report</a></li>
+    <li><a href="/video/codec_comparison/2022/cloud_report.html" class="link-en">- Cloud report</a></li>
+    <li><a href="/video/codec_comparison/2022/ultrafast_report_4k.html" class="link-en">- Hardware report 4K</a></li>
+    <li><a href="/video/codec_comparison/2022/main_report.html" class="link-en">- FullHD report</a> </li>
+    <li><a href="/video/codec_comparison/2022/10_bit_report.html" class="link-en">- 10-bit report </a> </li>
+    <li><a href="/video/codec_comparison/2022/4k_report.html" class="link-en">- 4K report</a></li>
+    <li><a href="/video/codec_comparison/2022/subjective_report.html" class="link-en">- Subjective report</a></li>
+	
+    <li><b><a href="/video/codec_comparison/2021/" class="link-en">2021</a></b></li>
+    <li><a href="/video/codec_comparison/2021/call_for_codecs.html" class="link-en">- Call for Codecs</a></li>
+    <li><a href="/video/codec_comparison/2021/main_report.html" class="link-en">- FullHD report</a></li>
+    <li><a href="/video/codec_comparison/2021/subjective_report.html" class="link-en">- Subjective report</a></li>
+	<li><a href="/video/codec_comparison/2021/4k_report.html" class="link-en">- 4K & 10-bit report</a></li>
+    <li><a href="/video/codec_comparison/2021/cloud_report.html" class="link-en">- Cloud report</a></li>
+    <li><a href="/video/codec_comparison/2021/ultrafast_report.html" class="link-en">- FPGA & Ultrafast report</a></li>
+    <li><a href="/video/codec_comparison/faq.html" class="link-en">FAQ</a></li>
+</ul>
+
+<h2><a href="/video/quality_measure/video_measurement_tool.html" class="link-en">Video Quality Measurement Tool (MSU VQMT)</a></h2>
+<ul class="first-level">
+	<li><a href="/video/quality_measure/vqmt_download.html#free" class="link-en">
+		<span class="only-ru">Скачать бесплатно</span>
+		<span class="only-en">Download Free</span>
+	</a></li>
+	<li><a href="/video/quality_measure/vqmt_download.html#purchase" class="link-en">
+		<span class="only-ru">Купить PRO</span>
+		<span class="only-en">Purchase PRO</span>
+	</a></li>
+	<li><a href="https://videoprocessing.ai/vqmt/metrics/" class="link-en" target="_blank">
+		<span class="only-ru">Информация о метриках</span>
+		<span class="only-en">Metrics' info</span>
+	</a></li>
+	<li><a href="vqmt_sdk.html" class="link-en">
+		<span class="only-ru">Плагины и SDK</span>
+		<span class="only-en">Plugins & SDK</span>
+	</a></li>
+    <li><a href="https://videoprocessing.ai/vqmt/vqmt-doc-toc/" class="link-en">
+        <span class="only-ru">Онлайн справка</span>
+        <span class="only-en">Online help</span>
+    </a></li>
+	<li><a href="/video/quality_measure/perceptual_video_quality_tool.html" class="link-en">
+        Perceptual Video Quality Tool (MSU PVQT)
+    </a></li>
+</ul>
+
+<h2><a href="https://videoprocessing.ai/benchmarks/" class="link-en">Benchmarks</a></h2>
+<ul class="first-level">
+    <li><a href="https://videoprocessing.ai/benchmarks/video-upscalers.html" class="link-en">
+        <span class="only-ru">Video Upscalers Benchmark</span>
+        <span class="only-en">Video Upscalers Benchmark</span>
+    </a></li>
+    <li><a href="https://videoprocessing.ai/benchmarks/aligners.html" class="link-en">
+        <span class="only-ru">Video Alignment and Retrieval Benchmark</span>
+        <span class="only-en">Video Alignment and Retrieval Benchmark</span>
+    </a></li>
+    <li><a href="https://videoprocessing.ai/benchmarks/video-super-resolution.html" class="link-en">
+        <span class="only-ru">Super-Resolution for Video Compression Benchmark</span>
+        <span class="only-en">Super-Resolution for Video Compression Benchmark</span>
+    </a></li>
+        <li><a href="https://videoprocessing.ai/benchmarks/mobile-video-codec-benchmark.html" class="link-en">
+        <span class="only-ru">Mobile Video Codecs Benchmark</span>
+        <span class="only-en">Mobile Video Codecs Benchmark</span>
+    </a></li>
+        <li><a href="https://videoprocessing.ai/benchmarks/video-super-resolution.html" class="link-en">
+        <span class="only-ru">Video Super Resolution Benchmark</span>
+        <span class="only-en">Video Super Resolution Benchmark</span>
+    </a></li>
+        <li><a href="https://videoprocessing.ai/benchmarks/sbd.html" class="link-en">
+        <span class="only-ru">Shot Boundary Detection Benchmark</span>
+        <span class="only-en">Shot Boundary Detection Benchmark</span>
+    </a></li>
+        <li><a href="https://videoprocessing.ai/benchmarks/deinterlacer.html" class="link-en">
+        <span class="only-ru">Deinterlacer Benchmark</span>
+        <span class="only-en">Deinterlacer Benchmark</span>
+    </a></li>
+        <li><a href="https://videomatting.com" class="link-en">
+        <span class="only-ru">VideoMatting Project</span>
+        <span class="only-en">VideoMatting Project</span>
+    </a></li>
+    <li><a href="http://videocompletion.org" class="link-en">
+        <span class="only-ru">Video Impainting Benchmark</span>
+        <span class="only-en">Video Impainting Benchmark</span>
+    </a></li>
+</ul>
+
+<h2>
+    <a href="/video/3d_video_ru.htm" class="only-ru">3D-пїЅпїЅпїЅпїЅпїЅ</a>
+    <a href="/video/3d_video.htm" class="only-en">3D video</a>
+</h2>
+<ul class="second-level">
+    <li><a href="/video/vqmt3d" class="link-en">
+        <span class="only-ru">VQMT3D</span>
+        <span class="only-en">S3D quality analysis & reports</span>
+    </a></li>
+    <!-- <li><a href="/video/vqmt3d/report9/" class="link-en"> -->
+        <!-- <span class="only-ru">Отчет 9 (105 фильмов)</span> -->
+        <!-- <span class="only-en">Report 9 (105 movies)</span> -->
+    <!-- </a></li> -->
+    <!-- <li><a href="/video/vqmt3d/report8/" class="link-en"> -->
+        <!-- <span class="only-ru">Отчет 8 (5 метрик & 25 фильмов)</span> -->
+        <!-- <span class="only-en">Report 8 (5 metrics & 25 movies)</span> -->
+    <!-- </a></li> -->
+    <!-- <li><a href="/video/vqmt3d/report7/" class="link-en"> -->
+        <!-- <span class="only-ru">Отчет 7 (stereo-window & 10 фильмов)</span> -->
+        <!-- <span class="only-en">Report 7 (stereo-window & 10 movies)</span> -->
+    <!-- </a></li> -->
+    <!-- <li><a href="/video/vqmt3d/report6/" class="link-en"> -->
+        <!-- <span class="only-ru">Отчет 6 (stereo-window & 10 фильмов)</span> -->
+        <!-- <span class="only-en">Report 6 (stereo-window & 10 movies)</span> -->
+    <!-- </a></li> -->
+    <!-- <li><a href="/video/vqmt3d/report5/" class="link-en"> -->
+        <!-- <span class="only-ru">Отчет 5 (6 метрик & 5 фильмов)</span> -->
+        <!-- <span class="only-en">Report 5 (6 metrics & 5 movies)</span> -->
+    <!-- </a></li> -->
+    <li>
+          <a href="/video/msu_device_testing/index_en.html" class="link-en">
+          <span class="only-en">MSU 3D Devices Testing</span>
+          <span class="only-ru">MSU 3D Devices Testing</span>
+      </a></li>
+      <li>
+          <a href="/video/3d_display_video/index_en.html" class="link-en">
+          <span class="only-en">3D Displays Video Generation</span>
+          <span class="only-ru">3D Displays Video Generation</span>
+      </a></li>
+      <li>
+          <a href="/video/3d_display_video/depth_map_generation_en.html" class="link-en">
+          <span class="only-en">Stereo Video Depth Map Generation</span>
+          <span class="only-ru">Stereo Video Depth Map Generation</span>
+      </a></li>
+      <li>
+          <a href="/video/3d_display_video/3d_video_capturing_en.html" class="link-en">
+          <span class="only-en">3D Displays Video Capturing</span>
+          <span class="only-ru">3D Displays Video Capturing</span>
+      </a></li>
+</ul>
+
+
+<h1 class="only-ru">Проекты</h1>
+<h1 class="only-en">Projects</h1>
+<ul class="first-level">
+	<li><a href="/video/video_codec_optimization/" class="link-en">Content-Aware Video Codecs Tuning</a></li>
+	<li><a href="/video/savam/" class="link-en">
+		<span class="only-en">SAVAM Saliensy-Aware Video Compression & Dataset</span>
+		<span class="only-ru">Полуавтоматическая модель внимания и база записей движения глаз</span>
+	</a></li>
+	<li>
+		<a href="/video/public_filters.htm" class="only-en">Public filters</a>
+		<a href="/video/public_filters_ru.htm" class="only-ru">Общедоступные видеофильтры</a>
+	</li>
+	<li>
+		<a href="/video/filters.htm" class="only-en">Com. filters</a>
+		<a href="/video/filters_ru.htm" class="only-ru">Коммерческие видеофильтры</a>
+	</li>
+	<li>
+		<a href="/video/video_codecs.htm" class="only-en">Our Video Codecs</a>
+		<a href="/video/video_codecs_ru.htm" class="only-ru">Проекты по видеокодекам</a>
+	</li>
+	<li><a href="https://globalcompetition.compression.ru" class="link-en" target="_blank">Global Data Compression Competition</a></li>
+</ul>
+
+<h1 class="only-ru"><a href="book">Книга &laquo;Методы сжатия данных&raquo;</a></h1>
+
+<h1 class="only-ru">Разделы</h1>
+<ul class="first-level only-ru">
+	<li><a href="/download">Статьи</a></li>
+	<li><a href="/arctest">Arctest</a></li>
+	<li><a href="/fido">Ru.compress</a></li>
+	<li><a href="/video/other_ru.htm">Разное</a></li>
+	<!--<li><a href="http://forum.compression.ru/">Форму</a></li> форум всё -->
+</ul>
+
+<h1>
+	<a href="/about/index_en.html" class="only-en">About</a>
+	<a href="/about" class="only-ru">О сервере</a>
+</h1>
+
+
+			</div>
+
+			<div id="rightcolinleft">
+				<h1>Новости:</h1>
+
+<ul class="site-news">
+<li><span class="news-date">05.08.26</span> <a href="/video/codec_comparison/2025/main_report.html" class="link-en" style="color: red">
+    <span class="only-en">MSU Video Codecs Comparison 2025 <br>(Part 2, 3, FullHD Objective & Subjective) report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2025 (часть 1, 2: FullHD Objective & Subjective)</span>
+</a></li>
+<li><span class="news-date">25.05.26</span> <a href="/video/codec_comparison/2025/hardware_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2025 <br>(Part 1, Hardware) report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2025 (часть 1, Hardware)</span>
+</a></li>
+<li><span class="news-date">20.05.25</span> <a href="/video/codec_comparison/2025/call_for_codecs.html" class="link-en">
+    <span class="only-en">Call-for-codecs 2025: participate in annual video-codecs comparison!</span>
+    <span class="only-ru">Прием заявок на участие в ежегодном сравнении видеокодеков 2025!</span>
+</a></li>
+<li><span class="news-date">10.04.25</span> <a href="/video/codec_comparison/2023/4k_hardware_report.html" class="link-en">
+        <span class="only-en">MSU Video Codecs Comparison 2023-2024 <br>(Part 5, Hardware 4K 10-bit) report released!</span>
+        <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2023-2024 (часть 5, Hardware 4K 10-bit)</span>
+</a></li>
+<li><span class="news-date">06.04.25</span> <a href="/video/codec_comparison/2023/4k_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2023-2024 <br>(Part 4, 4K 10-bit) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2023-2024 (часть 4, 4K 10-bit)</span>
+</a></li>
+<li><span class="news-date">28.08.24</span> <a href="/video/codec_comparison/2023/hardware_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2023-2024 <br>(Part 3, Hardware) report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2023-2024 (часть 3, Hardware)</span>
+</a></li>
+<li><span class="news-date">02.08.24</span> <a href="/video/codec_comparison/2023/main_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2023-2024 <br>(Part 1, 2: FullHD Objective & Subjective) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2023-2024 (Часть 1, 2: FullHD  Objective & Subjective)</span>
+</a></li>
+<li><span class="news-date">14.12.23</span> <a href="/video/codec_comparison/2023/call_for_codecs.html" class="link-en">
+    <span class="only-en">Call-for-codecs 2023-2024: participate in annual video-codecs comparison!</span>
+    <span class="only-ru">Прием заявок на участие в ежегодном сравнении видеокодеков 2023-2024!</span>
+</a></li>
+<li><span class="news-date">07.11.23</span> <a href="/video/codec_comparison/2022/subjective_report.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 7, Subjective) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 7, Subjective)</span>
+</a></li>
+<li><span class="news-date">17.10.23</span> <a href="/video/codec_comparison/2022/4k_report.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 6, 4K) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 6, 4K)</span>
+</a></li>
+<li><span class="news-date">25.09.23</span> <a href="/video/codec_comparison/2022/10_bit_report.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 5, FullHD 10-bit) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 5, FullHD 10-bit)</span>
+</a></li>
+<li><span class="news-date">09.08.23</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+    <span class="only-en">Preset requirements for 4K comparison 2022 changed</span>
+    <span class="only-ru">Изменены требования к пресетам 4K сравнения 2022</span>
+</a></li>
+    <li><span class="news-date">26.07.23</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+    <span class="only-en">Preset requirements for 4K comparison 2022 changed</span>
+    <span class="only-ru">Изменены требования к пресетам 4K сравнения 2022</span>
+</a></li>
+    <li><span class="news-date">26.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#news" class="link-en">
+    <span class="only-en">MSU 4K Video Codecs Comparison 2022 appliance deadline changed</span>
+    <span class="only-ru">Изменены сроки приема кодеков 4K сравнения видеокодеков-2022</span>
+</a></li>
+
+    <li><span class="news-date">14.07.23</span> <a href="/video/codec_comparison/2022/main_report.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 4, FullHD) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 4, FullHD)</span>
+</a></li>
+    <li><span class="news-date">04.07.23</span> <a href="/video/codec_comparison/2022/ultrafast_report_4k.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 3, Hardware 4K) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 3, Hardware 4K)</span>
+</a></li>
+<li><span class="news-date">26.06.23</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+    <span class="only-en">Preset requirements for 4K comparison 2022 changed</span>
+    <span class="only-ru">Изменены требования к пресетам 4K сравнения 2022</span>
+</a></li>
+<li><span class="news-date">18.04.23</span> <a href="/video/codec_comparison/2022/cloud_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 2, Cloud) additional charts added</span>
+    <span class="only-ru">Добавлены дополнительные в сравнении видеокодеков-2022 (часть 2, Cloud)</span>
+</a></li>
+<li><span class="news-date">15.04.23</span> <a href="/video/codec_comparison/2022/ultrafast_report.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 1, Hardware) fixed errors, minor leaderboard change</span>
+    <span class="only-ru">Изменения в сравнении видеокодеков-2022 (часть 1, Hardware)</span>
+</a></li>
+<li><span class="news-date">14.04.23</span> <a href="/video/codec_comparison/2022/ultrafast_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 1, Hardware) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 1, Hardware)</span>
+</a></li>
+<li><span class="news-date">14.04.23</span> <a href="/video/codec_comparison/2022/cloud_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 2, Cloud) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 2, Cloud)</span>
+</a></li>
+<li><span class="news-date">10.10.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+<span class="only-en">Preset requirements for FullHD and FPGA comparison changed</span>
+<span class="only-ru">Изменены требования к пресетам FullHD и FPGA сравнениям 2022</span>
+</a></li>   
+<li><span class="news-date">26.09.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#dates" class="link-en">
+<span class="only-en">MSU Video Codecs Comparison 2022 Subjective and FPGA comparisons deadlines changed</span>
+<span class="only-ru">Изменены требования к пресетам Субъективного сравнения 2022</span>
+</a></li>   
+<li><span class="news-date">18.08.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+<span class="only-en">Preset requirements for Subjective comparison changed</span>
+<span class="only-ru">Изменены требования к пресетам Субъективного сравнения 2022</span>
+</a></li>   
+<li><span class="news-date">18.08.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#dates" class="link-en">
+<span class="only-en">MSU Video Codecs Comparison 2022 appliance deadline changed</span>
+<span class="only-ru">Изменены сроки приема кодеков сравнения видеокодеков-2022</span>
+</a></li>  
+<li><span class="news-date">26.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#rules" class="link-en">
+<span class="only-en">MSU Video Codecs Comparison 2022 methodology changed</span>
+<span class="only-ru">Изменена методология сравнения видеокодеков-2022</span>
+</a></li>  
+<li><span class="news-date">26.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#dates" class="link-en">
+<span class="only-en">MSU Video Codecs Comparison 2022 appliance deadline changed</span>
+<span class="only-ru">Изменены сроки приема кодеков сравнения видеокодеков-2022</span>
+</a></li>   
+<li><span class="news-date">22.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+<span class="only-en">Preset requirements for FullHD comparison changed</span>
+<span class="only-ru">Изменены требования к пресетам FullHD сравнения</span>
+</a></li>   
+<li><span class="news-date">14.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+<span class="only-en">Preset requirements for FullHD comparison changed</span>
+<span class="only-ru">Изменены требования к пресетам FullHD сравнения</span>
+</a></li>
+<li><span class="news-date">10.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#dates" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 appliance deadline changed</span>
+    <span class="only-ru">Изменены сроки приема кодеков сравнения видеокодеков-2022</span>
+</a></li>
+<li><span class="news-date">26.06.22</span> <a href="/vqmt" class="link-en">
+    <span class="only-en">MSU VQMT 14.1 released</span>
+    <span class="only-ru">Выпущен MSU VQMT 14.1</span>
+</a></li>
+<li><span class="news-date">01.06.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html" class="link-en">
+    <span class="only-en">Call-for-codecs 2022: participate in annual video-codecs comparison!</span>
+    <span class="only-ru">Прием заявок на участие в ежегодном сравнении видеокодеков 2022</span>
+</a></li>
+<li><span class="news-date">16.05.22</span> <a href="/video/codec_comparison/2021/cloud_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2021 (Part 4, Cloud) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2021 (часть 4, Cloud)</span>
+</a></li>
+<li><span class="news-date">21.04.22</span> <a href="/video/codec_comparison/2021/4k_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2021 (Part 3, 4K & 10-bit) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2021 (часть 3, 4K & 10-bit)</span>
+</a></li>
+<li><span class="news-date">14.04.22</span> <a href="/video/codec_comparison/2021/ultrafast_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2021 (Part 5, Ultra-fast) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2021 (часть 5, Ultra-fast)</span>
+</a></li>
+<li><span class="news-date">14.03.22</span> <a href="/video/codec_comparison/2022" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparisons 2022 announced</span>
+    <span class="only-ru">Анонсированы сравнения видеокодеков-2022</span>
+</a></li>
+<li><span class="news-date">30.01.22</span> <a href="/vqmt" class="link-en">
+    <span class="only-en">MSU VQMT 14.0 BETA released</span>
+    <span class="only-ru">Выпущен MSU VQMT 14.0 BETA</span>
+</a></li>
+<li><span class="news-date">30.11.21</span> <a href="/video/codec_comparison/2021/subjective_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2021 (Part 2, Subjective) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2021 (часть 2, Subjective)</span>
+</a></li>
+<li><span class="news-date">30.10.21</span> <a href="/video/codec_comparison/2021/main_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2021 (Part 1, FullHD) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2021 (часть 1, FullHD)</span>
+</a></li>
+<li><span class="news-date">23.05.21</span> <a href="/vqmt" class="link-en">
+    <span class="only-en">MSU VQMT 13.1 released</span>
+    <span class="only-ru">Выпущен MSU VQMT 13.1</span>
+</a></li>
+<li><span class="news-date">01.05.21</span> <a href="/video/codec_comparison/2021/call_for_codecs.html" class="link-en">
+    <span class="only-en">Call-for-codecs 2021: participate in annual video codecs comparison</span>
+    <span class="only-ru">Прием заявок на участие в ежегодном сравнении видеокодеков 2021</span>
+</a></li>
+<li><span class="news-date">01.04.21</span> <a href="/video/codec_comparison/hevc_2020/4k_report.html" class="link-en">
+    <span class="only-en">Released 4K&10-bit MSU Video Codecs Comparison report</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков на 4K&10-bit видео</span>
+</a></li>
+<li><span class="news-date">23.03.21</span> <a href="/video/codec_comparison/hevc_2020/subjective_report.html" class="link-en">
+    <span class="only-en">Released Subjective MSU Video Codecs Comparison report</span>
+    <span class="only-ru">Выпущен отчет о субъективном сравнении видеокодеков</span>
+</a></li>
+<li><span class="news-date">20.02.21</span> <a href="/vqmt" class="link-en">
+    <span class="only-en">MSU VQMT 13 BETA and 12.1 released</span>
+    <span class="only-ru">Выпущен MSU VQMT 13 BETA и 12.1</span>
+</a></li>
+<li><span class="news-date">19.02.21</span> <a href="/video/codec_comparison/cloud_2020" class="link-en">
+    <span class="only-en">MSU Cloud Video Transcoding Benchmark: released new report</span>
+    <span class="only-ru">MSU Cloud Benchmark: выпущен отчет о сравнении облачных сервисов кодирования 2020</span>
+</a></li>
+<li><span class="news-date">08.12.20</span> <a href="/video/codec_comparison/hevc_2020/fpga_express_report.html" class="link-en">
+    <span class="only-en">Released report on FPGA&HW-accelerated video encoders</span>
+    <span class="only-ru">Выпущен отчет о сравнении FPGA&HW-accelerated видеокодеков</span>
+</a></li>
+<!-- <li><span class="news-date">07.12.20</span> <a href="/video/codec_comparison/hevc_2020/main_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2020 (Part 1, FullHD) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2020 (часть 1, FullHD)</span>
+</a></li> -->
+<!-- <li><span class="news-date">17.06.20</span> <a href="https://globalcompetition.compression.ru/" class="link-en" target="_blank">
+    <span class="only-en">Global Data Compression Competition: Call for lossless compressors. Win up to 50,000 EUR</span>
+    <span class="only-ru">Конкурс по сжатию без потерь с призовым фондом 50,000 EUR</span>
+</a></li>
+<li><span class="news-date">15.04.20</span> <a href="/video/codec_comparison/hevc_2020/call_for_codecs.html" class="link-en">
+    <span class="only-en">Call-for-codecs 2020: participate in annual video-codecs comparison!</span>
+    <span class="only-ru">Прием заявок на участие в ежегодном сравнении видеокодеков 2020</span>
+</a></li>
+<li><span class="news-date">30.03.20</span> <a href="/video/codec_comparison/hevc_2019/#hq_report_summary" class="link-en">
+    <span class="only-en">High-quality encoding report on new codecs (aom, rav1e, SVT, etc.) released</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков (aom, rav1e, SVT, etc.) в режиме кодирования высокого качества</span>
+</a></li>
+<li><span class="news-date">20.03.20</span> <a href="/video/codec_comparison/hevc_2019/#4k_report_summary" class="link-en">
+    <span class="only-en">4K content encoding report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков на 4K контенте</span>
+</a></li>
+<li><span class="news-date">01.02.20</span> <a href="/video/codec_comparison/cloud_2020" class="link-en">
+    <span class="only-en">Cloud Video Encoding Benchmark 2020 has started</span>
+    <span class="only-ru">Начато сравнение облачных сервисов кодирования видео 2020</span>
+</a></li>
+<li><span class="news-date">22.12.19</span> <a href="/video/codec_comparison/cloud_2019" class="link-en">
+    <span class="only-en">Report on 2019 cloud video encoding services comparison is released</span>
+    <span class="only-ru">Выпущен отчёт о сравнении облачных сервисов кодирования видео 2019</span>
+</a></li>
+<li><span class="news-date">22.10.19</span> <a href="/video/codec_comparison/cloud_2019" class="link-en">
+    <span class="only-en">Cloud transcoding services comparison report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении облачных сервисов сжатия видео</span>
+</a></li>
+<li><span class="news-date">22.10.19</span> <a href="/video/codec_comparison/hevc_2019" class="link-en">
+    <span class="only-en">Released FullHD and subjective reports on 2019 HEVC/AV1 video-codec comparison</span>
+    <span class="only-ru">Выпущены FullHD и субъективный отчеты о сравнении HEVC/AV1 кодеков 2019</span>
+</a></li> -->
+<!-- <li><span class="news-date">07.11.19</span> <a href="/video/quality_measure/video_measurement_tool.html" class="link-en">
+    <span class="only-en">Released VQMT 12.0 and BETA VQMT 11.2</span>
+    <span class="only-ru">Выпущены VQMT 12.0 и VQMT 11.2</span>
+</a></li>
+<li><span class="news-date">01.02.19</span> <a href="/video/codec_comparison/call_for_codecs_19.html" class="link-en">
+    <span class="only-en">Call for codecs: apply for 2019 MSU video codecs comparison</span>
+    <span class="only-ru">Прием заявок на участие в сравнении видеокодеков 2019 открыт</span>
+</a></li>
+<li><span class="news-date">04.09.18</span> <a href="/video/codec_comparison/hevc_2018#hq_report" class="link-en">
+    <span class="only-en">HEVC and AV1 high quality codecs comparison report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении HEVC кодеков и AV1 2018</span>
+</a></li>
+<li><span class="news-date">24.01.17</span> <a href="/video/vqmt3d/report9/" class="link-en">
+    <span class="only-en">Report 9 on 3D-video Quality Analysis released</span>
+    <span class="only-ru">Выпущен девятый отчёт с оценкой качества 3D-фильмов</span>
+</a></li>
+<li class="only-ru"><span class="news-date">11.05.15</span> <a href="/video/vqmt3d/geektimes/" class="link-ru">
+    <span>Опубликована серия статей «Почему от 3D болит голова»</span>
+</a></li>
+<li><span class="news-date">14.12.14</span> <a href="/video/savam/" class="link-en">
+    <span class="only-en">Semiautomatic Visual-Attention Model released</span>
+    <span class="only-ru">Опубликована полуавтоматическая модель внимания и база записей движения глаз</span>
+</a></li>
+<li><span class="news-date">25.07.14</span> <a href="https://videomatting.com/" class="link-en">
+    <span class="only-en">The public objective benchmark for video-matting methods released</span>
+    <span class="only-ru">Выпущен открытый объективный бенчмарк по отделению полупрозрачных объектов от фона</span>
+</a></li> -->
+</ul>
+
+			</div>
+		</div>
+<!-- ========================================================== MENU END ================== -->
+
+<!-- ========================================== RIGHTCOL BEGIN ==================== -->
+		<div id="rightcol" class="menucol flagedlinks">
+			<div>
+				<h1>Новости:</h1>
+
+<ul class="site-news">
+<li><span class="news-date">05.08.26</span> <a href="/video/codec_comparison/2025/main_report.html" class="link-en" style="color: red">
+    <span class="only-en">MSU Video Codecs Comparison 2025 <br>(Part 2, 3, FullHD Objective & Subjective) report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2025 (часть 1, 2: FullHD Objective & Subjective)</span>
+</a></li>
+<li><span class="news-date">25.05.26</span> <a href="/video/codec_comparison/2025/hardware_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2025 <br>(Part 1, Hardware) report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2025 (часть 1, Hardware)</span>
+</a></li>
+<li><span class="news-date">20.05.25</span> <a href="/video/codec_comparison/2025/call_for_codecs.html" class="link-en">
+    <span class="only-en">Call-for-codecs 2025: participate in annual video-codecs comparison!</span>
+    <span class="only-ru">Прием заявок на участие в ежегодном сравнении видеокодеков 2025!</span>
+</a></li>
+<li><span class="news-date">10.04.25</span> <a href="/video/codec_comparison/2023/4k_hardware_report.html" class="link-en">
+        <span class="only-en">MSU Video Codecs Comparison 2023-2024 <br>(Part 5, Hardware 4K 10-bit) report released!</span>
+        <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2023-2024 (часть 5, Hardware 4K 10-bit)</span>
+</a></li>
+<li><span class="news-date">06.04.25</span> <a href="/video/codec_comparison/2023/4k_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2023-2024 <br>(Part 4, 4K 10-bit) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2023-2024 (часть 4, 4K 10-bit)</span>
+</a></li>
+<li><span class="news-date">28.08.24</span> <a href="/video/codec_comparison/2023/hardware_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2023-2024 <br>(Part 3, Hardware) report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2023-2024 (часть 3, Hardware)</span>
+</a></li>
+<li><span class="news-date">02.08.24</span> <a href="/video/codec_comparison/2023/main_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2023-2024 <br>(Part 1, 2: FullHD Objective & Subjective) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков 2023-2024 (Часть 1, 2: FullHD  Objective & Subjective)</span>
+</a></li>
+<li><span class="news-date">14.12.23</span> <a href="/video/codec_comparison/2023/call_for_codecs.html" class="link-en">
+    <span class="only-en">Call-for-codecs 2023-2024: participate in annual video-codecs comparison!</span>
+    <span class="only-ru">Прием заявок на участие в ежегодном сравнении видеокодеков 2023-2024!</span>
+</a></li>
+<li><span class="news-date">07.11.23</span> <a href="/video/codec_comparison/2022/subjective_report.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 7, Subjective) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 7, Subjective)</span>
+</a></li>
+<li><span class="news-date">17.10.23</span> <a href="/video/codec_comparison/2022/4k_report.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 6, 4K) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 6, 4K)</span>
+</a></li>
+<li><span class="news-date">25.09.23</span> <a href="/video/codec_comparison/2022/10_bit_report.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 5, FullHD 10-bit) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 5, FullHD 10-bit)</span>
+</a></li>
+<li><span class="news-date">09.08.23</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+    <span class="only-en">Preset requirements for 4K comparison 2022 changed</span>
+    <span class="only-ru">Изменены требования к пресетам 4K сравнения 2022</span>
+</a></li>
+    <li><span class="news-date">26.07.23</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+    <span class="only-en">Preset requirements for 4K comparison 2022 changed</span>
+    <span class="only-ru">Изменены требования к пресетам 4K сравнения 2022</span>
+</a></li>
+    <li><span class="news-date">26.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#news" class="link-en">
+    <span class="only-en">MSU 4K Video Codecs Comparison 2022 appliance deadline changed</span>
+    <span class="only-ru">Изменены сроки приема кодеков 4K сравнения видеокодеков-2022</span>
+</a></li>
+
+    <li><span class="news-date">14.07.23</span> <a href="/video/codec_comparison/2022/main_report.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 4, FullHD) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 4, FullHD)</span>
+</a></li>
+    <li><span class="news-date">04.07.23</span> <a href="/video/codec_comparison/2022/ultrafast_report_4k.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 3, Hardware 4K) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 3, Hardware 4K)</span>
+</a></li>
+<li><span class="news-date">26.06.23</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+    <span class="only-en">Preset requirements for 4K comparison 2022 changed</span>
+    <span class="only-ru">Изменены требования к пресетам 4K сравнения 2022</span>
+</a></li>
+<li><span class="news-date">18.04.23</span> <a href="/video/codec_comparison/2022/cloud_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 2, Cloud) additional charts added</span>
+    <span class="only-ru">Добавлены дополнительные в сравнении видеокодеков-2022 (часть 2, Cloud)</span>
+</a></li>
+<li><span class="news-date">15.04.23</span> <a href="/video/codec_comparison/2022/ultrafast_report.html#news" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 1, Hardware) fixed errors, minor leaderboard change</span>
+    <span class="only-ru">Изменения в сравнении видеокодеков-2022 (часть 1, Hardware)</span>
+</a></li>
+<li><span class="news-date">14.04.23</span> <a href="/video/codec_comparison/2022/ultrafast_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 1, Hardware) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 1, Hardware)</span>
+</a></li>
+<li><span class="news-date">14.04.23</span> <a href="/video/codec_comparison/2022/cloud_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 (Part 2, Cloud) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2022 (часть 2, Cloud)</span>
+</a></li>
+<li><span class="news-date">10.10.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+<span class="only-en">Preset requirements for FullHD and FPGA comparison changed</span>
+<span class="only-ru">Изменены требования к пресетам FullHD и FPGA сравнениям 2022</span>
+</a></li>   
+<li><span class="news-date">26.09.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#dates" class="link-en">
+<span class="only-en">MSU Video Codecs Comparison 2022 Subjective and FPGA comparisons deadlines changed</span>
+<span class="only-ru">Изменены требования к пресетам Субъективного сравнения 2022</span>
+</a></li>   
+<li><span class="news-date">18.08.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+<span class="only-en">Preset requirements for Subjective comparison changed</span>
+<span class="only-ru">Изменены требования к пресетам Субъективного сравнения 2022</span>
+</a></li>   
+<li><span class="news-date">18.08.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#dates" class="link-en">
+<span class="only-en">MSU Video Codecs Comparison 2022 appliance deadline changed</span>
+<span class="only-ru">Изменены сроки приема кодеков сравнения видеокодеков-2022</span>
+</a></li>  
+<li><span class="news-date">26.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#rules" class="link-en">
+<span class="only-en">MSU Video Codecs Comparison 2022 methodology changed</span>
+<span class="only-ru">Изменена методология сравнения видеокодеков-2022</span>
+</a></li>  
+<li><span class="news-date">26.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#dates" class="link-en">
+<span class="only-en">MSU Video Codecs Comparison 2022 appliance deadline changed</span>
+<span class="only-ru">Изменены сроки приема кодеков сравнения видеокодеков-2022</span>
+</a></li>   
+<li><span class="news-date">22.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+<span class="only-en">Preset requirements for FullHD comparison changed</span>
+<span class="only-ru">Изменены требования к пресетам FullHD сравнения</span>
+</a></li>   
+<li><span class="news-date">14.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#comparison_parts" class="link-en">
+<span class="only-en">Preset requirements for FullHD comparison changed</span>
+<span class="only-ru">Изменены требования к пресетам FullHD сравнения</span>
+</a></li>
+<li><span class="news-date">10.07.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html#dates" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2022 appliance deadline changed</span>
+    <span class="only-ru">Изменены сроки приема кодеков сравнения видеокодеков-2022</span>
+</a></li>
+<li><span class="news-date">26.06.22</span> <a href="/vqmt" class="link-en">
+    <span class="only-en">MSU VQMT 14.1 released</span>
+    <span class="only-ru">Выпущен MSU VQMT 14.1</span>
+</a></li>
+<li><span class="news-date">01.06.22</span> <a href="/video/codec_comparison/2022/call_for_codecs.html" class="link-en">
+    <span class="only-en">Call-for-codecs 2022: participate in annual video-codecs comparison!</span>
+    <span class="only-ru">Прием заявок на участие в ежегодном сравнении видеокодеков 2022</span>
+</a></li>
+<li><span class="news-date">16.05.22</span> <a href="/video/codec_comparison/2021/cloud_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2021 (Part 4, Cloud) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2021 (часть 4, Cloud)</span>
+</a></li>
+<li><span class="news-date">21.04.22</span> <a href="/video/codec_comparison/2021/4k_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2021 (Part 3, 4K & 10-bit) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2021 (часть 3, 4K & 10-bit)</span>
+</a></li>
+<li><span class="news-date">14.04.22</span> <a href="/video/codec_comparison/2021/ultrafast_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2021 (Part 5, Ultra-fast) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2021 (часть 5, Ultra-fast)</span>
+</a></li>
+<li><span class="news-date">14.03.22</span> <a href="/video/codec_comparison/2022" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparisons 2022 announced</span>
+    <span class="only-ru">Анонсированы сравнения видеокодеков-2022</span>
+</a></li>
+<li><span class="news-date">30.01.22</span> <a href="/vqmt" class="link-en">
+    <span class="only-en">MSU VQMT 14.0 BETA released</span>
+    <span class="only-ru">Выпущен MSU VQMT 14.0 BETA</span>
+</a></li>
+<li><span class="news-date">30.11.21</span> <a href="/video/codec_comparison/2021/subjective_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2021 (Part 2, Subjective) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2021 (часть 2, Subjective)</span>
+</a></li>
+<li><span class="news-date">30.10.21</span> <a href="/video/codec_comparison/2021/main_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2021 (Part 1, FullHD) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2021 (часть 1, FullHD)</span>
+</a></li>
+<li><span class="news-date">23.05.21</span> <a href="/vqmt" class="link-en">
+    <span class="only-en">MSU VQMT 13.1 released</span>
+    <span class="only-ru">Выпущен MSU VQMT 13.1</span>
+</a></li>
+<li><span class="news-date">01.05.21</span> <a href="/video/codec_comparison/2021/call_for_codecs.html" class="link-en">
+    <span class="only-en">Call-for-codecs 2021: participate in annual video codecs comparison</span>
+    <span class="only-ru">Прием заявок на участие в ежегодном сравнении видеокодеков 2021</span>
+</a></li>
+<li><span class="news-date">01.04.21</span> <a href="/video/codec_comparison/hevc_2020/4k_report.html" class="link-en">
+    <span class="only-en">Released 4K&10-bit MSU Video Codecs Comparison report</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков на 4K&10-bit видео</span>
+</a></li>
+<li><span class="news-date">23.03.21</span> <a href="/video/codec_comparison/hevc_2020/subjective_report.html" class="link-en">
+    <span class="only-en">Released Subjective MSU Video Codecs Comparison report</span>
+    <span class="only-ru">Выпущен отчет о субъективном сравнении видеокодеков</span>
+</a></li>
+<li><span class="news-date">20.02.21</span> <a href="/vqmt" class="link-en">
+    <span class="only-en">MSU VQMT 13 BETA and 12.1 released</span>
+    <span class="only-ru">Выпущен MSU VQMT 13 BETA и 12.1</span>
+</a></li>
+<li><span class="news-date">19.02.21</span> <a href="/video/codec_comparison/cloud_2020" class="link-en">
+    <span class="only-en">MSU Cloud Video Transcoding Benchmark: released new report</span>
+    <span class="only-ru">MSU Cloud Benchmark: выпущен отчет о сравнении облачных сервисов кодирования 2020</span>
+</a></li>
+<li><span class="news-date">08.12.20</span> <a href="/video/codec_comparison/hevc_2020/fpga_express_report.html" class="link-en">
+    <span class="only-en">Released report on FPGA&HW-accelerated video encoders</span>
+    <span class="only-ru">Выпущен отчет о сравнении FPGA&HW-accelerated видеокодеков</span>
+</a></li>
+<!-- <li><span class="news-date">07.12.20</span> <a href="/video/codec_comparison/hevc_2020/main_report.html" class="link-en">
+    <span class="only-en">MSU Video Codecs Comparison 2020 (Part 1, FullHD) report released!</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков-2020 (часть 1, FullHD)</span>
+</a></li> -->
+<!-- <li><span class="news-date">17.06.20</span> <a href="https://globalcompetition.compression.ru/" class="link-en" target="_blank">
+    <span class="only-en">Global Data Compression Competition: Call for lossless compressors. Win up to 50,000 EUR</span>
+    <span class="only-ru">Конкурс по сжатию без потерь с призовым фондом 50,000 EUR</span>
+</a></li>
+<li><span class="news-date">15.04.20</span> <a href="/video/codec_comparison/hevc_2020/call_for_codecs.html" class="link-en">
+    <span class="only-en">Call-for-codecs 2020: participate in annual video-codecs comparison!</span>
+    <span class="only-ru">Прием заявок на участие в ежегодном сравнении видеокодеков 2020</span>
+</a></li>
+<li><span class="news-date">30.03.20</span> <a href="/video/codec_comparison/hevc_2019/#hq_report_summary" class="link-en">
+    <span class="only-en">High-quality encoding report on new codecs (aom, rav1e, SVT, etc.) released</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков (aom, rav1e, SVT, etc.) в режиме кодирования высокого качества</span>
+</a></li>
+<li><span class="news-date">20.03.20</span> <a href="/video/codec_comparison/hevc_2019/#4k_report_summary" class="link-en">
+    <span class="only-en">4K content encoding report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении видеокодеков на 4K контенте</span>
+</a></li>
+<li><span class="news-date">01.02.20</span> <a href="/video/codec_comparison/cloud_2020" class="link-en">
+    <span class="only-en">Cloud Video Encoding Benchmark 2020 has started</span>
+    <span class="only-ru">Начато сравнение облачных сервисов кодирования видео 2020</span>
+</a></li>
+<li><span class="news-date">22.12.19</span> <a href="/video/codec_comparison/cloud_2019" class="link-en">
+    <span class="only-en">Report on 2019 cloud video encoding services comparison is released</span>
+    <span class="only-ru">Выпущен отчёт о сравнении облачных сервисов кодирования видео 2019</span>
+</a></li>
+<li><span class="news-date">22.10.19</span> <a href="/video/codec_comparison/cloud_2019" class="link-en">
+    <span class="only-en">Cloud transcoding services comparison report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении облачных сервисов сжатия видео</span>
+</a></li>
+<li><span class="news-date">22.10.19</span> <a href="/video/codec_comparison/hevc_2019" class="link-en">
+    <span class="only-en">Released FullHD and subjective reports on 2019 HEVC/AV1 video-codec comparison</span>
+    <span class="only-ru">Выпущены FullHD и субъективный отчеты о сравнении HEVC/AV1 кодеков 2019</span>
+</a></li> -->
+<!-- <li><span class="news-date">07.11.19</span> <a href="/video/quality_measure/video_measurement_tool.html" class="link-en">
+    <span class="only-en">Released VQMT 12.0 and BETA VQMT 11.2</span>
+    <span class="only-ru">Выпущены VQMT 12.0 и VQMT 11.2</span>
+</a></li>
+<li><span class="news-date">01.02.19</span> <a href="/video/codec_comparison/call_for_codecs_19.html" class="link-en">
+    <span class="only-en">Call for codecs: apply for 2019 MSU video codecs comparison</span>
+    <span class="only-ru">Прием заявок на участие в сравнении видеокодеков 2019 открыт</span>
+</a></li>
+<li><span class="news-date">04.09.18</span> <a href="/video/codec_comparison/hevc_2018#hq_report" class="link-en">
+    <span class="only-en">HEVC and AV1 high quality codecs comparison report released</span>
+    <span class="only-ru">Выпущен отчет о сравнении HEVC кодеков и AV1 2018</span>
+</a></li>
+<li><span class="news-date">24.01.17</span> <a href="/video/vqmt3d/report9/" class="link-en">
+    <span class="only-en">Report 9 on 3D-video Quality Analysis released</span>
+    <span class="only-ru">Выпущен девятый отчёт с оценкой качества 3D-фильмов</span>
+</a></li>
+<li class="only-ru"><span class="news-date">11.05.15</span> <a href="/video/vqmt3d/geektimes/" class="link-ru">
+    <span>Опубликована серия статей «Почему от 3D болит голова»</span>
+</a></li>
+<li><span class="news-date">14.12.14</span> <a href="/video/savam/" class="link-en">
+    <span class="only-en">Semiautomatic Visual-Attention Model released</span>
+    <span class="only-ru">Опубликована полуавтоматическая модель внимания и база записей движения глаз</span>
+</a></li>
+<li><span class="news-date">25.07.14</span> <a href="https://videomatting.com/" class="link-en">
+    <span class="only-en">The public objective benchmark for video-matting methods released</span>
+    <span class="only-ru">Выпущен открытый объективный бенчмарк по отделению полупрозрачных объектов от фона</span>
+</a></li> -->
+</ul>
+
+			</div>
+		</div>
+<!-- ========================================================== RIGHTCOL END ================== -->
+
+		<div id="content">
+
+
+<!-------------------------------------------------------------------------------->
+<!-------------------------------------------------------------------------------->
+
+
+<table width="100%"><tr><td align="right"><a href="index_en.html"><font size=-2 COLOR="#808080">ENGLISH</font></a></td></tr></table>
+
+
+<center>
+<h1><b> Проведенные в МГУ сравнения видеокодеков </b></h1>
+<h4><i>
+<a href="/video/">MSU Graphics & Media Lab (Video Group)</a>
+</i></h4>
+</center>
+
+<!-------------------------------------------------------------------------------->
+<!-------------------------------------------------------------------------------->
+
+
+<p>
+<font size=3>
+<p align="center"><a href="/video/codec_comparison/2022">Выпущен отчет о сравнении видеокодеков 2022 года <!--(часть 1, FullHD видео)--></a></p>
+</font>
+</p>
+
+<p>
+<hr size="1" noshade="" class="headerline"/>
+
+<h3>Проведенные сравнения</h3>
+<hr size="1" noshade="" class="headerline"/>
+
+
+</p>
+
+<p><font size = "3">
+
+<ul>
+<li><b> <a href="introduction.html">Введение в сравнение видеокодеков</a></b><br>
+Как и почему сравниваются кодеки? Как правильно это делать и какими инструментами 
+<br>необходимо для этого пользоваться?
+</li>
+<p>
+<li><b> <a href="codec_comparison.html">Старое сравнение видеокодеков (май 2003)</a></b><br>
+Большое сравнение кодеков по разным параметрам и на разных файлах.
+<br> Предназначено для тех, кто занимается использованием кодеков профессионально и полупрофессионально.
+</li>
+</p>
+<p>
+<li><b> <a href="lossless_codecs.html">Сравнение видеокодеков без потерь (октябрь 2004)</a></b><br>
+Самое большое сравнение кодеков без потерь - 15 кодеков в 3 цветовых пространствах. 
+<br>Указаны кодеки, применение которых приводит к потерям в "беcпотерьных" режимах. 
+<br>Указана суммарная степень сжатия.
+</li>
+</p>
+<p>
+<li><b> <a href="mpeg-4.html">Сравнение видеокодеков стандарта MPEG-4 SP/ASP (март 2005)</a></b><br>
+Сравниваются видеокодеки стандарта MPEG-4 SP/ASP.
+<br> Рассмотрены самые новые версии MPEG-4 кодеков, которые можно использовать 
+<br>для записи домашнего видео обычными пользователями.
+<br>Оценивается прогресс в развитии кодека DivX.
+</li>
+</p>
+<p>
+<li><b> <a href="jpeg2000_codecs_comparison.html">Сравнение кодеков изображений стандарта JPEG 2000  (сентябрь 2005)</a></b><br>
+Сравниваются кодеки изображений стандарта JPEG 2000 и кодек стандарта JPEG.
+<br>Демонстрируется преимущество нового стандарта, можно увидеть, как отличаются его разные реализации.
+</li>
+</p>
+<p>
+<li><b> <a href="mpeg-4_avc_h264.html">Первое ежегодное сравнение MPEG-4 AVC/H.264 видеокодеков (январь 2005)</a></b><br>
+Кодеки 6 компаний сравниваются между собой и с DivX. 
+<br>Tри кодека предоставлены специально для этого тестирования производителями. 
+<br>Предназначено для профессинальных пользователей и разработчиков кодеков.
+<ul>
+    <li><b> <a href="codecs_faq.html">FAQ первого сравнения видеокодеков стандарта MPEG-4 AVC/H.264</a></b><br>
+    Часто задаваемые вопросы по первому сравнению видеокодеков стандарта MPEG-4 AVC/H.264.
+    </li>
+    <li><b> <a href="h_264_comments.html">Избранные отзывы к первому сравнению видеокодеков стандарта MPEG-4 AVC/H.264</a></b><br>
+    Некоторые из приходящих к нам отзывов на первое сравнение видеокодеков стандарта MPEG-4 AVC/H.264.
+    </li>
+</ul>
+</li>
+</p>
+<p>
+<li><b> <a href="mpeg-4_avc_h264_2005.html">Второе ежегодное сравнение видеокодеков стандарта MPEG-4 AVC/H.264  (декабрь 2005)</a></b><br>
+Второе ежегодное сравнение H.264 кодеков. Сравниваются 8 кодеков.
+<br>Шесть кодеков предоставлены специально для этого тестирования производителями. 
+<br>Предназначено для профессинальных пользователей и разработчиков кодеков.
+    <ul>
+    <li><b> <a href="h264_2005_comparison_faq.html">FAQ второго сравнения видеокодеков стандарта MPEG-4 AVC/H.264</a></b><br>
+    Часто задаваемые вопросы по второму сравнению видеокодеков стандарта MPEG-4 AVC/H.264.
+    </li>
+    </ul>
+</li>
+<br>
+<li><b> <a href="subjective_codecs_comparison.html">Субъективное сравнение современных видеокодеков (февраль 2006)</a></b><br>
+Четыре популярных кодека сравниваются при помощи метода SAMVIQ 
+(человек ставит оценки последовательностям, не зная, какие кодеки были использованы для сжатия).
+</li>
+</p>
+<p>
+<li><b> <a href="mpeg-2_2006_ru.html">Сравнение декодеров стандарта MPEG-2 (май 2006)</a></b><br>
+Проводится сравнительная оценка качества работы 8 различных декодеров стандарта MPEG-2 при декодировании потоков с ошибками.
+Потоки с ошибками встречаются в спутниковом вещании и, в меньшей степени, при воспроизведении видео с DVD.
+</li>
+</p>
+
+<p>
+<li><b> <a href="wmp_codecs_comparison.html">Сравнение WMP и JPEG 2000 (октябрь 2006)</a></b><br>
+Ранее протестированные кодеки изображений стандарта JPEG 2000  
+(смотрите <A HREF="jpeg2000_codecs_comparison.html">Сравнение кодеков изображений стандарта JPEG 2000</A>) 
+сравниваются с новым стандартом WMP от Microsoft.
+</li>
+</p>
+
+<p>
+<li><b> <a href="mpeg-4_avc_h264_2006.html"> Третье ежегодное сравнение видеокодеков стандарта MPEG-4 AVC/H.264 (декабрь 2006)</a></b><br>
+Третье ежегодное сравнение кодеков H.264 стандарта. Помимо традиционного сравнения кодеков этого года, добавлено сравнение всех протестированных кодеков за последние 3 года.
+</li>
+</p>
+
+<p>
+<li><b> <a href="lossless_codecs_2007.html">Сравнение кодеков без потерь 2007 (март 2007)</a></b><br>
+Тестирование 16 современных видео кодеков без потерь, в котором оцениваются степень сжатия, скорость работы и возможности распараллеливания кодеков.
+</li>
+</p>
+
+<p>
+<li><b> <a href="mpeg-4_avc_h264_2007.html"> Четвертое ежегодное сравнение видеокодеков стандарта MPEG-4 AVC/H.264 (декабрь 2007)</a></b><br>
+Четвертое ежегодное сравнение кодеков H.264 стандарта. Помимо традиционного сравнения кодеков добавлен новый тип анализа с использованием синтетических последовательностей, также добавлены новые последовательности, новые кодеки, новые пресеты.
+</li>
+</p>
+
+<p>
+<li><b> <a href="x264_options_analysis_08.html"> Анализ опций видеокодека x264 стандарта MPEG-4 AVC/H.264 (декабрь 2008)</a></b><br>
+Проанализированы опции одного из лучших кодеков x264 на предмет поиска как оптимальных значений отдельных опций, так и лучших пресетов.
+</li>
+</p>
+
+<p>
+<li><b> <a href="codec_tuning_en.html">Анализ видеокодеков для компаний</a></b><br>
+Набор программных продуктов и возможные направления R&D проектов для компаний на тему тестирования и анализа видеокодеков.
+</li>
+</p>
+
+<p>
+<li><b> <a href="mpeg-4_avc_h264_2009.html"> Пятое сравнение видеокодеков стандарта MPEG-4 AVC/H.264 (май 2009)</a></b><br>
+Пятое сравнение кодеков H.264 стандарта. Добавлены новые типы анализа, также новые последовательности, новые кодеки, новые пресеты.
+</li>
+</p>
+
+<p>
+<li><b> <a href="h264_2010/"> Шестое сравнение видеокодеков стандарта MPEG-4 AVC/H.264 (май 2010)</a></b><br>
+Шестое сравнение кодеков H.264 стандарта. Добавлены новые типы анализа, также новые последовательности, новые кодеки, новые пресеты.
+</li>
+</p>
+
+<p>
+<li><b> <a href="h264_2011/"> Седьмое сравнение видеокодеков стандарта MPEG-4 AVC/H.264 (май 2011)</a></b><br>
+Седьмое сравнение кодеков H.264 стандарта. Добавлены новые типы анализа, также новые последовательности, новые кодеки, новые пресеты.
+Сравнение GPU кодеков. Новые метрики.
+</li>
+</p>
+
+<p>
+<li><b> <a href="h264_2012/">Восьмое сравнение видеокодеков стандарта MPEG-4 AVC/H.264 (май 2012)</a></b><br>
+Восьмое сравнение кодеков H.264 стандарта.  Добавлены новые последвоатльности в разделы HDTV и Видеоконференции. Также новые кодеки и пресеты, сравнение GPU кодеков на платформах Ivy Bridge и NVIDIA.
+</li>
+</p>
+
+<p>
+<li> <a href="hevc_2015/">Сравнение HEVC кодеков 2015 (октябрь 2015)</a><br>
+</li>
+</p>
+
+<p>
+<li> <a href="hevc_2016/">Сравнение HEVC кодеков 2016 (август 2016)</a><br>
+</li>
+</p>
+
+<p>
+<li> <a href="hevc_2017/">Сравнение HEVC кодеков 2017 (август 2017)</a><br>
+</li>
+</p>
+
+<p>
+<li> <a href="hevc_2018/">Сравнение HEVC/AV1 кодеков 2018 (сентябрь 2018)</a><br>
+</li>
+</p>
+
+<p>
+<li><b> <a href="hevc_2019/">Сравнение HEVC/AV1 кодеков 2019 (октябрь 2019)</a></b><br>
+</li>
+</p>
+
+<p>
+<li><b> <a href="hevc_2020/">Сравнение HEVC/AV1 кодеков 2020 (декабрь 2020)</a></b><br>
+</li>
+</p>
+
+
+</ul>
+</font></p>
+
+<div align="left">
+<p><table><tr>
+<td>Связаться с нами можно по адресу:&nbsp;</td>
+<td><img src="images/videocodec_testing_graphics_cs_msu_ru.gif"></td>
+</tr></table>
+</div>
+
+<font size=-1>
+
+<a href = "http://compression.ru/video/codec_comparison/index.html"><B>Полный список сравнений видео кодеков</B></a><br>
+
+<p>
+<B>Сравнения видео кодеков в МГУ:</B>
+</p>
+
+<ul>
+
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/introduction.html">Введение в сравнение видео кодеков</a>
+	</li>
+
+	<li>
+	    <a href="http://compression.ru/video/codec_comparison/lossless_codecs.html">Сравнение видео кодеков без потерь (октябрь 2004)</a>
+	</li>
+
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/mpeg-4.html">Сравнение MPEG-4 SP/ASP кодеков (март 2005)</a>
+	</li>
+
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/jpeg2000_codecs_comparison.html">Сравнение кодеков изображений стандарта JPEG 2000  (сентябрь 2005)</a>
+	</li>
+
+	<li>
+	    <a href="http://compression.ru/video/codec_comparison/mpeg-4_avc_h264.html">Первое ежегодное сравнение видео кодеков стандарта MPEG-4 AVC/H.264 (январь 2005)</a>
+	</li>
+
+	<ul>
+		<li>
+			<a href="http://compression.ru/video/codec_comparison/codecs_faq.html">FAQ первого ежегодного сравнения видео кодеков стандарта MPEG-4 AVC/H.264</a>
+		</li>
+
+		<li> <a href="http://compression.ru/video/codec_comparison/h_264_comments.html">Избранные комментарии на первое сравнение видео кодеков стандарта  MPEG-4 AVC/ H.264</a>
+		</li>
+	</ul>
+
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/mpeg-4_avc_h264_2005.html">Второе ежегодное сравнение видео кодеков стандарта MPEG-4 AVC/H.264 (декабрь 2005)</a> <font color="red" size=-1><b></b></font>
+	</li>
+
+	<ul>
+		<li>
+			<a href="http://compression.ru/video/codec_comparison/h264_2005_comparison_faq.html">FAQ второго ежегодного сравнения видео кодеков стандарта MPEG-4 AVC/H.264</a> <font color="red" size=-1><b></b></font>
+		</li>
+	</ul>
+
+	<li>
+		<a href="http://www.compression.ru/video/codec_comparison/subjective_codecs_comparison.html">Субъективное сравнение современных видео кодеков (февраль 2006)</a></li>
+
+	<li>
+		<a href="http://www.compression.ru/video/codec_comparison/mpeg-2_2006_ru.html">Сравнение декодеров стандарта MPEG-2 (май 2006)</a>
+	</li>
+
+	<li>
+		<a href="http://www.compression.ru/video/codec_comparison/wmp_codecs_comparison.html"> Сравнение WMP и JPEG2000 (октябрь 2006)</a>
+	</li>
+	
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/mpeg-4_avc_h264_2006.html">Третье сравнение кодеков MPEG-4 AVC/H.264 (декабрь 2006)</a> 
+        <font color="red" size=-1><b>(Все версии бесплатно!)</b></font> 
+	</li>
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/lossless_codecs_2007.html">Сравнение видео кодеков без потерь 2007 (март 2007)</a>
+	</li>
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/mpeg-4_avc_h264_2007.html">Четвертое сравнение кодеков MPEG-4 AVC/H.264 (декабрь 2007)</a>
+        <font color="red" size=-1><b>(Все версии бесплатно!)</b></font> 
+	</li>
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/x264_options_analysis_08.html">Анализ опций видеокодека x264 стандарта MPEG-4 AVC/H.264 (декабрь 2008)</a>
+	</li>
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/codec_analysis.html"><B>Анализ видеокодеков для компаний</B></a>
+        <FONT SIZE=-1>(англ.)</FONT>
+	</li>
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/mpeg-4_avc_h264_2009.html">Пятое сравнение кодеков MPEG-4 AVC/H.264 (май 2009)</a>
+        <FONT SIZE=-1>(англ.)</FONT>
+        <font color="red" size=-1><b>(Все версии бесплатно!)</b></font> 
+	</li>
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/h264_2010/">Шестое сравнение кодеков MPEG-4 AVC/H.264 (май 2010)</a>
+	</li>
+	<li>
+		<a href="http://compression.ru/video/codec_comparison/h264_2011/">Седьмое сравнение кодеков MPEG-4 AVC/H.264 (май 2011)</a>
+	</li>
+	<li>	<a href="http://compression.ru/video/codec_comparison/h264_2012/">Восьмое сравнение кодеков MPEG-4 AVC/H.264 (май 2011)</a></li>
+	<li>	<a href="http://compression.ru/video/codec_comparison/HEVC_2015/">Десятое сравнение кодеков (HEVC-2015) (октябрь 2015)</a> </li>
+	<li>	<a href="http://compression.ru/video/codec_comparison/HEVC_2016/">Одиннадцатое сравнение кодеков (HEVC-2016) (август 2016)</a>
+	<li>	<a href="http://compression.ru/video/codec_comparison/HEVC_2017/">Двенадцатое сравнение кодеков (HEVC-2017) (август 2017)</a> </li>
+	<li>	<a href="http://compression.ru/video/codec_comparison/HEVC_2018/">Тринадцатое сравнение кодеков (HEVC-2018) (сентябрь 2018)</a></li>
+	<li>	<a href="http://compression.ru/video/codec_comparison/HEVC_2019/">Четырнадцатое сравнение кодеков (HEVC-2019) (сентябрь 2019)</a></li>
+	<li>	<a href="http://compression.ru/video/codec_comparison/cloud_2019/">Сравнение сервисов облачного кодирование 2019 (декабрь 2019)</a></li>
+	<li>	<a href="http://compression.ru/video/codec_comparison/HEVC_2020/">Пятнадцатое сравнение кодеков (HEVC-2020) (декабрь 2020)</a></li>
+	<li>	<a href="http://compression.ru/video/codec_comparison/2021/">Шестнадцатое сравнение кодеков (декабрь 2021)</a></li>
+	<li>	<a href="http://compression.ru/video/codec_comparison/2022/">Семнадцатое сравнение кодеков (декабрь 2022)</a></li>
+
+</ul>
+</font>
+
+
+<hr size="1" noshade="" class="headerline"/>
+
+<h3>Другие материалы</h3>
+<hr size="1" noshade="" class="headerline"/>
+
+    
+
+
+<!-- VIDEO_MENU BEGIN  -->
+
+<font size=+1><b><a href="/video/index_ru.htm">Материалы по видео</a></b></font>
+
+<p>
+<table BORDER="0" CELLPADDING="0" CELLSPACING="0" class="menu_bottom">
+  
+  <tr valign="TOP">
+  <td>
+
+      <font size="+1"><b><a href="/video/3d_video_ru.htm">3D и стереовидео</a></b></font><br>
+  <font size="-1">
+    Проекты по анализу и обработке 3D/стереовидео<br/>
+      <font size="-1">
+        <ul>
+          <li>
+            <b><a href="/video/vqmt3d/geektimes/">Серия статей &laquo;Почему от 3D болит голова&raquo;</a></b>
+            <font color="red" size="-2"><b>(New!)</b></font>
+            <ul>
+              <li>
+                <a href="/video/vqmt3d/geektimes/part1.html">Часть 1 : Недостатки оборудования</a>
+              </li><li>
+                <a href="/video/vqmt3d/geektimes/part2.html">Часть 2 : Дискомфорт из-за качества видео</a> 
+              </li><li>
+                <a href="/video/vqmt3d/geektimes/part3.html">Часть 3 : Перепутанные ракурсы</a>
+              </li><li>
+                <a href="/video/vqmt3d/geektimes/part4.html">Часть 4 : Параллакс</a>
+              </li><li>
+                <a href="/video/vqmt3d/geektimes/part5.html">Часть 5 : Геометрические искажения в стерео</a>
+              </li><li>
+                <a href="/video/vqmt3d/geektimes/part6.html">Часть 6 : Искажения цвета</a>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <b><a href="/video/vqmt3d">Анализ качества 3D фильмов</a></b>
+            <font color="red" size="-2"><b>(New!)</b></font>
+          </li>
+          <li>
+            <a href="/video/msu_device_testing/index.html">Измерение характеристик 3D дисплеев</a>
+          </li>
+          <li>
+            <a href="http://videomatting.com/">Матирование видео</a>
+          </li>
+          <li><a href="/video/3d_display_video/index.html">Создание видео для 3D дисплее</a></li>
+          <li><a href="/video/3d_display_video/3d_video_capturing.html">Съёмка видео для 3D дисплеев</a></li>
+          <li><a href="/video/3d_display_video/depth_map_generation.html">Создание карт глубины для 3D видео</a></li>
+        </ul>
+      </font><br />
+      
+    <font size="+1"><b><a href="/video/quality_measure/index.html">Метрики качества видео </a></b></font><br>
+   <font size="-1">
+    Различные реализации объективных и субъективных метрик качества видео.
+   <ul> 
+    <li><a href="/video/quality_measure/video_measurement_tool.html"><b>MSU Video Quality Measurement Tool</b> 
+     - объективные метрики для сравнения кодеков и видеофильтров.</a>
+     
+     <font color="red" size="-2"><b>(New!)</b></font>
+    <ul>
+     <li><a href="/video/quality_measure/info.html">Implemented metrics short info: PSNR, Delta, 
+       MSAD, MSE, SSIM, VQM, MSU Blurring Metric, MSU Blocking Metric</a>
+     <li><a href="/video/quality_measure/vqmt_why_update.html">Why update</a>
+     <li><a href="/video/quality_measure/vqmt_download.html#start">Download & Purchase</a>
+     <li><a href="/video/quality_measure/faq.html">MSU VQMT FAQ</a>
+    </ul> 
+    <li><a href="/video/quality_measure/perceptual_video_quality_tool.html"><b>MSU Perceptual Quality Metric</b> - несколько метрик для измерения субъективного качества видео</a>
+     <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+     <ul>
+     <li><a href="/video/quality_measure/subjective_metrics_info.html">Краткая информация по реализованным метрикам: 
+         ITU-R BT.500-11: DSIS, DSCQS I & II, SCACJ;
+         EBU: SAMVIQ; MSUCQE</a>
+     <li><a href="/video/quality_measure/msu_pvq_faq.html">MSU PVQ Metric Tool FAQ</a>
+    </ul> 
+   </ul> 
+   </font>
+   </td>
+  <td> <font size="+1"><b><a href="/video/codec_comparison/index.html">Сравнения кодеков</a></b></font><br>
+  <font size="-1">
+    Объективные и субъективные сравнения качества<br>
+    видеокодеков и кодеков изображений.<br/>
+    <ul>
+    <li><a href="/video/codec_comparison/2022"><font size="+1"><b>Ежегодное сравнение видеокодеков 2022</b></font></a>
+    <li><a href="/video/codec_comparison/2021"><font size="+1"><b>Ежегодное сравнение видеокодеков 2021</b></font></a>
+    <li><a href="/video/codec_comparison/hevc_2020"><font size="+1"><b>Ежегодное сравнение видеокодеков 2020</b></font></a>
+    <li><a href="/video/codec_comparison/cloud_2020"><font size="+1"><b>MSU Cloud Benchmark 2020</b></font></a>
+    <li><a href="/video/codec_comparison/cloud_2019"><b>Сравнение сервисов облачного кодирования видео</b></a>
+    <li><a href="/video/codec_comparison/hevc_2019"><b>Сравнение кодеков стандарта HEVC/AV1 - 2019</b></a>
+    <li><a href="/video/codec_comparison/hevc_2018">Сравнение кодеков стандарта HEVC/AV1 - 2018</a> 
+    <li><a href="/video/codec_comparison/hevc_2017">Сравнение кодеков стандарта HEVC/AV1 - 2017</a> 
+    <li><a href="/video/codec_comparison/hevc_2016">Сравнение кодеков стандарта HEVC - 2016</a> 
+
+    <li><a href="/video/codec_comparison/hevc_2015">Сравнение кодеков стандарта HEVC - 2015</a> 
+
+  <li><a href="/video/codec_comparison/h264_2012/">8-е сравнение видеокодеков MPEG4-AVC/H.264</a>
+  <li><a href="/video/codec_comparison/h264_2011/">7-е сравнение видеокодеков MPEG4-AVC/H.264</a>
+  <li><a href="/video/codec_comparison/h264_2010/">6-е сравнение видеокодеков MPEG4-AVC/H.264</a>
+  <li><a href="/video/codec_comparison/mpeg-4_avc_h264_2009.html">5-е сравнение видеокодеков MPEG4-AVC/H.264</a>
+   <li><a href="/video/codec_comparison/codec_analysis.html"><B>Анализ видеокодеков для компаний</B></a> <FONT SIZE=-1>(англ.)</FONT></li>
+     
+   <!--li><a href="/video/codec_comparison/call_for_codecs_09.html"><font color="red">Call for MPEG-4 AVC/H.264 codecs 2009</a> </font></li-->
+    <li><a href="/video/codec_comparison/x264_options_analysis_08.html">Анализ опций видеокодека x264 стандарта MPEG-4 AVC/H.264</a>
+     
+    <li><a href="/video/codec_comparison/mpeg-4_avc_h264_2007.html">4-е ежегодное сравнение видеокодеков MPEG4-AVC/H.264</a>
+     <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+    <li><a href="/video/codec_comparison/lossless_codecs_2007.html">Сравнение кодеков без потерь 2007</a>
+    <li><a href="/video/codec_comparison/mpeg-4_avc_h264_2006.html">3-е ежегодное сравнение видеокодеков MPEG4-AVC/H.264</a>
+    <li><a href="/video/codec_comparison/wmp_codecs_comparison.html">Windows Meda Photo vs JPEG-2000</a>
+    <li><a href="/video/codec_comparison/mpeg-2_2006_ru.html">Сравнение декодеров стандарта MPEG-2 на потоках с ошибками</a>
+     <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+    <li><a href="/video/codec_comparison/subjective_codecs_comparison.html">Субъективное сравнение современных видеокодеков</a>
+     <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+    <li><a href="/video/codec_comparison/mpeg-4_avc_h264_2005.html">Второе ежегодное сравнение видеокодеков стандарта MPEG-4 AVC/H.264</a>
+     <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+    <ul> 
+     <li><a href="/video/codec_comparison/h264_2005_comparison_faq.html">FAQ 2-го сравнения H.264-x</a>
+    </ul> 
+    <li><a href="/video/codec_comparison/mpeg-4_avc_h264.html">Первое ежегодное сравнение видеокодеков стандарта MPEG-4 AVC/H.264</a>
+    <ul> 
+     <li><a href="/video/codec_comparison/codecs_faq.html">FAQ 1-го сравнения H.264-x</a>
+    </ul> 
+    <li><a href="/video/codec_comparison/jpeg2000_codecs_comparison.html">Сравнение 9 кодеров JPEG 2000</a>
+     <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+    <li><a href="/video/codec_comparison/lossless_codecs.html">Сравнение видеокодеков без потерь 2004</a>
+    <li><a href="/video/codec_comparison/mpeg-4.html">Сравнение кодеков MPEG-4 SP/ASP</a>
+     <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+    <li><a href="/video/codec_comparison/codec_comparison.html">Сравнение видеокодеков (старое)</a></li>
+
+    <br>См. также (старые) сравнения аудиокодеков:
+    <li><a href="/audio/codec_comparison/index.html">Сравнение аудиокодеков на 32 kbps</a>
+    <li><a href="/audio/codec_comparison/time_timefreq_comparison.html">Сводное тестирование 10 кодеков по разным метрикам ("тест метрик")</a>
+    </ul> 
+  </font>
+ </td>
+  </tr>
+
+  <tr valign="TOP">
+    <td width="50%">
+      <font size="+1"><b> <a href="/video/public_filters_ru.htm">Общедоступные видеофильтры </a></b></font><br>
+      <font size="-1">
+      Доступные фильтры для <b>VirtualDub и AviSynth</b>. Обычно мы разрабатываем семейства фильтров.
+      Свяжитесь с нами для получения версий, оптимизированных под ASIC/FPGA/DSP.
+      <ul>
+       <li><a href="/video/cartoon_restore/index.htm">MSU Cartoon Restore</a>
+       
+       <li><a href="/video/noise_estimation/index.html">MSU Noise Estimation</a>
+       <li><a href="/video/frame_rate_conversion/index_msu.html">MSU Frame Rate Conversion</a>
+       <li><a href="/video/image_restoration/index.html">MSU Image Restoration</a>
+      <li><a href="/video/denoising/index.html">MSU Denoising</a>
+       <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+      <li><a href="/video/old_cinema/index.html">MSU Old Cinema</a>
+      <li><a href="/video/deblocking/index.html">MSU Deblocking</a>
+       <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+      <li><a href="/video/smart_contrast/index.html">MSU Smart Brightness and Contrast</a>
+       <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+      <li><a href="/video/smart_sharpen/index.html">MSU Smart Sharpen</a>
+       <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+      <li><a href="/video/noise_generation/index.html">MSU Noise generation</a></b>
+      <li><a href="/video/noise_estimation/index.html">MSU Noise estimation</a>
+      <li><a href="/video/motion_estimation/index.html">MSU Motion Estimation Information</a>
+      <li><a href="/video/subtitles_removal/index.html">MSU Subtitles removal</a>
+       
+      <li><a href="/video/logo_removal/index.html">MSU Logo removal</a>
+       <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+      <li><a href="/video/deflicker/index.html">MSU Deflicker</a>
+       <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+      <li><a href="/video/old_film_recover/field_shift.html">MSU Field Shift Fixer AviSynth plug-in</a>
+      <li><a href="/video/stego_video/index.html">MSU StegoVideo</a>
+      <li><a href="/video/cartoonizer/index.html">MSU Cartoonizer</a>
+       <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+      <li><a href="/video/deblocking/smartdeblocking.html">MSU SmartDeblocking</a>
+       <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+      <li><a href="/video/color_enhancement/index.html">MSU Color Enhancement</a>
+      <li><a href="/video/color_enhancement/old_color_ru.html">MSU Old Color Restoration</a>
+      <li><a href="/video/tv_commercial_detector/index.html">MSU TV Commercial Detector</a>
+       
+      <li><b><a href="/video/filters_faq.html">Частые вопросы</a></b>
+       <font color="#44AA44" size="-2"><b>(Прочти меня!)</b></font>
+      <li><b><a href="/video/video_statistics_ru.htm">Статистика фильтров</a></b>
+      </ul> 
+      </font>
+   </td>
+
+    <td  width="50%">      
+  <font size="+1"><b> <a href="/video/filters_ru.htm">Коммерческие видеофильтры</a></b></font><br>
+  <font size="-1">
+    Мы работаем с <b>Intel, Samsung, Real Networks и другими компаниями</b> 
+    над адаптацией наших фильтров для специфических видеопотоков и аппаратного обеспечения,
+    такого как телевизоры, видеокарты и т.д. Свяжитесь с нами, если Вам нужна лицензия на такие фильтры.
+    <ul>
+     <li><a href="/video/3d_display_video/index.html">3D Displays Video Generation</a>
+     
+     <li><a href="/video/3d_display_video/3d_video_capturing.html">3D Displays 
+     Video Capturing</a>
+     
+     <li><a href="/video/3d_display_video/depth_map_generation.html">Stereo Video 
+     Depth Map Generation</a>
+     
+     <li><a href="/video/segmentation/index.html">Automatic Objects Segmentation</a>
+     <li>Semiautomatic Objects Segmentation
+     <li><a href="/video/frame_rate_conversion/index_frcn.html">New Frame Rate Conversion</a>
+     <li><a href="/video/deinterlacing/index.html">New Deinterlacer</a>
+     <li><a href="/video/deinterlacing_samsung/index.html">MSU-Samsung Deinterlacing Project</a>
+     <li><a href="/video/intel_dtv/index.html">Digital TV Signal Enhancement</a>
+     <li><a href="/video/old_film_recover/index.html">Old Film Recovery</a>
+     <li><a href="/video/tuner_tv_restore/index.html">Tuner TV Restore</a>
+     <li><a href="/video/panorama/index.html">Panorama</a>
+     <li><a href="/video/super_resolution/video2photo.html">Video2Photo</a>
+     <li><a href="/video/super_resolution/super_resolution.html">SuperResolution</a>
+     <li><a href="/video/super_resolution/super_precision.html">SuperPrecision</a>
+     <li><a href="/video/resampling/index.html">High quality image and video resampling</a>
+     <li><a href="/video/frame_rate_conversion/index.html">Frame Rate Conversion</a>
+     <li><a href="/video/motion_phase/index.html">Motion Phase filter</a>
+     <li><a href="/video/deshaker/index.html">Deshaker (video stabilization)</a>
+     <li><a href="/video/grain_degrain/index.html">Film Grain/Degrain filter</a>
+     <li>Deblurring filter
+     <li>Fast/Hi-Fi Face Detection 
+    </ul> 
+    </font>
+  </td>
+  </tr>
+
+  <tr valign="TOP">
+  <td><font size="+1"><b><a href="/video/video_codecs_ru.htm">Проекты по видеокодекам</a></b></font><br>
+  <font size="-1">
+    Проекты по исследованию и разработке видеокодеков.
+    <ul> 
+    <li><a href="/video/ls-codec/index.html">MSU Lossless Video Codec</a>
+     <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+    <li><a href="/video/ls-codec/screen_capture_codec.html">MSU Screen Capture Lossless Codec</a>
+     <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+    <li>MSU MPEG-2 Video Codec
+    <li><a href="/video/x264/x264_improvement_ru.html">Улучшение кодека x264</a>
+    <li><a href="/video/x264/x264_faq_ru.html">FAQ по кодеку x264</a>
+    </ul> 
+   </font>
+  </td>
+
+ <td><font size="+1"><b><a href="/video/other_ru.htm">Разное</a></b></font><br>
+  <font size="-1">
+  Другая информация.
+   <ul> 
+    <li><a href="/dv/course/index.htm">Около 1000 слайдов лекций курса "Методы сжатия и обработки медиаданных"</a>
+    <font color="#44AA44" size="-2"><b>(Top!)</b></font>
+    <li><a href="http://courses.graphicon.ru/main/mdc">Страница курса на ВМиК МГУ "Методы сжатия и обработки видео"</a>
+    <li><a href="/video/course/">Подкасты курса "Методы сжатия и обработки видео" (некоторые лекции)</a>
+    <li><a href="/video/seminar/"><font color="red">Лучшие доклады семинара</font> видеогруппы (ускорение на GPU, 3D видео, оптический поток и т.д.)</a>
+    <li><a href="http://graphics.cs.msu.ru/courses/mdc/about/index.html">Страница старого курса на ВМиК МГУ "Методы сжатия данных"</a> <br><br>
+    <li><a href="/video/crazy_gallery/index.html">Crazy gallery (приколы с фильтрами :-)</a>
+    <li><a href="/video/license.txt">Лицензия на ПО Видеогруппы</a>
+    </ul> 
+   </font>
+  </td>
+ </tr>
+
+  <tr valign="TOP">
+  <td> <font size="+1"><b><a href="/download/index.html">Статьи по темам</a></b></font><br>
+  <font size="-1">
+     <ul>
+      <li><a href="/download/video_interlacing.html">    Фильтрация: Deinterlacing</a>
+      <li><a href="/download/video_denoising.html">      Фильтрация: Шумоподавление</a>
+      <li><a href="/download/video_preprocessing.html">  Фильтрация: Предобработка видеопотока</a>
+      <li><a href="/download/video_post-processing.html">Фильтрация: Постобработка видеопотока</a>
+      <li><a href="/download/video_2-3pulldown.html">    Фильтрация: Преобразование частоты кадров</a>
+      <li><a href="/download/video_resampling.html">     Фильтрация: Масштабирование видео</a>
+      <li><a href="/download/video_dct.html">            Преобразования: Использование DCT и альтернативных преобразований</a>
+      <li><a href="/download/video_quantization.html">   Преобразования: Квантование </a>
+      <li><a href="/download/video_wavelet.html">        Преобразования: Wavelet для видео </a>
+      <li><a href="/download/video_bitratecontrol.html"> Bitrate: Управление битрейтом </a>
+      <li><a href="/download/video_lowbitrate.html">     Bitrate: Сильное сжатие (Low Bitrate)</a>
+      <li><a href="/download/video_metrics.html">        Метрики: Общие сведения и метрики для изображений </a>
+      <li><a href="/download/video_quality_measure.html">Метрики: Измерение качества видео </a>
+     </ul>
+  </font>
+  </td>
+
+  <td> <br>
+  <font size="-1">
+     <ul>
+      <li><a href="/download/video_hardware.html">       Hardware: Аппаратное ускорение видео</a>
+      <li><a href="/download/video_displays.html">       Hardware: Особенности работы на разных дисплеях</a>
+      <li><a href="/download/video_entropy_coding.html"> Энтропийное сжатие и видео</a>
+      <li><a href="/download/video_motioninfo.html">     Компенсация движения</a>
+      <li><a href="/download/video_format_conversion.html">Преобразование форматов видео</a>
+      <li><a href="/download/video_indexing_segmentation.html">Сегментация и индексирование видео</a>
+      <li><a href="/download/video_streaming.html">      Потоковая передача видео</a>
+      <li><a href="/download/video_stereoscopic.html">   Стереоскопичеcкое и 3D видео</a>
+      <li><a href="/download/video_objects.html">        "Объектный" подход к видео</a>
+      <li><a href="/download/video_general.html">Разное</a>
+     </ul>
+  </font>
+  </td>
+
+ </tr>
+
+</table>
+
+<hr size="1">
+<!--LiveInternet counter--><script type="text/javascript"><!--
+document.write("<a href='http://www.liveinternet.ru/click' "+
+"target=_blank><img src='//counter.yadro.ru/hit?t17.10;r"+
+escape(document.referrer)+((typeof(screen)=="undefined")?"":
+";s"+screen.width+"*"+screen.height+"*"+(screen.colorDepth?
+screen.colorDepth:screen.pixelDepth))+";u"+escape(document.URL)+
+";"+Math.random()+
+"' alt='' title='LiveInternet: показано число просмотров за 24"+
+" часа, посетителей за 24 часа и за сегодня' "+
+"border='0' width='88' height='31'><\/a>")
+//--></script><!--/LiveInternet-->
+
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-15281510-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+
+<p>
+<font size=-1>Смотрите также материалы:<br>
+  - <a href="/download/color.html">По цветовым пространствам</a><br>
+  - <a href="/download/jpeg.html">По JPEG</a><br>
+  - <a href="/download/jpeg2000.html">По JPEG-2000</a><br>
+</font>
+<br>
+
+<!-- VIDEO_MENU END  -->
+
+</div> <!-- content -->
+
+</div> <!-- wrapper-middle -->
+</div> <!-- wrapper-top -->
+		
+		<div id="footer">
+			<p><a href="mailto:video@compression.ru" target="_blank">Оставьте ваши замечания, предложения, мнения!</a></p>
+			<p>&copy; 2001&ndash;2008 <a href="/about/#team">Д.&nbsp;Ватолин, А.&nbsp;Ратушняк, М.&nbsp;Смирнов, В.&nbsp;Юкин, Е.&nbsp;Шелвин, Д.&nbsp;Шкарин и&nbsp;другие</a> Текст, состав.</p>
+			<p>&copy; 2008&ndash;2011 <a href="/about/#team">Д.&nbsp;Ватолин, М.&nbsp;Смирнов и&nbsp;другие</a> Текст, состав.</p>
+			<p>&copy; 2005&ndash;2026 Видеогруппа <a href="http://graphics.cs.msu.ru/" target="_blank">Лаборатории компьютерной графики и мультимедиа</a></p>
+		</div>
+		
+<!-- now using Google Tag Manager. No Analytics at this place -->
+
+</body>
+</html>

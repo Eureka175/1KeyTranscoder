@@ -1,0 +1,590 @@
+# Source: https://forum.selur.net/thread-4229-post-27820.html?mode=threaded
+# Fetched: 2026-08-29 17:12:46 +08:00
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><!-- start: showthread -->
+<html xml:lang="en" lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>Video seeking issues for AV1 encoded files</title>
+<!-- start: headerinclude -->
+<link rel="alternate" type="application/rss+xml" title="Latest Threads (RSS 2.0)" href="https://forum.selur.net/syndication.php" />
+<link rel="alternate" type="application/atom+xml" title="Latest Threads (Atom 1.0)" href="https://forum.selur.net/syndication.php?type=atom1.0" />
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta http-equiv="Content-Script-Type" content="text/javascript" />
+<script type="text/javascript" src="https://forum.selur.net/jscripts/jquery.js?ver=1823"></script>
+<script type="text/javascript" src="https://forum.selur.net/jscripts/jquery.plugins.min.js?ver=1821"></script>
+<script type="text/javascript" src="https://forum.selur.net/jscripts/general.js?ver=1827"></script>
+
+<link type="text/css" rel="stylesheet" href="https://forum.selur.net/cache/themes/theme1/global.min.css?t=1780128224" />
+<link type="text/css" rel="stylesheet" href="https://forum.selur.net/cache/themes/theme1/star_ratings.min.css?t=1780128224" />
+<link type="text/css" rel="stylesheet" href="https://forum.selur.net/cache/themes/theme1/showthread.min.css?t=1780128224" />
+<link type="text/css" rel="stylesheet" href="https://forum.selur.net/cache/themes/theme1/css3.min.css?t=1780128224" />
+
+<script type="text/javascript">
+<!--
+	lang.unknown_error = "An unknown error has occurred.";
+	lang.confirm_title = "Please Confirm";
+	lang.expcol_collapse = "[-]";
+	lang.expcol_expand = "[+]";
+	lang.select2_match = "One result is available, press enter to select it.";
+	lang.select2_matches = "{1} results are available, use up and down arrow keys to navigate.";
+	lang.select2_nomatches = "No matches found";
+	lang.select2_inputtooshort_single = "Please enter one or more character";
+	lang.select2_inputtooshort_plural = "Please enter {1} or more characters";
+	lang.select2_inputtoolong_single = "Please delete one character";
+	lang.select2_inputtoolong_plural = "Please delete {1} characters";
+	lang.select2_selectiontoobig_single = "You can only select one item";
+	lang.select2_selectiontoobig_plural = "You can only select {1} items";
+	lang.select2_loadmore = "Loading more results&hellip;";
+	lang.select2_searching = "Searching&hellip;";
+
+	var templates = {
+		modal: '<div class=\"modal\">\
+	<div style=\"overflow-y: auto; max-height: 400px;\">\
+		<table border=\"0\" cellspacing=\"0\" cellpadding=\"5\" class=\"tborder\">\
+			<tr>\
+				<td class=\"thead\"><strong>__title__</strong></td>\
+			</tr>\
+			<tr>\
+				<td class=\"trow1\">__message__</td>\
+			</tr>\
+			<tr>\
+				<td class=\"tfoot\">\
+					<div style=\"text-align: center\" class=\"modal_buttons\">__buttons__</div>\
+				</td>\
+			</tr>\
+		</table>\
+	</div>\
+</div>',
+		modal_button: '<input type=\"submit\" class=\"button\" value=\"__title__\"/>&nbsp;'
+	};
+
+	var cookieDomain = ".forum.selur.net";
+	var cookiePath = "/";
+	var cookiePrefix = "";
+	var cookieSecureFlag = "1";
+	var deleteevent_confirm = "Are you sure you want to delete this event?";
+	var removeattach_confirm = "Are you sure you want to remove the selected attachment from this post?";
+	var loading_text = 'Loading. <br />Please Wait&hellip;';
+	var saving_changes = 'Saving changes&hellip;';
+	var use_xmlhttprequest = "1";
+	var my_post_key = "a5e4e94e5a4c5346e65f0f3073180877";
+	var rootpath = "https://forum.selur.net";
+	var imagepath = "https://forum.selur.net/images";
+  	var yes_confirm = "Yes";
+	var no_confirm = "No";
+	var MyBBEditor = null;
+	var spinner_image = "https://forum.selur.net/images/spinner.gif";
+	var spinner = "<img src='" + spinner_image +"' alt='' />";
+	var modal_zindex = 9999;
+// -->
+</script>
+<!-- end: headerinclude -->
+<script type="text/javascript">
+<!--
+	var quickdelete_confirm = "Are you sure you want to delete this post?";
+	var quickrestore_confirm = "Are you sure you want to restore this post?";
+	var allowEditReason = "1";
+	var thread_deleted = "0";
+	var visible_replies = "5";
+	lang.save_changes = "Save Changes";
+	lang.cancel_edit = "Cancel Edit";
+	lang.quick_edit_update_error = "There was an error editing your reply:";
+	lang.quick_reply_post_error = "There was an error posting your reply:";
+	lang.quick_delete_error = "There was an error deleting your reply:";
+	lang.quick_delete_success = "The post was deleted successfully.";
+	lang.quick_delete_thread_success = "The thread was deleted successfully.";
+	lang.quick_restore_error = "There was an error restoring your reply:";
+	lang.quick_restore_success = "The post was restored successfully.";
+	lang.editreason = "Edit Reason";
+	lang.post_deleted_error = "You can not perform this action to a deleted post.";
+	lang.softdelete_thread = "Soft Delete Thread";
+	lang.restore_thread = "Restore Thread";
+// -->
+</script>
+<!-- jeditable (jquery) -->
+<script type="text/javascript" src="https://forum.selur.net/jscripts/report.js?ver=1820"></script>
+<script src="https://forum.selur.net/jscripts/jeditable/jeditable.min.js"></script>
+<script type="text/javascript" src="https://forum.selur.net/jscripts/thread.js?ver=1838"></script>
+<meta name="description" content="Muxing was done with ffmpeg: ffmpeg -y -r 100/1 -i &quot;/media/pawel/WINDOWS_11/_VIDEO RECODE/2025-10-11@10_42_08_1410_04.av1&quot; -i &quot;/media/pawel/WINDOWS_11/_VIDEO RECODE/iId_1_aid_0_2025-10-11@10_42_08_141" />
+<link rel="canonical" href="https://forum.selur.net/thread-4229.html" />
+</head>
+<body>
+	<!-- start: header -->
+<!-- start: cookielaw_header -->
+<script type="text/javascript">
+jQuery(document).ready(function() {
+	jQuery('#cookies .cookielaw_disallow').click(function() {
+		if(!confirm('Are you sure you want to disallow cookies?'+'\r\n\r\n'+'It will mean you will be unable to log in to the forum, and will restrict functionality when browsing as a guest.'))
+		{
+			return false;
+		}
+	});
+});
+</script>
+<div id="cookies" style="width: 100%; text-align: left; margin-bottom: 10px;">
+	<form action="https://forum.selur.net/misc.php?action=cookielaw_change" method="post">
+		<table border="0" cellspacing="0" cellpadding="5" class="tborder">
+			<tr>		
+				<td class="thead"><strong>This forum uses cookies</strong></td>
+			</tr>
+			<tr>		
+				<td class="trow1">This forum makes use of cookies to store your login information if you are registered, and your last visit if you are not. Cookies are small text documents stored on your computer; the cookies set by this forum can only be used on this website and pose no security risk. Cookies on this forum also track the specific topics you have read and when you last read them. Please confirm whether you accept or reject these cookies being set.<br /><br />A cookie will be stored in your browser regardless of choice to prevent you being asked this question again. You will be able to change your cookie settings at any time using the link in the footer.</td>
+			</tr>
+			<tr>		
+				<td class="tfoot"><div class="float_right"><!-- start: cookielaw_buttons_opt -->
+<input type="submit" name="allow" value="Allow Cookies" /> <input type="submit" name="disallow" class="cookielaw_disallow" value="Disallow Cookies" /><!-- start: cookielaw_button_more_info -->
+<input type="submit" name="more_info" value="More Information" />
+<!-- end: cookielaw_button_more_info --><input type="hidden" name="my_post_key" value="a5e4e94e5a4c5346e65f0f3073180877" />
+<!-- end: cookielaw_buttons_opt --></div></td>
+			</tr>
+		</table>
+	</form>
+</div>
+<!-- end: cookielaw_header --><div id="container">
+		<a name="top" id="top"></a>
+		<div id="header">
+			<div id="logo">
+				<div class="wrapper">
+					<a href="https://forum.selur.net/index.php"><img src="https://forum.selur.net/images/logo.png" alt="Selur's Little Message Board" title="Selur's Little Message Board" /></a>
+					<ul class="menu top_links">
+						
+						<!-- start: header_menu_search -->
+<li><a href="https://forum.selur.net/search.php" class="search">Search</a></li>
+<!-- end: header_menu_search -->
+						
+						
+						<li><a href="https://forum.selur.net/misc.php?action=help" class="help">Help</a></li>
+					</ul>
+				</div>
+			</div>
+			<div id="panel">
+				<div class="upper">
+					<div class="wrapper">
+						<!-- start: header_quicksearch -->
+						<form action="https://forum.selur.net/search.php">
+						<fieldset id="search">
+							<input name="keywords" type="text" class="textbox" />
+							<input value="Search" type="submit" class="button" />
+							<input type="hidden" name="action" value="do_search" />
+							<input type="hidden" name="postthread" value="1" />
+						</fieldset>
+						</form>
+<!-- end: header_quicksearch -->
+						<!-- start: header_welcomeblock_guest -->
+						<!-- Continuation of div(class="upper") as opened in the header template -->
+						<span class="welcome">Hello There, Guest! <a href="https://forum.selur.net/member.php?action=login" onclick="$('#quick_login').modal({ fadeDuration: 250, keepelement: true, zIndex: (typeof modal_zindex !== 'undefined' ? modal_zindex : 9999) }); return false;" class="login">Login</a> <a href="https://forum.selur.net/member.php?action=register" class="register">Register</a></span>
+					</div>
+				</div>
+				<div class="modal" id="quick_login" style="display: none;">
+					<form method="post" action="https://forum.selur.net/member.php">
+						<input name="action" type="hidden" value="do_login" />
+						<input name="url" type="hidden" value="" />
+						<input name="quick_login" type="hidden" value="1" />
+						<input name="my_post_key" type="hidden" value="a5e4e94e5a4c5346e65f0f3073180877" />
+						<table width="100%" cellspacing="0" cellpadding="5" border="0" class="tborder">
+							<tr>
+								<td class="thead" colspan="2"><strong>Login</strong></td>
+							</tr>
+							<!-- start: header_welcomeblock_guest_login_modal -->
+<tr>
+	<td class="trow1" width="25%"><strong>Username:</strong></td>
+	<td class="trow1"><input name="quick_username" id="quick_login_username" type="text" value="" class="textbox initial_focus" /></td>
+</tr>
+<tr>
+	<td class="trow2"><strong>Password:</strong></td>
+	<td class="trow2">
+		<input name="quick_password" id="quick_login_password" type="password" value="" class="textbox" /><br />
+		<a href="https://forum.selur.net/member.php?action=lostpw" class="lost_password">Lost Password?</a>
+	</td>
+</tr>
+<tr>
+	<td class="trow1">&nbsp;</td>
+	<td class="trow1 remember_me">
+		<input name="quick_remember" id="quick_login_remember" type="checkbox" value="yes" class="checkbox" checked="checked" />
+		<label for="quick_login_remember">Remember me</label>
+	</td>
+</tr>
+<tr>
+	<td class="trow2" colspan="2">
+		<div align="center"><input name="submit" type="submit" class="button" value="Login" /></div>
+	</td>
+</tr>
+<!-- end: header_welcomeblock_guest_login_modal -->
+						</table>
+					</form>
+				</div>
+				<script type="text/javascript">
+					$("#quick_login input[name='url']").val($(location).attr('href'));
+				</script>
+<!-- end: header_welcomeblock_guest -->
+					<!-- </div> in header_welcomeblock_member and header_welcomeblock_guest -->
+				<!-- </div> in header_welcomeblock_member and header_welcomeblock_guest -->
+			</div>
+		</div>
+		<div id="content">
+			<div class="wrapper">
+				
+				
+				
+				
+				
+				
+				
+				<!-- start: nav -->
+<div class="navigation">
+<!-- start: nav_bit -->
+<a href="https://forum.selur.net/index.php">Selur's Little Message Board</a><!-- start: nav_sep -->
+&rsaquo;
+<!-- end: nav_sep -->
+<!-- end: nav_bit --><!-- start: nav_bit -->
+<a href="forum-1.html">Hybrid - Support</a><!-- start: nav_sep -->
+&rsaquo;
+<!-- end: nav_sep -->
+<!-- end: nav_bit --><!-- start: nav_bit -->
+<a href="forum-3-page-3.html">Problems &amp; Questions</a><!-- start: nav_dropdown -->
+ <img src="https://forum.selur.net/images/arrow_down.png" alt="v" title="" class="pagination_breadcrumb_link" id="breadcrumb_multipage" /><!-- start: multipage_breadcrumb -->
+<div id="breadcrumb_multipage_popup" class="pagination pagination_breadcrumb" style="display: none;">
+<!-- start: multipage_prevpage -->
+<a href="forum-3-page-2.html" class="pagination_previous">&laquo; Previous</a>
+<!-- end: multipage_prevpage --><!-- start: multipage_page -->
+<a href="forum-3.html" class="pagination_page">1</a>
+<!-- end: multipage_page --><!-- start: multipage_page -->
+<a href="forum-3-page-2.html" class="pagination_page">2</a>
+<!-- end: multipage_page --><!-- start: multipage_page_link_current -->
+ <a href="forum-3-page-3.html" class="pagination_current">3</a>
+<!-- end: multipage_page_link_current --><!-- start: multipage_page -->
+<a href="forum-3-page-4.html" class="pagination_page">4</a>
+<!-- end: multipage_page --><!-- start: multipage_page -->
+<a href="forum-3-page-5.html" class="pagination_page">5</a>
+<!-- end: multipage_page --><!-- start: multipage_end -->
+&hellip;  <a href="forum-3-page-45.html" class="pagination_last">45</a>
+<!-- end: multipage_end --><!-- start: multipage_nextpage -->
+<a href="forum-3-page-4.html" class="pagination_next">Next &raquo;</a>
+<!-- end: multipage_nextpage -->
+</div>
+<script type="text/javascript">
+// <!--
+	if(use_xmlhttprequest == "1")
+	{
+		$("#breadcrumb_multipage").popupMenu();
+	}
+// -->
+</script>
+<!-- end: multipage_breadcrumb -->
+<!-- end: nav_dropdown -->
+<!-- end: nav_bit --><!-- start: nav_sep_active -->
+<br /><img src="https://forum.selur.net/images/nav_bit.png" alt="" />
+<!-- end: nav_sep_active --><!-- start: nav_bit_active -->
+<span class="active">Video seeking issues for AV1 encoded files</span>
+<!-- end: nav_bit_active -->
+</div>
+<!-- end: nav -->
+				<br />
+<!-- end: header -->
+	
+	
+	<div class="float_left">
+		
+	</div>
+	<div class="float_right">
+		
+	</div>
+	
+	<table border="0" cellspacing="0" cellpadding="5" class="tborder tfixed clear">
+		<tr>
+			<td class="thead">
+				<div class="float_right">
+					<span class="smalltext"><strong><a href="showthread.php?mode=linear&amp;tid=4229&amp;pid=27820#pid27820">Linear Mode</a></strong></span>
+				</div>
+				<div>
+					<strong>Video seeking issues for AV1 encoded files</strong>
+				</div>
+			</td>
+		</tr>
+<tr><td id="posts_container">
+	<div id="posts">
+		<!-- start: postbit -->
+
+<a name="pid27820" id="pid27820"></a>
+<div class="post " style="" id="post_27820">
+<div class="post_author">
+	<!-- start: postbit_avatar -->
+<div class="author_avatar"><a href="user-1.html"><img src="https://forum.selur.net/uploads/avatars/avatar_1.png?dateline=1494065081" alt="" width="55" height="46" /></a></div>
+<!-- end: postbit_avatar -->
+	<div class="author_information">
+			<strong><span class="largetext"><a href="https://forum.selur.net/user-1.html"><span style="color: green;"><strong><em>Selur</em></strong></span></a></span></strong> <!-- start: postbit_offline -->
+<img src="https://forum.selur.net/images/buddy_offline.png" title="Offline" alt="Offline" class="buddy_status" />
+<!-- end: postbit_offline --><br />
+			<span class="smalltext">
+				the author<br />
+				<img src="images/star.png" border="0" alt="*" /><img src="images/star.png" border="0" alt="*" /><img src="images/star.png" border="0" alt="*" /><img src="images/star.png" border="0" alt="*" /><img src="images/star.png" border="0" alt="*" /><img src="images/star.png" border="0" alt="*" /><img src="images/star.png" border="0" alt="*" /><br />
+				
+			</span>
+	</div>
+	<div class="author_statistics">
+		<!-- start: postbit_author_user -->
+
+	Posts: 13.160<br />
+	Threads: 73<br />
+	Joined: May 2017
+	
+<!-- end: postbit_author_user -->
+	</div>
+</div>
+<div class="post_content">
+	<div class="post_head">
+		<!-- start: postbit_posturl -->
+<div class="float_right" style="vertical-align: top">
+<strong><a href="thread-4229-post-27820.html#pid27820" title="RE: Video seeking issues for AV1 encoded files">#4</a></strong>
+
+</div>
+<!-- end: postbit_posturl -->
+		
+		<span class="post_date">11.10.2025, 12:22 <span class="post_edit" id="edited_by_27820"></span></span>
+		
+	</div>
+	<div class="post_body scaleimages" id="pid_27820">
+		Muxing was done with ffmpeg:<br />
+<div class="codeblock"><!--div class="title">Code:</div--><div class="body" dir="ltr"><code>ffmpeg -y  -r 100/1 -i "/media/pawel/WINDOWS_11/_VIDEO RECODE/2025-10-11@10_42_08_1410_04.av1" -i "/media/pawel/WINDOWS_11/_VIDEO RECODE/iId_1_aid_0_2025-10-11@10_42_08_1410_02.opus" -metadata encoding_tool="Hybrid 2025.07.27.1" -c:v copy -c:1 copy -map 0:0  -map 1:0  -aspect 1920:1080 -r 100/1 "/media/pawel/WINDOWS_11/_VIDEO RECODE/2025-09-30 21-20-14 - TEST CUT_HYBRID_.mkv"</code></div></div>which is not the default, but remuxing with mkvmerge doesn't help so I suspect it's not a muxing problem.<br />
+<br />
+<div class="codeblock"><!--div class="title">Code:</div--><div class="body" dir="ltr"><code>SvtAv1EncApp --input stdin  --width 1920 --height 1080 --fps-num 100 --fps-denom 1 --profile 0 --tile-rows 0 --tile-columns 0 --progress 2 --rc 0 --crf 60 --mbr 5000 --aq-mode 2 --preset 13 --irefresh-type 1 --lookahead 33  --scm 0 --matrix-coefficients 1 --color-range 0 --output "/media/pawel/WINDOWS_11/_VIDEO RECODE/2025-09-30 21-20-14 - TEST CUT_HYBRID__1.av1"</code></div></div>looking at the defaults:<br />
+<div class="codeblock"><!--div class="title">Code:</div--><div class="body" dir="ltr"><code>--keyint                     GOP size (frames), default is -2 [-2: ~5 seconds, -1: "infinite" and only applicable for CRF, 0: same as -1]
+      --irefresh-type              Intra refresh type, default is 2 [1: FWD Frame (Open GOP), 2: KEY Frame (Closed GOP)]</code></div></div>so svtav1 will create a gop every 5 seconds @100fps this means every 500 frames.<br />
+<br />
+Looking at the content: I suspect the problem is that there are a really few key frames.<br />
+What version of SvtAv1EncApp are you using?<br />
+<br />
+Playing the file with ffplay ant trying to seek it reports:<br />
+<div class="codeblock"><!--div class="title">Code:</div--><div class="body" dir="ltr"><code>[matroska,webm @ 0000020a0afffa80] seek_frame_generic failed as this stream seems to contain no keyframes after the target timestamp, 1002 non keyframes found</code></div></div><br />
+=&gt; try different key frame related settings<br />
+<br />
+Cu Selur
+	</div>
+	
+	<!-- start: postbit_signature -->
+<div class="signature scaleimages">
+----<br />
+Dev versions are in the 'experimental'-folder of my GoogleDrive, which is linked on the download page.
+</div>
+<!-- end: postbit_signature -->
+	<div class="post_meta" id="post_meta_27820">
+		
+		<div class="float_right">
+			
+		</div>
+	</div>
+	
+</div>
+<div class="post_controls">
+	<div class="postbit_buttons author_buttons float_left">
+		<!-- start: postbit_find -->
+<a href="search.php?action=finduser&amp;uid=1" title="Find all posts by this user" class="postbit_find"><span>Find</span></a>
+<!-- end: postbit_find -->
+	</div>
+	<div class="postbit_buttons post_management_buttons float_right">
+		<!-- start: postbit_quote -->
+<a href="newreply.php?tid=4229" title="Quote this message in a reply" class="postbit_quote postbit_mirage"><span>Reply</span></a>
+<!-- end: postbit_quote -->
+	</div>
+</div>
+</div>
+<!-- end: postbit -->
+	</div>
+</td></tr>
+		<tr>
+			<td class="tfoot">
+				<!-- start: showthread_search -->
+	<div class="float_right">
+		<form action="search.php" method="post">
+			<input type="hidden" name="action" value="thread" />
+			<input type="hidden" name="tid" value="4229" />
+			<input type="text" name="keywords" value="Enter Keywords" onfocus="if(this.value == 'Enter Keywords') { this.value = ''; }" onblur="if(this.value=='') { this.value='Enter Keywords'; }" class="textbox" size="25" />
+			<input type="submit" class="button" value="Search Thread" />
+		</form>
+	</div>
+<!-- end: showthread_search -->
+				<div>
+					<strong>&laquo; <a href="thread-4229-nextoldest.html">Next Oldest</a> | <a href="thread-4229-nextnewest.html">Next Newest</a> &raquo;</strong>
+				</div>
+			</td>
+		</tr>
+	</table>
+	<div class="float_left">
+		
+	</div>
+	<div style="padding-top: 4px;" class="float_right">
+		
+	</div>
+	<br class="clear" />
+	
+	<!-- start: showthread_threadedbox -->
+<br />
+<table border="0" cellspacing="0" cellpadding="5" class="tborder">
+<tr>
+<td class="thead"><span class="smalltext"><strong>Messages In This Thread</strong></span></td>
+</tr>
+<tr>
+<td class="trow1"><!-- start: showthread_threaded_bit -->
+<div style="margin-left: 0px;"><a href="showthread.php?tid=4229&amp;pid=27783&amp;mode=threaded">Video seeking issues for AV1 encoded files</a> <span class="smalltext">- by <a href="https://forum.selur.net/user-22.html">Doink</a> - 08.10.2025, 19:23</span></div>
+<!-- end: showthread_threaded_bit --><!-- start: showthread_threaded_bit -->
+<div style="margin-left: 13px;"><a href="showthread.php?tid=4229&amp;pid=27785&amp;mode=threaded">RE: Video seeking issues for AV1 encoded files</a> <span class="smalltext">- by <a href="https://forum.selur.net/user-1.html">Selur</a> - 08.10.2025, 19:35</span></div>
+<!-- end: showthread_threaded_bit --><!-- start: showthread_threaded_bit -->
+<div style="margin-left: 13px;"><a href="showthread.php?tid=4229&amp;pid=27819&amp;mode=threaded">RE: Video seeking issues for AV1 encoded files</a> <span class="smalltext">- by <a href="https://forum.selur.net/user-22.html">Doink</a> - 11.10.2025, 10:57</span></div>
+<!-- end: showthread_threaded_bit --><!-- start: showthread_threaded_bitactive -->
+<div style="margin-left: 13px;"><strong>RE: Video seeking issues for AV1 encoded files</strong> <span class="smalltext">- by <a href="https://forum.selur.net/user-1.html">Selur</a> - 11.10.2025, 12:22</span></div>
+<!-- end: showthread_threaded_bitactive --><!-- start: showthread_threaded_bit -->
+<div style="margin-left: 13px;"><a href="showthread.php?tid=4229&amp;pid=27823&amp;mode=threaded">RE: Video seeking issues for AV1 encoded files</a> <span class="smalltext">- by <a href="https://forum.selur.net/user-22.html">Doink</a> - 11.10.2025, 19:00</span></div>
+<!-- end: showthread_threaded_bit --><!-- start: showthread_threaded_bit -->
+<div style="margin-left: 13px;"><a href="showthread.php?tid=4229&amp;pid=27826&amp;mode=threaded">RE: Video seeking issues for AV1 encoded files</a> <span class="smalltext">- by <a href="https://forum.selur.net/user-1.html">Selur</a> - 12.10.2025, 08:50</span></div>
+<!-- end: showthread_threaded_bit --></td>
+</tr>
+</table>
+<!-- end: showthread_threadedbox -->
+	
+	<br />
+	<div class="float_left">
+		<ul class="thread_tools">
+			<!-- start: showthread_printthread -->
+<li class="printable"><a href="printthread.php?tid=4229">View a Printable Version</a></li>
+<!-- end: showthread_printthread -->
+			
+			
+			
+		</ul>
+	</div>
+
+	<div class="float_right" style="text-align: right;">
+		
+		<!-- start: forumjump_advanced -->
+<form action="forumdisplay.php" method="get">
+<span class="smalltext"><strong>Forum Jump:</strong></span>
+<select name="fid" class="forumjump">
+<option value="-4">Private Messages</option>
+<option value="-3">User Control Panel</option>
+<option value="-5">Who's Online</option>
+<option value="-2">Search</option>
+<option value="-1">Forum Home</option>
+<!-- start: forumjump_bit -->
+<option value="5" > Talk, Talk, Talk</option>
+<!-- end: forumjump_bit --><!-- start: forumjump_bit -->
+<option value="2" >-- General Hybrid Infos</option>
+<!-- end: forumjump_bit --><!-- start: forumjump_bit -->
+<option value="6" >-- A/V Talk</option>
+<!-- end: forumjump_bit --><!-- start: forumjump_bit -->
+<option value="7" >-- Small Talk</option>
+<!-- end: forumjump_bit --><!-- start: forumjump_bit -->
+<option value="1" > Hybrid - Support</option>
+<!-- end: forumjump_bit --><!-- start: forumjump_bit -->
+<option value="3" selected="selected">-- Problems &amp; Questions</option>
+<!-- end: forumjump_bit --><!-- start: forumjump_bit -->
+<option value="4" >-- Probleme und Fragen</option>
+<!-- end: forumjump_bit --><!-- start: forumjump_bit -->
+<option value="8" >-- Step-by-Step</option>
+<!-- end: forumjump_bit -->
+</select>
+<!-- start: gobutton -->
+<input type="submit" class="button" value="Go" />
+<!-- end: gobutton -->
+</form>
+<script type="text/javascript">
+$(".forumjump").on('change', function() {
+	var option = $(this).val();
+
+	if(option < 0)
+	{
+		window.location = 'forumdisplay.php?fid='+option;
+	}
+	else
+	{
+		window.location = 'forum-'+option+'.html';
+	}
+});
+</script>
+<!-- end: forumjump_advanced -->
+	</div>
+	<br class="clear" />
+	<!-- start: showthread_usersbrowsing -->
+<br />
+<span class="smalltext">Users browsing this thread: 1 Guest(s)</span>
+<br />
+<!-- end: showthread_usersbrowsing -->
+	<!-- start: footer -->
+
+	</div>
+</div>
+<div id="footer">
+	<div class="upper">
+		<div class="wrapper">
+			<!-- start: footer_languageselect -->
+<div class="language">
+<form method="POST" action="/showthread.php" id="lang_select">
+	<input type="hidden" name="tid" value="4229" />
+<input type="hidden" name="pid" value="27820" />
+<input type="hidden" name="mode" value="threaded" />
+
+	<input type="hidden" name="my_post_key" value="a5e4e94e5a4c5346e65f0f3073180877" />
+	<select name="language" onchange="MyBB.changeLanguage();">
+		<optgroup label="Quick Language Select">
+			<!-- start: footer_languageselect_option -->
+<option value="deutsch_du">&nbsp;&nbsp;&nbsp;Deutsch informell (&quot;Du&quot;)</option>
+<!-- end: footer_languageselect_option --><!-- start: footer_languageselect_option -->
+<option value="deutsch_sie">&nbsp;&nbsp;&nbsp;Deutsch formell (&quot;Sie&quot;)</option>
+<!-- end: footer_languageselect_option --><!-- start: footer_languageselect_option -->
+<option value="english" selected="selected">&nbsp;&nbsp;&nbsp;English (American)</option>
+<!-- end: footer_languageselect_option -->
+		</optgroup>
+	</select>
+	<!-- start: gobutton -->
+<input type="submit" class="button" value="Go" />
+<!-- end: gobutton -->
+</form>
+</div>
+<!-- end: footer_languageselect -->
+			
+			<ul class="menu bottom_links">
+				<!-- start: footer_showteamlink -->
+<li><a href="showteam.php">Forum Team</a></li>
+<!-- end: footer_showteamlink -->
+				
+				<li><a href="https://forum.selur.net/">Selur's Forum</a></li>
+				<li><a href="#top">Return to Top</a></li>
+				<li><a href="https://forum.selur.net/archive/index.php/thread-4229.html">Lite (Archive) Mode</a></li>
+				<li><a href="https://forum.selur.net/misc.php?action=markread">Mark all forums read</a></li>
+				<li><a href="https://forum.selur.net/misc.php?action=syndication">RSS Syndication</a></li>
+				<li><a href="https://forum.selur.net/misc.php?action=cookielaw_info">Cookie Consent Settings</a></li>
+			</ul>
+		</div>
+	</div>
+	<div class="lower">
+		<div class="wrapper">
+			<span id="current_time"><strong>Current time:</strong> 29.08.2026, 11:12</span>
+			<span id="copyright">
+				<!-- MyBB is free software developed and maintained by a volunteer community.
+					It would be much appreciated by the MyBB Group if you left the full copyright and "powered by" notice intact,
+					to show your support for MyBB.  If you choose to remove or modify the copyright below,
+					you may be refused support on the MyBB Community Forums.
+
+					This is free software, support us and we'll support you. -->
+				Powered By <a href="https://mybb.com" target="_blank" rel="noopener">MyBB</a>, &copy; 2002-2026 <a href="https://mybb.com" target="_blank" rel="noopener">MyBB Group</a>.
+				<!-- End powered by -->
+			</span>
+		</div>
+	</div>
+</div>
+<!-- The following piece of code allows MyBB to run scheduled tasks. DO NOT REMOVE --><!-- start: task_image -->
+<img src="https://forum.selur.net/task.php" width="1" height="1" alt="" />
+<!-- end: task_image --><!-- End task image code -->
+
+</div>
+<!-- end: footer -->
+	<script type="text/javascript">
+		var thread_deleted = "0";
+		if(thread_deleted == "1")
+		{
+			$("#quick_reply_form, .new_reply_button, .thread_tools, .inline_rating").hide();
+			$("#moderator_options_selector option.option_mirage").attr("disabled","disabled");
+		}
+	</script>
+</body>
+</html>
+<!-- end: showthread -->

@@ -1,0 +1,771 @@
+ 
+ 
+ 
+ 
+ 
+
+ SVT-AV1 V3.0 is Now Available | Alliance for Open Media 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+
+
+
+ 
+
+
+
+
+
+ 
+
+
+
+
+
+ 
+
+ 
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+
+ 
+ 
+ 
+
+
+
+
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+ 
+ Skip links 
+ 
+ Skip to primary navigation 
+ Skip to content 
+ Skip to footer 
+ 
+ 
+
+ 
+ You are using an outdated browser. Please upgrade your browser to improve your experience. 
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Alliance for Open Media
+ An Alliance of Global Media Innovators 
+ 
+ 
+ About
+ 
+ 
+ 
+ 
+ Story 
+ 
+ FAQ 
+ 
+ Members 
+ 
+ Organization 
+ 
+ Legal 
+ 
+ Contact 
+ 
+ 
+ 
+ The Future of Innovation is Open 
+ 
+ AV1 adoption 
+ 
+ Specifications
+ 
+ 
+ 
+ 
+ All Specifications 
+ 
+ AV1 
+ 
+ AV2 
+ 
+ AVIF 
+ 
+ IAMF 
+ 
+ Open Audio Renderer (OAR) 
+ 
+ ID3 Timed Metadata 
+ 
+ AFGS1 
+ 
+ 
+ 
+ Resources
+ 
+ 
+ 
+ 
+ Products and services 
+ 
+ Open source 
+ 
+ Videos and Webinars 
+ 
+ Logo 
+ 
+ 
+ 
+ Get involved
+ 
+ 
+ 
+ 
+ Join 
+ 
+ Adopt 
+ 
+ Contribute 
+ 
+ Research 
+ 
+ 
+ 
+ News 
+ 
+ 
+ 
+ Toggle search 
+ 
+ 
+ 
+ 
+ 
+ 
+ Toggle menu 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Home 
+ 
+ 
+ > 
+ 
+ 
+ 
+ 
+ Blog posts 
+ 
+ 
+ > 
+ 
+ 
+ 
+ 
+ SVT-AV1 V3.0 is Now Available 
+ 
+ 
+ 
+ 
+
+ 
+
+
+ 
+ 
+ 
+ 
+
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ Follow 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ Custom Social Profile Link
+ 
+ 
+-->
+ 
+ 
+ 
+
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ SVT-AV1 V3.0 is Now Available
+ 
+ 
+ 
+ 
+ May 21, 2025 | 
+ 
+ 
+
+
+
+
+ 2 minute read
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ The AOMedia Software Implementation Working Group (SIWG) is excited to share
+SVT-AV1 V3.0, a major release that represents an important improvement in
+performance and includes a few key bug fixes. Scalable Video Technology (SVT)
+refers to the ability of an encoder to scale its performance according to the
+compute capabilities of the platform on which it is running, essentially
+allowing it to use the maximum amount of allocated resources to achieve the
+highest possible video quality. SVT-AV1 is an open-source, CPU-based AV1
+encoder. It is an AOMedia project that provides an AV1-compliant open-source
+encoder library. 
+
+ Why is this update important? 
+
+ The latest release of SVT-AV1 delivers significant performance improvements
+along with a major API update, including: 
+
+ 
+ A clean-up of unused fields, use stdbool type, and redundant parameters in
+svt_av1_enc_init_handle 
+ Repositioning the presets and removing one preset resulting in a max preset of
+M10 in the current version 
+ Addition of a temporal layer and averageQP fields in output picture structure,
+along with an option to specify a QP offset for the startup GOP 
+ 
+
+ The API changes are not backwards compatible. More details about the changes can
+be found in issue
+ 2217 . 
+
+ The release also featured some key encoder updates, including: 
+
+ 
+ Improved mid- and high-quality presets and quality vs. speed tradeoffs for
+fast-decode 2 mode:
+ 
+ ~15-25% speedup for M3-M10 at the same quality levels 
+ ~1% BD-rate improvement for presets M0-M2 
+ 
+ 
+ Repositioning of the fast-decode 1 mode to produce ~10% decoder cycle
+reduction vs fast-decode 0 while reducing the BD-rate loss to ~1% 
+ Further Arm Neon and SVE2 optimizations that improve high bit-depth encoding
+by an average of 10-25% for 480p-1080p resolutions beyond the
+architecture-agnostic algorithmic improvements since
+ v2.3.0 
+ Porting of several features from SVT-AV1-SPY fork to further improve the
+perceptual quality of tune 0 mode 
+ Added lossless coding support and an avif mode to reduce resource utilization
+when encoding still images 
+ 
+
+ Finally, SVT-AV1 also released two follow-up minor releases v3.0.1 and v3.0.2
+that includes a cleanup build, bug fixes and documentation, specifically: 
+
+ 
+ Removal of the third party cpuinfo code in favor of using one provided by the
+system. (For those without cpuinfo, it will be pulled and compiled into the
+library, similar to before) 
+ Improved unit test coverage for Arm Neon and SVE2 code 
+ Updated documentation 
+ 
+
+ Where can you find it? 
+
+ The latest SVT-AV1 release can be
+ found on GitLab .
+Please take a moment to give it a try and report feedback. Your input helps
+drive the continued improvements that benefit us all. 
+
+ Thank you to all the members of the Software Implementation Working Group and
+the vibrant open source community for their ongoing contributions. Your hard
+work makes these updates possible. 
+
+ Follow AOMedia on
+ Reddit ,
+ LinkedIn 
+and Instagram . 
+
+ 
+ 
+
+ 
+ 
+ 
+
+
+ 
+
+
+ 
+ 
+ 
+
+ 
+ Categories: 
+ 
+ 
+ 
+ 
+ Blog Posts 
+ 
+ 
+ 
+
+
+
+ 
+ Updated: May 21, 2025 
+ 
+ 
+
+ 
+ 
+ Share on 
+ 
+
+ Twitter 
+
+ Facebook 
+
+ LinkedIn 
+ 
+
+
+ 
+ 
+ 
+ Previous 
+ 
+ 
+ Next 
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ You may also enjoy 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ Alliance for Open Media Publishes Open Audio Renderer (OAR) v1, Advancing Open Spatial Audio
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+ 2 minute read
+
+ 
+ 
+ 
+ 
+ 2026-07-30 
+ 
+ 
+ Reference implementation strengthens the open immersive audio ecosystem with
+production-ready rendering for loudspeakers and headphones
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ AV2: What the Final Specification Means for Implementers
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+ 3 minute read
+
+ 
+ 
+ 
+ 
+ 2026-07-27 
+ 
+ 
+ The Alliance for Open Media has reached a significant milestone in open video
+coding with the official release of the AV2 specification.
+While the announceme... 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ AOMedia Video Codec Working Group Announces Availability of Libaom v3.14 “Pinkie Pie”
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+ 5 minute read
+
+ 
+ 
+ 
+ 
+ 2026-07-23 
+ 
+ 
+ The AOMedia Video Codec Working Group is pleased to announce that libaom v3.14,
+aka “Pinkie Pie,” is now available. This release makes available all the
+impr... 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ Alliance for Open Media Releases AV2 Codec, Advancing Next-Generation Open Video Coding
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+ 2 minute read
+
+ 
+ 
+ 
+ 
+ 2026-06-06 
+ 
+ 
+ Wakefield, Mass. – June 9, 2026 - The Alliance for Open Media (AOMedia)
+today announced the release of the AV2 specification. AOMedia is a standards
+organiza... 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ Enter your search term...
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Follow: 
+ 
+
+ 
+ 
+ 
+ LinkedIn 
+ 
+ 
+ 
+ YouTube 
+ 
+ 
+ 
+ Reddit 
+ 
+ 
+ 
+ 
+ 
+ GitHub 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ RSS 
+ 
+ 
+
+ © 2026 Alliance for Open Media · All Rights Reserved · Project of the Joint Development Foundation · Terms of Service 
+
+ 
+ 
+
+ 
+ 
+ 
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+

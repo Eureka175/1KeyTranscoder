@@ -1,0 +1,541 @@
+===== POST 1 =====
+I only have experiences encoding my movie collection to HEVC. Now I want to start and get a bit more experiences with AV1. I use HandBrake to encode which uses SVT-AV1 (v.1.7.0). After a bit of experimenting I think preset 5 or 4 would be good for movie archiving. 4 takes around double as long as 5. I was wondering, is 4 that much better then 5 to invest the longer encoding time? What preset do you use?
+
+
+
+For HEVC I put together a set of parameters to pass to the encoder to improve quality, size and speed to my needs. For AV1 and would need to do this all again. Or is this not needed for AV1? A quick search in the internet gave me some parameters that are often used: 
+	Code:
+	enable-overlays=1:scd=1:enable-tf=0
+.
+
+What do you think, is this useful? This flags do increase file size a little bit. Or what do you recommend
+
+===== POST 2 =====
+hi I'm in the same situation as you, personally I do preset 4 at 5000kb/S it's magnificent and preset 4 is much better than 5 but 5 is not bad too it's up to you to see what you want is strange is that my 16 cores are only used at 30% I have to find a way to ensure that more CPU is used like at 80% like that the encoding time would be shorte
+
+===== POST 3 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by charliebaby
+					
+				
+				hi I'm in the same situation as you, personally I do preset 4 at 5000kb/S it's magnificent and preset 4 is much better than 5 but 5 is not bad too it's up to you to see what you want is strange is that my 16 cores are only used at 30% I have to find a way to ensure that more CPU is used like at 80% like that the encoding time would be shorter
+			
+		
+	
+	
+Don't assume that using more cores will always improve quality, as a lot of threading techniques can sacrifice some quality. Bigger frames certainly can increase core utilization, but lower resolutions can struggle to find enough to parallelize
+
+===== POST 4 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by charliebaby
+					
+				
+				hi I'm in the same situation as you, personally I do preset 4 at 5000kb/S it's magnificent and preset 4 is much better than 5 but 5 is not bad too it's up to you to see what you want is strange is that my 16 cores are only used at 30% I have to find a way to ensure that more CPU is used like at 80% like that the encoding time would be shorter
+			
+		
+	
+	
+Thanks for your recommendation , I will try 4 at 5000kb/s and see. There I found another suggestion of using 4: https://forum.jellyfin.org/t-encodin...&mode=threaded
+
+
+
+I also found this, and there seems just a little difference between 4 and 5: https://ottverse.com/analysis-of-svt...nd-crf-values/
+
+
+
+The difference between 4 and 5 according to this table are "Filter intra", "Difference-weighted prediction", "Distance-weighted prediction" and "Restoration Filter - SG Filter": https://gitlab.com/AOMediaCodec/SVT-...hat-presets-do
+
+But I have no clue what this is all doing
+
+===== POST 5 =====
+After some testing with different setting and sources, I'm now quite happy with the following settings in HandBrake:
+
+
+
+Codec: AV1 10bit (SVT)
+
+CRF: 26
+
+Preset: 5
+
+Profile: main
+
+Level: auto
+
+Additional parameter: enable-tf=0:film-grain-denoise=0:film-grain=8:mbr=10m (for 2D/3D animation change film-grain from 8 to 4)
+
+
+
+The quality of the video is perfect (in some cases I like it more than the original), encoding is much faster than my x265 encodings and the file size is also smaller
+
+===== POST 6 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by ShortKatz
+					
+				
+				Additional parameter: enable-tf=0:film-grain-denoise=0:film-grain=8:mbr=10m (for 2D/3D animation change film-grain from 8 to 4)
+			
+		
+	
+	
+By setting film-grain-denoise=0 you are disabling film-grain=8, because film-grain sets the level of denoising and is not for preserving grain but the contrary, see https://gitlab.com/AOMediaCodec/SVT-.../Parameters.md . The name "film-grain" is very misleading here and it would have been much more user friendly if the level of denoise would be set directly in film-grain-denoise like e.g. film-grain-denoise=8.
+
+
+
+
+	Quote:
+	
+	
+		
+			
+				
+					Originally Posted by ShortKatz
+					
+				
+				The quality of the video is perfect (in some cases I like it more than the original), encoding is much faster than my x265 encodings and the file size is also smaller.
+			
+		
+	
+	
+That's what I thought about preset 5 until I compared the result with preset 4 on my 48" OLED. Preset 4 is significantly better. Did you try some AV1 hardware encoding by any chance? I got a A380 last week and the results with highest quality settings and the encoding speed are stunning
+
+===== POST 7 =====
+film-grain-denoise doesn't disable film-grain, it disables encoding from the denoised image
+
+===== POST 8 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by quietvoid
+					
+				
+				film-grain-denoise doesn't disable film-grain, it disables encoding from the denoised image.
+			
+		
+	
+	
+Okay, maybe I misread the parameter description but if film-grain-denoise=0 disables denoising and film-grain=n sets the level of denoising, what exactly would be the purpose of "film-grain-denoise=0 film-grain=8" ? Or in other words: How exactly would it effect the encoding result
+
+===== POST 9 =====
+The denoising strength is still controlled by film-grain.
+
+When disabling film-grain-denoise, it only encodes from the original image instead of the denoised result.
+
+
+
+It would probably end up higher bitrate if the source video is noisy
+
+===== POST 10 =====
+Does this mean "film-grain-denoise=1 film-grain=8" would be 2-step process? First, film-grain-denoise=1 prepares a denoised image which is then encoded with film-grain=8
+
+===== POST 11 =====
+Thanks, I think I got it now. So film-grain foremost sets the level of grain in the video, which is also used as level for denoising if film-grain-denoise=1. Is that correct? If so, the parameter description is rather 
+
+
+
+FilmGrain: Enable film grain [0: off, 1-50: level of film grain, also used as denoising strength if film-grain-denoise=1]
+
+
+
+Since there are levels from 1-50, it raises the question how to determine the level. Is this a pure subjective matter or is there some kind of technical indicator to determine the level? Thanks
+
+===== POST 12 =====
+Usually the more noise there is, the higher film-grain would be.
+
+I usually stay between 10-20
+
+===== POST 13 =====
+Setting film-grain-denoise=0 and film-grain=8 as a start is recommended in the SVT-AV1 CommonQuestions.
+
+https://gitlab.com/AOMediaCodec/SVT-...rain-synthesis
+
+
+
+
+	Quote:
+	
+	
+		
+			
+				As a general rule, a film-grain level of around 8 is sufficient for live action video with a normal amount of grain. Noisier video benefits from higher levels in the 10-15 range. 
+			
+		
+	
+	
+
+
+
+	Quote:
+	
+	
+		
+			
+				If grain synthesis levels can be manually verified through subjective evaluation or high fidelity metrics, then passing film-grain-denoise=0 may result in higher fidelity by disabling source denoising.
+			
+		
+	
+	
+
+
+The effect of film-grain-denoise=0 can also be seen in this video starting at 9:00 min.
+
+https://www.youtube.com/watch?v=5IV36FMpLqY</a
+
+===== POST 14 =====
+Note that a lot of devices with AV1 decode don't support FGS, or have buggy implementations. It's not a safe "always on" feature at this point. Hopefully AVFG1 spec will catch on, and we can use FGS with VVC, and eventually a better version in AV2
+
+===== POST 15 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by benwaggoner
+					
+				
+				Note that a lot of devices with AV1 decode don't support FGS, or have buggy implementations. It's not a safe "always on" feature at this point. Hopefully AVFG1 spec will catch on, and we can use FGS with VVC, and eventually a better version in AV2.
+			
+		
+	
+	
+Then again, it is possible to remove the layer if it proves to be an issue
+
+===== POST 16 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by ShortKatz
+					
+				
+				After some testing with different setting and sources, I'm now quite happy with the following settings in HandBrake:
+
+
+
+Codec: AV1 10bit (SVT)
+
+CRF: 26
+
+Preset: 5
+
+Profile: main
+
+Level: auto
+
+Additional parameter: enable-tf=0:film-grain-denoise=0:film-grain=8:mbr=10m (for 2D/3D animation change film-grain from 8 to 4)
+
+
+
+The quality of the video is perfect (in some cases I like it more than the original), encoding is much faster than my x265 encodings and the file size is also smaller.
+			
+		
+	
+	
+Looks like you've never been interested in transparent encoding.
+
+
+
+CRF 26 is a complete blurfest to me only useful for encoding anime
+
+===== POST 17 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by Boulder
+					
+				
+				Then again, it is possible to remove the layer if it proves to be an issue.
+			
+		
+	
+	
+Sure, but that can utterly change the look, as the source is denoised to use FGS, with FGS to replace the removed noise. Encoding for FGS but playing back without it can look really smoothed out and unnatural, and certainly wouldn't match creative intent.
+
+
+
+If I can't count on FGS being used with AV1, I'd just encode AV1 without FGS. It'll increase the bitrate, but at least the visual appearance will be predictable.
+
+
+
+AV1 and AV1 + FGS can almost be thought of as different codecs, and absolutely require different encodes
+
+===== POST 18 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by benwaggoner
+					
+				
+				Sure, but that can utterly change the look, as the source is denoised to use FGS, with FGS to replace the removed noise. Encoding for FGS but playing back without it can look really smoothed out and unnatural, and certainly wouldn't match creative intent.
+
+
+
+If I can't count on FGS being used with AV1, I'd just encode AV1 without FGS. It'll increase the bitrate, but at least the visual appearance will be predictable.
+
+
+
+AV1 and AV1 + FGS can almost be thought of as different codecs, and absolutely require different encodes.
+			
+		
+	
+	
+Unfortunately with modern codecs, everything is quite smoothed out without FGS no matter what settings you use. Believe me..I have attempted to remove all the filtering in both parameters and code and still there is horrible flat area banding left even at very low quantizers (like Q12 for aomenc). And I see people are using something like Q24, which must mean that there are no details left in the encoded video 
+
+
+
+FGS won't restore the details, in my opinion it just works very well at hiding the problems and fooling your brain into thinking that the material is sharper and more detailed than it is <img src="images/smilies/smile.gif" border="0" alt="" title="Smilie" class="inlineimg" /
+
+===== POST 19 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by Boulder
+					
+				
+				Unfortunately with modern codecs, everything is quite smoothed out without FGS no matter what settings you use. Believe me..I have attempted to remove all the filtering in both parameters and code and still there is horrible flat area banding left even at very low quantizers (like Q12 for aomenc). And I see people are using something like Q24, which must mean that there are no details left in the encoded video 
+			
+		
+	
+	
+Too much PSNR tuning, and to a lesser degree VMAF, can cause the flattening. This can generally be addressed with AQ tuning. It's an encoder limitation, not a codec limitation.
+
+
+
+I've done comparisons between encoding AV1 with grain preservation without FGS versus FGS, and while grain preservation requires more bits than with FGS, with proper encoder and parameter tuning the perceptual results are pretty similar, and can match what's possible with x265.
+
+
+
+
+	Quote:
+	
+	
+		
+			
+				FGS won't restore the details, in my opinion it just works very well at hiding the problems and fooling your brain into thinking that the material is sharper and more detailed than it is 
+			
+		
+	
+	
+FGS is best thought of as a creative intent preservation feature. If the source is supposed to have grain texture, the exact temporal and spatial location of each grain particle isn't important. So we can synthesize grain to preserve a similar creative intent and feel without having to encode the exact random locations of all those particles distributed randomly on any given frame.
+
+
+
+And the metadata to describe the grain is a LOT more bitrate efficient than trying to encode all that high temporal and spatial frequency noise. For a premium quality experience, heavy grain can more than double the bitrate required compared the the same content without grain.
+
+
+
+Content is going to look very different if it originally had heavy grain, but it was removed presuming it would be added back, but it was not.
+
+
+
+There is one major flaw in the AV1 FGS implementation, in that grain particle size is rendered relative to display instead of content, so the size of a grain particle relative to the image changes. A fix for that is is in progress
+
+===== POST 20 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by birdie
+					
+				
+				Looks like you've never been interested in transparent encoding.
+
+
+
+CRF 26 is a complete blurfest to me only useful for encoding anime.
+			
+		
+	
+	
+I'm very interested in transparent encoding. Seems we have different CRF 26, it's not a bluffest for me
+
+===== POST 21 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by benwaggoner
+					
+				
+				Too much PSNR tuning, and to a lesser degree VMAF, can cause the flattening. This can generally be addressed with AQ tuning. It's an encoder limitation, not a codec limitation.
+
+
+
+I've done comparisons between encoding AV1 with grain preservation without FGS versus FGS, and while grain preservation requires more bits than with FGS, with proper encoder and parameter tuning the perceptual results are pretty similar, and can match what's possible with x265.
+			
+		
+	
+	
+Out of interest, which encoders have you been testing? Are all the current open source encoders based on the same source so they basically work the same way no matter what? At least aomenc and svt-av1 are both smoothing things very heavily, I'd say aomenc less when it is tamed in code and all temporal filtering is switched off in parameters.
+
+
+
+Funny thing is that with a very grainy source like "Withnail and I" Blu-ray, the grain is actually preserved quite nicely. I don't know if I should test adding grain before encoding and seeing what comes out <img src="images/smilies/biggrin.gif" border="0" alt="" title="Big Grin" class="inlineimg" /
+
+===== POST 22 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by ShortKatz
+					
+				
+				I'm very interested in transparent encoding. Seems we have different CRF 26, it's not a bluffest for me.
+			
+		
+	
+	
+I can assure you CRF 26 destroys fine details and smooths out everything to the point where e.g. sea waves turn into goo.
+
+
+
+Again, looks like you're not interested in transparent encoding by a long shot or maybe you have a completely different idea what it is.
+
+
+
+Transparent encoding is when your encode matches your source in terms of fine details 100%.
+
+
+
+Here, try to encode this clip at CRF 26 and then compare the result to the source. Pay extra attention to the sea and mountains
+
+===== POST 23 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by birdie
+					
+				
+				Transparent encoding is when your encode matches your source in terms of fine details 100%.
+			
+		
+	
+	
+And svt-av1 will not be able to do that even at CRF 12 <img src="images/smilies/frown.gif" border="0" alt="" title="Frown" class="inlineimg" /
+
+===== POST 24 =====
+Looking at the 1080p 900kbps samples here: http://download.opencontent.netflix....ix=AV1/Sparks/
+
+
+
+Does it make sense to use FGS if the source doesn't have grain ? I am not looking for transparency just a clean result
+
+===== POST 25 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by butterw2
+					
+				
+				Looking at the 1080p 900kbps samples here: http://download.opencontent.netflix....ix=AV1/Sparks/
+
+
+
+Does it make sense to use FGS if the source doesn't have grain ? I am not looking for transparency just a clean result.
+			
+		
+	
+	
+FGS won't do much if there isn't grain, but it can help with even light grain. But benefits are proportional to grain levels
+
+===== POST 26 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by birdie
+					
+				
+				I can assure you CRF 26 destroys fine details and smooths out everything to the point where e.g. sea waves turn into goo.
+
+
+
+Again, looks like you're not interested in transparent encoding by a long shot or maybe you have a completely different idea what it is.
+
+
+
+Transparent encoding is when your encode matches your source in terms of fine details 100%.
+
+
+
+Here, try to encode this clip at CRF 26 and then compare the result to the source. Pay extra attention to the sea and mountains.
+			
+		
+	
+	
+Thanks for the file. I made an encode with CRF 26 and CRF 0. And yes, you are correct, there are differences with CRF 26 in the waves and the mountain, so it's not transparent. But this differences are so light that I can live with it.
+
+I made a picture of the first frame.
+
+https://www.swisstransfer.com/d/5558...4-9550b636182e</a
+
+===== POST 27 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by ShortKatz
+					
+				
+				Thanks for the file. I made an encode with CRF 26 and CRF 0. And yes, you are correct, there are differences with CRF 26 in the waves and the mountain, so it's not transparent. But this differences are so light that I can live with it.
+
+I made a picture of the first frame.
+
+https://www.swisstransfer.com/d/5558...4-9550b636182e
+			
+		
+	
+	
+The first frame for most codecs will have higher image quality/detail retention than consecutive frames because it's type I.
+
+
+
+Try frames other than I, that's P or B (depending on your compression settings and codec: for offline software codecs it's almost always B frames, hardware codecs are normally only P frames)
+
+

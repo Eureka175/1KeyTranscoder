@@ -1,0 +1,238 @@
+﻿ 
+X265 vs x264 CRF values mapping - Doom9's Forum 
+Welcome to Doom9 's Forum, THE in-place to be for everyone interested in DVD conversion. 
+Before you start posting please read the forum rules . By posting to this forum you agree to abide by the rules. 
+Domains: forum.doom9.org / forum.doom9.net / forum.doom9.se 
+Doom9's Forum 
+ > Video Encoding 
+> High Efficiency Video Coding (HEVC) 
+X265 vs x264 CRF values mapping
+User Name 
+Remember Me? 
+Password 
+Register 
+FAQ 
+Today's Posts 
+Search 
+Search Forums 
+Show Threads 
+Show Posts 
+Tag Search 
+Advanced Search 
+Go to Page... 
+Thread Tools 
+Search this Thread 
+30th October 2020, 08:51
+# 1 
+|   Link 
+TEB 
+Registered User
+Join Date: Feb 2003
+Location: Palmcoast of Norway
+Posts: 370
+X265 vs x264 CRF values mapping 
+hi, anyone know what the eq. of CRF 20 is in X264 vs x265? Is there a 1:1 map somewhere i can use as a reference?
+TEB 
+View Public Profile 
+Find More Posts by TEB 
+30th October 2020, 10:56
+# 2 
+|   Link 
+microchip8 
+ffx264/ffhevc author
+Join Date: May 2007
+Location: /dev/video0
+Posts: 2,123
+A CRF of 18 in x264 corresponds to 20 in x265.
+__________________
+The Cyberpunk Database || NTP & NTS Time Server || Mirror Services 
+ffhevc || ffx264 || ffxvid 
+microchip8 
+View Public Profile 
+Visit microchip8's homepage! 
+Find More Posts by microchip8 
+30th October 2020, 13:28
+# 3 
+|   Link 
+outhud 
+Registered User
+Join Date: Aug 2018
+Posts: 23
+Quote:
+Originally Posted by microchip8 
+A CRF of 18 in x264 corresponds to 20 in x265.
+Does that mean they give about the same file size? Or the same image quality?
+outhud 
+View Public Profile 
+Find More Posts by outhud 
+30th October 2020, 14:24
+# 4 
+|   Link 
+microchip8 
+ffx264/ffhevc author
+Join Date: May 2007
+Location: /dev/video0
+Posts: 2,123
+Quote:
+Originally Posted by outhud 
+Does that mean they give about the same file size? Or the same image quality?
+file size and image quality are correlated. x265 is roughly 30-35% more efficient than x264 at the same bitrate
+I personally use in x265 a CRF of 21 with a qcomp of 0.7 and high psy-rd and psy-rdoq values. I cannot tell the difference between it and the same encoded with x264 @ CRF 18 and almost the highest possible setting (except exhaustive ME search as it's a placebo)
+__________________
+The Cyberpunk Database || NTP & NTS Time Server || Mirror Services 
+ffhevc || ffx264 || ffxvid 
+microchip8 
+View Public Profile 
+Visit microchip8's homepage! 
+Find More Posts by microchip8 
+30th October 2020, 14:28
+# 5 
+|   Link 
+filler56789 
+SuperVirus
+Join Date: Jun 2012
+Location: Antarctic Japan
+Posts: 1,459
+Quote:
+Originally Posted by TEB 
+hi, anyone know what the eq. of CRF 20 is in X264 vs x265? Is there a 1:1 map somewhere i can use as a reference?
+for x264: QP = 12 + 6 * log ₂ (qscale[i])
+for x265: QP = 12 + 6 * log ₂ (qscale[i] / 0.85)
+source : https://www.cnblogs.com/lakeone/p/5436481.html 
+But NOTICE :
+Quote:
+Originally Posted by benwaggoner 
+Note that CRF~QP only roughly. It's on the same log scale as QP, but with an offset based on frame complexity. I wouldn't expect it to map linearly to any other quality control algorithms.
+filler56789 
+View Public Profile 
+Visit filler56789's homepage! 
+Find More Posts by filler56789 
+30th October 2020, 15:54
+# 6 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by microchip8 
+A CRF of 18 in x264 corresponds to 20 in x265.
+At what settings? Default? Cause how can we say that crf18 in x264 equals crf20 terms of image quality in x265, when crf20 preset 'fast' will produce image quality vastly different to crf20 preset 'slower'?
+In my experience slower presets uses higher bitrate at given crf-value than faster ones in x265, and the opposite is true for x264. So TS question can only be answered (at best) at specific encoder settings.
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+30th October 2020, 16:24
+# 7 
+|   Link 
+microchip8 
+ffx264/ffhevc author
+Join Date: May 2007
+Location: /dev/video0
+Posts: 2,123
+Quote:
+Originally Posted by excellentswordfight 
+At what settings? Default? Cause how can we say that crf18 in x264 equals crf20 terms of image quality in x265, when crf20 preset 'fast' will produce image quality vastly different to crf20 preset 'slower'?
+In my experience slower presets uses higher bitrate at given crf-value than faster ones in x265, and the opposite is true for x264. So TS question can only be answered (at best) at specific encoder settings.
+at medium preset
+__________________
+The Cyberpunk Database || NTP & NTS Time Server || Mirror Services 
+ffhevc || ffx264 || ffxvid 
+microchip8 
+View Public Profile 
+Visit microchip8's homepage! 
+Find More Posts by microchip8 
+30th October 2020, 21:06
+# 8 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Also, HEVC has a lot of tools to encode more efficiently or to suppress encoding artifacts that H.264 doesn't have. So, depending on the content, x265 can look better than x264 at the same QP. This will be somewhat content dependent. I'd think x265 anime using --tskip would look at lot better at the same QP than x264. But for noisy film grain content, the gap might be smaller or non-existent. In x264 a 10-bit QP looks better than the same QP at 8-bit, but HEVC doesn't have nearly the same gap.
+So, at a high level, starting with the same CRF is a decent ballpark, but I don't think we're going to have anything substantially more accurate without specifying parameters and content. I'd probably start an x265 encode tuning with the same CRF as x264, and go from there. Or maybe start it at 2 higher if I think the CRF might have been overkill in some sequences in x264.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+« 
+ Previous Thread 
+ |
+ Next Thread 
+ » 
+Thread Tools 
+Show Printable Version 
+Search this Thread 
+Advanced Search 
+Posting Rules
+You may not post new threads
+You may not post replies
+You may not post attachments
+You may not edit your posts
+BB code is On 
+Smilies are On 
+[IMG] code is On 
+HTML code is Off 
+Forum Rules 
+Forum Jump 
+User Control Panel 
+ Private Messages 
+ Subscriptions 
+ Who's Online 
+ Search Forums 
+ Forums Home 
+Announcements and Chat 
+     General Discussion 
+     News 
+     Forum / Site Suggestions & Help 
+ General 
+     Decrypting 
+     Newbies 
+     DVD2AVI / DGIndex 
+     Audio encoding 
+     Subtitles 
+     Linux, Mac OS X, & Co 
+ Capturing and Editing Video 
+     Avisynth Usage 
+     Avisynth Development 
+     VapourSynth 
+     Capturing Video 
+     DV 
+     HDTV / DVB / TiVo 
+     NLE - Non Linear Editing 
+     VirtualDub, VDubMod & AviDemux 
+     New and alternative a/v containers 
+ Video Encoding 
+     (Auto) Gordian Knot 
+     MPEG-4 ASP 
+     MPEG-4 Encoder GUIs 
+     MPEG-4 AVC / H.264 
+     High Efficiency Video Coding (HEVC) 
+     New and alternative video codecs 
+     MPEG-2 Encoding 
+     Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+ (HD) DVD, Blu-ray & (S)VCD 
+     One click suites for DVD backup and DVD creation 
+     DVD & BD Rebuilder 
+     (HD) DVD & Blu-ray authoring 
+     Advanced authoring 
+     IFO/VOB Editors 
+     DVD burning 
+ Hardware & Software 
+     Software players 
+     Hardware players 
+     PC Hard & Software 
+ Programming and Hacking 
+     Development 
+     Translations 
+All times are GMT +1. The time now is 09:23 .
+doom9.org -
+Archive -
+Top 
+Powered by vBulletin® Version 3.8.11
+Copyright ©2000 - 2026, vBulletin Solutions Inc.

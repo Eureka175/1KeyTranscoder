@@ -1,0 +1,940 @@
+<!DOCTYPE html><!-- Last Published: Wed Aug 26 2026 12:58:20 GMT+0000 (Coordinated Universal Time) --><html data-wf-domain="www.forasoft.com" data-wf-page="6a3f947f29694379b0158b0c" data-wf-site="64e8910adc5a63966a68acc1" lang="en" data-wf-collection="6a3f947e29694379b0158b06" data-wf-item-slug="vmaf-explained"><head><meta charset="utf-8"/><link href="https://cdn.prod.website-files.com" rel="preconnect" crossorigin="anonymous"/><title>VMAF Explained: Netflix&#x27;s Perceptual Video Quality Metric · Telemedicine · Fora Soft Learn</title><meta content="VMAF is Netflix&#x27;s perception-trained video quality metric on a 0–100 scale. See what it fuses, the 2026 v1 models, the 6-point JND, and where it lies." name="description"/><meta content="VMAF Explained: Netflix&#x27;s Perceptual Video Quality Metric · Telemedicine · Fora Soft Learn" property="og:title"/><meta content="VMAF is Netflix&#x27;s perception-trained video quality metric on a 0–100 scale. See what it fuses, the 2026 v1 models, the 6-point JND, and where it lies." property="og:description"/><meta content="VMAF Explained: Netflix&#x27;s Perceptual Video Quality Metric · Telemedicine · Fora Soft Learn" name="twitter:title"/><meta content="VMAF is Netflix&#x27;s perception-trained video quality metric on a 0–100 scale. See what it fuses, the 2026 v1 models, the 6-point JND, and where it lies." name="twitter:description"/><meta property="og:type" content="website"/><meta content="summary_large_image" name="twitter:card"/><meta content="width=device-width, initial-scale=1" name="viewport"/><link href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/css/test-forasoft.webflow.shared.17d7e35c0.min.css" rel="stylesheet" type="text/css" integrity="sha384-F9fjXAhiihBIS8qBDLRzr3LgZWz4ihKhLUzWdKCaNBwrk43whxX/efCPjUV488pM" crossorigin="anonymous"/><link href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/css/test-forasoft.webflow.6a3f947f29694379b0158b0c.d62dee11e.opt.min.css" rel="stylesheet" type="text/css" integrity="sha384-1i3uEebvmmrabEx91W/uVY75ktx4ynEkvDw0rUW82qiDsbWK9DcUsAcgUgjRvaEa" crossorigin="anonymous"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin="anonymous"/><script src="https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js" type="text/javascript"></script><script type="text/javascript">WebFont.load({  google: {    families: ["PT Serif:400,400italic,700,700italic"]  }});</script><script type="text/javascript">!function(o,c){var n=c.documentElement,t=" w-mod-";n.className+=t+"js",("ontouchstart"in o||o.DocumentTouch&&c instanceof DocumentTouch)&&(n.className+=t+"touch")}(window,document);</script><link href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/662ce6ca78c55edb337955c0_Favicon_32.png" rel="shortcut icon" type="image/x-icon"/><link href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/662ce63e7bb96441a4c253a4_Webclip.png" rel="apple-touch-icon"/><link href="https://www.forasoft.com/learn/video-quality/articles-vqm/vmaf-explained" rel="canonical"/><script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/vmaf-explained#webpage",
+      "url": "https://www.forasoft.com/learn/video-quality/articles-vqm/vmaf-explained",
+      "name": "VMAF Explained: Netflix&#39;s Perceptual Video Quality Metric · Telemedicine · Fora Soft Learn",
+      "description": "VMAF is Netflix&#39;s perception-trained video quality metric on a 0–100 scale. See what it fuses, the 2026 v1 models, the 6-point JND, and where it lies.",
+      "isPartOf": {
+        "@id": "https://www.forasoft.com/#website"
+      },
+      "inLanguage": "en",
+      "mainEntity": {
+        "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/vmaf-explained#article"
+      },
+      "breadcrumb": {
+        "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/vmaf-explained#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/vmaf-explained#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.forasoft.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Learn",
+          "item": "https://www.forasoft.com/learn"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Video quality",
+          "item": "https://www.forasoft.com/learn/video-quality"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Block 2. Objective Metrics",
+          "item": "https://www.forasoft.com/learn/video-quality/blocks/topics-vqm/objective-metrics"
+        },
+        {
+          "@type": "ListItem",
+          "position": 5,
+          "name": "VMAF Explained: Netflix&#39;s Perceptual Video Quality Metric",
+          "item": "https://www.forasoft.com/learn/video-quality/articles-vqm/vmaf-explained"
+        }
+      ]
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/vmaf-explained#article",
+      "headline": "VMAF Explained: Netflix&#39;s Perceptual Video Quality Metric",
+      "description": "VMAF is Netflix&#39;s perception-trained video quality metric on a 0–100 scale. See what it fuses, the 2026 v1 models, the 6-point JND, and where it lies.",
+      "datePublished": "2026-06-23T00:00:00.000Z",
+      "dateModified": "2026-06-23T00:00:00.000Z",
+      "author": {
+        "@type": "Person",
+        "@id": "https://www.forasoft.com/team/nikolay-sapunov#person",
+        "name": "Nikolay Sapunov",
+        "url": "https://www.forasoft.com/team/nikolay-sapunov",
+        "jobTitle": "CEO at Fora Soft",
+        "image": "https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a0c72a04c29b22a8ddb991b_6a0c728d356dff40621f0967_nikolay_sapunov.jpeg",
+        "sameAs": [
+          "https://www.linkedin.com/in/sapunov/",
+          "https://github.com/nicksapunov"
+        ],
+        "worksFor": {
+          "@id": "https://www.forasoft.com/#organization"
+        }
+      },
+      "publisher": {
+        "@id": "https://www.forasoft.com/#organization"
+      },
+      "mainEntityOfPage": {
+        "@id": "https://www.forasoft.com/learn/video-quality/articles-vqm/vmaf-explained#webpage"
+      },
+      "inLanguage": "en"
+    }
+  ]
+}
+</script><script src="https://www.google.com/recaptcha/api.js" type="text/javascript"></script><script async type="module" src="https://cdn.jsdelivr.net/npm/@finsweet/attributes@2/attributes.js" fs-list></script>
+
+<!-- Performance: preload LCP hero image (homepage) -->
+<link rel="preload" as="image" 
+      href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815-p-500.avif"
+      imagesrcset="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815-p-500.avif 500w, https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815.avif 884w"
+      imagesizes="(max-width: 479px) 100vw, 442px"
+      fetchpriority="high">
+
+<!-- Performance: preconnect to third-party JS CDN (Finsweet attributes) -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+<script>
+// Webflow injects loading="lazy" on all <img>. Override for above-the-fold.
+(function() {
+  var ATF_CLASSES = ['logo', 'image-273', 'close-menu', 'open-icon', 'rectangle-3821-copy'];
+  function fixImg(img) {
+    if (img.classList && ATF_CLASSES.some(c => img.classList.contains(c))) {
+      if (img.loading === 'lazy') {
+        img.loading = 'eager';
+        img.fetchPriority = 'high';
+      }
+    }
+  }
+  // 1) Run early on existing imgs
+  if (document.images) for (var i = 0; i < document.images.length; i++) fixImg(document.images[i]);
+  // 2) Watch for newly added imgs
+  new MutationObserver(function(records) {
+    records.forEach(function(r) {
+      r.addedNodes && r.addedNodes.forEach(function(n) {
+        if (n.tagName === 'IMG') fixImg(n);
+        if (n.querySelectorAll) n.querySelectorAll('img').forEach(fixImg);
+      });
+    });
+  }).observe(document.documentElement, {childList: true, subtree: true});
+})();
+</script>
+
+<!-- Performance: preconnect to Google Tag Manager (loaded via custom GTM block) -->
+<link rel="preconnect" href="https://www.googletagmanager.com">
+
+<link rel="preload" as="font" type="font/woff2" href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/69e3be8ec6908e6c1cf35c68_IBMPlexSans-Medium.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/69e3c02e489c18ea7d6561d7_IBMPlexSans-Bold.woff2" crossorigin>
+
+<style>
+.no-scroll{overflow:hidden}
+
+textarea{resize:none}
+*{-webkit-tap-highlight-color:transparent;outline:none}
+
+html,body{
+  font-family:"IBM Plex Sans",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif
+}
+
+.services-navigation-fixed{
+  opacity:0;
+  transition:opacity .3s ease
+}
+.services-navigation-fixed.is-visible{
+  opacity:1
+}
+
+@media screen and (max-width:479px){
+  .all-nav-links{
+    transform:translate3d(0,200dvh,0)!important;
+    height:140dvh!important;
+    min-height:100dvh;
+    margin-top:-100dvh
+  }
+}
+@media screen and (max-width:991px){
+  .all-nav-links{
+    transform:translate3d(0,-200vh,0);
+    height:140dvh!important;
+    min-height:100dvh;
+    margin-top:-100dvh
+  }
+}
+</style>
+
+<!-- Canonical Organization + WebSite (single source; see schema-implementation/00_CORE_NODES_canonical.md) -->
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://www.forasoft.com/#organization","name":"Fora Soft","legalName":"Fora Soft LLC","url":"https://www.forasoft.com/","logo":{"@type":"ImageObject","@id":"https://www.forasoft.com/#logo","url":"https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64e8910adc5a63966a68acc4_Logo%20full.svg","caption":"Fora Soft"},"image":{"@id":"https://www.forasoft.com/#logo"},"description":"Specialist software house for video, real-time and AI products. Founded 2005.","foundingDate":"2005","numberOfEmployees":{"@type":"QuantitativeValue","value":50},"founder":[{"@type":"Person","name":"Nikolay Sapunov","jobTitle":"CEO"},{"@type":"Person","name":"Polina Sapunova","jobTitle":"Co-founder, CMO/CFO"}],"email":"eager2develop@forasoft.com","areaServed":["US","GB","ZA","TR","DE","CH","NL","AU","AE","FR","DK","KZ","HK"],"knowsAbout":["WebRTC","LiveKit","Real-time video streaming","Low-latency live streaming","AI video recognition","Computer vision","Speech-to-text","Text-to-speech","Real-time speech translation","Multimodal AI agents","HIPAA-compliant telemedicine software","E-learning and virtual classroom platforms","Video surveillance / VMS","OTT and IPTV"],"contactPoint":[{"@type":"ContactPoint","telephone":"+852-8193-2621","email":"eager2develop@forasoft.com","contactType":"sales","availableLanguage":["en"]},{"@type":"ContactPoint","telephone":"+1-914-775-5855","email":"eager2develop@forasoft.com","contactType":"sales","areaServed":"US","availableLanguage":["en"]},{"@type":"ContactPoint","telephone":"+971-58-539-6367","contactType":"sales","availableLanguage":["en"],"url":"https://wa.me/971585396367"}],"address":[{"@type":"PostalAddress","streetAddress":"Flat A, 8/F, Kingswell Commercial Tower, 171 Lockhart Road, Wan Chai","addressLocality":"Hong Kong","addressCountry":"HK"},{"@type":"PostalAddress","addressLocality":"New York","addressRegion":"NY","addressCountry":"US"}],"sameAs":["https://www.linkedin.com/company/fora-soft-llc-","https://github.com/forasoft","https://www.youtube.com/@eager2develop","https://www.instagram.com/eager2develop","https://dribbble.com/ForaSoft","https://www.behance.net/Fora-Soft","https://forasoft.medium.com","https://clutch.co/profile/fora-soft","https://www.goodfirms.co/company/fora-soft"],"hasOfferCatalog":{"@type":"OfferCatalog","name":"Fora Soft services","itemListElement":[{"@type":"Offer","itemOffered":{"@type":"Service","name":"Video & Audio Streaming Software Development","url":"https://www.forasoft.com/services/video-audio-streaming-software-development"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Video Calling, Chat & Conferencing App Development","url":"https://www.forasoft.com/services/video-conference"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Custom Video & Audio Processing Software Development","url":"https://www.forasoft.com/services/custom-video-audio-processing-software-development"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"AI Integration & AI Software Development","url":"https://www.forasoft.com/services/ai-integration"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"AI Video & Streaming Software Development","url":"https://www.forasoft.com/services/ai-video-guide"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Video Surveillance & Video Management Software Development","url":"https://www.forasoft.com/services/video-surveillance"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Telemedicine & Healthcare Software Development","url":"https://www.forasoft.com/services/telemedicine"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"E-Learning & Virtual Classroom Software Development","url":"https://www.forasoft.com/services/e-learning"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Internet TV, OTT & IPTV Streaming Development","url":"https://www.forasoft.com/services/internet-tv"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Music Software Development","url":"https://www.forasoft.com/services/music"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"AR and VR Software Development","url":"https://www.forasoft.com/services/ar-vr"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Custom Software Development","url":"https://www.forasoft.com/services/custom-software-development"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Dedicated Development Team","url":"https://www.forasoft.com/services/dedicated-development-team"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Software Product Planning & Analytics","url":"https://www.forasoft.com/services/software-product-planning-analytics"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Software Troubleshooting & Optimization","url":"https://www.forasoft.com/services/software-troubleshooting-optimization"}},{"@type":"Offer","itemOffered":{"@type":"Service","name":"Software Product Maintenance & Support","url":"https://www.forasoft.com/services/software-product-maintenance-support"}}]}},{"@type":"WebSite","@id":"https://www.forasoft.com/#website","url":"https://www.forasoft.com/","name":"Fora Soft","publisher":{"@id":"https://www.forasoft.com/#organization"},"inLanguage":"en"}]}
+</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+
+<style>
+  /* ===== Article body typography ===== */
+  .article-body h2 {
+    font-size: 38px;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 48px 0 16px;
+    color: #111827;
+  }
+  .article-body h3 {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 32px 0 12px;
+    color: #111827;
+  }
+  .article-body p {
+    font-size: 17px;
+    line-height: 1.7;
+    color: #1f2937;
+    margin: 0 0 16px;
+  }
+  .article-body ul,
+  .article-body ol {
+    margin: 0 0 16px 24px;
+    font-size: 17px;
+    line-height: 1.7;
+    color: #1f2937;
+  }
+  .article-body li {
+    margin-bottom: 6px;
+  }
+  .article-body blockquote {
+    border-left: 4px solid #e5e7eb;
+    padding-left: 16px;
+    margin: 24px 0;
+    color: #4b5563;
+    font-style: italic;
+  }
+  .article-body a {
+    color: #2563eb;
+    text-decoration: underline;
+  }
+  .article-body a:hover {
+    color: #1d4ed8;
+  }
+
+  /* ===== Inline code ===== */
+  .article-body p code,
+  .article-body li code {
+    background: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+    font-size: 0.92em;
+    color: #be185d;
+  }
+
+  /* ===== Code blocks (dark theme for syntax highlighting) ===== */
+  .article-body pre {
+    background: #1e1e1e;
+    color: #f8f8f2;
+    padding: 16px 20px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 20px 0;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .article-body pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+  }
+
+  /* ===== Footnote markers — clean editorial style, no brackets ===== */
+  .article-body a.footnote-ref {
+    font-size: 0.65em !important;
+    line-height: 1 !important;
+    vertical-align: super !important;
+    color: #1B3A6F !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+    padding: 0 1px;
+    margin-left: 1px;
+    letter-spacing: 0.02em;
+    border-bottom: 0;
+    transition: color 0.15s ease;
+  }
+  .article-body a.footnote-ref:hover {
+    color: #3DA5D9 !important;
+  }
+  .article-body a.footnote-ref + a.footnote-ref::before {
+    content: "\2009";
+    color: #C5CAD2;
+    margin-right: 1px;
+  }
+  .article-body sup + sup::before {
+    content: "\2009";
+    color: #C5CAD2;
+  }
+  .article-body sup:has(a.footnote-ref) {
+    font-size: inherit !important;
+    vertical-align: baseline !important;
+    line-height: inherit !important;
+    margin-left: 1px;
+  }
+
+  /* ===== References list at the end of the article ===== */
+  .article-body .footnote {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid #E8EBEF;
+    font-size: 0.9em;
+    color: #4A4E55;
+  }
+  .article-body .footnote::before {
+    content: "References";
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #1B3A6F;
+    margin-bottom: 16px;
+  }
+  .article-body .footnote hr { display: none; }
+  .article-body .footnote ol {
+    padding-left: 24px;
+    font-size: inherit;
+  }
+  .article-body .footnote li {
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  .article-body .footnote a.footnote-backref {
+    color: #7A7F87 !important;
+    text-decoration: none !important;
+    margin-left: 6px;
+    font-size: 0.9em;
+  }
+  .article-body .footnote a.footnote-backref:hover { color: #1B3A6F !important; }
+
+  /* ===== Tables ===== */
+  .article-body table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 24px 0;
+    font-size: 0.95em;
+  }
+  .article-body table th,
+  .article-body table td {
+    border: 1px solid #E8EBEF;
+    padding: 10px 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .article-body table th {
+    background: #F5F7FA;
+    font-weight: 600;
+    color: #1B3A6F;
+  }
+  .article-body table tr:nth-child(even) td {
+    background: #FBFCFD;
+  }
+
+  /* ===== Body images ===== */
+  .article-body img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 24px auto;
+  }
+
+  /* ===== Mobile ===== */
+  @media screen and (max-width: 767px) {
+    .article-body h2 { font-size: 30px; line-height: 1.25; margin: 36px 0 12px; }
+    .article-body h3 { font-size: 19px; margin: 24px 0 10px; }
+    .article-body p,
+    .article-body ul,
+    .article-body ol { font-size: 16px; line-height: 1.65; }
+    .article-body pre { padding: 12px 16px; font-size: 13px; }
+    .article-body .footnote::before { font-size: 1.2rem; }
+    .article-body table { font-size: 0.88em; }
+    .article-body table th,
+    .article-body table td { padding: 8px 10px; }
+  }
+</style><script src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1%2F689e5ba67671442434f3ca35%2F6a82d2c710184daee99a58e7%2Fgtmcontainer-1.0.0.js" type="text/javascript"></script></head><body><header id="Header" class="header-copy h-landing"><div class="nav w-container"><a href="https://www.forasoft.com/" class="link-logonav w-inline-block"><div class="iconsite w-embed"><svg width="120" height="38" viewBox="0 0 100 25" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M7.38893 9.85327C9.60614 9.85327 11.4975 7.91317 11.4975 5.64638C11.4891 3.358 9.61746 1.45508 7.38131 1.45508H7.3737C5.15931 1.45508 3.27344 3.41801 3.27344 5.66267C3.27344 7.95215 5.17821 9.85327 7.38893 9.85327ZM7.38893 7.66167C6.31839 7.66167 5.41806 6.75266 5.41806 5.65488C5.41806 4.57196 6.32872 3.6396 7.38131 3.6396C8.45105 3.6396 9.34439 4.55405 9.35287 5.64638C9.35007 6.72969 8.45136 7.66167 7.38893 7.66167Z" fill="currentColor"/>
+<path d="M26.7385 10.446C26.7385 7.14802 23.8486 4.50916 20.6777 4.50916H20.6694L13.608 4.52545C13.0368 4.52545 12.5475 5.01941 12.5475 5.60531C12.5475 6.20083 13.023 6.68518 13.608 6.68518L20.6694 6.6689H20.677C22.7111 6.6689 24.6091 8.31697 24.6091 10.4467L24.6167 13.9032C24.6167 16.6816 21.9462 17.8563 19.5687 17.5358C16.2334 17.0967 15.1935 17.1003 11.8824 17.5521C9.5022 17.8747 6.82885 16.7094 6.81851 13.9272L6.81089 11.6786C6.81089 11.083 6.33531 10.5987 5.75035 10.5987C5.17919 10.5987 4.6898 11.0927 4.6898 11.6786L4.69742 13.9272C4.69742 18.0288 8.60079 20.1621 12.1697 19.6856C15.2911 19.26 16.1434 19.2572 19.2967 19.6693C22.8332 20.1458 26.7454 17.8695 26.7454 13.8869L26.7385 10.446Z" fill="currentColor"/>
+<path d="M19.6555 21.31C20.2152 21.4502 20.5579 22.0657 20.4197 22.6328L20.419 22.6342C20.2667 23.2084 19.6818 23.5561 19.1148 23.4088C16.6642 22.8185 14.8237 22.8343 12.3748 23.4251C11.8227 23.5775 11.2206 23.2149 11.0699 22.6505L11.0692 22.649C10.9311 22.0826 11.2739 21.4651 11.8341 21.3263C14.6517 20.6458 16.8362 20.6288 19.6555 21.31Z" fill="currentColor"/>
+<path d="M43.3362 9.86133C45.567 9.86133 47.3892 11.7811 47.3892 13.976C47.3892 16.1884 45.5757 18.0752 43.3362 18.0752C41.0914 18.0752 39.2832 16.1946 39.2832 13.976C39.2832 11.7786 41.0987 9.86133 43.3362 9.86133ZM43.3362 11.5565C42.0275 11.5565 41.2558 12.7772 41.2558 13.976C41.2558 15.1701 42.0372 16.3801 43.3362 16.3801C44.6353 16.3801 45.4167 15.1701 45.4167 13.976C45.4167 12.7772 44.645 11.5565 43.3362 11.5565Z" fill="currentColor"/>
+<path d="M53.6916 9.87674C53.9792 9.87674 54.2155 9.89215 54.4005 9.92297V11.7568C54.2361 11.7363 53.9946 11.726 53.6762 11.726C52.9673 11.726 52.3663 11.9675 51.8731 12.4503C51.3902 12.9229 51.1128 13.5599 51.0409 14.3613V17.9674H49.0684V9.95379H51.0409V12.4966C51.1334 11.7157 51.3954 11.0839 51.8269 10.601C52.2686 10.1182 52.8902 9.87674 53.6916 9.87674Z" fill="currentColor"/>
+<path d="M58.858 9.86133C59.4436 9.86133 59.947 9.98975 60.3683 10.2466C60.7895 10.5034 61.0258 10.7654 61.0771 11.0325V9.95379H63.0497V17.9674H61.0771V16.7807C60.6963 17.5146 59.6162 18.0752 58.858 18.0752C56.6 18.0752 55.0978 16.101 55.0978 13.9606C55.0978 11.849 56.6317 9.86133 58.858 9.86133ZM59.1662 11.5565C57.8719 11.5565 57.0704 12.7659 57.0704 13.9606C57.0704 15.1702 57.8531 16.3801 59.1662 16.3801C60.5205 16.3801 61.1696 15.1817 61.1696 13.9606C61.1696 13.1387 60.9744 12.5325 60.584 12.1421C60.2039 11.7517 59.7313 11.5565 59.1662 11.5565Z" fill="currentColor"/>
+<path d="M38.9002 8.75592H35.537C34.7251 8.75592 34.0669 9.42793 34.0669 10.2569V11.6438H38.1698L37.7497 13.5003H34.0669V18.0384H31.9844V10.1475C31.9844 8.37118 33.3948 6.93115 35.1346 6.93115H38.9002V8.75592Z" fill="currentColor"/>
+<path d="M90.0556 6.93115H91.6753L91.4317 8.75145H90.159C89.458 8.75145 88.9844 9.24903 88.9844 9.99539V10.5142H91.1703L90.9253 12.3414H88.9844V17.9672H87.0938V10.164C87.0938 8.22209 88.2861 6.93115 90.0556 6.93115Z" fill="currentColor"/>
+<path d="M96.6461 12.3891H94.8104V14.6267C94.8104 15.6302 95.2971 16.2318 96.1418 16.2318H97.0908L96.8183 18.0713H95.7201C94.047 18.0713 92.9258 16.8152 92.9258 14.9435V7.76416H94.8104V10.5426H96.8888L96.6461 12.3891Z" fill="currentColor"/>
+<path d="M74.634 7.54073C75.2678 7.95607 75.7353 8.46486 76.0366 9.0671L74.2444 9.6901C73.7412 8.61732 70.9561 8.10806 70.9561 9.76798C70.9561 10.8294 72.1325 11.0592 72.9353 11.3411C74.5703 11.8955 76.286 12.9304 76.286 14.8611C76.286 16.8904 74.2101 18.0384 72.3742 18.0384C70.6372 18.0384 68.9356 17.1869 68.3223 15.4841L70.0054 14.7365C70.3725 15.6994 71.3708 16.2628 72.3742 16.2628C73.2424 16.2628 74.2444 15.8629 74.2444 14.8611C74.2444 13.8279 73.2418 13.4547 72.4054 13.1634C70.7321 12.5913 68.8989 11.8036 68.8989 9.76798C68.8989 6.99957 72.7086 6.25791 74.634 7.54073Z" fill="currentColor"/>
+<path d="M81.5686 9.86133C83.7994 9.86133 85.6216 11.7811 85.6216 13.976C85.6216 16.1733 83.7701 18.0752 81.5686 18.0752C79.3238 18.0752 77.5156 16.1946 77.5156 13.976C77.5156 11.7786 79.3312 9.86133 81.5686 9.86133ZM81.5686 11.5565C80.2599 11.5565 79.4882 12.7772 79.4882 13.976C79.4882 15.1701 80.2696 16.3801 81.5686 16.3801C82.8677 16.3801 83.6491 15.1701 83.6491 13.976C83.6491 12.7772 82.8774 11.5565 81.5686 11.5565Z" fill="currentColor"/>
+</svg>
+
+<style>
+.iconsite {
+ display: flex;
+ align-items: center;
+}
+</style></div></a><address id="nav-dropdown" class="all-nav-links"><div class="nav-links"><div data-hover="true" data-delay="0" class="w-dropdown"><div id="services-dd-toggle" class="dropdown-toggle w-dropdown-toggle"><a href="/services" class="w-inline-block"><div class="link-menu-copy">Services</div><div class="icon-17 w-icon-dropdown-toggle"></div></a></div><nav id="services-dd-list" class="dropdown-list w-dropdown-list"><div class="svc-mega"><div class="svc-col"><div class="svc-sec"><div class="svc-eyebrow svc-eyebrow--accent">Industries <!-- -->&amp;<!-- --> use cases</div><div class="svc-list"><a href="/services/ai-integration" class="svc-link">AI integration</a><a href="/services/video-audio-streaming-software-development" class="svc-link">Video <!-- -->&amp;<!-- --> audio streaming</a><a href="/services/video-conference" class="svc-link">Video chats &amp; conference</a><a href="/services/custom-video-audio-processing-software-development" class="svc-link">Video <!-- -->&amp;<!-- --> audio processing</a><a href="/services/video-surveillance" class="svc-link">Video surveillance</a><a href="/services/e-learning" class="svc-link">E-learning</a><a href="/services/music" class="svc-link">Music</a><a href="/services/telemedicine" class="svc-link">Telemedicine</a><a href="/services/ar-vr" class="svc-link">AR / VR</a><a href="/services/internet-tv" class="svc-link">Internet TV</a></div></div><div class="svc-sec"><div class="svc-eyebrow svc-eyebrow--accent">Engagement models</div><div class="svc-list"><a href="/services/software-product-planning-analytics" class="svc-link"><span class="svc-num">01</span><span>Plan <!-- -->&amp;<!-- --> analytics</span></a><a href="/services/custom-software-development" class="svc-link"><span class="svc-num">02</span><span>Custom dev</span></a><a href="/services/software-troubleshooting-optimization" class="svc-link"><span class="svc-num">03</span><span>Troubleshoot <!-- -->&amp;<!-- --> optimize</span></a><a href="/services/software-product-maintenance-support" class="svc-link"><span class="svc-num">04</span><span>Maintain <!-- -->&amp;<!-- --> support</span></a><a href="/services/dedicated-development-team" class="svc-link"><span class="svc-num">05</span><span>Dedicated team</span></a></div></div></div><div class="svc-col"><div class="svc-sec"><div class="svc-eyebrow accent">Technology<!-- -->‍</div><div class="svc-eyebrow">01 · Real-time &amp; infra</div><div class="svc-list"><a href="/webrtc-software-development-experts" class="svc-link">WebRTC</a><a href="/livekit-software-development-experts" class="svc-link">LiveKit</a><a href="/agora-software-development-experts" class="svc-link">Agora</a><a href="/twilio-software-development-experts" class="svc-link">Twilio</a><a href="/telnyx-api-integration-services-experts" class="svc-link">Telnyx</a><a href="/wowza-streaming-development-experts" class="svc-link">Wowza</a><a href="/custom-webrtc-architecture-development-experts" class="svc-link">Custom WebRTC architecture</a><a href="/custom-moq-quic-development" class="svc-link">MoQ <!-- -->&amp;<!-- --> QUIC</a><a href="/ai-scalable-video-streaming" class="svc-link">Scalable AI streaming</a><a href="/video-chat-app-development" class="svc-link">Video calling &amp; chat</a></div></div><div class="svc-sec"><div class="svc-eyebrow">02 <!-- -->·<!-- --> AI agents <!-- -->&amp;<!-- --> voice</div><div class="svc-list"><a href="/livekit-ai-agent-development-experts" class="svc-link">LiveKit AI agent</a><a href="/ai-call-agent-development" class="svc-link">AI call agent</a><a href="/ai-chatbot-voice-assistant-development-experts" class="svc-link">AI chatbot <!-- -->&amp;<!-- --> voice</a><a href="/custom-speech-to-text-development" class="svc-link">ASR / STT</a><a href="/custom-text-to-speech-development" class="svc-link">TTS <!-- -->&amp;<!-- --> voice cloning</a><a href="/custom-ai-language-interpretation-experts" class="svc-link">AI interpretation</a><a href="/agentic-engineering-video-streaming-development" class="svc-link">Agentic engineering</a><a href="/ai-video-agent-development" class="svc-link">AI video agent for computer vision</a></div></div></div><div class="svc-col"><div class="svc-sec"><div class="svc-eyebrow">03 <!-- -->·<!-- --> AI vision</div><div class="svc-list"><a href="/ai-video-recognition-software-experts" class="svc-link">AI video recognition</a><a href="/computer-vision-for-video-surveillance" class="svc-link">Computer vision for surveillance</a></div></div><div class="svc-sec"><div class="svc-eyebrow">04 <!-- -->·<!-- --> Industry solutions</div><div class="svc-list"><a href="/ai-telehealth-video-platform-development" class="svc-link">AI telehealth</a><a href="/ai-medical-imaging-development-experts" class="svc-link">AI medical imaging</a><a href="/elearning-virtual-classroom-development" class="svc-link">Virtual classroom <!-- -->&amp;<!-- --> EdTech</a></div></div><div class="svc-sec"><div class="svc-eyebrow">05 <!-- -->·<!-- --> Mobile <!-- -->&amp;<!-- --> platform</div><div class="svc-list"><a href="/ai-mobile-app-development" class="svc-link">AI mobile app</a><a href="/electron-desktop-app-development-services" class="svc-link">All-purpose Electron desktop</a><a href="/electron-desktop-app-development-video-ai-real-time" class="svc-link">Electron.js for video, AI, and real-time</a><a href="#" class="svc-link">Custom MDM</a></div></div><div class="svc-sec"><div class="svc-eyebrow">06 <!-- -->·<!-- --> Code rescue</div><div class="svc-list"><a href="/vibe-code-cleanup" class="svc-link">Vibe code cleanup</a><a href="/lovable-app-bug-fixing" class="svc-link">Lovable &amp; Replit bug fixing</a></div></div></div></div><div aria-hidden="true" class="svc-overrides"></div></nav></div><a href="https://www.forasoft.com/projects" class="nav-link w-inline-block"><div class="link-menu-copy">Projects</div></a><a href="/calculator" class="nav-link w-inline-block"><div class="link-menu-copy">Cost</div></a><a href="https://www.forasoft.com/blog" class="nav-link w-inline-block"><div class="link-menu-copy blogredirect">Blog</div></a><a href="/ship-log" class="nav-link w-inline-block"><div class="link-menu-copy blogredirect">Ship Log</div></a><div data-hover="true" data-delay="0" class="dropdown w-dropdown"><div id="services-dd-toggle" class="dropdown-toggle w-dropdown-toggle"><a href="/learn" class="link-block-23 w-inline-block"><div class="link-menu-copy">Learn</div><div class="icon-17 w-icon-dropdown-toggle"></div></a></div><nav id="services-dd-list" class="dropdown-list learn-hub w-dropdown-list"><div class="svc-mega learn-hub"><div class="svc-col"><div class="svc-sec"><div class="svc-eyebrow svc-eyebrow--accent">Learning courses</div><div class="svc-list"><a href="/learn/video-encoding" class="svc-link">Video encoding</a><a href="/learn/video-streaming" class="svc-link">Video streaming</a><a href="/learn/ai-for-video-engineering" class="svc-link">AI for video engineering</a><a href="/learn/audio-for-video" class="svc-link">Audio for video</a><a href="/learn/video-surveillance" class="svc-link">Video surveillance &amp; VMS</a><a href="/learn/telemedicine" class="svc-link">Video for telemedicine</a><a href="/learn/ott-video-platform" class="svc-link">OTT &amp; Video-on-demand</a><a href="/learn/elearning-video" class="svc-link">E-learning video</a><a href="/learn/video-quality" class="svc-link">Video quality measurement</a></div></div><div class="svc-sec"><div class="svc-eyebrow accent">Downloads</div><div class="svc-list"><a href="https://www.forasoft.com/learn/downloads" class="svc-link">Go to the downloads hub</a></div></div></div><div class="svc-col"><div class="svc-sec"><div class="svc-eyebrow svc-eyebrow--accent">Architecture guides</div><div class="svc-list"><a href="/learn/webrtc-architecture-production-systems" class="svc-link">WebRTC architecture for production systems</a><a href="/learn/livekit-for-ai-agents-guide" class="svc-link">LiveKit for AI agents</a><a href="/learn/real-time-speech-translation-live-video" class="svc-link">Real-time speech translation for live video</a><a href="/learn/multimodal-agentic-ai-real-time-systems" class="svc-link">Multimodal agentic AI in real-time systems</a><a href="/learn/ai-video-agent-development" class="svc-link">AI video agent development</a><a href="/learn/e-learning-platform-development" class="svc-link">E-learning platform development</a></div></div><div class="svc-sec"><div class="svc-eyebrow accent">Tools</div><div class="svc-list"><a href="/learn/tools" class="svc-link">Go to the tools hub</a></div></div></div></div><div aria-hidden="true" class="svc-overrides"></div></nav></div><a href="https://www.forasoft.com/lab" class="nav-link w-inline-block"><div class="link-menu-copy">Demos</div></a><a href="https://www.forasoft.com/#Contacts" class="nav-link w-inline-block"><div class="link-menu-copy">Contacts</div></a></div><a href="#" data-w-id="a06cc9e2-c70e-e5fa-494f-01dc98a86e78" class="button text-header open-form w-button">Contact us</a></address><div class="hamburger"><img data-w-id="78fe4c3a-f111-43f1-fad8-5ff99dd904c5" fetchpriority="high" alt="Cross icon" src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/653a5a637eb6fd8866e66e0b_Close.svg" loading="eager" class="close-menu"/><img data-w-id="78fe4c3a-f111-43f1-fad8-5ff99dd904c6" fetchpriority="high" alt="Menu icon" src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/654202981f0a7887493a6442_Menu.svg" loading="eager" class="open-icon"/><div class="open-menu"><div class="line"></div><div class="line"></div><div class="line"></div></div></div></div></header><section class="article-header"><div class="article-container"><div class="breadcrumbs"><a href="/" class="breadcrumb-link">Home</a><div class="breadcrumb-sep">›</div><a href="/learn" class="breadcrumb-link">Learn</a><div class="breadcrumb-sep">›</div><a href="/learn/video-quality" class="breadcrumb-link">Video quality measurement</a><div class="breadcrumb-sep">›</div><a href="/learn/video-quality/blocks/topics-vqm/objective-metrics" class="breadcrumb-link w-inline-block"><div>Block 2. Objective Metrics</div></a><div class="breadcrumb-sep">›</div><div class="breadcrumb-current">VMAF Explained: Netflix&#x27;s Perceptual Video Quality Metric</div></div><h1 class="article-h1">VMAF Explained: Netflix&#x27;s Perceptual Video Quality Metric</h1><div class="article-meta"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a0c72a04c29b22a8ddb991b_6a0c728d356dff40621f0967_nikolay_sapunov.jpeg" alt="VMAF Explained: Netflix&#x27;s Perceptual Video Quality Metric" class="author-photo"/><div>By</div><a href="/team/nikolay-sapunov" class="meta-author-link">Nikolay Sapunov</a><div class="meta-sep">·</div><div>Published</div><div>June 23, 2026</div><div class="meta-sep">·</div><div>22</div><div>min read</div></div></div></section><section><div class="article-container"><div class="tldr-box"><p class="tldr-label">TL;DR</p><div class="w-richtext"><p>VMAF — Video Multimethod Assessment Fusion — is a full-reference video quality metric that Netflix built and open-sourced to predict, on a 0-to-100 scale, how good a compressed video actually looks to a person. Instead of measuring one thing, it measures several — how much visual information survived, how much fine detail was lost, and how much the picture moves — and a machine-learning model trained on human scores fuses them into a single number that tracks the eye better than PSNR or SSIM. That training is its strength and its catch: a VMAF score means nothing until you name the model behin</p></div></div><div id="article-body" class="article-body w-richtext"><h2>Why this matters</h2>
+<p>VMAF is the quality number the streaming industry now argues in. It decides bitrate ladders, settles "which encoder is better" debates, gates releases, and shows up in every modern FFmpeg quality report — usually quoted as a bare "VMAF 95" with no model named, which is the single most common way engineers fool themselves with it. This article gives you the metric in full: the fusion idea that makes it perceptual, the training that grounds it in human opinion, the score scale and the just-noticeable-difference threshold, the model-selection rules, and the blind spots you must name before you trust a number. It is the deep dive that the encoder-side <a href="/learn/video-encoding/articles/quality-metrics-psnr-ssim-vmaf">quality-metrics overview</a> in our Video Encoding section points to.</p>
+<h2>What VMAF actually is</h2>
+<p>Start with the problem VMAF was built to solve. <a href="/learn/video-quality/articles-vqm/psnr-explained">PSNR</a> measures pixel error and correlates weakly with what people see. <a href="/learn/video-quality/articles-vqm/ssim-explained">SSIM</a> measures structural similarity and tracks the eye better, but it still measures only one kind of thing, and it saturates near the top of its scale where streaming-grade encodes live. Netflix, grading thousands of encodes a day across a vast catalogue, needed a number that matched human opinion closely enough to drive real bitrate decisions. No single existing metric did the job on all their content.</p>
+<p>Their answer was to stop looking for one perfect measurement and instead combine several imperfect ones. The full name says it: Video Multimethod Assessment <strong>Fusion</strong>. VMAF takes a handful of established quality measurements — each good at catching a different kind of damage — and fuses them with a model that learned, from human ratings, how to weigh them. The result is a single score from 0 to 100 that predicts the Mean Opinion Score a panel of viewers would give the clip (Netflix Technology Blog, "Toward a Practical Perceptual Video Quality Metric", June 2016).</p>
+<p>Two facts about VMAF frame everything else. First, like PSNR and SSIM, it is a <strong>full-reference</strong> metric: it needs the pristine original on disk to compare the impaired video against, frame for frame. No reference, no VMAF — which rules it out for live and user-generated content with no master to compare (the three setups are covered in <a href="/learn/video-quality/articles-vqm/full-reduced-no-reference-metrics">full-reference, reduced-reference, no-reference metrics</a>). Second, VMAF is <strong>trained</strong>, not derived. PSNR comes from a formula; VMAF comes from a model fitted to human scores. That is why it is more accurate, and also why it carries baggage a formula never would — a training set, a viewing condition, and a way to be gamed.</p>
+<h2>The fusion idea: what VMAF combines</h2>
+<p>Here is the analogy to carry through the article. PSNR is a single judge who only counts spelling mistakes. VMAF is a small panel of specialist judges — one watches for lost information, one watches for lost detail, one watches how the picture moves — and a chairman who learned from experience how much to trust each judge on each kind of footage. The panel beats any single judge because each specialist catches something the others miss.</p>
+<p>In the original and long-dominant VMAF design (the "v0" generation, models named <code>vmaf_v0.6.1</code> and friends), the panel had three kinds of judge.</p>
+<p><strong>Visual Information Fidelity, or VIF — how much of the picture's information survived.</strong> VIF treats the original frame as a source of visual information and asks how much of that information makes it through compression to your eye, modelled on how the human visual system takes in a scene. It is computed at four spatial scales, from coarse to fine, so it notices both broad and fine losses (Sheikh and Bovik, "Image Information and Visual Quality", IEEE Transactions on Image Processing, 2006). When compression strips away the subtle texture of skin or foliage, VIF is the judge that reacts.</p>
+<p><strong>Detail Loss Metric, or DLM — how much fine detail was destroyed, separately from noise that was added.</strong> DLM splits the damage into two parts: detail that was <em>lost</em> (which makes the picture less clear) and impairment that was <em>added</em> (extra junk that distracts the eye), and it scores the detail loss on its own (Li, Zhang, Ma, and Ngan, "Image Quality Assessment by Separately Evaluating Detail Losses and Additive Impairments", IEEE Transactions on Multimedia, 2011). This is the judge that catches blur and the smearing-away of texture.</p>
+<p><strong>Motion — how much the picture is moving.</strong> VMAF measures the temporal difference between neighbouring frames — in the open-source package, the mean co-located pixel difference on the luma (brightness) channel. Motion matters because the eye forgives more distortion when the scene is moving fast; a still frame is scrutinised, a fast pan is not. Feeding motion into the model lets it calibrate how harshly to judge the spatial damage.</p>
+<p>Each of these produces a number per frame. On its own, none is VMAF. The point of VMAF is what happens next.</p>
+<p><img alt="VMAF fuses three kinds of feature — information fidelity, detail loss, and motion — through a trained model into one 0-to-100 score." src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a3f96bfaf40729e075a28a0_6a3f96b7086bb480a4511dff_02_4-vmaf-explained__01-fusion.svg">
+<em>Figure 1. The classic VMAF (v0) design: per-frame features feed a model trained on human scores, which fuses them into one perceptual number. The 2026 v1 generation changes the feature set — see below.</em></p>
+<h2>How the model learned: training on human scores</h2>
+<p>The judges' scores are combined by a trained model — in the open-source VMAF, a <strong>Support Vector Machine regressor</strong>, a standard machine-learning model that learns a smooth mapping from a set of input numbers (the feature scores) to one output number (the predicted quality). It is "trained" in the literal sense: it was shown thousands of examples where the feature scores were known and the true quality was measured, and it fitted the weights that best reproduce the true quality from the features (Netflix Technology Blog, 2016).</p>
+<p>Where did the "true quality" come from? From people. Netflix built a dataset of clips from its own catalogue, each ten seconds long, encoded at a grid of resolutions and quality levels to produce a wide range of impairments. Human viewers rated each one in a controlled lab test using the Absolute Category Rating method — watch a clip, score it on a scale from bad to excellent — defined in <a href="/learn/video-quality/articles-vqm/test-methodologies-acr-dcr-pc">ITU-T P.910</a>. Those raw opinions were cleaned of unreliable voters and noise into stable per-clip scores, then mapped onto the VMAF scale, where roughly "bad" lands near 20 and "excellent" lands at 100 (Netflix VMAF documentation, model notes, accessed 2026-06-23).</p>
+<p>This is the whole basis of VMAF's authority, and the reason to respect it: the metric is a model of human opinion, fitted to real human opinion. Remember the central rule of this section — every objective metric is a proxy validated against subjective scores, and the eye is the ground truth (the distinction is laid out in <a href="/learn/video-quality/articles-vqm/subjective-vs-objective-quality">subjective vs objective quality</a>). VMAF wears that relationship on its sleeve: it was <em>literally built</em> by regression onto subjective scores. When VMAF and a careful subjective test disagree, the test wins and the model failed on that content — the same as for any metric.</p>
+<h2>Reading a VMAF score: the 0-to-100 scale</h2>
+<p>VMAF runs from 0 to 100. Higher is better; 100 is the ceiling, reached when the encode is perceptually indistinguishable from the source under the model's viewing condition. The scale is designed to be roughly linear with human opinion, which is its great usability advantage over SSIM: a jump from 60 to 70 means about as much perceptual improvement as a jump from 80 to 90, so you can reason about differences arithmetically.</p>
+<p>The rough, content-dependent bands are worth committing to memory. Below about 60, most viewers find the quality poor or annoying. Around 70 is fair — watchable but visibly compressed. Around 80 is good. The 90s are where streaming services aim for premium content: at roughly 93 and above, most viewers stop noticing compression under normal viewing. Treat these as orientation, not law — what a given VMAF "looks like" depends on the content, the screen, and the viewer, and only a <a href="/learn/video-quality/articles-vqm/why-subjective-testing-is-ground-truth">subjective test</a> is ground truth.</p>
+<p>The most useful single fact for working with VMAF is the <strong>just-noticeable difference, or JND: about 6 VMAF points</strong>. Netflix's guidance is that a difference of roughly 6 points is the threshold at which most viewers (more than half) start to notice a quality change. A delta under about 2 points is in the noise and irrelevant; deltas above 2 begin to matter; deltas of 6 or more are visible to most people (Netflix VMAF guidance, 2017). That single number turns VMAF from an abstract score into a decision tool, as the worked example below shows.</p>
+<p><img alt="The VMAF 0-to-100 scale with quality bands, the roughly 6-point just-noticeable-difference threshold, and a worked comparison point." src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a3f96beaf40729e075a2891_6a3f96b85a000ae4c4b32ba6_02_4-vmaf-explained__02-scale.svg">
+<em>Figure 2. The VMAF scale and its bands are content-dependent rules of thumb. The ~6-point JND is the practical threshold: smaller gaps are below what most viewers notice.</em></p>
+<h2>A worked example: turning a VMAF gap into a bitrate decision</h2>
+<p>Numbers make this concrete. Suppose you are choosing between two encodes of the same master, measured with the <strong>same model</strong> (default 1080p) and the <strong>same pooling</strong> (mean), apples-to-apples on the same frames:</p>
+<ul>
+<li>Encode A: 4.5 Mbps, VMAF 95.2</li>
+<li>Encode B: 3.0 Mbps, VMAF 93.4</li>
+</ul>
+<p>Work the two questions out loud. First, <strong>is the quality difference one a viewer would see?</strong> Subtract the scores:</p>
+<pre><code>VMAF gap = 95.2 − 93.4 = 1.8 points
+</code></pre>
+<p>That 1.8 is below the ~6-point JND, and even below the ~2-point "irrelevant" floor. Most viewers would not see the difference between A and B. Second, <strong>what does choosing B cost in quality and save in bandwidth?</strong></p>
+<pre><code>bitrate saving = (4.5 − 3.0) / 4.5 = 1.5 / 4.5 = 0.333 = 33%
+</code></pre>
+<p>Encode B delivers a 33% bitrate saving for a quality drop most people will never notice. Multiply that across millions of streams and it is the difference between an affordable service and an expensive one — which is exactly why Netflix built VMAF, and why a metric that tracks the eye pays for itself (the broader argument is in <a href="/learn/video-quality/articles-vqm/business-case-for-measuring-quality">the business case for measuring quality</a>). The decision rests entirely on the JND: without it, 1.8 points looks like a real difference; with it, you can see the saving is nearly free.</p>
+<p>One caveat the example needs. VMAF predictions carry uncertainty, and the 0.6.2 and 0.6.3 models can report a <strong>95% confidence interval</strong> computed by bootstrapping the model on its training residuals (Netflix Technology Blog, "VMAF: The Journey Continues", October 2018). If Encode B's score is reported as 93.4 with a 95% interval of, say, ±1.2 points — the range [92.2, 94.6] — then a second run on slightly different frames could land anywhere in that band. A gap of 1.8 points between two encodes, with intervals that wide, is well inside the noise. Reporting VMAF without its interval, then treating a sub-point difference as real, is a classic error. VMAF gives you error bars; use them. The practical depth on models, pooling, and confidence intervals is the subject of <a href="/learn/video-quality/articles-vqm/vmaf-in-depth-models-confidence-intervals">VMAF in depth</a>.</p>
+<h2>A VMAF score is meaningless without its model</h2>
+<p>This is the point that separates people who use VMAF well from people who quote it badly. <strong>"VMAF 95" is not a quality statement until you name the model.</strong> The default model was trained for one specific viewing condition — a 1080p HDTV in a living room, viewed from three times the screen height. Change the screen or the distance and the right model changes, because the same distortion is more or less visible depending on how big the picture is and how close you sit.</p>
+<p>Netflix ships several models for exactly this reason (Netflix VMAF model documentation, accessed 2026-06-23):</p>
+<ul>
+<li>The <strong>default model</strong> (<code>vmaf_v0.6.1</code>) predicts quality on a 1080p TV at three times the screen height. It is the right default for most living-room streaming.</li>
+<li>The <strong>phone model</strong>, invoked with a phone-viewing option, predicts quality on a small handset screen. Because a phone is small and held at a comfortable distance, the same compression is <em>less</em> visible, so the phone model reports <strong>higher</strong> scores than the default for the same encode. An encode that scores 88 on the default model can score in the high 90s on the phone model — and both are correct, for their viewing conditions.</li>
+<li>The <strong>4K model</strong> (<code>vmaf_4k_v0.6.1</code>, added 2018) predicts quality on a 4K TV viewed from 1.5 times the screen height, the distance at which a viewer can actually appreciate 4K sharpness.</li>
+</ul>
+<p>The rule is strict: a VMAF comparison is only valid when every number uses the <strong>same model</strong>, computed by the same tool and version, on the same frames at the same resolution. Compare a phone-model score against a default-model score and you are comparing two different questions. When you report VMAF, state the model — "VMAF 93.4, default v0.6.1 model, mean pooling" — never just "VMAF 93.4".</p>
+<p><img alt="A model-selection table: default, phone, and 4K viewing conditions map to different VMAF models and different scores for the same encode." src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a3f96bfaf40729e075a289a_6a3f96ba933922841eb78c9f_02_4-vmaf-explained__03-models.svg">
+<em>Figure 3. The same encode scores differently under each model because each predicts a different viewing condition. Name the model, or the number is ambiguous.</em></p>
+<h2>VMAF v1: the 2026 generation</h2>
+<p>In June 2026 Netflix released a new generation of models, <strong>VMAF v1</strong>, the first substantial change to the feature set since the metric launched. It matters for anyone reading or quoting VMAF today, because v1 fixes several of v0's best-known blind spots — and because the two generations are not interchangeable (Netflix Technology Blog, "VMAF v1: Good Is Not Good Enough", June 2026; Netflix VMAF v1 model documentation).</p>
+<p>Four changes stand out. First, <strong>v1 adds a banding detector.</strong> Plain v0 was largely blind to banding — the staircase steps that appear in what should be a smooth sky or gradient — so an encode could band visibly while VMAF stayed high. V1 folds in CAMBI, Netflix's banding-artifact detector, as a feature, so the score now reacts to banding (banding itself is covered in <a href="/learn/video-quality/articles-vqm/banding-gradient-steps">banding: when smooth gradients break into steps</a>). Second, <strong>v1 sees colour.</strong> V0 used only luma (brightness) features and was unaware of chroma artifacts like colour bleeding; v1 adds chroma features so colour damage now affects the score. Third, <strong>v1 handles viewing distance more cleanly:</strong> rather than bolting on separate phone and 4K models after the fact, v1 adjusts its feature calculations for the normalised viewing distance directly, then trains one consistent model that is reapplied for phone (5H), 4K at 1.5H, and a consumer 4K-at-3H condition — the last using an extended [0, 110] range to quantify the extra benefit of 4K over 1080p at the same distance. Fourth, and surprising: <strong>v1 drops VIF.</strong> The information-fidelity feature that anchored v0 was computationally expensive and, once the other features were improved, no longer added meaningful accuracy — so removing it made VMAF both more accurate and faster.</p>
+<p>Two practical notes. V1 is best computed at 10-bit precision even for 8-bit SDR content, because the extra precision helps it see banding; you can measure an 8-bit encode at 10 bits by preprocessing both inputs. And v1 ships dedicated high-frame-rate variants for ~50/60 fps content, using a wider five-frame motion window to fix the under-prediction v0 showed on fast content. The headline for a working engineer: if you are starting a new measurement program in 2026, evaluate v1; if you have a history of v0 numbers, do not mix the two in one comparison — re-baseline.</p>
+<h2>NEG mode: when the metric can be gamed</h2>
+<p>VMAF has one property that is a feature in delivery and a trap in codec comparison: it rewards image enhancement. Because it was trained to predict what looks good, sharpening or boosting contrast before encoding can <em>raise</em> the VMAF score, even though nothing about the compression improved — the encoder just learned to please the metric (Netflix Technology Blog, "Toward a Better Quality Metric for the Video Community", December 2020).</p>
+<p>That is fine when you really did enhance the picture for viewers, but it corrupts an encoder-versus-encoder test, where you want to measure compression gain alone. Netflix's fix is <strong>VMAF-NEG</strong> — No Enhancement Gain — a mode that disables the score boost from enhancement so a sharpening trick cannot inflate the result. Use the standard model to predict delivered quality; use NEG when comparing encoders so nobody can game the comparison. This "gaming the metric" problem, and exactly when to report NEG, is the subject of its own article, <a href="/learn/video-quality/articles-vqm/vmaf-neg-explained">VMAF-NEG explained</a>.</p>
+<h2>How to compute VMAF with FFmpeg and libvmaf</h2>
+<p>You will almost never run the model yourself; the everyday path is FFmpeg with the <code>libvmaf</code> filter, which wraps Netflix's library. The filter takes two inputs — the distorted clip first, the reference second — and writes a log with the per-frame and pooled VMAF. A current invocation (FFmpeg 7.x, libvmaf 3.x) looks like this:</p>
+<pre><code class="language-bash"># VMAF of a distorted encode against its reference master.
+# Distorted is the FIRST input, reference the SECOND.
+# Writes a JSON log with per-frame and pooled VMAF.
+ffmpeg -i distorted.mp4 -i reference.mp4 \
+  -lavfi &quot;libvmaf=log_path=vmaf.json:log_fmt=json:n_threads=4&quot; \
+  -f null -
+</code></pre>
+<p>Two rules the command hides. First, <strong>the two inputs must match</strong> in resolution and frame rate; if the distorted clip was encoded at a lower resolution, scale it up to the reference resolution first, or the numbers are meaningless. Second, <strong>if you do not name a model, you get the default</strong> (<code>vmaf_v0.6.1</code>) — so to use the phone, 4K, or v1 models, point the filter at the model explicitly:</p>
+<pre><code class="language-bash"># Use an explicit model file (here a v1 model) and also emit PSNR alongside.
+ffmpeg -i distorted.mp4 -i reference.mp4 \
+  -lavfi &quot;[0:v]scale=1920:1080:flags=bicubic[dis];[dis][1:v]libvmaf=\
+model='path=/usr/share/model/vmaf_v1.0.16/vmaf_v1.0.16_3d0h.json':\
+feature='name=psnr':log_path=vmaf.json:log_fmt=json&quot; \
+  -f null -
+</code></pre>
+<p>The output JSON carries a VMAF value per frame plus the pooled score; the pooling defaults to the mean but can be set to harmonic mean or a low percentile to surface the worst moments — a choice that matters as much as the model, covered in <a href="/learn/video-quality/articles-vqm/pooling-per-frame-to-one-number">pooling: per-frame to one number</a>. The full FFmpeg-and-libvmaf workflow, with model selection and output parsing, lives in <a href="/learn/video-quality/articles-vqm/measuring-quality-ffmpeg-libvmaf">measuring quality with FFmpeg and libvmaf</a>; the encoder-side quick reference is in Video Encoding's <a href="/learn/video-encoding/articles/ffmpeg-cheat-sheet-developers">FFmpeg cheat sheet</a>.</p>
+<p>To make the score concrete at your desk, we built a small, dependency-light script that runs VMAF on a pair of files, then parses the JSON to print the pooled score three ways — mean, harmonic mean, and 5th-percentile (the worst moments) — alongside the per-frame minimum and the implied just-noticeable-difference band, so you can see how much the single headline number hides. <strong><a href="/learn/downloads/vmaf-measure-and-pool">Download the VMAF measurement-and-pooling script (Python)</a></strong> and run it against your own encodes.</p>
+<h2>Where VMAF still lies</h2>
+<p>VMAF is the best widely-deployed full-reference metric, not an oracle. Naming its blind spots is the price of using it well, and the honest core of this section.</p>
+<p>First, <strong>a bare VMAF number is ambiguous</strong> — without the model, pooling, and content named, it cannot be interpreted or compared, as the model section showed. This is less a flaw in VMAF than the most common flaw in how people quote it.</p>
+<p>Second, <strong>it can be gamed by enhancement</strong>, which is why NEG exists. An encoder tuned to maximise VMAF can learn to please the metric in ways that do not please a viewer — the general hazard of optimising for any metric instead of the eye.</p>
+<p>Third, <strong>it is trained, so it is weakest off its training distribution.</strong> VMAF learned from a particular kind of content — professionally-produced video clips. On content unlike its training set — screen recordings and text, video-game capture, heavy film grain, animation, extreme high dynamic range — its predictions are less reliable, and it can rank encodes in an order a viewer would not. The v0 generation was additionally blind to banding and colour; v1 narrows but does not erase these gaps. Which content fools which metric is catalogued in <a href="/learn/video-quality/articles-vqm/where-objective-metrics-lie">where objective metrics lie</a>.</p>
+<p>Fourth, <strong>mean pooling hides the worst seconds.</strong> A clip with one badly broken passage and a lot of clean footage can still post a high mean VMAF, because the good frames outvote the bad. When a localised failure matters, read a low percentile or the per-frame minimum, not just the mean.</p>
+<p>Fifth, <strong>it is full-reference</strong>, so it is useless for live and user-generated content where there is no pristine master to compare against — that hard case needs the no-reference metrics covered in <a href="/learn/video-quality/articles-vqm/no-reference-quality-for-live-and-ugc">no-reference quality for live and UGC</a>.</p>
+<p><img alt="A scatter of objective scores against human MOS shows VMAF's points hugging the ideal line more tightly than PSNR's, the reason it correlates better." src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a3f96bfaf40729e075a289d_6a3f96bb64673cc103924637_02_4-vmaf-explained__04-correlation.svg">
+<em>Figure 4. Why VMAF tracks the eye better: against human Mean Opinion Scores, VMAF's predictions cluster closer to the ideal diagonal than PSNR's. The fit is measured by correlation coefficients, not assumed.</em></p>
+<h2>How VMAF compares with PSNR and SSIM</h2>
+<p>VMAF is the most perception-accurate of the three full-reference metrics you meet constantly, and the most demanding to quote correctly. The fastest way to hold all three in your head is side by side, with the columns that actually matter — what each one measures, and where each one lies.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Metric</th>
+<th style="text-align: left;">Scale</th>
+<th style="text-align: left;">What it measures</th>
+<th style="text-align: left;">Where it lies (blind spot)</th>
+<th style="text-align: left;">Best for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>PSNR</strong></td>
+<td style="text-align: left;">dB (≈20–50, ∞ if identical)</td>
+<td style="text-align: left;">Average pixel error vs the original</td>
+<td style="text-align: left;">Ignores where errors land; weak perceptual match</td>
+<td style="text-align: left;">Same-codec comparison, RDO, regression gates</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>SSIM</strong></td>
+<td style="text-align: left;">0–1 (higher better)</td>
+<td style="text-align: left;">Structural similarity: luminance, contrast, structure</td>
+<td style="text-align: left;">Luma-only, per-frame, saturates near 1; implementation-dependent</td>
+<td style="text-align: left;">A better-than-PSNR structural proxy; quality maps</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>VMAF</strong></td>
+<td style="text-align: left;">0–100 (higher better)</td>
+<td style="text-align: left;">Fused, perception-trained quality (model-dependent)</td>
+<td style="text-align: left;">Meaningless without the model named; gameable; trained-distribution limits</td>
+<td style="text-align: left;">Predicting viewer-perceived streaming quality at scale</td>
+</tr>
+</tbody>
+</table>
+<p><em>Table 1. The three full-reference metrics at a glance. All need the original; they differ in how close they get to the eye and what they miss. Pick the row by the job, and always name the conditions — the tool and version for SSIM, the model and pooling for VMAF.</em></p>
+<p>This is the deep dive on the bottom row. The encoder-operator's one-screen version of all three is in Video Encoding's <a href="/learn/video-encoding/articles/quality-metrics-psnr-ssim-vmaf">quality-metrics article</a>; when you are choosing between metrics for a specific job, <a href="/learn/video-quality/articles-vqm/choosing-the-right-metric">choosing the right metric</a> is the decision guide, and how each is graded against the eye is in <a href="/learn/video-quality/articles-vqm/validating-metrics-against-human-scores">validating metrics against human scores</a>.</p>
+<h2>Common mistakes with VMAF</h2>
+<blockquote>
+<p><strong>Mistake: quoting "VMAF 95" with no model named.</strong> The default, phone, and 4K models give different scores for the same encode because they predict different viewing conditions. A VMAF number without its model, pooling, and content is uninterpretable. Always report "VMAF 95, default v0.6.1, mean pooling".</p>
+<p><strong>Mistake: treating a sub-JND gap as a real difference.</strong> About 6 VMAF points is the just-noticeable difference; under ~2 points is noise. A 1-point "win" between two encodes is almost certainly not visible — and may be inside the model's confidence interval. Compare gaps against the JND, not against zero.</p>
+<p><strong>Mistake: using the standard model to compare encoders.</strong> Sharpening can inflate standard VMAF without improving compression. For encoder-versus-encoder tests use VMAF-NEG, which disables the enhancement gain, so the comparison measures compression alone.</p>
+<p><strong>Mistake: mixing VMAF versions or pooling methods.</strong> A v0 number and a v1 number are not comparable; neither are a mean-pooled and a harmonic-mean-pooled score. Apples-to-apples means same model, same version, same pooling, same frames, same resolution.</p>
+</blockquote>
+<h2>Where Fora Soft fits in</h2>
+<p>Fora Soft has built video software since 2005 — streaming, WebRTC conferencing, OTT, e-learning, telemedicine, and surveillance — and VMAF is the metric we reach for when the question is "how good will this look to the viewer," because it is the closest widely-deployed proxy for the eye. We use it to set quality targets for bitrate ladders, to gate encoder changes before they reach users, and to put a defensible number on delivered quality — always with the model, pooling, and content stated, and always read against the ~6-point JND rather than chased to the last decimal. We move to VMAF-NEG for encoder comparisons so nobody games the result, and to a low percentile when the worst seconds matter more than the average. Our <a href="/learn/video-quality/articles-vqm/our-benchmark-methodology">benchmark methodology</a> records the exact model and pooling behind every VMAF figure we publish, because a quality number you cannot reproduce is marketing, not measurement.</p>
+<h2>What to read next</h2>
+<ul>
+<li><a href="/learn/video-quality/articles-vqm/vmaf-in-depth-models-confidence-intervals">VMAF in depth: models, phones, 4K, and confidence intervals</a></li>
+<li><a href="/learn/video-quality/articles-vqm/vmaf-neg-explained">VMAF-NEG: the no-enhancement-gain model and why it exists</a></li>
+<li><a href="/learn/video-quality/articles-vqm/ssim-explained">SSIM explained: structural similarity and why it beats PSNR</a></li>
+</ul>
+<h2>Call to action</h2>
+<ul>
+<li><strong>Talk to a video engineer</strong> — <a href="https://calendly.com/vadim-fora-soft/30min" target="_blank" rel="noopener">book a 30-minute scoping call</a> to talk through your vmaf plan.</li>
+<li><strong>See our case studies</strong> — <a href="https://www.forasoft.com/projects">250+ shipped projects across video streaming, WebRTC, OTT, telemedicine, e-learning, surveillance, and AR/VR</a>.</li>
+</ul>
+
+<h2>References</h2>
+<ol>
+<li>Netflix Technology Blog, "Toward a Practical Perceptual Video Quality Metric," June 6, 2016. Tier 1 (metric-author defining work). The launch and open-sourcing of VMAF: the fusion idea, the SVM regressor, the VIF/DLM/motion features, and training on the NFLX subjective dataset. <a href="https://netflixtechblog.com/toward-a-practical-perceptual-video-quality-metric-653f208b9652" target="_blank" rel="noopener">https://netflixtechblog.com/toward-a-practical-perceptual-video-quality-metric-653f208b9652</a></li>
+<li>Netflix Technology Blog, "VMAF: The Journey Continues," October 25, 2018. Tier 1 (metric-author). Adds the phone and 4K models, the bootstrapped 95% confidence interval (models 0.6.2/0.6.3), and best-practice guidance on pooling. <a href="https://netflixtechblog.com/vmaf-the-journey-continues-44b51ee9ed12" target="_blank" rel="noopener">https://netflixtechblog.com/vmaf-the-journey-continues-44b51ee9ed12</a></li>
+<li>Netflix Technology Blog, "Toward a Better Quality Metric for the Video Community," December 7, 2020. Tier 1 (metric-author). The libvmaf v2 API redesign, speed work, and the introduction of NEG (No Enhancement Gain) mode for codec evaluation. <a href="https://netflixtechblog.com/toward-a-better-quality-metric-for-the-video-community-7ed94e752a30" target="_blank" rel="noopener">https://netflixtechblog.com/toward-a-better-quality-metric-for-the-video-community-7ed94e752a30</a></li>
+<li>Netflix Technology Blog, "VMAF v1: Good Is Not Good Enough," June 2026. Tier 1 (metric-author). The v1 generation: CAMBI banding feature, chroma features, normalised-viewing-distance feature adjustment, removal of VIF, and the accuracy/speed gains. <a href="https://medium.com/netflix-techblog/vmaf-v1-good-is-not-good-enough-60d7e4244ea8" target="_blank" rel="noopener">https://medium.com/netflix-techblog/vmaf-v1-good-is-not-good-enough-60d7e4244ea8</a></li>
+<li>Netflix/vmaf repository, "Models" and "Models (v1)" documentation (<code>resource/doc/models.md</code>, <code>resource/doc/models_v1.md</code>), accessed 2026-06-23. Tier 1/Tier 3 (metric-author reference implementation). The default/phone/4K viewing conditions and score mapping; the v1.0.16 model files, score ranges ([0,100] and [0,110]), 10-bit guidance, CAMBI encode-side parameters, and HFR variants. <a href="https://github.com/Netflix/vmaf/blob/master/resource/doc/models_v1.md" target="_blank" rel="noopener">https://github.com/Netflix/vmaf/blob/master/resource/doc/models_v1.md</a></li>
+<li>H. R. Sheikh and A. C. Bovik, "Image Information and Visual Quality," IEEE Transactions on Image Processing, vol. 15, no. 2, pp. 430–444, 2006. Tier 1 (metric-author defining paper). Defines Visual Information Fidelity (VIF), the information-fidelity feature in VMAF v0. <a href="https://ieeexplore.ieee.org/document/1576816" target="_blank" rel="noopener">https://ieeexplore.ieee.org/document/1576816</a></li>
+<li>S. Li, F. Zhang, L. Ma, and K. N. Ngan, "Image Quality Assessment by Separately Evaluating Detail Losses and Additive Impairments," IEEE Transactions on Multimedia, vol. 13, no. 5, pp. 935–949, 2011. Tier 1 (metric-author defining paper). Defines the Detail Loss Metric (DLM/ADM), the detail-loss feature in VMAF. <a href="https://ieeexplore.ieee.org/document/5765502" target="_blank" rel="noopener">https://ieeexplore.ieee.org/document/5765502</a></li>
+<li>Recommendation ITU-T P.1401 (01/2020), "Methods, metrics and procedures for statistical evaluation, qualification and comparison of objective quality prediction models." International Telecommunication Union. Tier 1. Defines PCC, SROCC, and RMSE — how VMAF and every objective metric is graded against subjective MOS. <a href="https://www.itu.int/rec/T-REC-P.1401" target="_blank" rel="noopener">https://www.itu.int/rec/T-REC-P.1401</a></li>
+<li>Recommendation ITU-R BT.500-15 (2023), "Methodologies for the subjective assessment of the quality of television images." International Telecommunication Union. Tier 1. The subjective ground truth against which VMAF was trained and is validated. <a href="https://www.itu.int/rec/R-REC-BT.500" target="_blank" rel="noopener">https://www.itu.int/rec/R-REC-BT.500</a></li>
+<li>FFmpeg, "libvmaf filter documentation," accessed 2026-06-23. Tier 3 (first-party tooling). The <code>libvmaf</code> filter (distorted-then-reference input order, <code>model</code>, <code>feature</code>, <code>log_path</code>/<code>log_fmt</code>, <code>n_threads</code>, pooling), the default <code>vmaf_v0.6.1</code> model, and the input-matching requirement. <a href="https://ffmpeg.org/ffmpeg-filters.html#libvmaf" target="_blank" rel="noopener">https://ffmpeg.org/ffmpeg-filters.html#libvmaf</a></li>
+<li>Netflix/vmaf repository (libvmaf), release notes and CHANGELOG, accessed 2026-06-23. Tier 3 (metric-author tooling). libvmaf v2.0.0 (.json model format), v3.0.0 (Dec 2023, deprecated-API removal, CUDA), and the threading improvements that benefit v0 and v1 models. <a href="https://github.com/Netflix/vmaf/releases" target="_blank" rel="noopener">https://github.com/Netflix/vmaf/releases</a></li>
+<li>J. Ozer, "Finding the Just Noticeable Difference with Netflix VMAF," Streaming Learning Center, accessed 2026-06-23. Tier 6 (educational, orientation only). Source for the widely-cited ~6-point JND rule of thumb (delta &lt;2 irrelevant, &gt;6 noticeable by most viewers); the underlying guidance is Netflix's. <a href="https://streaminglearningcenter.com/codecs/finding-the-just-noticeable-difference-with-netflix-vmaf.html" target="_blank" rel="noopener">https://streaminglearningcenter.com/codecs/finding-the-just-noticeable-difference-with-netflix-vmaf.html</a></li>
+</ol></div><div class="takeaways-box"><p class="takeaways-label">Key takeaways</p><div class="w-richtext"><ul><li>VMAF fuses several quality features with a model trained on human scores into one 0–100 number.</li><li>It tracks the eye better than PSNR or SSIM because it was fitted directly to subjective opinion.</li><li>A VMAF score is meaningless without its model named — default, phone, and 4K differ.</li><li>About 6 VMAF points is the just-noticeable difference; smaller gaps are usually invisible.</li><li>The 2026 v1 models add banding and colour awareness, drop VIF, and run faster.</li><li>VMAF is full-reference, gameable by enhancement (use NEG), and weakest off its training content.</li></ul></div></div></div></section><section><div class="article-container"><h2 class="section-heading">Related glossary terms</h2><div class="related-terms-grid w-dyn-list"><div role="list" class="w-dyn-items"><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/vmaf" class="term-card w-inline-block"><h4 class="term-name">VMAF</h4><p class="term-def">Video Multimethod Assessment Fusion — Netflix&#x27;s full-reference metric (0 to 100) that fuses several features and was trained on subjective scores. The industry default.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/pooling" class="term-card w-inline-block"><h4 class="term-name">Pooling</h4><p class="term-def">Combining per-frame metric scores into one number for a clip. The method matters — arithmetic mean hides bad frames; percentile or harmonic pooling surfaces them.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/libvmaf" class="term-card w-inline-block"><h4 class="term-name">libvmaf</h4><p class="term-def">The open-source library that computes VMAF (and PSNR/SSIM), available as an FFmpeg filter, making perceptual quality measurement scriptable and free.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/ffmpeg" class="term-card w-inline-block"><h4 class="term-name">FFmpeg</h4><p class="term-def">FFmpeg is the open-source media engine that decodes, scales, encodes, and pipes frames between filters. It hosts libvmaf (and the psnr and ssim filters) and runs most scripted, automated quality measurement - the default free way to measure video quality.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/psnr" class="term-card w-inline-block"><h4 class="term-name">PSNR</h4><p class="term-def">Peak Signal-to-Noise Ratio — a full-reference metric in decibels that measures pixel error. Fast and universal, but a weak predictor of perceived quality.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/banding" class="term-card w-inline-block"><h4 class="term-name">Banding</h4><p class="term-def">Smooth gradients (like a sky) breaking into visible steps, caused by low bit depth and coarse quantization. Most objective metrics miss it.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/ssim" class="term-card w-inline-block"><h4 class="term-name">SSIM</h4><p class="term-def">Structural Similarity Index — a full-reference metric (0 to 1) that compares luminance, contrast, and structure. Tracks the human eye better than PSNR.</p></a></div><div role="listitem" class="w-dyn-item"><a href="/learn/video-quality/glossary/terms-vqm/vmaf-neg" class="term-card w-inline-block"><h4 class="term-name">VMAF-NEG</h4><p class="term-def">VMAF No-Enhancement-Gain — a VMAF model that resists inflation from sharpening and contrast tricks, so the score reflects real quality rather than enhancement.</p></a></div></div></div><div class="author-bio-card"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acea/6a0c72a04c29b22a8ddb991b_6a0c728d356dff40621f0967_nikolay_sapunov.jpeg" loading="lazy" alt="Nikolay Sapunov" class="author-bio-photo"/><div class="author-bio-body"><p class="author-bio-name">Nikolay Sapunov</p><p class="author-bio-role">CEO at Fora Soft</p><div class="w-richtext"><p>Nikolay Sapunov is the CEO of Fora Soft, a software studio specialising in video-centric products — streaming platforms, WebRTC apps, video conferencing, and AI-driven video tools. He writes the Video Encoding knowledge base to give product and engineering teams a clear, no-jargon way to reason about codecs, compression, HDR, and the trade-offs behind every video architecture decision.</p></div><a href="/team/nikolay-sapunov" class="author-bio-link">View profile →</a></div></div></div></section><section class="block-nav-section"><div class="article-container"><div class="block-nav"><div class="block-nav-cell-prev w-dyn-list"><div role="list" class="collection-list-32 w-dyn-items"><div role="listitem" class="collection-item-29 w-dyn-item"><a href="/learn/video-quality/articles-vqm/ms-ssim-multi-scale-structural-similarity" class="block-nav-link w-inline-block"><div class="block-nav-direction"><div>← Previous article</div></div><div class="block-nav-name"><div>MS-SSIM Explained: Multi-Scale Structural Similarity</div></div></a></div></div></div><div id="w-node-_75923cda-8d30-389c-2ca7-86d14429793c-b0158b0c" class="block-nav-cell-next w-dyn-list"><div role="list" class="collection-list-44 w-dyn-items"><div role="listitem" class="collection-item-43 w-dyn-item"><a href="/learn/video-quality/articles-vqm/vmaf-in-depth-models-confidence-intervals" class="block-nav-link w-inline-block"><div class="block-nav-direction"><div>Next article →</div></div><div class="block-nav-name"><div>VMAF Score in Depth: Models, 4K &amp; Confidence Intervals</div></div></a></div></div></div></div></div></section><div id="Contacts" class="contacts new small"><div class="f26_inner"><div class="f26_container"><div class="f26_main"><div class="f26_brand"><a href="/" class="logo-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64e8910adc5a63966a68acca_ForaSoft_logo_white.svg" loading="lazy" alt="Fora Soft" class="logo"/></a><p class="f26_brand-desc">Specialist software house for video, real-time and AI products. Founded 2005. 50 in-house engineers.</p></div><div class="f26_col"><div class="f26_col-title">Knowledge base</div><a href="/blog" class="f26_link">Blog</a><a href="https://www.forasoft.com/learn#guides" class="f26_link">Guides</a><a href="https://www.forasoft.com/learn#courses" class="f26_link">Courses</a><a href="https://www.forasoft.com/learn#glossary-ref" class="f26_link">Glossary</a><a href="/learn/downloads" class="f26_link">Downloads</a></div><div class="f26_col"><div class="f26_col-title">Company</div><a href="/services" class="f26_link">Services</a><a href="/projects" class="f26_link">Projects</a><a href="/lab" class="f26_link">Demos</a><a href="/calculator" class="f26_link">Calculator</a><a href="#" class="f26_link">Contacts</a></div><div><div class="f26_contact"><a href="tel:+85281932621" class="f26_phone-link"><span class="f26_phone">+852-8193-2621</span></a><div class="f26_location">Hong Kong</div></div><div class="f26_contact"><a href="tel:+19147755855" class="f26_phone-link"><span class="f26_phone">+1 (914) 775-5855</span></a><div class="f26_location">New York <!-- -->·<!-- --> USA</div></div><div class="contact"><a href="mailto:eager2develop@forasoft.com" class="contact-link w-inline-block"><div class="h6 white">eager2develop@forasoft.com</div></a><div class="small-text white">Email</div></div></div></div><div class="f26_bottom"><div id="w-node-_627e336f-73fe-8084-298f-af3851458cd1-a97cf909" class="f26_copy">©<!-- --> Fora Soft, 2005<!-- -->–<!-- -->2026</div><div id="w-node-_627e336f-73fe-8084-298f-af3851458cd6-a97cf909" class="f26_legal"><a href="https://www.forasoft.com/legal" class="f26_legal-link">Privacy Policy</a><a href="https://www.forasoft.com/trust" class="f26_legal-link">Trust</a></div><div id="w-node-_7cb67f33-d91b-1464-0888-960f40a55759-a97cf909" class="social-icons"><a href="https://www.instagram.com/eager2develop" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49c2e345879335a916d_social-inst.svg" loading="lazy" id="w-node-_7cb67f33-d91b-1464-0888-960f40a5575b-a97cf909" alt="Instagram" class="social-icon"/></a><a href="https://www.youtube.com/@eager2develop" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49cb0629b88aca1ac72_social-youtube.svg" loading="lazy" alt="Youtube" class="social-icon"/></a><a href="https://github.com/forasoft" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49c10e3dc944fabd72d_social-github.svg" loading="lazy" alt="Github" class="social-icon"/></a><a href="https://www.behance.net/Fora-Soft?tracking_source=search_users|fora%20soft" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49ce35e8d399a2c2a91_social-behance.svg" loading="lazy" alt="Behance" class="social-icon"/></a><a href="https://dribbble.com/ForaSoft" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49cb20bde1e8f6ff3ca_social-dribbble.svg" loading="lazy" alt="Dribbble" class="social-icon"/></a><a href="https://linkedin.com/company/fora-soft-llc-" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49c720cb8a64ce75980_social-linkedin.svg" loading="lazy" alt="LinkedIn" class="social-icon"/></a><a href="https://forasoft.medium.com" target="_blank" class="social-icon-link w-inline-block"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/6572e49c0155f1acbea2b259_social-medium.svg" loading="lazy" alt="Medium" class="social-icon"/></a></div></div></div></div><section class="window-wrapper"><div class="contact-us-form-main"><a href="#" class="button-close w-inline-block"></a><div class="contact-us"><div class="contact-us-img"><img class="rectangle-3821-copy" src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815.avif" width="442" height="690" alt="" sizes="(max-width: 479px) 100vw, 442px" loading="eager" fetchpriority="high" srcset="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815-p-500.avif 500w, https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64ff15bebc7380d05ba1b049_Rectangle-3815.avif 884w"/></div><div class="contact-us-content"><div class="contact-us-form-copy w-form"><form id="wf-form-Contact-us" name="wf-form-Contact-us" data-name="Contact us" method="get" class="form-contact-us-copy" data-wf-page-id="6a3f947f29694379b0158b0c" data-wf-element-id="db196907-b7d0-5a83-1943-0c9ea97cf955"><div class="h4 line-heigh-120 margin-20 margin-24">Describe your project and we will get in touch</div><div class="div-block-192"><textarea class="comment-field field error big w-input" maxlength="5000" name="Message" wr-type="required-field" data-name="Message" placeholder="Describe your needs and ideas" id="Message" required=""></textarea><div wr-type="error" class="form-field-error">Enter your message</div></div><div class="form-fiels-wrapper-copy"><input class="field error w-input" maxlength="256" name="Email" wr-type="required-field" data-name="Email" placeholder="Email" type="email" id="Email" required=""/><div wr-type="error" class="form-field-error">Enter your email</div></div><div class="form-field-wrapper-copy"><input class="field error w-input" maxlength="256" name="Name" wr-type="required-field" data-name="Name" placeholder="Name" type="text" id="Name" required=""/><div wr-type="error" class="form-field-error">Enter your name</div></div><div data-sitekey="6LcnRuYsAAAAAPkJxcdqLKU5qrOyFjElIfkbXJ0U" class="w-form-formrecaptcha g-recaptcha g-recaptcha-error g-recaptcha-disabled"></div><div class="send-button-wrapper-copy"><input type="submit" data-wait="" id="send-comment" wr-type="submit" class="button form padding margin w-button" value="Send"/><p class="small-text left text-14">By submitting data in this form, you agree with the <a href="/legal" class="small-text">Personal Data Processing Policy.</a></p></div><div class="contact-sales-btn-copy"><a href="https://wa.me/971585396367" target="_blank" class="contact-gray-btn w-inline-block"><div id="whatsapp-button" class="contact-gray-btn whatsapp"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/664479e0486f0a12e9428679_Whatsapp%20logo.avif" loading="lazy" width="24" height="24" alt="WhatsApp"/><div class="text-16-med">WhatsApp us</div></div></a><a href="https://calendly.com/vadim-fora-soft/30min" target="_blank" class="contact-gray-btn w-inline-block"><div id="book-a-call-in-popup" class="contact-gray-btn call"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/664479e07b108eff3e0a1125_Calendly%20logo.avif" loading="lazy" width="24" height="24" alt="Calendly"/><div class="text-16-med">Book a call</div></div></a></div></form><div class="success-message w-form-done"><div class="success-contact-us"><img src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/64e8910adc5a63966a68acdc_emoji_succsess.avif" loading="lazy" alt=" " class="image-8"/><div class="h3 centre">Your message has been sent successfully</div><div class="full-screen-text">We will contact you soon</div></div></div><div class="error-message margin-8 w-form-fail"><div class="text-block-8">Message not sent. Please try again.</div></div></div></div></div></div><div id="close-modal" data-w-id="db196907-b7d0-5a83-1943-0c9ea97cf97f" class="close-bg"></div></section></div><script src="https://d3e54v103j8qbb.cloudfront.net/js/jquery-3.5.1.min.dc5e7f18c8.js?site=64e8910adc5a63966a68acc1" type="text/javascript" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script><script src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1/js/webflow.8c63ce37.44d94b17112d79f1.js" type="text/javascript" integrity="sha384-xVTGfJEwJ/5k3oJxD1xjGj6mfpvmLYI6hts+GNt7ctjLEPugFwkxly1GX0uG6F5V" crossorigin="anonymous"></script><style>
+  img { aspect-ratio: attr(width) / attr(height); }
+  .logo { width: 142px; height: 32px; }
+  .close-menu, .open-icon { width: 24px; height: 24px; }
+  .image-273 { width: 32px; height: 32px; }
+  .social-icon { width: 24px; height: 24px; }
+  .rectangle-3821-copy { aspect-ratio: 442 / 690; max-width: 442px; }
+</style>
+
+<script>
+(function () {
+  function onIdle(cb) {
+    if ('requestIdleCallback' in window) requestIdleCallback(cb, { timeout: 1500 });
+    else setTimeout(cb, 300);
+  }
+
+  function initServicesNav() {
+    const el = document.querySelector('.services-navigation-fixed');
+    if (!el) return;
+    if (window.innerWidth >= 768) el.classList.add('is-visible');
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.hamburger').forEach(el => {
+      el.addEventListener('click', () => document.body.classList.toggle('no-scroll'));
+    });
+
+    document.querySelectorAll('.hamburger-close,.link-menu').forEach(el => {
+      el.addEventListener('click', () => document.body.classList.remove('no-scroll'));
+    });
+
+    requestAnimationFrame(initServicesNav);
+
+    let resizeT;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeT);
+      resizeT = setTimeout(initServicesNav, 150);
+    });
+
+    onIdle(() => {
+      document.querySelectorAll('[wr-type="error"]').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('[wr-type="required-field"]').forEach(el => el.classList.remove('error'));
+
+      function fieldError(field) {
+        const err = field.parentElement?.querySelector('[wr-type="error"]');
+        if (err) err.style.display = 'block';
+        field.classList.add('error');
+        return true;
+      }
+
+      function validate(field) {
+        if (!field.value) return fieldError(field);
+        if (field.type === 'email' && (!field.value.includes('@') || !field.value.includes('.')))
+          return fieldError(field);
+        return false;
+      }
+
+      document.querySelectorAll('form').forEach(form => {
+        const required = form.querySelectorAll('[wr-type="required-field"]');
+        const submit = form.querySelector('[wr-type="submit"]');
+        if (!submit) return;
+
+        submit.addEventListener('click', e => {
+          let hasErrors = false;
+          required.forEach(f => { if (validate(f)) hasErrors = true; });
+          if (hasErrors) {
+            e.preventDefault();
+            return;
+          }
+        });
+      });
+
+      document.addEventListener('input', e => {
+        if (e.target.matches('[wr-type="required-field"]')) {
+          e.target.classList.remove('error');
+          const err = e.target.parentElement?.querySelector('[wr-type="error"]');
+          if (err) err.style.display = 'none';
+        }
+      });
+
+      const textarea = document.querySelector('#comment-form');
+      if (textarea) {
+        textarea.addEventListener('input', function () {
+          this.style.height = '60px';
+          this.style.height = Math.max(this.scrollHeight, 60) + 'px';
+        });
+      }
+
+      window.dataLayer = window.dataLayer || [];
+
+      const idToEvent = {
+        'open-modal-footer': 'form_view',
+        'open-modal': 'form_view',
+        'whatsapp-button': 'whatsapp_button_click',
+        'whatsapp-button-footer': 'whatsapp_button_click',
+        'book-a-consultation': 'calendly_button_click',
+        'book-a-consultation-2': 'calendly_button_click',
+        'start-your-project': 'calendly_button_click',
+        'get-a-consultation': 'calendly_button_click',
+        'book-a-call': 'calendly_button_click',
+        'book-a-call-in-popup': 'calendly_button_click',
+        'book-a-call-in-footer': 'calendly_button_click',
+        'book-a-consultation-3': 'calendly_button_click',
+        'whatsapp-button-calculator': 'whatsapp_button_click',
+        'calendly-button-calculator': 'calendly_button_click'
+      };
+
+      document.addEventListener('click', e => {
+        const el = e.target.closest('[id]');
+        if (!el) return;
+        const ev = idToEvent[el.id];
+        if (!ev) return;
+        window.dataLayer.push({
+          event: ev,
+          event_category: 'engagement',
+          event_label: (el.innerText || '').trim(),
+          value: 1
+        });
+      });
+    });
+  });
+})();
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var form = document.getElementById('wf-form-Search');
+  if (!form) return;
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return false;
+  });
+});
+</script>
+
+<script>
+(function() {
+  'use strict';
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  
+  async function init() {
+    // 1. Оборачиваем filter-контейнеры в <form> (требование Finsweet v2)
+    document.querySelectorAll('[fs-list-element="filters"]').forEach(function(el) {
+      if (el.tagName === 'FORM') return;
+      var form = document.createElement('form');
+      for (var i = 0; i < el.attributes.length; i++) {
+        form.setAttribute(el.attributes[i].name, el.attributes[i].value);
+      }
+      while (el.firstChild) form.appendChild(el.firstChild);
+      el.replaceWith(form);
+    });
+    
+    // 2. Превентим submit всех filter-форм (как уже сделано для wf-form-Search)
+    document.querySelectorAll('form[fs-list-element="filters"]').forEach(function(form) {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      });
+    });
+    
+    // 3. Ждём, пока Finsweet загрузит все items (fs-list-load="all")
+    var fs = window.FinsweetAttributes;
+    if (!fs || !fs.modules || !fs.modules.list || !fs.modules.list.loading) {
+      console.warn('[Custom filter] Finsweet List module not loaded');
+      return;
+    }
+    
+    var instances;
+    try {
+      instances = await fs.modules.list.loading;
+    } catch (e) {
+      console.warn('[Custom filter] Finsweet loading failed:', e);
+      return;
+    }
+    
+    var blog = instances.find(function(i) { return i.instance === 'blog'; });
+    if (!blog) { console.warn('[Custom filter] Blog instance not found'); return; }
+    
+    var items = blog.items && (blog.items.value || blog.items);
+    if (!items || !items.length) { console.warn('[Custom filter] No items loaded'); return; }
+    
+    // 4. Кешируем categories + title text каждого item
+    var itemData = items.map(function(item) {
+      var categories = ((item.fields && item.fields['category-new-2'] && item.fields['category-new-2'].value) || [])
+        .map(function(s) { return String(s).toLowerCase(); });
+      var title = String(
+        (item.fields && item.fields['title'] && item.fields['title'].value) ||
+        item.element.textContent || ''
+      ).toLowerCase();
+      return { el: item.element, categories: categories, title: title };
+    });
+    
+    // 5. Состояние и применение фильтра
+    var state = { activeCategories: new Set(), query: '' };
+    var applyTimeout;
+    
+    function applyFilter() {
+      clearTimeout(applyTimeout);
+      applyTimeout = setTimeout(function() {
+        var visibleCount = 0;
+        itemData.forEach(function(d) {
+          var catMatch = state.activeCategories.size === 0;
+          if (!catMatch) {
+            state.activeCategories.forEach(function(c) {
+              if (d.categories.indexOf(c.toLowerCase()) !== -1) catMatch = true;
+            });
+          }
+          var queryMatch = !state.query || d.title.indexOf(state.query) !== -1;
+          var show = catMatch && queryMatch;
+          d.el.style.display = show ? '' : 'none';
+          if (show) visibleCount++;
+        });
+        var emptyEl = document.querySelector('[fs-list-element="empty"]');
+        if (emptyEl) emptyEl.style.display = visibleCount === 0 ? '' : 'none';
+      }, 50);
+    }
+    
+    // 6. Хукаем чекбоксы категорий
+    document.querySelectorAll('input[type="checkbox"][fs-list-value][fs-list-field="category-new-2"]')
+      .forEach(function(input) {
+        input.addEventListener('change', function() {
+          var val = input.getAttribute('fs-list-value');
+          var label = input.closest('label');
+          if (input.checked) {
+            state.activeCategories.add(val);
+            if (label) label.classList.add('is-active');
+          } else {
+            state.activeCategories.delete(val);
+            if (label) label.classList.remove('is-active');
+          }
+          applyFilter();
+        });
+      });
+    
+    // 7. Хукаем search input с debounce
+    document.querySelectorAll('input[fs-list-element="search"]')
+      .forEach(function(input) {
+        var debounce;
+        input.addEventListener('input', function() {
+          clearTimeout(debounce);
+          var val = input.value.trim().toLowerCase();
+          debounce = setTimeout(function() {
+            state.query = val;
+            applyFilter();
+          }, 150);
+        });
+      });
+    
+    applyFilter();
+  }
+})();
+</script><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+
+<style>
+  /* Make body images look clickable + slightly bigger by default */
+  .article-body img {
+    cursor: zoom-in;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .article-body img:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
+  }
+
+  /* Lightbox overlay */
+  .lb-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.92);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    cursor: zoom-out;
+    padding: 32px;
+  }
+  .lb-overlay.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .lb-overlay img {
+    max-width: 95vw;
+    max-height: 90vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border-radius: 6px;
+    background: #fff;
+    transform: scale(0.96);
+    transition: transform 0.25s ease;
+  }
+  .lb-overlay.is-open img {
+    transform: scale(1);
+  }
+  .lb-close {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+  }
+  .lb-close:hover {
+    background: rgba(255, 255, 255, 0.22);
+  }
+  .lb-caption {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 14px;
+    max-width: 80vw;
+    text-align: center;
+  }
+  body.lb-locked {
+    overflow: hidden;
+  }
+</style>
+
+<script>
+(function () {
+  // Build overlay once
+  var overlay = document.createElement('div');
+  overlay.className = 'lb-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.innerHTML = '<button class="lb-close" aria-label="Close">✕</button>' +
+                     '<img alt="" />' +
+                     '<div class="lb-caption"></div>';
+  document.body.appendChild(overlay);
+
+  var lbImg = overlay.querySelector('img');
+  var lbCap = overlay.querySelector('.lb-caption');
+  var lbClose = overlay.querySelector('.lb-close');
+
+  function openLB(src, alt) {
+    lbImg.src = src;
+    lbImg.alt = alt || '';
+    lbCap.textContent = alt || '';
+    overlay.classList.add('is-open');
+    document.body.classList.add('lb-locked');
+  }
+  function closeLB() {
+    overlay.classList.remove('is-open');
+    document.body.classList.remove('lb-locked');
+    // delay clearing src so the fade-out is clean
+    setTimeout(function () { lbImg.src = ''; }, 250);
+  }
+
+  // Attach click to every image inside .article-body
+  document.querySelectorAll('.article-body img').forEach(function (img) {
+    img.addEventListener('click', function () {
+      openLB(img.currentSrc || img.src, img.alt);
+    });
+  });
+
+  // Close handlers
+  lbClose.addEventListener('click', function (e) {
+    e.stopPropagation();
+    closeLB();
+  });
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay || e.target === lbImg) closeLB();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeLB();
+  });
+})();
+</script><script src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1%2F689e5ba67671442434f3ca35%2F6a82d2c710184daee99a590c%2Fforatracking-1.0.0.js" type="text/javascript"></script><script src="https://cdn.prod.website-files.com/64e8910adc5a63966a68acc1%2F689e5ba67671442434f3ca35%2F6a8d5baeb6f5e1c6bbed4d78%2Fcanonicalslashfix-1.0.0.js" type="text/javascript"></script></body></html>

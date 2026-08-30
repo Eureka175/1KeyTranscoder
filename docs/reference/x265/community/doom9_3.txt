@@ -1,0 +1,376 @@
+﻿ 
+x265 10 bit encoding from 8 bit source - Doom9's Forum 
+Welcome to Doom9 's Forum, THE in-place to be for everyone interested in DVD conversion. 
+Before you start posting please read the forum rules . By posting to this forum you agree to abide by the rules. 
+Domains: forum.doom9.org / forum.doom9.net / forum.doom9.se 
+Doom9's Forum 
+ > Video Encoding 
+> High Efficiency Video Coding (HEVC) 
+x265 10 bit encoding from 8 bit source
+User Name 
+Remember Me? 
+Password 
+Register 
+FAQ 
+Today's Posts 
+Search 
+Search Forums 
+Show Threads 
+Show Posts 
+Tag Search 
+Advanced Search 
+Go to Page... 
+Thread Tools 
+Search this Thread 
+1st February 2026, 10:27
+# 1 
+|   Link 
+Gurn 
+Registered User
+Join Date: Dec 2012
+Posts: 4
+x265 10 bit encoding from 8 bit source 
+I keep seeing claims that using 10 bit x265 encoding from 8 bit sources is optimal.
+Is there any source that offer some solid justification for this claim?
+I personally am seeing the opposite, slightly larger encodes and micro stuttering consistently for moments after a video starts playing.
+Playback testing on VLC and various Roku players.
+This is based on using the Nvenc codec in Handbrake 1.10.2 with these settings:
+Audio passthrough: MKV 1080 File contains a E-AC-3 audio track
+FPS: Same as source
+CFR
+Color Range: Same as Source
+Encoder Profile and Level: Auto
+CQ 28
+Tia
+Gurn 
+View Public Profile 
+Find More Posts by Gurn 
+1st February 2026, 11:56
+# 2 
+|   Link 
+Z2697 
+Registered User
+Join Date: Aug 2024
+Location: Between my two ears
+Posts: 1,270
+nvenc is no x265
+stutter has nothing to do with bitdepth, unless your gfx card do main but not main10 and you cpu is very weak so decoding is slower than playback
+but if your nvenc can do main10 shouln't your nvdec can do it as well?
+Z2697 
+View Public Profile 
+Find More Posts by Z2697 
+2nd February 2026, 19:33
+# 3 
+|   Link 
+GeoffreyA 
+.
+Join Date: Jun 2024
+Location: South Africa
+Posts: 844
+In theory, it's supposed to help with banding.
+GeoffreyA 
+View Public Profile 
+Find More Posts by GeoffreyA 
+2nd February 2026, 21:40
+# 4 
+|   Link 
+Z2697 
+Registered User
+Join Date: Aug 2024
+Location: Between my two ears
+Posts: 1,270
+It helps when the source have dithering and without it the source would have significant banding .
+( non-post-8bit-quantization grain/noise can have the effect of dithering)
+If the dithering pattern is destroyed by lossy compression, the "fall down" value can be inbetween of one 8-bit code level...
+So, if your source relies little on dithering, or your bitrate is high enough, 10 bits encoding will help but not much.
+Last edited by Z2697; 2nd February 2026 at 21:42 .
+Z2697 
+View Public Profile 
+Find More Posts by Z2697 
+3rd February 2026, 02:19
+# 5 
+|   Link 
+RanmaCanada 
+Registered User
+Join Date: May 2009
+Posts: 364
+You're using NVENC, which is hardware encoder and is NOT x265. You also failed to mention what generation card you are using, which is extremely relevant as earlier renditions of NVENC didn't even support b-frames. Your main problem is it is NOT x265 as mentioned. 10 bit encoding helps remove banding, especially so on anime. It also helps with blacks.
+Hardware encoding takes multiple generations to reach software encoding quality. It was only recently that hardware encoding to h264 could reach the fidelity of x264, a 20 year old encoder.
+Rigaya has a great chart to show you just how far behind nvenc is in comparison to x265. Blackwell still can't reach x265 very slow and Pascal is a joke.
+RanmaCanada 
+View Public Profile 
+Find More Posts by RanmaCanada 
+3rd February 2026, 06:46
+# 6 
+|   Link 
+GeoffreyA 
+.
+Join Date: Jun 2024
+Location: South Africa
+Posts: 844
+And on dark gradients in anime, aq-mode 3 may be needed as well.
+x264 had a significant efficiency gain when using 10 bit; it is less pronounced with x265.
+Last edited by GeoffreyA; 3rd February 2026 at 06:52 .
+GeoffreyA 
+View Public Profile 
+Find More Posts by GeoffreyA 
+3rd February 2026, 08:30
+# 7 
+|   Link 
+microchip8 
+ffx264/ffhevc author
+Join Date: May 2007
+Location: /dev/video0
+Posts: 2,123
+Quote:
+Originally Posted by GeoffreyA 
+And on dark gradients in anime, aq-mode 3 may be needed as well.
+x264 had a significant efficiency gain when using 10 bit; it is less pronounced with x265.
+That's 12 bit for x265...
+__________________
+The Cyberpunk Database || NTP & NTS Time Server || Mirror Services 
+ffhevc || ffx264 || ffxvid 
+microchip8 
+View Public Profile 
+Visit microchip8's homepage! 
+Find More Posts by microchip8 
+3rd February 2026, 12:21
+# 8 
+|   Link 
+Z2697 
+Registered User
+Join Date: Aug 2024
+Location: Between my two ears
+Posts: 1,270
+I wouldn't think 12bit x265 has much of a gain, or my eyes are not good enough for the amount of gradients.
+Z2697 
+View Public Profile 
+Find More Posts by Z2697 
+3rd February 2026, 12:48
+# 9 
+|   Link 
+GeoffreyA 
+.
+Join Date: Jun 2024
+Location: South Africa
+Posts: 844
+Quote:
+Originally Posted by microchip8 
+That's 12 bit for x265...
+Somehow, reminds me of the quote, in relation to Penrose's theory: "the shortest path between two truths in the real domain passes through the complex domain."
+GeoffreyA 
+View Public Profile 
+Find More Posts by GeoffreyA 
+3rd February 2026, 13:22
+# 10 
+|   Link 
+microchip8 
+ffx264/ffhevc author
+Join Date: May 2007
+Location: /dev/video0
+Posts: 2,123
+Quote:
+Originally Posted by Z2697 
+I wouldn't think 12bit x265 has much of a gain, or my eyes are not good enough for the amount of gradients.
+I did a few encodes in 12 bit with a problematic source for 10 bit and there was quite an improvement. But that was many ages ago, since then I haven't touched 12 bit. Also, compatibility, etc
+__________________
+The Cyberpunk Database || NTP & NTS Time Server || Mirror Services 
+ffhevc || ffx264 || ffxvid 
+microchip8 
+View Public Profile 
+Visit microchip8's homepage! 
+Find More Posts by microchip8 
+14th April 2026, 23:02
+# 11 
+|   Link 
+DJ Bobo 
+Encoding Dinosaur!
+Join Date: Oct 2001
+Location: Europe
+Posts: 1,751
+I think it is bad tuning of the encoder . 10-bit encoding should NOT yield better quality than 8-bit at the same bitrate, but somehow it does.
+I tried it, it's true, there is significantly less banding with 10-bit, even from 8-bit sources. And using the same CRF parameter, the 10-bit result is even smaller than the 8-bit one, which is totally counter-intuitive, and not logical at all.
+So again, the problem is bad behaviour of x265 in 8-bit mode. It drives me nuts to see perfect gradiants on the original DVD, and then get severe banding in 8-bit mode at 1500kbps, even though CRF18 yields 700kbps!!! Crazy!
+__________________
+AMD Ryzen + Radeon
+DJ Bobo 
+View Public Profile 
+Find More Posts by DJ Bobo 
+15th April 2026, 07:22
+# 12 
+|   Link 
+excellentswordfight 
+Lost my old account :(
+Join Date: Jul 2017
+Posts: 413
+Quote:
+Originally Posted by DJ Bobo 
+I think it is bad tuning of the encoder . 10-bit encoding should NOT yield better quality than 8-bit at the same bitrate, but somehow it does.
+I tried it, it's true, there is significantly less banding with 10-bit, even from 8-bit sources. And using the same CRF parameter, the 10-bit result is even smaller than the 8-bit one, which is totally counter-intuitive, and not logical at all.
+So again, the problem is bad behaviour of x265 in 8-bit mode. It drives me nuts to see perfect gradiants on the original DVD, and then get severe banding in 8-bit mode at 1500kbps, even though CRF18 yields 700kbps!!! Crazy!
+This is my experience as well, when I did early tests, it wasnt just banding, there was overall improvements all over the place with main10.
+This is a frame from a an encode from a 8bit source of ToS, only change in the encode is 10bit vs 8bit. 
+8bit
+https://ibb.co/7Qbxxx5 
+10bit
+https://ibb.co/ChLFrTB 
+So most abvius is less banding on flat areas/gradiants. But also look at the green section at bottom, 10bit is keeping more details there.
+excellentswordfight 
+View Public Profile 
+Find More Posts by excellentswordfight 
+15th April 2026, 09:19
+# 13 
+|   Link 
+Z2697 
+Registered User
+Join Date: Aug 2024
+Location: Between my two ears
+Posts: 1,270
+Quote:
+Originally Posted by Z2697 
+It helps when the source have dithering and without it the source would have significant banding .
+( non-post-8bit-quantization grain/noise can have the effect of dithering)
+If the dithering pattern is destroyed by lossy compression, the "fall down" value can be inbetween of one 8-bit code level...
+So, if your source relies little on dithering, or your bitrate is high enough, 10 bits encoding will help but not much.
+this.
+Z2697 
+View Public Profile 
+Find More Posts by Z2697 
+23rd June 2026, 21:10
+# 14 
+|   Link 
+DuyNghia.Net 
+Registered User
+Join Date: Mar 2007
+Posts: 16
+I am thinking about re-encode tutorial videos I have about 40 TB all 8-bit H264 to 10-bit HEVC But my monitor is 8-bit no HDR, do I need 10-bit monitor HDR to watch Encoded output videos properly?
+I tried to download some Encoded 10-bit stuffs and tried to watch on my 8-bit monitor the color was completely Wrong with MPC-HC but correct with MPV (all default players' settings).
+Anyone please help thanks!
+DuyNghia.Net 
+View Public Profile 
+Find More Posts by DuyNghia.Net 
+23rd June 2026, 21:39
+# 15 
+|   Link 
+GeoffreyA 
+.
+Join Date: Jun 2024
+Location: South Africa
+Posts: 844
+If the colours are off, it is likely HDR not being tone mapped to SDR. Which video renderer is MPC-HC using? Try changing to MPC Video Renderer.
+__________________
+BitMe ~ Weights & Measures 
+GeoffreyA 
+View Public Profile 
+Find More Posts by GeoffreyA 
+23rd June 2026, 23:21
+# 16 
+|   Link 
+DuyNghia.Net 
+Registered User
+Join Date: Mar 2007
+Posts: 16
+Quote:
+Originally Posted by GeoffreyA 
+If the colours are off, it is likely HDR not being tone mapped to SDR. Which video renderer is MPC-HC using? Try changing to MPC Video Renderer.
+Thanks & You were absolutely right!
+The default is Enhanced Video Render (custom presenter) but when I 
+changed to MPC Video Renderer, HDR 10-bit colors to SDR was Correct.
+DuyNghia.Net 
+View Public Profile 
+Find More Posts by DuyNghia.Net 
+24th June 2026, 10:02
+# 17 
+|   Link 
+GeoffreyA 
+.
+Join Date: Jun 2024
+Location: South Africa
+Posts: 844
+Quote:
+Originally Posted by DuyNghia.Net 
+Thanks & You were absolutely right!
+The default is Enhanced Video Render (custom presenter) but when I 
+changed to MPC Video Renderer, HDR 10-bit colors to SDR was Correct.
+Excellent. Glad to hear it!
+__________________
+BitMe ~ Weights & Measures 
+GeoffreyA 
+View Public Profile 
+Find More Posts by GeoffreyA 
+« 
+ Previous Thread 
+ |
+ Next Thread 
+ » 
+Thread Tools 
+Show Printable Version 
+Search this Thread 
+Advanced Search 
+Posting Rules
+You may not post new threads
+You may not post replies
+You may not post attachments
+You may not edit your posts
+BB code is On 
+Smilies are On 
+[IMG] code is On 
+HTML code is Off 
+Forum Rules 
+Forum Jump 
+User Control Panel 
+ Private Messages 
+ Subscriptions 
+ Who's Online 
+ Search Forums 
+ Forums Home 
+Announcements and Chat 
+     General Discussion 
+     News 
+     Forum / Site Suggestions & Help 
+ General 
+     Decrypting 
+     Newbies 
+     DVD2AVI / DGIndex 
+     Audio encoding 
+     Subtitles 
+     Linux, Mac OS X, & Co 
+ Capturing and Editing Video 
+     Avisynth Usage 
+     Avisynth Development 
+     VapourSynth 
+     Capturing Video 
+     DV 
+     HDTV / DVB / TiVo 
+     NLE - Non Linear Editing 
+     VirtualDub, VDubMod & AviDemux 
+     New and alternative a/v containers 
+ Video Encoding 
+     (Auto) Gordian Knot 
+     MPEG-4 ASP 
+     MPEG-4 Encoder GUIs 
+     MPEG-4 AVC / H.264 
+     High Efficiency Video Coding (HEVC) 
+     New and alternative video codecs 
+     MPEG-2 Encoding 
+     Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+ (HD) DVD, Blu-ray & (S)VCD 
+     One click suites for DVD backup and DVD creation 
+     DVD & BD Rebuilder 
+     (HD) DVD & Blu-ray authoring 
+     Advanced authoring 
+     IFO/VOB Editors 
+     DVD burning 
+ Hardware & Software 
+     Software players 
+     Hardware players 
+     PC Hard & Software 
+ Programming and Hacking 
+     Development 
+     Translations 
+All times are GMT +1. The time now is 09:22 .
+doom9.org -
+Archive -
+Top 
+Powered by vBulletin® Version 3.8.11
+Copyright ©2000 - 2026, vBulletin Solutions Inc.

@@ -1,0 +1,733 @@
+ 
+ 
+ 
+ 
+ 
+
+ SVT-AV1 4.0 Boasts Major API Updates | Alliance for Open Media 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+
+
+
+ 
+
+
+
+
+
+ 
+
+
+
+
+
+ 
+
+ 
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+
+ 
+ 
+ 
+
+
+
+
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+ 
+ Skip links 
+ 
+ Skip to primary navigation 
+ Skip to content 
+ Skip to footer 
+ 
+ 
+
+ 
+ You are using an outdated browser. Please upgrade your browser to improve your experience. 
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Alliance for Open Media
+ An Alliance of Global Media Innovators 
+ 
+ 
+ About
+ 
+ 
+ 
+ 
+ Story 
+ 
+ FAQ 
+ 
+ Members 
+ 
+ Organization 
+ 
+ Legal 
+ 
+ Contact 
+ 
+ 
+ 
+ The Future of Innovation is Open 
+ 
+ AV1 adoption 
+ 
+ Specifications
+ 
+ 
+ 
+ 
+ All Specifications 
+ 
+ AV1 
+ 
+ AV2 
+ 
+ AVIF 
+ 
+ IAMF 
+ 
+ Open Audio Renderer (OAR) 
+ 
+ ID3 Timed Metadata 
+ 
+ AFGS1 
+ 
+ 
+ 
+ Resources
+ 
+ 
+ 
+ 
+ Products and services 
+ 
+ Open source 
+ 
+ Videos and Webinars 
+ 
+ Logo 
+ 
+ 
+ 
+ Get involved
+ 
+ 
+ 
+ 
+ Join 
+ 
+ Adopt 
+ 
+ Contribute 
+ 
+ Research 
+ 
+ 
+ 
+ News 
+ 
+ 
+ 
+ Toggle search 
+ 
+ 
+ 
+ 
+ 
+ 
+ Toggle menu 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Home 
+ 
+ 
+ > 
+ 
+ 
+ 
+ 
+ Blog posts 
+ 
+ 
+ > 
+ 
+ 
+ 
+ 
+ SVT-AV1 4.0 Boasts Major API Updates 
+ 
+ 
+ 
+ 
+
+ 
+
+
+ 
+ 
+ 
+ 
+
+
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ Follow 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+ Custom Social Profile Link
+ 
+ 
+-->
+ 
+ 
+ 
+
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ SVT-AV1 4.0 Boasts Major API Updates
+ 
+ 
+ 
+ 
+ March 11, 2026 | 
+ 
+ 
+
+
+
+
+ 1 minute read
+
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ AOMedia’s Software and Implementation Working Group (SIWG) is excited to share
+that SVT-AV1 4.0, the latest release of its
+ award-winning 
+flagship project, is now available. 
+
+ SVT-AV1 4.0, released earlier this year, represents a major software update that
+features a whole host of API improvements, including: 
+
+ 
+ Extended CRF range to 70, which reduces the impact or QP scaling, allowing the
+encoder to reach lower bitrates 
+ Added quarter steps between CRF increments to allow for further granularity in
+QP selection 
+ Added support for setting a custom global logger for library consumers 
+ Cleaned up public API headers including removal of deprecated macros, structs,
+and fields 
+ Added ability to calculate per-frame PSNR and SSIM metrics 
+ Added tune Image Quality (IQ) and MS-SSIM for Still Image coding mode 
+ This release boasts notable improvements of compute vs. compression efficiency
+across all modes, but in particular the AVIF encoding mode. It’s also worth
+noting that this latest version of the spec adds AC Bias, a psychovisual feature
+that improves detail preservation and film grain retention. 
+ 
+
+ SVT-AV1 4.0 can be accessed on GitLab ,
+and the SIWG requests that users try it out and report back on their experiences
+to allow for continuous improvements in SVT-AV1. 
+
+ A Closer Look at SVT-AV1 
+
+ The SIWG has been the steward of the SVT-AV1 since 2020, continually evolving and
+advancing it. 
+
+ As SVT-AV1 continues to improve, adoption continues to increase. Meta has noted
+that all its AV1 streams (which cover more than 75% of the watch time of videos
+on Facebook and Instagram) are produced using SVT-AV1. SVT-AV1 also allowed Meta
+to stream high-quality short-form videos (Reels) for the first time. 
+
+ In September 2025, SVT-AV1 won an IBC 2025 Innovation Award in the “Content Everywhere” category .
+Check out our recent SVT-AV1 highlight video ,
+and take a moment to test version 4.0 on GitLab. 
+
+ Many thanks to the members of the SIWG for their work advancing this spec. 
+
+ 
+ 
+
+ 
+ 
+ 
+
+
+ 
+
+
+ 
+ 
+ 
+
+ 
+ Categories: 
+ 
+ 
+ 
+ 
+ Blog Posts 
+ 
+ 
+ 
+
+
+
+ 
+ Updated: March 11, 2026 
+ 
+ 
+
+ 
+ 
+ Share on 
+ 
+
+ Twitter 
+
+ Facebook 
+
+ LinkedIn 
+ 
+
+
+ 
+ 
+ 
+ Previous 
+ 
+ 
+ Next 
+ 
+ 
+
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+ You may also enjoy 
+ 
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ Alliance for Open Media Publishes Open Audio Renderer (OAR) v1, Advancing Open Spatial Audio
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+ 2 minute read
+
+ 
+ 
+ 
+ 
+ 2026-07-30 
+ 
+ 
+ Reference implementation strengthens the open immersive audio ecosystem with
+production-ready rendering for loudspeakers and headphones
+
+ 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ AV2: What the Final Specification Means for Implementers
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+ 3 minute read
+
+ 
+ 
+ 
+ 
+ 2026-07-27 
+ 
+ 
+ The Alliance for Open Media has reached a significant milestone in open video
+coding with the official release of the AV2 specification.
+While the announceme... 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ AOMedia Video Codec Working Group Announces Availability of Libaom v3.14 “Pinkie Pie”
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+ 5 minute read
+
+ 
+ 
+ 
+ 
+ 2026-07-23 
+ 
+ 
+ The AOMedia Video Codec Working Group is pleased to announce that libaom v3.14,
+aka “Pinkie Pie,” is now available. This release makes available all the
+impr... 
+ 
+ 
+
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+ 
+ Alliance for Open Media Releases AV2 Codec, Advancing Next-Generation Open Video Coding
+ 
+ 
+ 
+ 
+ 
+
+
+
+
+ 2 minute read
+
+ 
+ 
+ 
+ 
+ 2026-06-06 
+ 
+ 
+ Wakefield, Mass. – June 9, 2026 - The Alliance for Open Media (AOMedia)
+today announced the release of the AV2 specification. AOMedia is a standards
+organiza... 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+ Enter your search term...
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ Follow: 
+ 
+
+ 
+ 
+ 
+ LinkedIn 
+ 
+ 
+ 
+ YouTube 
+ 
+ 
+ 
+ Reddit 
+ 
+ 
+ 
+ 
+ 
+ GitHub 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ RSS 
+ 
+ 
+
+ © 2026 Alliance for Open Media · All Rights Reserved · Project of the Joint Development Foundation · Terms of Service 
+
+ 
+ 
+
+ 
+ 
+ 
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+

@@ -1,0 +1,436 @@
+TITLE: Discard synthesized film grain for VMAF calculation
+STATE: open  CREATED: 04/22/2023 05:58:59
+===== ISSUE BODY =====
+Since AV1's film grain synthesis feature doesn't reproduce grain but only attempts to recreate a grain similar in type and intensity, synthesized film grain interferes with VMAF and other objective metrics. See [this paper](https://www.cambridge.org/core/journals/apsipa-transactions-on-signal-and-information-processing/article/an-overview-of-coding-tools-in-av1-the-first-video-codec-from-the-alliance-for-open-media/5972E00494363BE37E3439FAE382DB10) for example:
+
+>For grainy content, film grain synthesis significantly reduces the bitrate necessary to reconstruct the grain (up to 50% bitrate savings can be found on sequences with heavy grain or noise). This tool is not used in the comparison in section 3 since it does not generally improve objective quality metrics because of the mismatch in positions of individual grains.
+
+In my experience, leaving grain synth on when calculating VMAF produces lower scores, though I haven't done exhaustive testing.
+
+Synthesized grain can be disabled at decode-time, since it's a filter that's applied on top of the image after decoding the "traditionally" encoded data. With ffmpeg, this is done by using the `-export_side_data film_grain` switch prior to an input file (`-filmgrain 0` also works, but this option has been deprecated for at least a few months and might be removed in the future).
+
+However, this only seems to work when using dav1d; neither switch did anything when using libaom for decoding. One would hope that no one is using an ffmpeg build without dav1d, but there's a lot of old/not-very-good builds out there. Whether film grain can be disabled with hardware decoders is also an unknown, though I'm not sure if this is an issue since I don't know if hardware decoding can even be used with ab-av1.
+
+Film grain decoding is also surprisingly CPU intensive, so a side benefit will be less CPU used for decoding and more left over for VMAF calculation. Though this might only be noticeable on low-end systems.
+
+___
+
+In addition, we probably shouldn't tell people to use grain synthesis in the help output without mentioning how it should be used (currently the help for `--svt` mentions `film-grain=8`). It's a new feature to mainstream video codecs, and therefore probably not very well understood by the average user. As it's basically a layer of noise applied on top of the video, it's been found to be quite effective in hiding compression artifacts that exist underneath, thus the up to 50% bitrate saving on grainy sources. In practice for ab-av1 users, this means that they can reduce their VMAF target when using grain synthesis, and that grain synthesis should mostly be used for low-to-medium quality encodes of grainy content. It shouldn't be used for encodes that attempt to achieve a visually lossless result, since this is something the grain synthesis tool by its nature cannot achieve.
+
+It should also be mentioned that there is no single "right" value for `film-grain` and it isn't a set-it-and-forget-it thing; you'll need to look at each source video and estimate/test how much grain it has to find a suitable value that recreates a similar amount of it to the source. Neither SVT-AV1 or libaom have any kind of automation to estimate a correct amount of grain automatically, and I don't know if such a feature is planned.
+
+Also something to note is the `film-grain-denoise` option, which is turned on by default and leads the encoder to encode the grain-denoised picture instead of the original source picture. Since the denoising gets stronger the higher film-grain setting is, when encoding very noisy sources using grain synthesis, some detail will also get blurred in this denoising process. This eventually leads to lower VMAF scores no matter how low the CRF, because the detail simply isn't there anymore. Personally I'd try to use `film-grain-denoise=0`, since the grain tends to get removed during the normal compression process anyway, making it unnecessary to encode the grain-denoised picture. Just keep in mind that if you set too high of a VMAF target, the encoder will actually start to preserve the grain using the regular encoding tools, creating an output that has synthetic grain placed over the original grain and defeating the purpose of grain synthesis.
+
+===== COMMENTS =====
+--- alexheretic (04/22/2023 06:49:56) ---
+Thanks for the write up. As you say film-grain denoising + synthesis doesn't work well with VMAF. It is disabled by default upstream (svt-av1) so won't affect encodes unless explicitly opting in. This behaviour seems correct for ab-av1.
+
+Discarding the synthetic noise for vmaf runs seems like a good idea. This is worth testing.
+
+But the denoising seems an important part as it's the bit that will yield better compression. It might be useful to compare a denoised encode to an also denoised original so you can score the encode crf only. This could be done by denoising before encoding or possibly with an ffmpeg filter (though i haven't used any myself) + disabling svt-av1 denoising.
+
+However, then the tricky part of that would be denoising without killing the quality in an automatic way. I don't think this is currently possible.
+
+Ultimately film-grain encoding is a subjective tool that I think will be difficult to deal with with vmaf. Personally I just don't use it.
+
+--- veikk0 (04/22/2023 11:55:22) ---
+>But the denoising seems an important part as it's the bit that will yield better compression.
+
+Removal of noise also happens when using encoders normally, and this is why the `film-grain-denoise` option exists. You just use a higher CRF with `film-grain-denoise=0` to make up for the lack of a dedicated denoise step and get the compression benefit that way. See the following similarly sized encodes for example:
+
+* [grain-denoise-test.zip](https://github.com/alexheretic/ab-av1/files/11301149/grain-denoise-test.zip)
+* Input file: https://drive.google.com/file/d/1Zd-P0Plk1J5iSuNd4GgDNa0HyjwVYJbt/view?usp=sharing
+
+Command used (only change between the encodes is denoise and the CRF):
+
+>ffmpeg -i karatekid.110s.sample12+480f.mkv -c:v libsvtav1 -pix_fmt yuv420p10le -g 120 -svtav1-params tune=0:film-grain=45:film-grain-denoise=0 -crf 46 -preset 8 1.denoise0.grain45.RF46.ivf
+
+To my eye, the file with denoise disabled has more detail. See especially the key frame at 10 seconds for an easily distinguishable example of how the denoising blurs details that are much more visible in the non-denoised encode. There's also slight color shift in places, most noticeably in the red of the metal tin placed in the pan in that specific shot.
+
+>It might be useful to compare a denoised encode to an also denoised original so you can score the encode crf only.
+
+I don't think this is necessary, since I've found it better to just disable the denoising. But this could theoretically be done using a lossless encode with denoise enabled to create the reference file. However, SVT-AV1 doesn't currently support lossless (but libaom does). Though maybe a very low CRF encode would be good enough in practice, I dunno.
+
+The film grain synthesis tools in current encoders are definitely still primitive. I did find [this feature request](https://gitlab.com/AOMediaCodec/SVT-AV1/-/issues/1750) for SVT-AV1, but so far there hasn't been any activity on it.
+
+--- mr44er (04/22/2023 22:34:13) ---
+VMAF doesn't 'see' the synth grain, it only sees the denoised frames and this will result in a lower VMAF score overall.
+
+Some detailed info:
+https://norkin.org/research/film_grain/index.html
+https://medium.com/@nasirhemed/a-quick-overview-of-video-compression-and-av1-29dffbdb5cc4
+
+The really tricky part is to denoise just to let's say reach VMAF ~90 and still keeping the CRF/bitrate acceptable. VMAF 95 is nearly impossible.
+And yes, the denoiser from svt-av1 is brutal (but fast) and to be precise: the value for grain is bound to the denoising. You can't for example use grain 50 and only use denoise 25. Also synth grain recommends preset6 as minimum, because of the overhead. (read that somewhere in the manual and the encoder will tell this as info part when used with ffmpeg)
+The better option is to let nlmeans (-vf "nlmeans") do the denoise part and switch off on svt-av1 (film-grain-denoise=0). The bad thing is that this is terribly slow, slower than the encode itself. There should exist a gpu accelerated (nvidia only?) version of nlmeans, but I haven't tried yet.
+
+From my experience (not accurate, but -preset 3 to reach anything near VMAF90):
+`film-grain=20` = fast, and VMAF in range 84-87
+`-vf "nlmeans=1.0:7:5:3:3"` medium acceptable speed, quick'n'dirty, VMAF87-90
+`-vf "nlmeans"` REALLY slow, this would take a week for a 2h movie, but VMAF90+
+
+Here are some numbers for grain synth advice:
+https://gist.github.com/shssoichiro/a46ff01db70243c1719479f6518ea34d
+
+These are good numbers, but I came across movies from mid-90s and actual titles where film-grain=50 was needed.
+My rule of thumb is searching for anything near VMAF90 with nlmeans, check if the guessed file size is under 50% and then lower the CRF by -2 to let the grain 'hide' the missing bitrate.
+-preset 4 may work, but I didn't regret -preset 3 yet.
+
+The guy from av1an project has a photon noise generator (with ISO-values for better estimation) for libaom and rav1e. It should give a better look than that what svt-av1 will produce, but I haven't seen that yet.
+Anyway, they also don't have any detection how grainy the source is, it still relays on sample encodes and good guesses.
+
+I read anywhere from a guy who extracted just the noise (layers) as frame and ran VMAF checks with that until he hit his target. Maybe reddit/AV1 ? I can't find the source anymore....
+
+--- mr44er (04/25/2023 17:19:36) ---
+> It is disabled by default upstream (svt-av1) so won't affect encodes unless explicitly opting in. This behaviour seems correct for ab-av1.
+
+Yes, it is correct.
+
+I have to revise my part that VMAF95 with synth grain isn't reachable. Some fiddling more with different grainy sources and animated material gives quite the opposite result and even smaller file sizes.
+
+
+Example:
+`--preset 6 / without -svt film-grain : crf 26 VMAF 95.12 predicted video stream size 1.29 GiB (38%) taking 32 minutes`
+
+```diff
+ --preset 6 --svt film-grain=20 : crf 17 VMAF 95.09 predicted video stream size 1.59 GiB (47%) taking 2 hours
++--preset 6 --svt film-grain=10 : crf 25 VMAF 95.13 predicted video stream size 1.16 GiB (34%) taking 2 hours
+ --preset 6 --svt film-grain=15 : crf 21 VMAF 95.20 predicted video stream size 1.36 GiB (40%) taking 2 hours
+ --preset 6 --svt film-grain=13 : crf 23 VMAF 95.17 predicted video stream size 1.26 GiB (37%) taking 2 hours
+ --preset 6 --svt film-grain=11 : crf 24 VMAF 95.21 predicted video stream size 1.23 GiB (37%) taking 2 hours
+ --preset 6 --svt film-grain=9  : crf 25 VMAF 95.19 predicted video stream size 1.19 GiB (35%) taking 2 hours
+```
+
+It would be a very nice enhancement to have this as option for a search-run (--with-grain) with forced preset 6 because of
+`Svt[warn]: Instance 1: It is recommended to not use Film Grain for presets greater than 6 as it produces a significant compute overhead. This combination should only be used for debug purposes.`
+following with the same search logic (first run without grain to get file size as orientation, second run with grain and then compare) and in the end choose the smallest file size or a warning if it should be smaller without grain/denoise.
+
+--- veikk0 (04/30/2023 05:16:38) ---
+>VMAF doesn't 'see' the synth grain, it only sees the denoised frames and this will result in a lower VMAF score overall.
+
+I don't know how you came to this conclusion, or if you meant to say something else. But neither of the links you provided support this claim, and it's fairly simple to calculate the VMAF of an AV1 encode that has synthesized grain with the grain turned on and then turned off (with `-export_side_data film_grain` when using dav1d) and observe a difference in the VMAF scores (when there is grain, that is; if there is very little grain, it might not affect VMAF that much). Which means that VMAF definitely does see the synthesized film grain.
+
+To further simplify why calculating VMAF with grain synthesis on makes no sense, it's because AV1's film grain synthesis is a post-processing filter[1], and VMAF was trained to measure the effects of video compression and scaling artifacts[2], not pre- or post-processing.
+
+Once you start applying effects to the video other than video compression, you're no longer measuring what you think you're measuring. This has been used since time immemorial to massage/cheat on objective metrics to make them say what you want them to say. This is one of the reasons you should never take any compression efficiency claims at face value, especially from closed-source encoder vendors; they may be inflating their efficiency claims with things that have nothing to do with compression.
+
+Just like other objective metrics, VMAF is not infallible and can be cheated in various ways. There have been at least a couple of studies done on this ([3](https://arxiv.org/abs/1907.04807), [4](https://arxiv.org/abs/2107.04510)), and Netflix released [a memo](https://docs.google.com/document/d/1dJczEhXO0MZjBSNyKmd3ARiCTdFVMNPBykH4_HMPoyY/edit#heading=h.oaikhnw46pw5) on the subject. libaom [even has VMAF tunes](https://aomedia.googlesource.com/aom/+/615dc24579d531cb3a2c9627ab25a3026f9e2b47) that use some of these discoveries to produce higher VMAF output. The VMAF NEG models were created to address some of these methods, but were also demonstrated to be cheatable (see [4](https://arxiv.org/abs/2107.04510)).
+
+The relevance of this to our context is that we need to make sure we're using VMAF to measure the effects of video compression, not filters such as AV1's film grain synthesis. As I alluded to when I opened this report, even some advanced users of grain synthesis may not realize that this feature that's built-in to the codec is actually a post-processing filter and that this has implications for the applicability of objective metrics. And for this reason, the testing done by mr44er above is meaningless; grain synthesis is a very specific tool for enhancing subjective quality, and VMAF wasn't designed to capture its effect.
+
+As for "forcing preset 6" for grain synthesis, that's neither here or there. The only reason the warning is there is because grain synthesis is CPU heavy and makes up a proportionally unreasonable amount of the total compute time on higher presets. While using presets higher than 6 with grain synthesis definitely isn't ideal in terms of the compute-compression trade-off, I don't think it's a good idea to force the user to do anything, and messing with someone's encoding settings is just going to cause annoyance. If someone wants to do an encode with preset 12 and spend 85% of their CPU time doing grain synth, let them do it.
+
+In terms of the actual user experience with grain synth, I say just leave it up to the user. Since choosing the film-grain parameter isn't currently automated, you need to look at the source to estimate the amount of grain it has. And based on the amount of grain, you can estimate the VMAF you want to target.
+
+[1] [An Overview of Coding Tools in AV1: the First Video Codec from the Alliance for Open Media](https://www.cambridge.org/core/journals/apsipa-transactions-on-signal-and-information-processing/article/an-overview-of-coding-tools-in-av1-the-first-video-codec-from-the-alliance-for-open-media/5972E00494363BE37E3439FAE382DB10):
+
+>Film grain synthesis in AV1 is normative post-processing applied outside of the encoding/decoding loop
+
+[2] [On VMAF’s property in the presence of image enhancement operations](https://docs.google.com/document/d/1dJczEhXO0MZjBSNyKmd3ARiCTdFVMNPBykH4_HMPoyY/edit#heading=h.oaikhnw46pw5):
+
+>VMAF was designed with Netflix’s streaming use case in mind, in particular, to capture the video quality of professionally generated movies and TV shows, in the presence of [compression and scaling artifacts](https://netflixtechblog.com/toward-a-practical-perceptual-video-quality-metric-653f208b9652), as perceived by end viewers.
+
+--- mr44er (04/30/2023 21:47:21) ---
+> I don't know how you came to this conclusion, or if you meant to say something else.
+
+No, that's exactly what I meant. Grain is just metadata (for svt-av1 and libaom or as I understood), an additional layer that only the player renders on top when playing, just like a soft subtitle. The grain is not in the video, does not need to be compressed, just metadata, hence synthetic or let's say fake. I came to that conclusion when reading some threads about the av1an project and grain. They changed just the grain table (very small in size), remuxed and voila, another level of grain without recode.
+Also I saw the picture from the first link: https://norkin.org/img/fg_flowchart_av1.png
+
+The only post-processing filter would be the denoising, because grain on top of compressed grain is kinda senseless. From my understanding the only purpose for synth grain is to rip it out from the source video, so that the encoder doesn't have to do it to pay with bigger filesize. This does work up to some level with encoding alone, but better with denoising. So ripping out with denoising, cranking CRF up to still reach VMAF95 **and** nonetheless getting a smaller filesize is from my opinion the sweet spot. My eyes say the same for the results. I can't tell the difference between VMAF95 and denoised VMAF95 until I stare frame per frame, but encoded grain vs. synth grain does make the difference (it appears sharper), filesize also.
+
+> Once you start applying effects to the video other than video compression, you're no longer measuring what you think you're measuring.
+
+Yes, I know. And so my conclusion, that VMAF measures the denoised picture unless ffmpeg does render it also into VMAF, which I don't now at the moment. ffmpeg6 was just ported 2 days ago to FreeBSD, so the tests ran with ffmpeg4.
+
+> The relevance of this to our context is that we need to make sure we're using VMAF to measure the effects of video compression, not filters such as AV1's film grain synthesis. As I alluded to when I opened this report, even some advanced users of grain synthesis may not realize that this feature that's built-in to the codec is actually a post-processing filter and that this has implications for the applicability of objective metrics. And for this reason, the testing done by mr44er above is meaningless; grain synthesis is a very specific tool for enhancing subjective quality, and VMAF wasn't designed to capture its effect.
+
+Yes, correct. I didn't suggest this as default in any way or changing the normal procedure. My point was only additional and optional a (grain)search run if the user wants it and understand all the consequences. Provided for sure that I'm not completely wrong on svt-av1 or you guys say that a denoised VMAF95 is directly inacceptable at all. :)
+
+> As for "forcing preset 6" for grain synthesis, that's neither here or there. The only reason the warning is there is because grain synthesis is CPU heavy and makes up a proportionally unreasonable amount of the total compute time on higher presets. While using presets higher than 6 with grain synthesis definitely isn't ideal in terms of the compute-compression trade-off, I don't think it's a good idea to force the user to do anything, and messing with someone's encoding settings is just going to cause annoyance. If someone wants to do an encode with preset 12 and spend 85% of their CPU time doing grain synth, let them do it.
+
+Also right, yes. I thought about this in the same way of 'most optimal', not forcing or disallowing anything, just like preset8/10bit as defaults for ab-av1, where the defaults for svt-av1 are preset10/8bit (when used without parameters with ffmpeg). Everything optional, but just as min-default when user chooses anything with grain. But again, this is irrelevant, if you decide to keep out anything with grain of ab-av1. :)
+
+> In terms of the actual user experience with grain synth, I say just leave it up to the user.
+
+I am a user and I'm trying to find a more convenient way.
+
+> Since choosing the film-grain parameter isn't currently automated, you need to look at the source to estimate the amount of grain it has. And based on the amount of grain, you can estimate the VMAF you want to target.
+
+I can tell that the visual experience with my eyes isn't that big between grain10,20 or 30 from couch distance but huge in terms of filesize. All my tests above were more or less good guesses, the sample encodes had not a big difference in visual quality, but as said synth grain looks always sharper, regardless if grain10 or grain30.
+So I always prefer a VMAF95/1GB-file with **any** synth grain vs. a VMAF95/2GB-file with smoothed/recompressed grain and wished this could be done automatically. That was my intention and hope you don't misunderstand me. :)
+
+--- veikk0 (07/29/2023 04:39:45) ---
+I asked Netflix directly about whether grain synth should be disabled for VMAF calculation (because I know there's been at least one talk/presentation that mentions it, but I can't find it), and [I got a response](https://github.com/Netflix/vmaf/issues/1192#issuecomment-1654243689):
+
+>You are right that synthesized grain interferes with VMAF scores, and we recommend to disable it when computing VMAF.
+
+So that should settle it.
+
+In terms of implementation, in my testing `-export_side_data film_grain` has no effect when decoding non-AV1 files, so that shouldn't be an issue. However, since FFmpeg doesn't support discarding film grain with libaom (but `aomdec` can do this with `--skip-film-grain`, so maybe an FFmpeg bug should be filed about this), there should probably at least be a README note that an FFmpeg build that includes libdav1d is recommended.
+
+--- mr44er (08/01/2023 16:32:19) ---
+Too bad that he didn't go into more details, but ok, calculate VMAF with grain off is a start.
+
+
+
+
+--- mr44er (10/07/2023 21:08:47) ---
+I like to roll that up again to get some opinions and missing pieces. -> Grain off for VMAF calculation as the guy from Netflix suggests, but what next if I want synth grain done right?
+
+For this experiment I used https://pixabay.com/de/videos/aufzeichnung-spieler-vinyl-musik-64333/ and you can see clearly in the upper left brownish/orange area the dancing grain pixels.
+
+Choosing highest res/quality offered (uncropped 1080p):
+yt-dlp -f hls-google_mediacdn-3918 https://pixabay.com/de/videos/aufzeichnung-spieler-vinyl-musik-64333/
+
+Delete unnecessary bits and put the video in the .mkv container so that I can start watching the video in the temp folder during the sample encodes.
+ffmpeg -i Record\ -\ 64333\ \[510004236].mp4 -c:v copy -an -sn -dn source.mkv
+
+As preset6 is the recommended minimum (for grain) to avoid overhead and to get comparable results, I will use it exclusively.
+
+```
+ab-av1 crf-search --thorough --preset 6 -i source.mkv
+  00:00:31 ##################################################################################################################################### (sampling crf 32, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 32 --preset 6
+
+crf 32 VMAF 95.00 predicted video stream size 1.53 MiB (5%) taking 70 seconds
+```
+
+Perfect, VMAF95 to the point!
+
+
+```
+ab-av1 encode -i source.mkv --crf 32 --preset 6 -o outnormalpreset6crf32.mkv
+  00:00:54 ############################################################################################################################################## (29 fps, eta 0s)
+Encoded 1.54 MiB (5%) 
+```
+-> I know that normal coding alone smoothes things out. Still visible dancing pixel, these were encoded and needed bitrate.
+
+
+Let's try -crf 32 as value for synth grain with a good guess of 10 (and remember synth grain 10 does also svt-av1 internal denoise of 10):
+
+```
+ab-av1 encode -i source.mkv --crf 32 --preset 6 --svt film-grain=10 -o outgrain10preset6crf32.mkv
+  00:01:13 ############################################################################################################################################## (21 fps, eta 0s)
+Encoded 1.36 MiB (5%) 
+```
+-> Looks more like the original and it's smaller! But what about VMAF here? I don't know, I guess it's bad (and under 95) because of the denoise.
+
+
+Let's try 10 and switch off the internal denoiser:
+
+```
+ab-av1 encode -i source.mkv --crf 32 --preset 6 --svt film-grain=10 --svt film-grain-denoise=0 -o outgrain10nodenoisepreset6crf32.mkv
+  00:01:17 ############################################################################################################################################## (20 fps, eta 0s)
+Encoded 1.69 MiB (6%) -> counterproductive
+```
+
+
+Let's try this again with 20:
+```
+ab-av1 encode -i source.mkv --crf 32 --preset 6 --svt film-grain=20 -o outgrain20preset6crf32.mkv
+00:01:12 ############################################################################################################################################## (21 fps, eta 0s)
+Encoded 1.31 MiB (4%) -> Nice size reduction and nearly the same grain as the original, but what about VMAF here? I don't know, I guess it's bad (and under 95) because of the denoise.
+```
+
+```
+ab-av1 encode -i source.mkv --crf 32 --preset 6 --svt film-grain=20 --svt film-grain-denoise=0 -o outgrain20nodenoisepreset6crf32.mkv
+00:01:17 ############################################################################################################################################## (20 fps, eta 0s)
+Encoded 1.69 MiB (6%) -> counterproductive
+```
+
+The general finding is that any other denoiser gives better results than the internal one from svt-av1. This is consistent with my own tests, with nlmeans having the least 'damage' to the quality, but also costing a lot of time. The overhead is brutal, slower than the actual encode and therefore justifies using preset2 directly because nlmeans is even slower. :)
+
+nlmeans full/slow instead of the internal denoiser:
+```
+ab-av1 encode -i source.mkv --crf 32 --preset 6 --svt film-grain=10 --svt film-grain-denoise=0 --vfilter "nlmeans" -o outgrain10nlmeansslowpreset6crf32.mkv
+00:44:11 ############################################################################################################################################# (0.6 fps, eta 0s) -> ouch! :D
+Encoded 1.44 MiB (5%)
+
+```
+nlmeans quick:
+```
+ab-av1 encode -i source.mkv --crf 32 --preset 6 --svt film-grain=10 --svt film-grain-denoise=0 --vfilter "nlmeans=1.0:7:5:3:3" -o outgrain10nlmeansquickpreset6crf32.mkv
+00:02:18 ############################################################################################################################################## (11 fps, eta 0s)
+Encoded 1.60 MiB (5%) -> counterproductive
+```
+
+hqdn3d full (this kills too much fidelity, but it's fast and still better than internal denoiser)
+```
+ab-av1 encode -i source.mkv --crf 32 --preset 6 --svt film-grain=10 --svt film-grain-denoise=0 --vfilter "hqdn3d" -o outgrain10hqdn3dfullpreset6crf32.mkv
+00:01:13 ############################################################################################################################################## (21 fps, eta 0s)
+Encoded 1.28 MiB (4%)
+```
+
+```
+hqdn3d only slight temporal filtering
+ab-av1 encode -i source.mkv --crf 32 --preset 6 --svt film-grain=10 --svt film-grain-denoise=0 --vfilter "hqdn3d=0:0:1:0" -o outgrain10hqdn3dslightpreset6crf32.mkv
+00:01:14 ############################################################################################################################################## (21 fps, eta 0s)
+Encoded 1.46 MiB (5%)
+```
+
+Bonusround (without full nlmeans), because my eyes think grain20 is the sweet spot to be as close as the original.
+
+nlmeans quick:
+```
+ab-av1 encode -i source.mkv --crf 32 --preset 6 --svt film-grain=20 --svt film-grain-denoise=0 --vfilter "nlmeans=1.0:7:5:3:3" -o outgrain20nlmeansquickpreset6crf32.mkv
+  00:02:18 ############################################################################################################################################## (11 fps, eta 0s)
+Encoded 1.60 MiB (5%) -> counterproductive
+```
+
+hqdn3d full:
+```
+ab-av1 encode -i source.mkv --crf 32 --preset 6 --svt film-grain=20 --svt film-grain-denoise=0 --vfilter "hqdn3d" -o outgrain20hqdn3dfullpreset6crf32.mkv
+00:01:13 ############################################################################################################################################## (21 fps, eta 0s)
+Encoded 1.28 MiB (4%)
+```
+
+hqdn3d only slight temporal filtering:
+```
+ab-av1 encode -i source.mkv --crf 32 --preset 6 --svt film-grain=20 --svt film-grain-denoise=0 --vfilter "hqdn3d=0:0:1:0" -o outgrain20hqdn3dslightpreset6crf32.mkv
+00:01:15 ############################################################################################################################################## (20 fps, eta 0s)
+Encoded 1.46 MiB (5%)
+```
+
+I don't know what VMAF the results have at this point, regardless if ffmpeg would see the synth grain or not (that's what I'm missing from the answer from the Netflix guy). I know a crf-search with grain gives other results, but I don't know if it comes from the synth overlay or the further distortion (slight, but it's there, film-grain-denoise=0 is not 100% off) of the images. What would you do? Any suggestions?
+
+For science:
+```
+ab-av1 crf-search --thorough --preset 6 --svt film-grain=10 -i source.mkv
+- crf 32 VMAF 94.40 (5%)
+- crf 21 VMAF 95.31 (11%)
+- crf 25 VMAF 95.05 (8%)
+- crf 26 VMAF 94.97 (8%)
+  00:02:29 ##################################################################################################################################### (sampling crf 26, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 25 --preset 6 --svt film-grain=10
+
+crf 25 VMAF 95.05 predicted video stream size 2.45 MiB (8%) taking 89 seconds -> counterproductive
+```
+
+```
+ab-av1 crf-search --thorough --preset 6 --svt film-grain=10 --svt film-grain-denoise=0 -i source.mkv
+- crf 32 VMAF 94.86 (6%)
+- crf 21 VMAF 95.89 (16%)
+- crf 31 VMAF 94.97 (6%)
+  00:02:26 ##################################################################################################################################### (sampling crf 30, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 30 --preset 6 --svt film-grain=10 --svt film-grain-denoise=0
+
+crf 30 VMAF 95.11 predicted video stream size 2.11 MiB (7%) taking 84 seconds -> counterproductive
+
+```
+```
+ab-av1 crf-search --thorough --preset 6 --svt film-grain=20 -i source.mkv
+- crf 32 VMAF 93.64 (4%)
+- crf 21 VMAF 94.41 (10%)
+  00:01:51 ##################################################################################################################################### (sampling crf 10, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 10 --preset 6 --svt film-grain=20
+
+crf 10 VMAF 95.04 predicted video stream size 9.29 MiB (32%) taking 2 minutes -> counterproductive
+```
+
+```
+ab-av1 crf-search --thorough --preset 6 --svt film-grain=20 --svt film-grain-denoise=0 -i source.mkv
+- crf 32 VMAF 94.69 (6%)
+- crf 21 VMAF 95.71 (16%)
+  00:01:53 ##################################################################################################################################### (sampling crf 29, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 29 --preset 6 --svt film-grain=20 --svt film-grain-denoise=0
+
+crf 29 VMAF 95.02 predicted video stream size 2.30 MiB (8%) taking 88 seconds -> counterproductive
+```
+
+```
+ab-av1 crf-search --thorough --preset 6 --svt film-grain=20 --svt film-grain-denoise=0 --vfilter "nlmeans=1.0:7:5:3:3" -i source.mkv
+- crf 32 VMAF 94.75 (5%)
+- crf 21 VMAF 95.75 (15%)
+- crf 29 VMAF 95.09 (7%)
+  00:05:13 ##################################################################################################################################### (sampling crf 30, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 30 --preset 6 --vfilter "nlmeans=1.0:7:5:3:3" --svt film-grain=20 --svt film-grain-denoise=0
+
+crf 30 VMAF 95.00 predicted video stream size 2.01 MiB (7%) taking 2 minutes
+```
+
+```
+ab-av1 crf-search --thorough --preset 6 --svt film-grain=20 --svt film-grain-denoise=0 --vfilter "hqdn3d" -i source.mkv
+- crf 32 VMAF 95.12 (4%)
+- crf 43 VMAF 93.87 (2%)
+  00:01:38 ##################################################################################################################################### (sampling crf 33, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 33 --preset 6 --vfilter "hqdn3d" --svt film-grain=20 --svt film-grain-denoise=0
+
+crf 33 VMAF 95.02 predicted video stream size 1.18 MiB (4%) taking 77 seconds
+```
+
+```
+ab-av1 crf-search --thorough --preset 6 --svt film-grain=20 --svt film-grain-denoise=0 --vfilter "hqdn3d=0:0:1:0" -i source.mkv
+- crf 32 VMAF 94.86 (5%)
+- crf 21 VMAF 95.77 (12%)
+- crf 30 VMAF 95.08 (6%)
+- crf 31 VMAF 94.96 (5%)
+  00:02:24 ##################################################################################################################################### (sampling crf 31, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 30 --preset 6 --vfilter "hqdn3d=0:0:1:0" --svt film-grain=20 --svt film-grain-denoise=0
+
+crf 30 VMAF 95.08 predicted video stream size 1.75 MiB (6%) taking 84 seconds
+```
+
+```
+ab-av1 crf-search --thorough --preset 6 --vfilter "nlmeans=1.0:7:5:3:3" -i source.mkv
+  00:01:14 ##################################################################################################################################### (sampling crf 32, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 32 --preset 6 --vfilter "nlmeans=1.0:7:5:3:3"
+
+crf 32 VMAF 95.04 predicted video stream size 1.44 MiB (5%) taking 2 minutes
+```
+
+```
+ab-av1 crf-search --thorough --preset 6 --vfilter "hqdn3d" -i source.mkv
+- crf 32 VMAF 95.29 (4%)
+- crf 43 VMAF 94.03 (2%)
+- crf 35 VMAF 94.95 (3%)
+  00:01:43 ##################################################################################################################################### (sampling crf 34, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 34 --preset 6 --vfilter "hqdn3d"
+
+crf 34 VMAF 95.09 predicted video stream size 971.05 KiB (3%) taking 53 seconds
+```
+```
+
+ab-av1 crf-search --thorough --preset 6 --vfilter "hqdn3d=0:0:1:0" -i source.mkv
+- crf 32 VMAF 95.06 (4%)
+- crf 43 VMAF 93.58 (2%)
+- crf 33 VMAF 94.92 (4%)
+  00:01:19 ##################################################################################################################################### (sampling crf 33, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 32 --preset 6 --vfilter "hqdn3d=0:0:1:0"
+
+crf 32 VMAF 95.06 predicted video stream size 1.30 MiB (4%) taking 58 seconds
+```
+
+For now I tend to do a crf-search 'pre-scan' on preset2 with hqdn3d=0:0:1:0 (and check the temp files if they are grainless enough for good compression) and then use this in a second step with a fitting amount of grain:
+
+```
+ab-av1 crf-search --thorough --preset 2 --vfilter "hqdn3d=0:0:1:0" -i source.mkv
+- crf 32 VMAF 95.40 (4%)
+- crf 43 VMAF 93.95 (2%)
+  00:04:54 ##################################################################################################################################### (sampling crf 35, eta 0s)
+Encode with: ab-av1 encode -i source.mkv --crf 35 --preset 2 --vfilter "hqdn3d=0:0:1:0"
+
+crf 35 VMAF 95.02 predicted video stream size 962.99 KiB (3%) taking 5 minutes
+
+->
+ab-av1 encode -i source.mkv --crf 35 --preset 2 --svt film-grain=20 --svt film-grain-denoise=0 --vfilter "hqdn3d=0:0:1:0"
+-o outgrain20hqdn3dslightpreset2crf35-final.mkv
+  00:05:04 ############################################################################################################################################# (5.1 fps, eta 0s)
+Encoded 1.10 MiB (4%)
+```
+
+
+Bonus2:
+```
+ab-av1 auto-encode --preset 2 -i source.mkv -o outonlypreset2.mkv 
+  Searching 00:05:24 ####################################################################################################################### (crf 34, VMAF 95.06, size 4%)
+  Encoding  00:05:28 ################################################################################################################################### (4.7 fps, eta 0s)
+Encoded 1.16 MiB (4%)
+```
+
+outgrain20hqdn3dslightpreset2crf35-final.mkv ran faster, is smaller and looks more like the original than outonlypreset2.mkv. The effect is even better on long videos (more samples) and/or 4k.
+
+
+[grainsamples.zip](https://github.com/alexheretic/ab-av1/files/12838939/grainsamples.zip)
+
+
+

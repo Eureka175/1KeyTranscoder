@@ -1,0 +1,139 @@
+===== POST 1 =====
+Does anyone know how to get SVT-AV1 to model film grain better than this?
+
+
+
+
+
+
+
+The left half is the input and the right half is SVT-AV1.
+
+
+
+Command line:
+
+
+
+
+	Code:
+	ffmpeg -i fringe-intro.mkv -color_primaries bt709 -color_trc bt709 -colorspace bt709 -pix_fmt yuv420p -f rawvideo - |     SvtAv1EncApp -i /dev/stdin --input-depth 8 -w 1920 -h 1080 --film-grain 16 --fps-num 24000 --fps-denom 1001 --crf 20 --preset 4 --tune 0 --tile-columns 2 --color-primaries bt709 --transfer-characteristics bt709 --matrix-coefficients bt709 -b video.ivf
+</div
+
+===== POST 2 =====
+Well for one, unless you want to use some exotic options or chunked encoding, you should use libsvtav1 within ffmpeg.
+
+
+
+Here is what I'd recommend if you want better detail retention in general.
+
+Also, no need for tiles really at 1080p unless you code lossless.
+
+
+
+
+	Code:
+	ffmpeg -i input.mkv -crf 20 -preset 4  -svtav1-params tune=0:keyint=240:film-grain=16:film-grain-denoise=0 -pix_fmt yuv420p10le -colorspace 1 -color_primaries 1 -color_trc 1 -c:a copy output.mkv
+This should help a decent bit, especially in fidelity driven encoding
+
+===== POST 3 =====
+Is there a Linux binary somewhere that has SVT-AV1 built in
+
+===== POST 4 =====
+The FGS features aren't really parts of the AV1 codec proper. Both analysis and playback are out of band of the encoder and decoder itself. On analysis, the grain needs to be modeled, parameterized, and removed. This part is HARD, and a good job often requires tuning. And grain can vary throughout a movie if shots came from different sources or have different effects applied, so a single tuning is going to be difficult.
+
+
+
+The grain parameters are put into a SEI message in the video elementary stream, which is then read by the player, random grain based on the parameters is generated, and then applied to the decoded frames. As architected, the same SEI message should work in other codecs. Also, since the grain is added as a post processing filter, the implementation can vary by manufacturer. There's been examples of some devices that decode AV1 but don't add the grain back. Another will keep randomizing the grain when the video is paused
+
+===== POST 5 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by benwaggoner
+					
+				
+				The FGS features aren't really parts of the AV1 codec proper. Both analysis and playback are out of band of the encoder and decoder itself. On analysis, the grain needs to be modeled, parameterized, and removed. This part is HARD, and a good job often requires tuning. And grain can vary throughout a movie if shots came from different sources or have different effects applied, so a single tuning is going to be difficult.
+
+
+
+The grain parameters are put into a SEI message in the video elementary stream, which is then read by the player, random grain based on the parameters is generated, and then applied to the decoded frames. As architected, the same SEI message should work in other codecs. Also, since the grain is added as a post processing filter, the implementation can vary by manufacturer. There's been examples of some devices that decode AV1 but don't add the grain back. Another will keep randomizing the grain when the video is paused.
+			
+		
+	
+	
+Sections 5.9.30 and 6.8.20 of the AV1 specification detail film grain coefficients.
+
+
+
+"SEI" never appears in the specification, but I've seen this with HEVC and Dolby Vision. Is this a generic term?
+
+
+
+I recognize that grain synthesis is obviously not handled here using MDCT, but it is nonetheless part of the standard specification.
+
+
+
+https://aomediacodec.github.io/av1-spec/av1-spec.pdf</a
+
+===== POST 6 =====
+Quote:
+	
+	
+		
+			
+				
+					Originally Posted by wswartzendruber
+					
+				
+				Sections 5.9.30 and 6.8.20 of the AV1 specification detail film grain coefficients.
+
+
+
+"SEI" never appears in the specification, but I've seen this with HEVC and Dolby Vision. Is this a generic term?
+			
+		
+	
+	
+Yes, a SEI is a standard MPEG/SMPTE way to put metadata into an elementary stream. IIRC AV1 in a MPEG-4 wrapper also supports SEI. SEI's is where HDR static and dynamic metadata live, and the source for that metadata when it is inserted into HDMI.
+
+
+
+
+	Quote:
+	
+	
+		
+			
+				I recognize that grain synthesis is obviously not handled here using MDCT, but it is nonetheless part of the standard specification.
+
+
+
+https://aomediacodec.github.io/av1-spec/av1-spec.pdf
+			
+		
+	
+	
+Right. It is a normative part of the specification. But it's not an in-loop filter that impacts the fundamental pixels-bitstream-pixels codec. Its more akin to VC-1's post processing, which was defined normatively, but is optional to decoding.
+
+
+
+One can make an AV1 decoder that fully decodes but doesn't generate film grain. One can't make an AV1 decoder that doesn't do, say, in-loop deblocking, as that would mess with predictions and quality would get worse the farther into the GOP.
+
+
+
+And as it is out of loop, it is also available to arbitrary codecs that carry the correct metadata
+
+===== POST 7 =====
+AV1 doesn't have SEI messages as found in typical MPEG codecs. It has metadata OBUs.
+
+The only generic part is the syntax of the payload which can be reused in any codec supporting arbitrary payload messages such as SEI (though those aren't generic enough).
+
+
+
+And that syntax is what can be made into a specification, like the models for AV1 FGS: https://github.com/AOMediaCodec/afgs1-spec</a
+
+

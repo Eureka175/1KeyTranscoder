@@ -1,0 +1,6238 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+<meta name="generator" content="vBulletin 3.8.11" />
+
+<meta name="keywords" content=" VMAF-comparison: x265 vs other encoders, doom9,video,dvd,conversion,mpeg-2,mpeg-4,divx,xvid,avisynth" />
+<meta name="description" content=" VMAF-comparison: x265 vs other encoders High Efficiency Video Coding (HEVC)" />
+
+
+<!-- CSS Stylesheet -->
+<style type="text/css" id="vbulletin_css">
+/**
+* vBulletin 3.8.11 CSS
+* Style: 'Doom9's Forum vBulletin 3 Style'; Style ID: 1
+*/
+@import url("clientscript/vbulletin_css/style-b4d5df61-00001.css");
+</style>
+<link rel="stylesheet" type="text/css" href="clientscript/vbulletin_important.css?v=3811" />
+
+
+<!-- / CSS Stylesheet -->
+
+<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript" src="clientscript/yui/yahoo-dom-event/yahoo-dom-event.js?v=3811"></script>
+<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript" src="clientscript/yui/connection/connection-min.js?v=3811"></script>
+<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript">
+<!--
+var SESSIONURL = "s=7c0e76e9769aef9feff36a1e7c003b15&";
+var SECURITYTOKEN = "guest";
+var IMGDIR_MISC = "images/misc";
+var vb_disable_ajax = parseInt("0", 10);
+// -->
+</script>
+<script type="text/javascript" src="clientscript/vbulletin_global.js?v=3811"></script>
+<script type="text/javascript" src="clientscript/vbulletin_menu.js?v=3811"></script>
+
+
+	<link rel="alternate" type="application/rss+xml" title="Doom9's Forum RSS Feed" href="external.php?type=RSS2" />
+	
+		<link rel="alternate" type="application/rss+xml" title="Doom9's Forum - High Efficiency Video Coding (HEVC) - RSS Feed" href="external.php?type=RSS2&amp;forumids=81" />
+	
+
+
+        <!-- App Indexing for Google Search -->
+        <link href="android-app://com.quoord.tapatalkpro.activity/tapatalk/forum.doom9.org?location=post&amp;fid=81&amp;tid=176273&amp;pid=1871517&amp;channel=google-indexing" rel="alternate" />
+        <link href="ios-app://307880732/tapatalk/forum.doom9.org?location=post&amp;fid=81&amp;tid=176273&amp;pid=1871517&amp;channel=google-indexing" rel="alternate" />
+        
+           <link href="https://forum.doom9.org/mobiquo/smartbanner/manifest.json" rel="manifest">
+        
+        <meta name="apple-itunes-app" content="app-id=307880732, affiliate-data=at=10lR7C, app-argument=tapatalk://forum.doom9.org?location=post&fid=81&tid=176273&pid=1871517" />
+        
+	<title> VMAF-comparison: x265 vs other encoders - Doom9's Forum</title>
+	<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript" src="clientscript/vbulletin_post_loader.js?v=3811"></script>
+	<style type="text/css" id="vbulletin_showthread_css">
+	<!--
+	
+	#links div { white-space: nowrap; }
+	#links img { vertical-align: middle; }
+	-->
+	</style>
+</head>
+<body>
+<!-- logo -->
+<a name="top"></a>
+<table border="0" width="100%" cellpadding="0" cellspacing="0" align="center">
+<tr>
+<td style="text-align:center;"><p><b>Welcome to <a href="https://www.doom9.org/">Doom9</a>'s Forum, THE in-place to be for everyone interested in DVD conversion.</b></p>
+<p><b>Before you start posting please read the <a href="https://forum.doom9.org/forum-rules.htm">forum rules</a>. By posting to this forum you agree to abide by the rules.</b></p>
+<p><b> Domains: <a href="https://forum.doom9.org/">forum.doom9.org</a> / <a href="https://forum.doom9.net/">forum.doom9.net</a> / <a href="https://forum.doom9.se/">forum.doom9.se</a></b></p>
+</td>
+
+	<td align="right" id="header_right_cell">
+		&nbsp;
+	</td>
+</tr>
+</table>
+<!-- /logo -->
+
+<!-- content table -->
+<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+
+
+
+
+<br />
+
+<!-- breadcrumb, login, pm info -->
+<table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%" align="center">
+<tr>
+	<td class="alt1" width="100%">
+		
+			<table cellpadding="0" cellspacing="0" border="0">
+			<tr valign="bottom">
+				<td><a href="#" onclick="history.back(1); return false;"><img src="images/misc/navbits_start.gif" alt="Go Back" border="0" /></a></td>
+				<td>&nbsp;</td>
+				<td width="100%"><span class="navbar"><a href="index.php?s=7c0e76e9769aef9feff36a1e7c003b15" accesskey="1">Doom9's Forum</a></span> 
+	<span class="navbar">&gt; <a href="forumdisplay.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;f=17">Video Encoding</a></span>
+
+
+	<span class="navbar">&gt; <a href="forumdisplay.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;f=81">High Efficiency Video Coding (HEVC)</a></span>
+
+</td>
+			</tr>
+			<tr>
+				<td class="navbar" style="font-size:10pt; padding-top:1px" colspan="3"><a href="/showthread.php?p=1871517"><img class="inlineimg" src="images/misc/navbits_finallink_ltr.gif" alt="Reload this Page" border="0" /></a> <strong>
+	 VMAF-comparison: x265 vs other encoders
+
+</strong></td>
+			</tr>
+			</table>
+		
+	</td>
+
+	<td class="alt2" nowrap="nowrap" style="padding:0px">
+		<!-- login form -->
+		<form action="login.php?do=login" method="post" onsubmit="md5hash(vb_login_password, vb_login_md5password, vb_login_md5password_utf, 0)">
+		<script type="text/javascript" src="clientscript/vbulletin_md5.js?v=3811"></script>
+		<table cellpadding="0" cellspacing="3" border="0">
+		<tr>
+			<td class="smallfont" style="white-space: nowrap;"><label for="navbar_username">User Name</label></td>
+			<td><input type="text" class="bginput" style="font-size: 11px" name="vb_login_username" id="navbar_username" size="10" accesskey="u" tabindex="101" value="User Name" onfocus="if (this.value == 'User Name') this.value = '';" /></td>
+			<td class="smallfont" nowrap="nowrap"><label for="cb_cookieuser_navbar"><input type="checkbox" name="cookieuser" value="1" tabindex="103" id="cb_cookieuser_navbar" accesskey="c" />Remember Me?</label></td>
+		</tr>
+		<tr>
+			<td class="smallfont"><label for="navbar_password">Password</label></td>
+			<td><input type="password" class="bginput" style="font-size: 11px" name="vb_login_password" id="navbar_password" size="10" tabindex="102" /></td>
+			<td><input type="submit" class="button" value="Log in" tabindex="104" title="Enter your username and password in the boxes provided to login, or click the 'register' button to create a profile for yourself." accesskey="s" /></td>
+		</tr>
+		</table>
+		<input type="hidden" name="s" value="7c0e76e9769aef9feff36a1e7c003b15" />
+		<input type="hidden" name="securitytoken" value="guest" />
+		<input type="hidden" name="do" value="login" />
+		<input type="hidden" name="vb_login_md5password" />
+		<input type="hidden" name="vb_login_md5password_utf" />
+		</form>
+		<!-- / login form -->
+	</td>
+
+</tr>
+</table>
+<!-- / breadcrumb, login, pm info -->
+
+<!-- nav buttons bar -->
+<div class="tborder" style="padding:1px; border-top-width:0px">
+	<table cellpadding="0" cellspacing="0" border="0" width="100%" align="center">
+	<tr align="center">
+		
+		
+			<td class="vbmenu_control"><a href="register.php?s=7c0e76e9769aef9feff36a1e7c003b15" rel="nofollow">Register</a></td>
+		
+		
+		<td class="vbmenu_control"><a rel="help" href="faq.php?s=7c0e76e9769aef9feff36a1e7c003b15" accesskey="5">FAQ</a></td>
+		
+			
+			
+		
+		
+			
+				
+				<td class="vbmenu_control"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=getdaily" accesskey="2">Today's Posts</a></td>
+				
+				<td class="vbmenu_control"><a id="navbar_search" href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15" accesskey="4" rel="nofollow">Search</a> <script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("navbar_search"); </script></td>
+			
+			
+		
+		
+		
+		</tr>
+	</table>
+</div>
+<!-- / nav buttons bar -->
+
+<br />
+
+
+
+
+
+
+<!-- NAVBAR POPUP MENUS -->
+
+	
+	
+	
+	<!-- header quick search form -->
+	<div class="vbmenu_popup" id="navbar_search_menu" style="display:none;margin-top:3px" align="left">
+		<table cellpadding="4" cellspacing="1" border="0">
+		<tr>
+			<td class="thead">Search Forums</td>
+		</tr>
+		<tr>
+			<td class="vbmenu_option" title="nohilite">
+				<form action="search.php?do=process" method="post">
+
+					<input type="hidden" name="do" value="process" />
+					<input type="hidden" name="quicksearch" value="1" />
+					<input type="hidden" name="childforums" value="1" />
+					<input type="hidden" name="exactname" value="1" />
+					<input type="hidden" name="s" value="7c0e76e9769aef9feff36a1e7c003b15" />
+					<input type="hidden" name="securitytoken" value="guest" />
+					<div><input type="text" class="bginput" name="query" size="25" tabindex="1001" /><input type="submit" class="button" value="Go" tabindex="1004" /></div>
+					<div style="margin-top:6px">
+						<label for="rb_nb_sp0"><input type="radio" name="showposts" value="0" id="rb_nb_sp0" tabindex="1002" checked="checked" />Show Threads</label>
+						&nbsp;
+						<label for="rb_nb_sp1"><input type="radio" name="showposts" value="1" id="rb_nb_sp1" tabindex="1003" />Show Posts</label>
+					</div>
+				</form>
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="vbmenu_option"><a href="tags.php?s=7c0e76e9769aef9feff36a1e7c003b15" rel="nofollow">Tag Search</a></td>
+		</tr>
+		
+		<tr>
+			<td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15" accesskey="4" rel="nofollow">Advanced Search</a></td>
+		</tr>
+		
+		</table>
+	</div>
+	<!-- / header quick search form -->
+	
+	
+	
+<!-- / NAVBAR POPUP MENUS -->
+
+<!-- PAGENAV POPUP -->
+	<div class="vbmenu_popup" id="pagenav_menu" style="display:none">
+		<table cellpadding="4" cellspacing="1" border="0">
+		<tr>
+			<td class="thead" nowrap="nowrap">Go to Page...</td>
+		</tr>
+		<tr>
+			<td class="vbmenu_option" title="nohilite">
+			<form action="index.php" method="get" onsubmit="return this.gotopage()" id="pagenav_form">
+				<input type="text" class="bginput" id="pagenav_itxt" style="font-size:11px" size="4" />
+				<input type="button" class="button" id="pagenav_ibtn" value="Go" />
+			</form>
+			</td>
+		</tr>
+		</table>
+	</div>
+<!-- / PAGENAV POPUP -->
+
+
+
+
+
+  
+<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" async 
+  src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2279224607973567"
+  crossorigin="anonymous">
+</script>
+<!-- Ad at top -->
+<ins class="adsbygoogle"
+       style="display:block"
+       data-ad-client="ca-pub-2279224607973567"
+       data-ad-slot="4276888716"
+       data-ad-format="auto"
+       data-full-width-responsive="true"></ins>
+<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" >
+       (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+  
+
+
+
+
+
+
+
+<a name="poststop" id="poststop"></a>
+
+<!-- controls above postbits -->
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:3px">
+<tr valign="bottom">
+	
+		<td class="smallfont"><a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;noquote=1&amp;p=1871517" rel="nofollow"><img src="images/buttons/reply.gif" alt="Reply" border="0" /></a></td>
+	
+	
+</tr>
+</table>
+<!-- / controls above postbits -->
+
+<!-- toolbar -->
+<table class="tborder" cellpadding="6" cellspacing="1" border="0" width="100%" align="center" style="border-bottom-width:0px">
+<tr>
+	<td class="tcat" width="100%">
+		<div class="smallfont">
+		
+		&nbsp;
+		</div>
+	</td>
+	<td class="vbmenu_control" id="threadtools" nowrap="nowrap">
+		<a href="/showthread.php?p=1871517&amp;nojs=1#goto_threadtools">Thread Tools</a>
+		<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("threadtools"); </script>
+	</td>
+	
+		<td class="vbmenu_control" id="threadsearch" nowrap="nowrap">
+			<a href="/showthread.php?p=1871517&amp;nojs=1#goto_threadsearch">Search this Thread</a>
+			<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("threadsearch"); </script>
+		</td>
+	
+	
+	
+
+	
+
+</tr>
+</table>
+<!-- / toolbar -->
+
+
+
+<!-- end content table -->
+
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+<!-- / end content table -->
+
+
+
+
+
+<div id="posts"><!-- post #1871517 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1871517" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1871517" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px"  id="currentPost">
+			<!-- status icon and date -->
+			<a name="post1871517"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			11th April 2019, 12:38
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871517&amp;postcount=1" target="new" rel="nofollow" id="postcount1871517" name="1"><strong>1</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871517#post1871517" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1871517">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">Forteen88</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1871517", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Herr</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Apr 2009</div>
+				<div>Location: North Europe, too cold winters.</div>
+				
+				<div>
+					Posts: 566
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1871517" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+			<!-- icon and title -->
+			<div class="smallfont">
+				
+				<strong>VMAF-comparison: x265 vs other encoders</strong>
+			</div>
+			<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+			<!-- / icon and title -->
+		
+
+		<!-- message -->
+		<div id="post_message_1871517">
+			
+			I found this quite new article which got a nice VMAF-comparison,<br />
+<a href="https://unrealaussies.com/tech/nvenc-x264-quicksync-qsv-vp9-av1/4/#Conclusions-for-x265" target="_blank">https://unrealaussies.com/tech/nvenc...sions-for-x265</a><br />
+<br />
+Does anyone else here got to the same conclusions?<br />
+I'm most interested in HD-encoding at high-quality (like CRF 18@veryslow) for offline use, so I'd like some more data for it.<br />
+<br />
+EDIT: Never mind, this article isn't 'nice', since the source is game-video, not suited for VMAF!<br />
+EDIT2: UPDATE! I wrote that &quot;this article isn't 'nice', since the source is game-video, not suited for VMAF!&quot; based upon the comments in this thread!<br />
+ BTW, it was I who contacted 'Agamemnus', the writer of this article, for him to know about this thread!
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by Forteen88; 8th June 2019 at <span class="time">11:08</span>.
+					
+					
+						Reason: added reply to Agamemnus, the writer of this article
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Forteen88 is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1871517" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1871517 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1871517_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Forteen88</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=166023" rel="nofollow">Find More Posts by Forteen88</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1871517 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1871517 --><!-- post #1871519 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1871519" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1871519" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1871519"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			11th April 2019, 13:22
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871519&amp;postcount=2" target="new" rel="nofollow" id="postcount1871519" name="2"><strong>2</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871519#post1871519" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1871519">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=226755">excellentswordfight</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1871519", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Lost my old account :(</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Jul 2017</div>
+				
+				
+				<div>
+					Posts: 413
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1871519" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1871519">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>Forteen88</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871517#post1871517" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">I found this quite new article which got a nice VFMA-comparison,<br />
+<a href="https://unrealaussies.com/tech/nvenc-x264-quicksync-qsv-vp9-av1/4/#Conclusions-for-x265" target="_blank">https://unrealaussies.com/tech/nvenc...sions-for-x265</a><br />
+<br />
+Does anyone else here got to the same conclusions?<br />
+I'm most interested in HD-encoding at high-quality (like CRF 18@veryslow) for offline use, so I'd like some more data for it.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>Note that the test is on gaming material in 1440p 60fps. Not even sure that the used VMAF algorithm is suitable for assessing that material. Also, I woudlnt think that x265 is tuned for that kind of material either, while NVENC most definitely is since they use gaming in their marketing material when they do comparisons. Even though nvenc has imroved alot, espcially the new turing version, I wouldnt base any conclusions regarding HD &quot;film&quot; offline encoding from those results.<br />
+<br />
+But on a more generell topic, I dont think x265 is that useable at crf18 veryslow for offline encoding for personal use; when reaching near visuall lossless quality, the bitrate saving isnt enough to justify the speed @ something like veryslow, compared to x264 for most film material. For me x265 makes the most sense for HDR, UHD, Streaming services and other bitrate starved scenarios.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by excellentswordfight; 11th April 2019 at <span class="time">13:38</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="excellentswordfight is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1871519" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1871519 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1871519_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">excellentswordfight</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=226755">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=226755" rel="nofollow">Find More Posts by excellentswordfight</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1871519 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1871519 --><!-- post #1871523 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1871523" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1871523" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1871523"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			11th April 2019, 13:26
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871523&amp;postcount=3" target="new" rel="nofollow" id="postcount1871523" name="3"><strong>3</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871523#post1871523" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1871523">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">Forteen88</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1871523", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Herr</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Apr 2009</div>
+				<div>Location: North Europe, too cold winters.</div>
+				
+				<div>
+					Posts: 566
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1871523" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1871523">
+			
+			@excellentswordfight. Thanks, I didn't look up what kind of source it was. I assumed it was a standard movie.<br />
+And yeah, I was surprised that Turing (H.265 hardware encoding) got even better result than x265 at same bitrate.<br />
+<br />
+EDIT: I've seen that many people uses like CRF 16 with x264 for HD-videos, so I thought that I'd save some bitrate by setting it to CRF 18 and use x265 instead. Also, using 10-bit encode-setting on x264 isn't GPU-decodable, while x265 at 10-bit is.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by Forteen88; 11th April 2019 at <span class="time">23:27</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Forteen88 is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1871523" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1871523 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1871523_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Forteen88</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=166023" rel="nofollow">Find More Posts by Forteen88</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1871523 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1871523 --><!-- post #1871588 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1871588" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1871588" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1871588"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			12th April 2019, 11:13
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871588&amp;postcount=4" target="new" rel="nofollow" id="postcount1871588" name="4"><strong>4</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871588#post1871588" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1871588">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=226755">excellentswordfight</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1871588", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Lost my old account :(</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Jul 2017</div>
+				
+				
+				<div>
+					Posts: 413
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1871588" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1871588">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>Forteen88</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871523#post1871523" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">EDIT: I've seen that many people uses like CRF 16 with x264 for HD-videos, so I thought that I'd save some bitrate by setting it to CRF 18 and use x265 instead. Also, using 10-bit encode-setting on x264 isn't GPU-decodable, while x265 at 10-bit is.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>If you wanna replace an encoding workflow that uses something like crf16 with x264, you are definitely aiming towards visually lossless compression. And when keeping that ammount a fidelity you will not get that big of an bitrate reduction, and it will be 15x slower (x265 veryslow vs x264 veryslow). The tradeoff is imo not worth it.<br />
+<br />
+Preset slow and accepting a bit of quality reduction, then it starting to makes more sense. Dont get me wrong, there are plenty of use cases for x265, and its up to each one to say if the compute time is worth the bitrate reduction. But I whouldnt compress a 1080p SDR library using x265.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by excellentswordfight; 12th April 2019 at <span class="time">11:24</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="excellentswordfight is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1871588" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1871588 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1871588_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">excellentswordfight</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=226755">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=226755" rel="nofollow">Find More Posts by excellentswordfight</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1871588 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1871588 --><!-- post #1871630 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1871630" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1871630" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1871630"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			12th April 2019, 18:31
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871630&amp;postcount=5" target="new" rel="nofollow" id="postcount1871630" name="5"><strong>5</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871630#post1871630" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1871630">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477">Blue_MiSfit</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1871630", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Derek Prestegard IRL</div>
+			<div class="smallfont"><img src="images/d9_donor.gif" alt="" border="" /><img src="images/d9.gif" alt="" border="" /></div>
+			
+
+			
+				<div class="smallfont">
+					&nbsp;<br /><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477"><img src="image.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477&amp;dateline=1307267974" width="70" height="70" alt="Blue_MiSfit's Avatar" border="0" /></a>
+				</div>
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Nov 2003</div>
+				<div>Location: Los Angeles</div>
+				
+				<div>
+					Posts: 6,031
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1871630" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1871630">
+			
+			Yeah if you want absolutely transparent quality you're probably better off using x264 still unless time is of no object. <br />
+<br />
+For the &quot;almost transparent&quot; use case, x265 absolutely crushes. You'll get very nice bitrate savings as long as you can spend a fair bit more compute.<br />
+<br />
+Typical web delivery is a few pegs below this - it tends to cap out at the &quot;very good at a distance&quot; level, and stay well above the &quot;good enough&quot; level (below which you start getting customer complaints).<br />
+<br />
+FWIW, I think VMAF is trained mostly for just below &quot;almost transparent&quot;. I've seen things that have VMAF scores of ~99 but I would just barely call &quot;almost transparent&quot;. This really makes sense, since streaming ABR ladders are not designed for archiving, or for critical viewing by me / other videophiles. They're designed for normal people, to prevent rebuffering, and offer a good experience under normal viewing conditions - not transparency. <br />
+<br />
+That's why streaming providers cap out between 15 and 25 Mbps for 2160p and why UHD BluRay averages easily double that.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by Blue_MiSfit; 13th April 2019 at <span class="time">05:38</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Blue_MiSfit is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1871630" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1871630 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1871630_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Blue_MiSfit</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=44477" rel="nofollow">Find More Posts by Blue_MiSfit</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1871630 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1871630 --><!-- post #1871634 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1871634" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1871634" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1871634"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			12th April 2019, 18:38
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871634&amp;postcount=6" target="new" rel="nofollow" id="postcount1871634" name="6"><strong>6</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871634#post1871634" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1871634">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=221313">dipje</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1871634", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Registered User</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Oct 2014</div>
+				
+				
+				<div>
+					Posts: 259
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1871634" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1871634">
+			
+			People seem to forget that the CRF from x264 isn't the same as x265's. Tune the value to the point where you think the quality is right on the edge of not acceptable, and then take some margin. Then do the same for the other codec and see if the smaller file size (if any ) is worth the encoding time.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="dipje is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1871634" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1871634 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1871634_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">dipje</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=221313">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=221313" rel="nofollow">Find More Posts by dipje</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1871634 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1871634 --><!-- post #1871766 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1871766" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1871766" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1871766"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			14th April 2019, 21:16
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871766&amp;postcount=7" target="new" rel="nofollow" id="postcount1871766" name="7"><strong>7</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871766#post1871766" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1871766">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">Forteen88</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1871766", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Herr</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Apr 2009</div>
+				<div>Location: North Europe, too cold winters.</div>
+				
+				<div>
+					Posts: 566
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1871766" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1871766">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>Blue_MiSfit</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871630#post1871630" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">Yeah if you want absolutely transparent quality you're probably better off using x264 still unless time is of no object. <br />
+<br />
+For the &quot;almost transparent&quot; use case, x265 absolutely crushes. You'll get very nice bitrate savings as long as you can spend a fair bit more compute.<br />
+...</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>I'm good with &quot;almost transparent&quot; quality. Isn't x265 CRF 18@veryslow usually that?! Sometimes I use x265@CRF 19 --slower too.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Forteen88 is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1871766" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1871766 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1871766_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Forteen88</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=166023" rel="nofollow">Find More Posts by Forteen88</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1871766 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1871766 --><!-- post #1871794 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1871794" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1871794" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1871794"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			15th April 2019, 01:25
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871794&amp;postcount=8" target="new" rel="nofollow" id="postcount1871794" name="8"><strong>8</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871794#post1871794" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1871794">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477">Blue_MiSfit</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1871794", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Derek Prestegard IRL</div>
+			<div class="smallfont"><img src="images/d9_donor.gif" alt="" border="" /><img src="images/d9.gif" alt="" border="" /></div>
+			
+
+			
+				<div class="smallfont">
+					&nbsp;<br /><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477"><img src="image.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477&amp;dateline=1307267974" width="70" height="70" alt="Blue_MiSfit's Avatar" border="0" /></a>
+				</div>
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Nov 2003</div>
+				<div>Location: Los Angeles</div>
+				
+				<div>
+					Posts: 6,031
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1871794" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1871794">
+			
+			That's up to you to decide.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Blue_MiSfit is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1871794" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1871794 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1871794_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Blue_MiSfit</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=44477" rel="nofollow">Find More Posts by Blue_MiSfit</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1871794 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1871794 --><!-- post #1871945 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1871945" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1871945" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1871945"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			16th April 2019, 19:39
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871945&amp;postcount=9" target="new" rel="nofollow" id="postcount1871945" name="9"><strong>9</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871945#post1871945" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1871945">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">Forteen88</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1871945", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Herr</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Apr 2009</div>
+				<div>Location: North Europe, too cold winters.</div>
+				
+				<div>
+					Posts: 566
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1871945" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1871945">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>Blue_MiSfit</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871794#post1871794" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">That's up to you to decide.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>I was just wondering at which CRF-numbers that x265 &quot;crushes&quot; when encoding &quot;almost transparent&quot; HD-video (I assume that &quot;crushes&quot; means where x265 is great?! my native language isn't English).<br />
+I thought about this comment of yours,<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				For the &quot;almost transparent&quot; use case, x265 absolutely crushes.
+			
+		</td>
+	</tr>
+	</table>
+</div>
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Forteen88 is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1871945" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1871945 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1871945_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Forteen88</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=166023" rel="nofollow">Find More Posts by Forteen88</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1871945 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1871945 --><!-- post #1871975 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1871975" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1871975" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1871975"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			17th April 2019, 03:53
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871975&amp;postcount=10" target="new" rel="nofollow" id="postcount1871975" name="10"><strong>10</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871975#post1871975" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1871975">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477">Blue_MiSfit</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1871975", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Derek Prestegard IRL</div>
+			<div class="smallfont"><img src="images/d9_donor.gif" alt="" border="" /><img src="images/d9.gif" alt="" border="" /></div>
+			
+
+			
+				<div class="smallfont">
+					&nbsp;<br /><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477"><img src="image.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477&amp;dateline=1307267974" width="70" height="70" alt="Blue_MiSfit's Avatar" border="0" /></a>
+				</div>
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Nov 2003</div>
+				<div>Location: Los Angeles</div>
+				
+				<div>
+					Posts: 6,031
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1871975" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1871975">
+			
+			Yep, I mean x265 is great for sure <img src="images/smilies/smile.gif" border="0" alt="" title="Smilie" class="inlineimg" /><br />
+<br />
+To me, most 1080p content around 5-8 Mbps is &quot;almost transparent&quot;, though it does depend. Really grainy content requires more, plus usually a grain tuning. In this area, x265 can excel. <br />
+<br />
+Going up closer to BluRay levels, the benefits of HEVC at 1080p start to melt away. Heck, eventually even MPEG-2 (or MPEG-1) look just fine <img src="images/smilies/biggrin.gif" border="0" alt="" title="Big Grin" class="inlineimg" />
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Blue_MiSfit is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1871975" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1871975 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1871975_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Blue_MiSfit</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=44477">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=44477" rel="nofollow">Find More Posts by Blue_MiSfit</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1871975 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1871975 --><!-- post #1871989 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1871989" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1871989" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1871989"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			17th April 2019, 10:00
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871989&amp;postcount=11" target="new" rel="nofollow" id="postcount1871989" name="11"><strong>11</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871989#post1871989" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1871989">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=226755">excellentswordfight</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1871989", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Lost my old account :(</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Jul 2017</div>
+				
+				
+				<div>
+					Posts: 413
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1871989" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1871989">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>Forteen88</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871945#post1871945" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">I was just wondering at which CRF-numbers that x265 &quot;crushes&quot; when encoding &quot;almost transparent&quot; HD-video (I assume that &quot;crushes&quot; means where x265 is great?! my native language isn't English).<br />
+I thought about this comment of yours,</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>CRF values between presets/settings are not comparable, so it cant really be answered without encoder settings as well.<br />
+<br />
+Just go ahead and try some presets and different CRF values and see what fits your need the best. And what I was trying to say earlier is that preset veryslow, is imo to slow if your not encoding at a bitrate starved level (which crf18 isnt), cause the speed penalty will imo not outweight the gains, but crf18 could still be absolutly perfect for preset medium etc. My &quot;baseline&quot; for x265 is preset slow and crf19, I then go from there depending on the resultats on the content. Cause if you are closer to say 10Mbps, then 5Mbps, for a normal blurayrip, there is a pretty high chance that x264 would give very comparable resaults much faster.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by excellentswordfight; 17th April 2019 at <span class="time">10:06</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="excellentswordfight is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1871989" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1871989 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1871989_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">excellentswordfight</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=226755">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=226755" rel="nofollow">Find More Posts by excellentswordfight</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1871989 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1871989 --><!-- post #1872009 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1872009" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1872009" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1872009"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			17th April 2019, 14:43
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872009&amp;postcount=12" target="new" rel="nofollow" id="postcount1872009" name="12"><strong>12</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872009#post1872009" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1872009">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">Forteen88</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1872009", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Herr</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Apr 2009</div>
+				<div>Location: North Europe, too cold winters.</div>
+				
+				<div>
+					Posts: 566
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1872009" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1872009">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>excellentswordfight</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871989#post1871989" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">CRF values between presets/settings are not comparable, so it cant really be answered without encoder settings as well.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>I meant my settings that I wrote earlier in this thread:<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				x265 CRF 18@veryslow usually that?! Sometimes I use x265@CRF 19 --slower too.
+			
+		</td>
+	</tr>
+	</table>
+</div>But I should've written it again there. I also set --no-sao and other minor settings too.<br />
+Maybe I should set CRF 19 more often then.<br />
+Thanks
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by Forteen88; 17th April 2019 at <span class="time">15:03</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Forteen88 is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1872009" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1872009 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1872009_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Forteen88</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=166023" rel="nofollow">Find More Posts by Forteen88</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1872009 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1872009 --><!-- post #1872095 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1872095" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1872095" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1872095"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			18th April 2019, 16:43
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872095&amp;postcount=13" target="new" rel="nofollow" id="postcount1872095" name="13"><strong>13</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872095#post1872095" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1872095">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=90717">benwaggoner</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1872095", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Moderator</div>
+			<div class="smallfont"><img src="images/d9.gif" alt="" border="" /></div>
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Jan 2006</div>
+				<div>Location: Portland, OR</div>
+				
+				<div>
+					Posts: 5,168
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1872095" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1872095">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>excellentswordfight</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871519#post1871519" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">Note that the test is on gaming material in 1440p 60fps. Not even sure that the used VMAF algorithm is suitable for assessing that material.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>VMAF was definitely not tested with 1440p, and had little to any game content in it. Game content is Weird, with a combination of continuous tone elements and super-sharp UHD, and often some aliasing.<br />
+<br />
+VMAF probably means SOMETHING with this kind of content, but I imagine the correlation with subjective quality is a lot weaker, and it's far from 100% even for movie content. VMAF is the least-bad objective metric we've had to date, and it's getting better, but like all machine learning systems, it's limited by what content it was trained against.<br />
+<br />
+VMAF's subjective correlation is also dropping as more an more encoders tune for VMAF instead of pure subjective quality. Once a metric becomes popular, it gets heavily optimized for. Optimizing for VMAF will make for a much better encoder than PSNR, but still will be inferior to pure subjective quality tuning. But that's super expensive, so VMAF is very helpful for early-stage iteration.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				Also, I woudlnt think that x265 is tuned for that kind of material either, while NVENC most definitely is since they use gaming in their marketing material when they do comparisons. Even though nvenc has imroved alot, espcially the new turing version, I wouldnt base any conclusions regarding HD &quot;film&quot; offline encoding from those results.
+			
+		</td>
+	</tr>
+	</table>
+</div>I know that x265 got at least some game content for tuning (Twitch has a good library of test sources). But yeah, NVENC is almost certainly the #1 encoder for game streaming. I would still anticipate that x265 would outperform it at higher presets, though, because it uses lots of codec features NVEnc doesn't.<br />
+<br />
+using --tskip would probably help disproportionately with gaming content.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				But on a more generell topic, I dont think x265 is that useable at crf18 veryslow for offline encoding for personal use; when reaching near visuall lossless quality, the bitrate saving isnt enough to justify the speed @ something like veryslow, compared to x264 for most film material. For me x265 makes the most sense for HDR, UHD, Streaming services and other bitrate starved scenarios.
+			
+		</td>
+	</tr>
+	</table>
+</div>The right test is quality @ speed, so perhaps x265 --preset slow versus x264 --preset veryslow?
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+		<!-- sig -->
+			<div>
+				__________________<br />
+				Ben Waggoner<br />
+Principal Video Specialist, Amazon Prime Video<br />
+<br />
+<a href="https://www.amazon.com/Compression-Great-Video-Audio-Second/dp/0240812131" target="_blank">My Compression Book</a>
+			</div>
+		<!-- / sig -->
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="benwaggoner is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1872095" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1872095 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1872095_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">benwaggoner</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=90717">View Public Profile</a></td></tr>
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="https://www.amazon.com/Amazon-Video">Visit benwaggoner's homepage!</a></td></tr>
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=90717" rel="nofollow">Find More Posts by benwaggoner</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1872095 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1872095 --><!-- post #1872783 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1872783" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1872783" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1872783"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			26th April 2019, 11:08
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872783&amp;postcount=14" target="new" rel="nofollow" id="postcount1872783" name="14"><strong>14</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872783#post1872783" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1872783">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=226755">excellentswordfight</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1872783", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Lost my old account :(</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Jul 2017</div>
+				
+				
+				<div>
+					Posts: 413
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1872783" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1872783">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872095#post1872095" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic"><b>The right test is quality @ speed</b>, so perhaps x265 --preset slow versus x264 --preset veryslow?</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>I agree, but I think x265 slow is generally about half the speed of x264 veryslow though. From what I've seen, veryslow is about the same speed as x265 medium. And medium isnt that great for HQ encodes imo, I dont think that x265 beat x264 for hq 1080p SDR encodes when tuned at the same speed.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="excellentswordfight is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1872783" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1872783 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1872783_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">excellentswordfight</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=226755">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=226755" rel="nofollow">Find More Posts by excellentswordfight</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1872783 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1872783 --><!-- post #1872811 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1872811" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1872811" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1872811"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			26th April 2019, 16:53
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872811&amp;postcount=15" target="new" rel="nofollow" id="postcount1872811" name="15"><strong>15</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872811#post1872811" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1872811">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">Forteen88</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1872811", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Herr</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Apr 2009</div>
+				<div>Location: North Europe, too cold winters.</div>
+				
+				<div>
+					Posts: 566
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1872811" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1872811">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>excellentswordfight</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872783#post1872783" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">I agree, but I think x265 slow is generally about half the speed of x264 veryslow though. From what I've seen, veryslow is about the same speed as x265 medium. And medium isnt that great for HQ encodes imo, I dont think that x265 beat x264 for hq 1080p SDR encodes when tuned at the same speed.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>So for people with slow CPU:s or those that are doing lots of encodes, x264 seems to be the way to go for 1080p transparent-HQ-encodes.<br />
+I'm going to buy one of the new AMD 7nm CPU:s that comes out this summer, so encoding-speed won't be that much of a big issue, although too many threads is not good for encoding.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by Forteen88; 26th April 2019 at <span class="time">16:57</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Forteen88 is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1872811" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1872811 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1872811_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Forteen88</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=166023" rel="nofollow">Find More Posts by Forteen88</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1872811 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1872811 --><!-- post #1872840 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1872840" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1872840" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1872840"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			26th April 2019, 21:27
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872840&amp;postcount=16" target="new" rel="nofollow" id="postcount1872840" name="16"><strong>16</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872840#post1872840" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1872840">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=177074">Motenai Yoda</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1872840", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Registered User</div>
+			
+			
+
+			
+				<div class="smallfont">
+					&nbsp;<br /><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=177074"><img src="image.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=177074&amp;dateline=1521154211" width="70" height="70" alt="Motenai Yoda's Avatar" border="0" /></a>
+				</div>
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Jan 2010</div>
+				
+				
+				<div>
+					Posts: 704
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1872840" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1872840">
+			
+			I don't get why you see x264 as better than x265, the results from the article you posted shows that x265_8_veryfast is way better (on the vmaf score) than x264_8_slow, and even x265_6_veryfast is better too.<br />
+also without results about encoding speeds I would prefer hw encoding when gaming rather than heavily increase cpu load
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+		<!-- sig -->
+			<div>
+				__________________<br />
+				powered by Google Translator
+			</div>
+		<!-- / sig -->
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Motenai Yoda is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1872840" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1872840 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1872840_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Motenai Yoda</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=177074">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=177074" rel="nofollow">Find More Posts by Motenai Yoda</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1872840 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1872840 --><!-- post #1872888 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1872888" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1872888" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1872888"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			27th April 2019, 12:56
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872888&amp;postcount=17" target="new" rel="nofollow" id="postcount1872888" name="17"><strong>17</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872888#post1872888" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1872888">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">Forteen88</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1872888", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Herr</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Apr 2009</div>
+				<div>Location: North Europe, too cold winters.</div>
+				
+				<div>
+					Posts: 566
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1872888" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1872888">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>Motenai Yoda</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872840#post1872840" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">I don't get why you see x264 as better than x265,</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>If you read the other posts here, you'll see that the article I linked was bad, because they use gaming-video as source, which VMAF isn't optimized for.<br />
+Also, I personally always prefer to use x265 over x264, since I'm in no hurry encoding fast (maybe I'll do that only when I GPU-encode in live video-capture).
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by Forteen88; 7th June 2019 at <span class="time">20:02</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Forteen88 is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1872888" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1872888 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1872888_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Forteen88</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=166023" rel="nofollow">Find More Posts by Forteen88</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1872888 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1872888 --><!-- post #1876603 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1876603" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1876603" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1876603"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			8th June 2019, 06:30
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876603&amp;postcount=18" target="new" rel="nofollow" id="postcount1876603" name="18"><strong>18</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876603#post1876603" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1876603">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=185177">Agamemnus</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1876603", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Registered User</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Jul 2010</div>
+				
+				
+				<div>
+					Posts: 5
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1876603" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1876603">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>Forteen88</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871517#post1871517" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">EDIT: Never mind, this article isn't 'nice', since the source is game-video, not suited for VMAF!</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>Rubbish. VMAF has better correlation with viewer experience than plenty of other methods. <a href="http://dx.doi.org/10.1145/3210424.3210434" target="_blank">http://dx.doi.org/10.1145/3210424.3210434</a> These guys tested CS:GO, Diablo 3, DotA 2, FIFA 2017, H1Z1:JK, Hearthstone, Heroes of the Storm, League of Legends, Project Cars, PUBG, Starcraft 2 and World of Warcraft. Each game has 2 clips of it, each clip encoded with 24 different settings. Then compared the scores given by VMAF, PSNR, SSIM, STRREDOpt, BRISQUE, BIQI and NIQE.<br />
+<br />
+Have a read before you pretend to know what you're talking about.<br />
+<br />
+The only thing that's worth pointing out regarding your particular issue, is that the link you looked at is not relative to your query. All the tests I did are with single-pass ABR rc methods of encoding, because it's streaming oriented. NVENC can't do CRF at all. If you want to do offline encoding of HD video then it's not the right data for you because it's not testing CRF in the first place.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				FWIW, I think VMAF is trained mostly for just below &quot;almost transparent&quot;.
+			
+		</td>
+	</tr>
+	</table>
+</div>VMAF can be trained for whatever you like, Netflix has their preferred methods, occasionally other people train it differently. The idea of VMAF being trained for &quot;almost lossless&quot; is inherently inaccurate to the fact that VMAF may or may not be, depending on the model, the use case and the audience it was trained on.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>excellentswordfight</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871989#post1871989" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">CRF values between presets/settings are not comparable, so it cant really be answered without encoder settings as well.<br />
+<br />
+Just go ahead and try some presets and different CRF values and see what fits your need the best. And what I was trying to say earlier is that preset veryslow, is imo to slow if your not encoding at a bitrate starved level (which crf18 isnt), cause the speed penalty will imo not outweight the gains, but crf18 could still be absolutly perfect for preset medium etc. My &quot;baseline&quot; for x265 is preset slow and crf19, I then go from there depending on the resultats on the content. Cause if you are closer to say 10Mbps, then 5Mbps, for a normal blurayrip, there is a pretty high chance that x264 would give very comparable resaults much faster.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>This is the best advice I can see for the OP in this thread. There isn't some kind of magical answer, and the encoding time they're going to get will be crazy. The best way to get actual good encoding speeds in H.265 is to use SVT-HEVC and have an x-series or XEON 7th gen Intel CPU or more recent. And again, you can't have CRF with that encoder either, and if you could, it wouldn't be related to x265's just like libvpx-vp9's CRF isn't related to x265's nor x264's.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872095#post1872095" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">VMAF was definitely not tested with 1440p, and had little to any game content in it. Game content is Weird, with a combination of continuous tone elements and super-sharp UHD, and often some aliasing.<br />
+<br />
+VMAF probably means SOMETHING with this kind of content, but I imagine the correlation with subjective quality is a lot weaker, and it's far from 100% even for movie content. VMAF is the least-bad objective metric we've had to date, and it's getting better, but like all machine learning systems, it's limited by what content it was trained against.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>It doesn't have to be, you can compare relative scores between encodes at the same resolution with any VMAF model, you just can't compare absolute scores cross-resolution with one single model, which I didn't do. The source code documentation makes this clear and the devs specifically answered this question when I asked them in the GitHub's issues. See the link I put above for how it correlates with game content. Model 0.6.1 may not have been trained on game content, but it still consistently performs spectacularly. Nothing stops somebody from making a model based solely on game content for VMAF, which I've thought about doing, but haven't yet found a game that doesn't already correlate with VMAF model 0.6.1 anyway. If you find one, and are able to show it, then I'd love to see it.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1872095#post1872095" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">VMAF's subjective correlation is also dropping as more an more encoders tune for VMAF instead of pure subjective quality. Once a metric becomes popular, it gets heavily optimized for. Optimizing for VMAF will make for a much better encoder than PSNR, but still will be inferior to pure subjective quality tuning. But that's super expensive, so VMAF is very helpful for early-stage iteration.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>Yes, encoders do that. As long as VMAF models are trained for correlation with subjective quality, then optimising for VMAF scores IS optimising for subjective quality.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Agamemnus is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1876603" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1876603 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1876603_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Agamemnus</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=185177">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=185177" rel="nofollow">Find More Posts by Agamemnus</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1876603 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1876603 --><!-- post #1876624 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1876624" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1876624" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1876624"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			8th June 2019, 11:53
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876624&amp;postcount=19" target="new" rel="nofollow" id="postcount1876624" name="19"><strong>19</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876624#post1876624" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1876624">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=185177">Agamemnus</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1876624", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Registered User</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Jul 2010</div>
+				
+				
+				<div>
+					Posts: 5
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1876624" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1876624">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>Forteen88</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1871517#post1871517" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">I found this quite new article which got a nice VMAF-comparison,<br />
+<a href="https://unrealaussies.com/tech/nvenc-x264-quicksync-qsv-vp9-av1/4/#Conclusions-for-x265" target="_blank">https://unrealaussies.com/tech/nvenc...sions-for-x265</a><br />
+<br />
+Does anyone else here got to the same conclusions?<br />
+I'm most interested in HD-encoding at high-quality (like CRF 18@veryslow) for offline use, so I'd like some more data for it.<br />
+<br />
+EDIT: Never mind, this article isn't 'nice', since the source is game-video, not suited for VMAF!<br />
+EDIT2: UPDATE! I wrote that &quot;this article isn't 'nice', since the source is game-video, not suited for VMAF!&quot; based upon the comments in this thread!<br />
+ BTW, it was I who contacted 'Agamemnus', the writer of this article, for him to know about this thread!</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>I saw your update, and you're right, you did go on the information that other people gave you. I may have reacted harshly.<br />
+<br />
+To answer your actual question, yes, NVENC HEVC is really really good, but sadly, for TV shows, one of it's weaknesses becomes particularly obvious. NVENC encoders produce slightly obvious artifacts in really dark scenes. If you're encoding your horror genre collection, then you'll notice it all the time.<br />
+<br />
+If you genuinely have absolutely NO ISSUE with time to encode, then x265 Slower is a fantastic preset. In my opinion, VerySlow does take longer but doesn't score higher and doesn't save bits. I don't know why, I have theories as to why, but I haven't proven them. Choose whatever CRF you think looks as good as you like it to look, and save a preset and keep it.<br />
+<br />
+VP9 is a good alternative, CRF 35-36 in libvpx-vp9 is approximately equal to x265 CRF 20. The encode time will do your head in though.<br />
+<br />
+If you have a CPU with some of the more recent instruction sets, like AVX-512, then you can get massive speed increases using Intel's SVT encoders. They have one for HEVC, one for VP9 and one for AV1. AV1 is the best, but it's feature set is still very immature. You can't use CRF for any of them, only QP, so file sizes for same-quality as your CRF encodes will be larger. But, if you have a good CPU, this is an awesome way to save a lot of time. These encoders are legit like 10x faster than common ones.<br />
+<br />
+I hope you find the answer you're looking for. Chances are, x265 Slower at the CRF you like will be good, it will just take ages to encode especially if you have a large collection.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Agamemnus is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1876624" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1876624 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1876624_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Agamemnus</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=185177">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=185177" rel="nofollow">Find More Posts by Agamemnus</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1876624 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1876624 --><!-- post #1876628 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1876628" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1876628" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1876628"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			8th June 2019, 13:06
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876628&amp;postcount=20" target="new" rel="nofollow" id="postcount1876628" name="20"><strong>20</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876628#post1876628" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1876628">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">Forteen88</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1876628", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Herr</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Apr 2009</div>
+				<div>Location: North Europe, too cold winters.</div>
+				
+				<div>
+					Posts: 566
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1876628" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1876628">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>Agamemnus</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876624#post1876624" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">If you genuinely have absolutely NO ISSUE with time to encode, then x265 Slower is a fantastic preset.<br />
+...<br />
+...CRF 35-36 in libvpx-vp9 is approximately equal to x265 CRF 20. The encode time will do your head in though.<br />
+<br />
+I hope you find the answer you're looking for. Chances are, x265 Slower at the CRF you like will be good, it will just take ages to encode especially if you have a large collection.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>Thanks, I plan to do lots of encodes like that (benwaggoner here also recommended x265@Slower preset) when I buy the new AMD Ryzen 3000-series of CPU:s that is released next month. My GPU (NVidia GF 840M) doesn't have AV1 hardware-decoding (and I don't know if it got VP9 hardware-decoding), so I'll just stick with HEVC/H.265.<br />
+<br />
+And thanks for commenting on this thread.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by Forteen88; 8th June 2019 at <span class="time">13:10</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Forteen88 is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1876628" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1876628 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1876628_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Forteen88</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=166023" rel="nofollow">Find More Posts by Forteen88</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1876628 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1876628 --><!-- post #1876629 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1876629" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1876629" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1876629"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			8th June 2019, 13:32
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876629&amp;postcount=21" target="new" rel="nofollow" id="postcount1876629" name="21"><strong>21</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876629#post1876629" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1876629">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=223196">lvqcl</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1876629", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Registered User</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Aug 2015</div>
+				
+				
+				<div>
+					Posts: 337
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1876629" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1876629">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>Forteen88</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876628#post1876628" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">My GPU (NVidia GF 840M) doesn't have AV1 hardware-decoding (and I don't know if it got VP9 hardware-decoding), so I'll just stick with HEVC/H.265.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>Looks like this videocard doesn't have any video decoding capabilities.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="lvqcl is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1876629" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1876629 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1876629_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">lvqcl</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=223196">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=223196" rel="nofollow">Find More Posts by lvqcl</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1876629 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1876629 --><!-- post #1876645 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1876645" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1876645" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1876645"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			8th June 2019, 17:33
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876645&amp;postcount=22" target="new" rel="nofollow" id="postcount1876645" name="22"><strong>22</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876645#post1876645" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1876645">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">Forteen88</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1876645", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Herr</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Apr 2009</div>
+				<div>Location: North Europe, too cold winters.</div>
+				
+				<div>
+					Posts: 566
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1876645" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1876645">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>lvqcl</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876629#post1876629" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">Looks like this videocard doesn't have any video decoding capabilities.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>I think that it got partly hardware-decoding support, since MPC-HC says: &quot;Playing [HW]&quot; when I play x265/x264-video.<br />
+<br />
+I've read here that Nvidia GF 960 GTX or better (except Nvidia GF 980 GTX!) got FULL H.265/H.264 decoding-support.<br />
+Or maybe it's my Intel i5-5200U integrated GPU that plays it?!<br />
+<br />
+EDIT: Oh, I read this, (my Nvidia GF 840M got GPU-codename 'GM108M'), and it seems to have partly HEVC-support,<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				First generation Maxwell (GM10x)<br />
+<br />
+First generation Maxwell GM107/GM108 provides few consumer-facing additional features; Nvidia instead focused on power efficiency. Nvidia's video encoder, NVENC, is 1.5 to 2 times faster than on Kepler-based GPUs meaning it can encode video at 6 to 8 times playback speed. Nvidia also claims an 8 to 10 times performance increase in PureVideo Feature Set E video decoding due to the video decoder cache paired with increases in memory efficiency. However, HEVC is not supported for full hardware decoding, relying on a mix of hardware and software decoding. When decoding video, a new low power state &quot;GC5&quot; is used on Maxwell GPUs to conserve power.
+			
+		</td>
+	</tr>
+	</table>
+</div>
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by Forteen88; 8th June 2019 at <span class="time">21:03</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Forteen88 is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1876645" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1876645 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1876645_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Forteen88</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=166023" rel="nofollow">Find More Posts by Forteen88</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1876645 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1876645 --><!-- post #1876649 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1876649" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1876649" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1876649"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			8th June 2019, 18:36
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876649&amp;postcount=23" target="new" rel="nofollow" id="postcount1876649" name="23"><strong>23</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876649#post1876649" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1876649">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=169152">MatLz</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1876649", true); </script>
+				
+			</div>
+
+			<div class="smallfont">I often say &quot;maybe&quot;...</div>
+			
+			
+
+			
+				<div class="smallfont">
+					&nbsp;<br /><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=169152"><img src="image.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=169152&amp;dateline=1278897532" width="66" height="70" alt="MatLz's Avatar" border="0" /></a>
+				</div>
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Jul 2009</div>
+				<div>Location: France</div>
+				
+				<div>
+					Posts: 585
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1876649" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1876649">
+			
+			Mine is GeForce Go 7600 .<br />
+Is it good to decode video ?
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+		<!-- sig -->
+			<div>
+				__________________<br />
+				<a href="http://www.rue89.com/files/20081204Television.jpg" target="_blank"><font color="Red"><font size="2"><font face="Comic Sans MS">We are spitting food to these hungry eyes.<br />
+You see they ask, we know they are greedy of our rot.<br />
+Better than to give jam to pigs.</font></font></font></a><br />
+<br />
+<a href="http://hotfile.com/dl/142658604/7396a40/x264r2146mod.rar.html" target="_blank">x264 r2146 MOD</a>
+			</div>
+		<!-- / sig -->
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="MatLz is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1876649" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1876649 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1876649_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">MatLz</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=169152">View Public Profile</a></td></tr>
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="http://carb.forumactif.com/">Visit MatLz's homepage!</a></td></tr>
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=169152" rel="nofollow">Find More Posts by MatLz</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1876649 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1876649 --><!-- post #1876653 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1876653" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1876653" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1876653"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			8th June 2019, 19:14
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876653&amp;postcount=24" target="new" rel="nofollow" id="postcount1876653" name="24"><strong>24</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876653#post1876653" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1876653">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=6394">Asmodian</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1876653", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Registered User</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Feb 2002</div>
+				<div>Location: San Jose, California</div>
+				
+				<div>
+					Posts: 2,673
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1876653" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1876653">
+			
+			LOL, no it is not. GPUs from 13 years ago don't have hardware decoding. It is only the last few generations that have had decent hardware decode chips. <img src="images/smilies/frown.gif" border="0" alt="" title="Frown" class="inlineimg" /><br />
+<br />
+Edit: We especially want H.265 hardware decoding, which is only on pretty new GPUs.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+		<!-- sig -->
+			<div>
+				__________________<br />
+				<a href="http://forum.doom9.org/showthread.php?p=1709584#post1709584" target="_blank">madVR options explained</a>
+			</div>
+		<!-- / sig -->
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by Asmodian; 8th June 2019 at <span class="time">19:16</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Asmodian is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1876653" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1876653 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1876653_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Asmodian</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=6394">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=6394" rel="nofollow">Find More Posts by Asmodian</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1876653 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1876653 --><!-- post #1876662 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1876662" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1876662" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1876662"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			8th June 2019, 20:52
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876662&amp;postcount=25" target="new" rel="nofollow" id="postcount1876662" name="25"><strong>25</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876662#post1876662" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1876662">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=223196">lvqcl</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1876662", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Registered User</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Aug 2015</div>
+				
+				
+				<div>
+					Posts: 337
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1876662" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1876662">
+			
+			More recent list:<br />
+<a href="https://developer.nvidia.com/video-encode-decode-gpu-support-matrix" target="_blank">https://developer.nvidia.com/video-e...support-matrix</a>
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="lvqcl is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1876662" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1876662 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1876662_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">lvqcl</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=223196">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=223196" rel="nofollow">Find More Posts by lvqcl</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1876662 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1876662 --><!-- post #1876664 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1876664" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1876664" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1876664"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			8th June 2019, 21:22
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876664&amp;postcount=26" target="new" rel="nofollow" id="postcount1876664" name="26"><strong>26</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876664#post1876664" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1876664">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">Forteen88</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1876664", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Herr</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Apr 2009</div>
+				<div>Location: North Europe, too cold winters.</div>
+				
+				<div>
+					Posts: 566
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1876664" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1876664">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>MatLz</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876649#post1876649" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">Mine is GeForce Go 7600 .<br />
+Is it good to decode video ?</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>Oh, darn, I deleted the old Nvidia-list that showed support for your graphicscard! I thought that the new list that the new poster included would include your graphicscard.<br />
+Here's the old list again,<br />
+<a href="https://www.nvidia.com/docs/CP/11036/PureVideo_Product_Comparison.pdf" target="_blank">https://www.nvidia.com/docs/CP/11036...Comparison.pdf</a>
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Forteen88 is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1876664" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1876664 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1876664_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Forteen88</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=166023">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=166023" rel="nofollow">Find More Posts by Forteen88</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1876664 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1876664 --><!-- post #1876666 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1876666" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1876666" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1876666"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			8th June 2019, 21:44
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876666&amp;postcount=27" target="new" rel="nofollow" id="postcount1876666" name="27"><strong>27</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876666#post1876666" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1876666">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=180452">nevcairiel</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1876666", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Registered Developer</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Mar 2010</div>
+				<div>Location: Hamburg/Germany</div>
+				
+				<div>
+					Posts: 8,930
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1876666" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1876666">
+			
+			Only NVIDIA GPUs with second-generation PureVideo HD (VP2) hardware or newer are supported by modern hardware acceleration, because first-gen PureVideo HD was only partial acceleration and required strong support from a host decoder.<br />
+VP2 was introduced in the 8th generation (only some models of the 8th gen at that), 7th Generation like the Geforce Go 7600 does not have it yet.<br />
+<br />
+You may be able to find some older software that still implements support for the partial hardware acceleration somewhere, but most modern stuff has dropped it, since it hasn't been useful for over a decade now, and was very complicated to use.<br />
+<br />
+There is a handy list in the Linux driver README:<br />
+<a href="http://us.download.nvidia.com/XFree86/Linux-x86_64/430.14/README/supportedchips.html" target="_blank">http://us.download.nvidia.com/XFree8...rtedchips.html</a><br />
+<br />
+Any card with VDPAU Feature Set A or higher is at least capable of some modern hardware decoding. For HEVC, you want a card with F or higher. The first cards ever with F are the 950 and 960.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+		<!-- sig -->
+			<div>
+				__________________<br />
+				<a href="http://forum.doom9.org/showthread.php?t=156191" target="_blank">LAV Filters</a> - open source ffmpeg based media splitter and decoders
+			</div>
+		<!-- / sig -->
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by nevcairiel; 8th June 2019 at <span class="time">21:52</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="nevcairiel is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1876666" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1876666 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1876666_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">nevcairiel</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=180452">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=180452" rel="nofollow">Find More Posts by nevcairiel</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1876666 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1876666 --><!-- post #1876857 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1876857" style="padding:0px 0px 6px 0px">
+	<!-- this is not the last post shown on the page -->
+
+
+
+<table id="post1876857" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1876857"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			11th June 2019, 16:42
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876857&amp;postcount=28" target="new" rel="nofollow" id="postcount1876857" name="28"><strong>28</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876857#post1876857" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1876857">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=90717">benwaggoner</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1876857", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Moderator</div>
+			<div class="smallfont"><img src="images/d9.gif" alt="" border="" /></div>
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Jan 2006</div>
+				<div>Location: Portland, OR</div>
+				
+				<div>
+					Posts: 5,168
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1876857" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1876857">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>Agamemnus</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876603#post1876603" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">It doesn't have to be, you can compare relative scores between encodes at the same resolution with any VMAF model, you just can't compare absolute scores cross-resolution with one single model, which I didn't do. The source code documentation makes this clear and the devs specifically answered this question when I asked them in the GitHub's issues. See the link I put above for how it correlates with game content. Model 0.6.1 may not have been trained on game content, but it still consistently performs spectacularly. Nothing stops somebody from making a model based solely on game content for VMAF, which I've thought about doing, but haven't yet found a game that doesn't already correlate with VMAF model 0.6.1 anyway. If you find one, and are able to show it, then I'd love to see it.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>To compare different resolution encodes, you can just scale up everything to the highest resolution. Choice of scaling algorithm has some interesting impacts (as it should).<br />
+<br />
+Do you have some data on VMAF use for gaming content? It's not that I think it would be <i>bad </i>so much as it wouldn't be <i>reliable</i>. Games are interesting with important static elements that need to be very sharp, and also moving parts that likely have sharper edges than natural image content, and less/no motion blur.<br />
+<br />
+VMAF is definitely the least-bad metric we have, and keeps getting better. But it definitely has some significant limitations. For example:<ul><li>It doesn't discriminate well between higher quality encodes; it's most useful when there is significant visible degradation</li>
+<li>It doesn't detect banding well</li>
+<li>It doesn't catch visible artifacts in low luma SDR content</li>
+<li>It doesn't have an HDR mode</li>
+<li>It's not great at rating different flavors of adaptive quantization.</li>
+</ul><br />
+In the end, it's a machine learning model, and so only as good as the content it was trained on. So it's going to be best at identifying the kinds of errors introduced by the encoder and the range of encoder settings that the test assets were created with.<br />
+<br />
+For example, I wouldn't expect VMAF to be particularly good for VVC until it's been trained some on VVC &quot;style&quot; artifacts.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				Yes, encoders do that. As long as VMAF models are trained for correlation with subjective quality, then optimising for VMAF scores IS optimising for subjective quality.
+			
+		</td>
+	</tr>
+	</table>
+</div>Except you can't train for subjective quality. You train on how humans subjectively rated a test corpus. The farther you get from the kind of content (including encoding settings) used in the test corpus, the less applicable VMAF will be.<br />
+<br />
+The issue with targeting the metric isn't unique to VMAF. Encoders were over-tuned for PSNR for decades, assuming that was highly perceptually correlated. But PNSR really isn't THAT correlated. But because it was a marketable feature, lots of encoders wound up optimizing for it <i>instead </i>of subjective quality. This happens with any metric. And the better the metric is subjectively correlated, the less problematic this will be. But still, any metric based on an average of individual frame scores is going to underscore things like keyframe strobing and quality in the most difficult scenes.<br />
+<br />
+One novel thing about VMAF versus SSIM and PSNR is that it significantly evolved over time. So VMAFv5 scores will be a lot more meaningful than VMAFv1. We should get into the habit of indicating the VMAF version number when we share VMAF scores. It'll be interesting to rerun VMAF on old encodes and see how those scores have changed over time.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+		<!-- sig -->
+			<div>
+				__________________<br />
+				Ben Waggoner<br />
+Principal Video Specialist, Amazon Prime Video<br />
+<br />
+<a href="https://www.amazon.com/Compression-Great-Video-Audio-Second/dp/0240812131" target="_blank">My Compression Book</a>
+			</div>
+		<!-- / sig -->
+		
+
+		
+
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="benwaggoner is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1876857" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1876857 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1876857_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">benwaggoner</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=90717">View Public Profile</a></td></tr>
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="https://www.amazon.com/Amazon-Video">Visit benwaggoner's homepage!</a></td></tr>
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=90717" rel="nofollow">Find More Posts by benwaggoner</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1876857 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1876857 --><!-- post #1877066 -->
+
+	<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+	<div id="edit1877066" style="padding:0px 0px 6px 0px">
+	
+
+
+
+<table id="post1877066" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+<tr>
+	
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-right: 0px" >
+			<!-- status icon and date -->
+			<a name="post1877066"><img class="inlineimg" src="images/statusicon/post_old.gif" alt="Old" border="0" /></a>
+			13th June 2019, 22:04
+			
+			<!-- / status icon and date -->
+		</td>
+		<td class="thead" style="font-weight:normal; border: 1px solid #FFFFFF; border-left: 0px" align="right">
+			&nbsp;
+			#<a href="showpost.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1877066&amp;postcount=29" target="new" rel="nofollow" id="postcount1877066" name="29"><strong>29</strong></a>
+<!-- hack -->
+&nbsp;|&nbsp;&nbsp;<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1877066#post1877066" target="new"><strong>Link</strong></a>
+<!-- endhack -->
+			
+		</td>
+	
+</tr>
+<tr valign="top">
+	<td class="alt2" width="175" style="border: 1px solid #FFFFFF; border-top: 0px; border-bottom: 0px">
+
+			<div id="postmenu_1877066">
+				
+				<a class="bigusername" href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=185177">Agamemnus</a>
+				<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript"> vbmenu_register("postmenu_1877066", true); </script>
+				
+			</div>
+
+			<div class="smallfont">Registered User</div>
+			
+			
+
+			
+
+			<div class="smallfont">
+				&nbsp;<br />
+				<div>Join Date: Jul 2010</div>
+				
+				
+				<div>
+					Posts: 5
+				</div>
+				
+				
+				
+				
+				<div>    </div>
+			</div>
+
+	</td>
+	
+	<td class="alt1" id="td_post_1877066" style="border-right: 1px solid #FFFFFF">
+	
+		
+		
+
+		<!-- message -->
+		<div id="post_message_1877066">
+			
+			<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876857#post1876857" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">To compare different resolution encodes, you can just scale up everything to the highest resolution. Choice of scaling algorithm has some interesting impacts (as it should).</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>Sure, if you want to compare the projected quality of two different res encodes played back on same-res viewing to see which one rates better, that's exactly what you have to do. There's a massive discussion about how that's how Netflix chooses the stream version to send their customers, including the resolution, all referenced from the source code. The link that the OP referenced was a comparison between different encodes of a single res and he's only asking about which settings to use. While you're correct, it doesn't seem to be relevant to the OP's question, though I think if he was mainly limited by file-size/bandwidth or even encode time, then it could come into play for sure.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876857#post1876857" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">Do you have some data on VMAF use for gaming content? It's not that I think it would be <i>bad </i>so much as it wouldn't be <i>reliable</i>. Games are interesting with important static elements that need to be very sharp, and also moving parts that likely have sharper edges than natural image content, and less/no motion blur.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>Yeah, there's a great study linked in the post you're quoting. <a href="http://dx.doi.org/10.1145/3210424.3210434" target="_blank">http://dx.doi.org/10.1145/3210424.3210434</a> where they tested CS:GO, Diablo 3, DotA 2, FIFA 2017, H1Z1:JK, Hearthstone, Heroes of the Storm, League of Legends, Project Cars, PUBG, Starcraft 2 and World of Warcraft and compared scores from VMAF, PSNR, SSIM, STRREDOpt, BRISQUE, BIQI and NIQE. It doesn't win in every single possible circumstance, but it wins the vast majority. Using any of the alternatives they tested you would be less likely to get a more accurate prediction most of the time. My first tests (the ones that the OP linked) were on Overwatch, then I started doing Apex, and now I'm including Heroes of the Storm. I originally suspected that the movement styles of the 3 games would cause more differences than what it has turned out to be, but I'd rather know than not-know.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876857#post1876857" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">VMAF is definitely the least-bad metric we have, and keeps getting better.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>To me, &quot;least-bad&quot; is just a rephrasing of &quot;best that exists&quot;. I gave him the best possible advice I know of, if there's better out there, I'd love to hear it. Why would anybody give advice that isn't the based on the best results possible? Regardless, I've noticed that most people seem to think there's some decisive way to know which of two distortions are better than the other, and everybody keeps forgetting that every single human alive rates &quot;video quality&quot; differently. In answering questions like &quot;which encode should I use?&quot; there's always different answers from different people. All I can offer, is what basically comes down to &quot;if you were to show the 2 resultant videos to a thousand people, here's the one that the majority will think is better&quot;. I can show that the answer will be accurate more often than any other method of working it out known to man. If a person doesn't want that answer, but wants to judge quality a particular way, then they're welcome to specify the judgement method. Without that, I don't know what other possible answer could be good when we know the one above. As far as I can tell, the world record time for the 100m sprint is the &quot;least-bad&quot; time. There's always a way to imagine it better, there's always a way to think it could be better, but until it's done, better doesn't exist. And I aim to give the best answer that exists. Originally I just wanted to know for myself, but so many people ask questions like this, it seems like something that needs to be spread. It's not an answer of &quot;which is better decisively&quot; but more of an answer to &quot;which will most people perceive is better?&quot;, which seems fair, since knowing without perception implies a definition of quality, and quality has a varied definition. If a person asks the internet &quot;which one will I think is better?&quot;, well then, I can give them the most likely answer, but I'll never be them and for all I know they're colour blind anyway.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876857#post1876857" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">But it definitely has some significant limitations. For example:<ul><li>It doesn't discriminate well between higher quality encodes; it's most useful when there is significant visible degradation</li>
+<li>It doesn't detect banding well</li>
+<li>It doesn't catch visible artifacts in low luma SDR content</li>
+<li>It doesn't have an HDR mode</li>
+<li>It's not great at rating different flavors of adaptive quantization.</li>
+</ul></div>
+			
+		</td>
+	</tr>
+	</table>
+</div>To the best of my knowledge, it discriminates better between higher quality encodes than any other method that exists. If I'm wrong I'd love to see what does it better. Saying it doesn't do it well, is a repeat of the &quot;least-bad&quot; 100m world record sprint time train of thought, which again to me seems a pointless road to go down. You can say the 100m sprint record is not fast, but hey, it's still the world record so I can't tell you what the next record time will be until it happens. If I'm wrong, and there's a better method, then please show me, I'm extremely interested in this stuff and that's how I got onto doing the testing that I do, but I'm yet to see better than VMAF. The best point you list is the HDR mode, which is true, as far as I know it doesn't exist for VMAF. An interesting thing to note is that it actually ONLY works on luma, I don't think it even considers chroma at all. Could be wrong about that though. In my opinion it's amazing how well it correlates to viewer rating only considering the luma channel. In fact, it's amazing that it works that way at all. I've read explanations for it, but I don't know that they're true.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876857#post1876857" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">In the end, it's a machine learning model, and so only as good as the content it was trained on. So it's going to be best at identifying the kinds of errors introduced by the encoder and the range of encoder settings that the test assets were created with.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>For sure, and the OP did link to that test I did asking about x265, which is indeed one of the encoders that generated distortions in the videos on which model 0.6.1 was trained on, and the model that I used in that article. So it's perfectly relevant. To your point though, I'm somewhat interested in training new models on VP9 and AV1, both the reference versions from Google and AOMedia, and the Intel software encoders. I'm not yet convinced that it needs to be done, but if anybody knows a test that shows another metric beats VMAF in these circumstances, then that would tip me over the edge and I'd start by the end of next month. As for VVC, I don't think the bitstream will even be finalised for another year, possibly 2, so we don't even have encoders for that yet, let alone testers. I know they've demonstrated progress encodes, but they may not be compatible by the time it's public anyway.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876857#post1876857" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">Except you can't train for subjective quality. You train on how humans subjectively rated a test corpus. The farther you get from the kind of content (including encoding settings) used in the test corpus, the less applicable VMAF will be.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>Again what you're saying is correct. It just doesn't change the fact that it still does it better than any other method. As long as VMAF predicts human quality ratings for a video more accurately than any other thing in the world can do, then it's doing it's job correctly. Until it doesn't, there's literally no better way to predict which video will rate better. How do you answer a person's question on what good quality is by using something OTHER than the best possible method? If they want the information, I say give it, and don't give anything other than the best. It's not perfect, my dad has terrible eyesight and will sometimes watch a video that I think looks perfect and he'll think it's terrible, that he can't see a thing. Then on another video we'll reverse opinions. That's just a matter of chance and preference. The best answer you can give, is which one will MOST people think is better, and go with that. Any non-subjective predictor method, say objective, still needs to be constructed from an underlying assumption about what &quot;quality&quot; is. It's inevitable that one day a person will say &quot;na that look horrible&quot; no matter how you do it. What's important, is minimising the frequency of this happening.<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876857#post1876857" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">The issue with targeting the metric isn't unique to VMAF. Encoders were over-tuned for PSNR for decades, assuming that was highly perceptually correlated. But PNSR really isn't THAT correlated. But because it was a marketable feature, lots of encoders wound up optimizing for it <i>instead </i>of subjective quality. This happens with any metric. And the better the metric is subjectively correlated, the less problematic this will be. But still, any metric based on an average of individual frame scores is going to underscore things like keyframe strobing and quality in the most difficult scenes.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>This is kind of the clincher point. Encoders slowly begin to &quot;cheat&quot; by optimising for a score according to a metric. That's clearly something that is conceptually unsettling. But if the cheat sheet is RIGHT then it's fine. The creation of VMAF is kind of a consequence of this, in that the &quot;cheat sheets&quot; weren't getting enough right answers, so Netflix wanted a better one. In an interesting turn of events, this is exactly what needs to happen. Any business that cares about how good their videos look to their customers, wants to know exactly how much bandwidth they can save while keeping their viewers served with what THE VIEWER will think is the best quality they could get with their internet connection. The monetary side of it keeps it honest. A test that just enables the encoder team to say &quot;look it's perfect at low bitrate&quot; doesn't serve the interest of the streaming provider if the customers can tell it's not perfect. For the streaming provider to know if they can cut bandwidth AND make their customers happier than any other streaming provider, then BOOM, they make more money. This is the birth of VMAF, and it will be the cause of revisions to VMAF, and the cause of new models for new circumstances. Eventually, it will be the cause for replacements, more encoders, and even more metrics, to replace them all. This is what's good in my opinion. Currently, from what the devs are saying, they seem to agree that the temporal artifacts are the next main issue to deal with. There's some different types of temporal pooling you can use with VMAF scoring, they're even available in the FFMPEG filter, but they're all pretty much stock standard mathematical methods of averaging, I don't think they're particularly ingenious as of this point in time. Hopefully, that will change and their models will be updated, but I don't know how much they will care as long as it still correlates better than all alternatives.<br />
+<br />
+I actually have a sneaking suspicion that x264 and x265 are over-optimised for SSIM. There's occasions where a video at very high bitrates just keeps scoring higher and higher in SSIM with more and more encoder time or bitrate. I've sat with a few dozen people desperately trying to see the differences and we all swear blind that every single one looks perfect. Yet more encode time or bitrate keeps raising MS-SSIM. It's deceptive, but it's built into the encoders. What else could they have done? I dunno. They had to use what they had available over the decade/s of development so it's not surprising. However, I'm not sure how much I can prove this, there's notes in the version history about it, but it doesn't reveal the degree to which it happens. One thing that usually boggles some minds with VMAF is that if you compare a bit-for-bit copy of a video to itself, the score isn't perfect. This is fascinating to me, since it's model is created by machine learning, of course, humans are flawed. If you test 1000 people with placebos, sometimes a person will say they saw distortion where there was none. This gets built into the model, and as a result, when it says that a perfect copy scores 99/100, then what it's ACTUALLY telling you is that for every 20 people on average queried about the video, on average, 1 of them will say that it's not perfect. It's actually CORRECTLY predicting a non-perfect score on a perfect video! On some perfect videos, the score is only 98, and on others it's 99.5. This variation reveals something about the source footage, that there's aspects to it that viewers don't like or see as imperfections even though they're seeing the intended original. Can you just imagine applications for this fact??????<br />
+<br />
+<div style="margin:20px; margin-top:5px; ">
+	<div class="smallfont" style="margin-bottom:2px">Quote:</div>
+	<table cellpadding="6" cellspacing="0" border="0" width="100%">
+	<tr>
+		<td class="alt2" style="border:1px inset">
+			
+				<div>
+					Originally Posted by <strong>benwaggoner</strong>
+					<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;p=1876857#post1876857" rel="nofollow"><img class="inlineimg" src="images/buttons/viewpost.gif" border="0" alt="View Post" /></a>
+				</div>
+				<div style="font-style:italic">One novel thing about VMAF versus SSIM and PSNR is that it significantly evolved over time. So VMAFv5 scores will be a lot more meaningful than VMAFv1. We should get into the habit of indicating the VMAF version number when we share VMAF scores. It'll be interesting to rerun VMAF on old encodes and see how those scores have changed over time.</div>
+			
+		</td>
+	</tr>
+	</table>
+</div>This I 100% agree with. I suspect that VMAF scores themselves will not exactly just go &quot;up or down&quot; in general over time, but, the correlation with subjective ratings is supposed to decisively go UP. I guess that's the goal of it's evolution. The VMAF scores will be closer and closer to opinion scores in more and more cases, for videos of which is was not trained on. That's the whole point of the thing. To be able to look at a new encoder or video type, or even just a new release movie, and be sure about how much bandwidth can be saved with scaling reduction in viewer perception of quality, before actually asking the viewers. This will enable better encoders, and keep the &quot;cheat sheet&quot; good. If it doesn't, then hopefully another metric will take over.<br />
+<br />
+I didn't start off including all the details I should have in my first tests, but I have been since, and I have a lot to publish, but work and stuff you know.... <img src="images/smilies/frown.gif" border="0" alt="" title="Frown" class="inlineimg" /> I will get it all out soon though, and, if you're interested in training GAME-SPECIFIC models, then the day may come soon, would you like to be contacted to be in the testing? I am most interested in testing under Twitch-streaming conditions, since Netflix seems to be all about the big TVs and phones for their own content. Like I said, it currently performs the best even on gaming content, but I'm open to the idea of a specifically trained model, and proving it's improved accuracy, if enough people are interested.
+		</div>
+		<!-- / message -->
+
+		
+
+		
+		
+
+		
+
+		
+
+		
+		<!-- edit note -->
+			<div class="smallfont">
+				<hr size="1" style="color:#FFFFFF; background-color:#FFFFFF" />
+				<em>
+					
+						Last edited by Agamemnus; 13th June 2019 at <span class="time">22:10</span>.
+					
+					
+				</em>
+			</div>
+		<!-- / edit note -->
+		
+
+	</td>
+</tr>
+<tr>
+	<td class="alt2" style="border: 1px solid #FFFFFF; border-top: 0px">
+		<img class="inlineimg" src="images/statusicon/user_offline.gif" alt="Agamemnus is offline" border="0" />
+
+
+		
+		
+		
+		
+		&nbsp;
+	</td>
+	
+	<td class="alt1" align="right" style="border: 1px solid #FFFFFF; border-left: 0px; border-top: 0px">
+	
+		<!-- controls -->
+<!-- hack -->
+
+<!-- endhack -->
+		
+		
+		
+			<a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;p=1877066" rel="nofollow"><img src="images/buttons/quote.gif" alt="Reply With Quote" border="0" /></a>
+		
+		
+		
+		
+		
+		
+		
+			
+		
+		
+		<!-- / controls -->
+	</td>
+</tr>
+</table>
+
+
+ 
+<!-- post 1877066 popup menu -->
+<div class="vbmenu_popup" id="postmenu_1877066_menu" style="display:none">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Agamemnus</td>
+	</tr>
+	
+		<tr><td class="vbmenu_option"><a href="member.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;u=185177">View Public Profile</a></td></tr>
+	
+	
+	
+	
+	
+		<tr><td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=finduser&amp;u=185177" rel="nofollow">Find More Posts by Agamemnus</a></td></tr>
+	
+	
+	
+	</table>
+</div>
+<!-- / post 1877066 popup menu -->
+
+
+
+	</div>
+	
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+
+<!-- / post #1877066 --><div id="lastpost"></div></div>
+
+<!-- start content table -->
+<!-- open content container -->
+
+<div align="center">
+	<div class="page" style="width:100%; text-align:left">
+		<div style="padding:0px 0px 0px 0px" align="left">
+
+<!-- / start content table -->
+
+<!-- controls below postbits -->
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:-3px">
+<tr valign="top">
+	
+		<td class="smallfont"><a href="newreply.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=newreply&amp;noquote=1&amp;p=1877066" rel="nofollow"><img src="images/buttons/reply.gif" alt="Reply" border="0" /></a></td>
+	
+	
+</tr>
+</table>
+<!-- / controls below postbits -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- next / previous links -->
+	<br />
+	<div class="smallfont" align="center">
+		<strong>&laquo;</strong>
+			<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;t=176273&amp;goto=nextoldest" rel="nofollow">Previous Thread</a>
+			|
+			<a href="showthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;t=176273&amp;goto=nextnewest" rel="nofollow">Next Thread</a>
+		<strong>&raquo;</strong>
+	</div>
+<!-- / next / previous links -->
+
+
+
+
+
+
+
+<!-- popup menu contents -->
+<br />
+
+<!-- thread tools menu -->
+<div class="vbmenu_popup" id="threadtools_menu" style="display:none">
+<form action="postings.php?t=176273&amp;pollid=" method="post" name="threadadminform">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Thread Tools<a name="goto_threadtools"></a></td>
+	</tr>
+	<tr>
+		<td class="vbmenu_option"><img class="inlineimg" src="images/buttons/printer.gif" alt="Show Printable Version" /> <a href="printthread.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;t=176273" accesskey="3" rel="nofollow">Show Printable Version</a></td>
+	</tr>
+	
+	
+	
+	
+	</table>
+</form>
+</div>
+<!-- / thread tools menu -->
+
+<!-- **************************************************** -->
+
+
+<!-- thread search menu -->
+<div class="vbmenu_popup" id="threadsearch_menu" style="display:none">
+<form action="search.php?do=process&amp;searchthreadid=176273" method="post">
+	<table cellpadding="4" cellspacing="1" border="0">
+	<tr>
+		<td class="thead">Search this Thread<a name="goto_threadsearch"></a></td>
+	</tr>
+	<tr>
+		<td class="vbmenu_option" title="nohilite">
+			<input type="hidden" name="s" value="7c0e76e9769aef9feff36a1e7c003b15" />
+			<input type="hidden" name="securitytoken" value="guest" />
+			<input type="hidden" name="do" value="process" />
+			<input type="hidden" name="searchthreadid" value="176273" />
+			<input type="text" class="bginput" name="query" size="25" /><input type="submit" class="button" value="Go"  /><br />
+		</td>
+	</tr>
+	<tr>
+		<td class="vbmenu_option"><a href="search.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;searchthreadid=176273">Advanced Search</a></td>
+	</tr>
+	</table>
+</form>
+</div>
+<!-- / thread search menu -->
+
+
+<!-- **************************************************** -->
+
+
+
+<!-- / popup menu contents -->
+
+
+<!-- forum rules and admin links -->
+<table cellpadding="0" cellspacing="0" border="0" width="100%" align="center">
+<tr valign="bottom">
+	<td width="100%" valign="top">
+		<table class="tborder" cellpadding="6" cellspacing="1" border="0" width="210">
+<thead>
+<tr>
+	<td class="thead">
+		<a style="float:right" href="#top" onclick="return toggle_collapse('forumrules')"><img id="collapseimg_forumrules" src="images/buttons/collapse_thead.gif" alt="" border="0" /></a>
+		Posting Rules
+	</td>
+</tr>
+</thead>
+<tbody id="collapseobj_forumrules" style="">
+<tr>
+	<td class="alt1" nowrap="nowrap"><div class="smallfont">
+		
+		<div>You <strong>may not</strong> post new threads</div>
+		<div>You <strong>may not</strong> post replies</div>
+		<div>You <strong>may not</strong> post attachments</div>
+		<div>You <strong>may not</strong> edit your posts</div>
+		<hr />
+		
+		<div><a href="misc.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=bbcode" target="_blank">BB code</a> is <strong>On</strong></div>
+		<div><a href="misc.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=showsmilies" target="_blank">Smilies</a> are <strong>On</strong></div>
+		<div><a href="misc.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=bbcode#imgcode" target="_blank">[IMG]</a> code is <strong>On</strong></div>
+		<div>HTML code is <strong>Off</strong></div>
+		<hr />
+		<div><a href="misc.php?s=7c0e76e9769aef9feff36a1e7c003b15&amp;do=showrules" target="_blank">Forum Rules</a></div>
+	</div></td>
+</tr>
+</tbody>
+</table>
+	</td>
+	<td class="smallfont" align="right">
+		<table cellpadding="0" cellspacing="0" border="0">
+		
+		<tr>
+			<td>
+			<div class="smallfont" style="text-align:left; white-space:nowrap">
+	<form action="forumdisplay.php" method="get">
+	<input type="hidden" name="s" value="7c0e76e9769aef9feff36a1e7c003b15" />
+	<input type="hidden" name="daysprune" value="" />
+	<strong>Forum Jump</strong><br />
+	<select name="f" onchange="this.form.submit();">
+		<optgroup label="Site Areas">
+			<option value="cp" >User Control Panel</option>
+			<option value="pm" >Private Messages</option>
+			<option value="subs" >Subscriptions</option>
+			<option value="wol" >Who's Online</option>
+			<option value="search" >Search Forums</option>
+			<option value="home" >Forums Home</option>
+		</optgroup>
+		
+		<optgroup label="Forums">
+		<option value="43" class="fjdpth0" > Announcements and Chat</option>
+<option value="8" class="fjdpth1" >&nbsp; &nbsp;  General Discussion</option>
+<option value="79" class="fjdpth1" >&nbsp; &nbsp;  News</option>
+<option value="45" class="fjdpth1" >&nbsp; &nbsp;  Forum / Site Suggestions &amp; Help</option>
+<option value="3" class="fjdpth0" > General</option>
+<option value="9" class="fjdpth1" >&nbsp; &nbsp;  Decrypting</option>
+<option value="6" class="fjdpth1" >&nbsp; &nbsp;  Newbies</option>
+<option value="5" class="fjdpth1" >&nbsp; &nbsp;  DVD2AVI / DGIndex</option>
+<option value="11" class="fjdpth1" >&nbsp; &nbsp;  Audio encoding</option>
+<option value="12" class="fjdpth1" >&nbsp; &nbsp;  Subtitles</option>
+<option value="63" class="fjdpth1" >&nbsp; &nbsp;  Linux, Mac OS X, &amp; Co</option>
+<option value="67" class="fjdpth0" > Capturing and Editing Video</option>
+<option value="33" class="fjdpth1" >&nbsp; &nbsp;  Avisynth Usage</option>
+<option value="69" class="fjdpth1" >&nbsp; &nbsp;  Avisynth Development</option>
+<option value="82" class="fjdpth1" >&nbsp; &nbsp;  VapourSynth</option>
+<option value="10" class="fjdpth1" >&nbsp; &nbsp;  Capturing Video</option>
+<option value="59" class="fjdpth1" >&nbsp; &nbsp;  DV</option>
+<option value="64" class="fjdpth1" >&nbsp; &nbsp;  HDTV / DVB / TiVo</option>
+<option value="68" class="fjdpth1" >&nbsp; &nbsp;  NLE - Non Linear Editing</option>
+<option value="22" class="fjdpth1" >&nbsp; &nbsp;  VirtualDub, VDubMod &amp; AviDemux</option>
+<option value="74" class="fjdpth1" >&nbsp; &nbsp;  New and alternative a/v containers</option>
+<option value="17" class="fjdpth0" > Video Encoding</option>
+<option value="28" class="fjdpth1" >&nbsp; &nbsp;  (Auto) Gordian Knot</option>
+<option value="52" class="fjdpth1" >&nbsp; &nbsp;  MPEG-4 ASP</option>
+<option value="78" class="fjdpth1" >&nbsp; &nbsp;  MPEG-4 Encoder GUIs</option>
+<option value="77" class="fjdpth1" >&nbsp; &nbsp;  MPEG-4 AVC / H.264</option>
+<option value="81" class="fjsel" selected="selected">&nbsp; &nbsp;  High Efficiency Video Coding (HEVC)</option>
+<option value="54" class="fjdpth1" >&nbsp; &nbsp;  New and alternative video codecs</option>
+<option value="62" class="fjdpth1" >&nbsp; &nbsp;  MPEG-2 Encoding</option>
+<option value="84" class="fjdpth1" >&nbsp; &nbsp;  Royalty free video codecs (VP8, VP9, AV1 and AV2)</option>
+<option value="49" class="fjdpth0" > (HD) DVD, Blu-ray &amp; (S)VCD</option>
+<option value="47" class="fjdpth1" >&nbsp; &nbsp;  One click suites for DVD backup and DVD creation</option>
+<option value="75" class="fjdpth1" >&nbsp; &nbsp;  DVD &amp; BD Rebuilder</option>
+<option value="39" class="fjdpth1" >&nbsp; &nbsp;  (HD) DVD &amp; Blu-ray authoring</option>
+<option value="61" class="fjdpth1" >&nbsp; &nbsp;  Advanced authoring</option>
+<option value="50" class="fjdpth1" >&nbsp; &nbsp;  IFO/VOB Editors</option>
+<option value="60" class="fjdpth1" >&nbsp; &nbsp;  DVD burning</option>
+<option value="13" class="fjdpth0" > Hardware &amp; Software</option>
+<option value="15" class="fjdpth1" >&nbsp; &nbsp;  Software players</option>
+<option value="73" class="fjdpth1" >&nbsp; &nbsp;  Hardware players</option>
+<option value="16" class="fjdpth1" >&nbsp; &nbsp;  PC Hard &amp; Software</option>
+<option value="40" class="fjdpth0" > Programming and Hacking</option>
+<option value="41" class="fjdpth1" >&nbsp; &nbsp;  Development</option>
+<option value="58" class="fjdpth1" >&nbsp; &nbsp;  Translations</option>
+
+		</optgroup>
+		
+	</select><input type="submit" class="button" value="Go"  />
+	</form>
+</div>
+			</td>
+		</tr>
+		</table>
+	</td>
+</tr>
+</table>
+<!-- /forum rules and admin links -->
+
+<br />
+
+
+
+
+
+<br />
+<div class="smallfont" align="center">All times are GMT +1. The time now is <span class="time">09:25</span>.</div>
+<br />
+
+
+		</div>
+	</div>
+</div>
+
+<!-- / close content container -->
+<!-- /content area table -->
+
+<form action="index.php" method="get" style="clear:left">
+
+<table cellpadding="6" cellspacing="0" border="0" width="100%" class="page" align="center">
+<tr>
+	
+	
+	<td class="tfoot" align="right" width="100%">
+		<div class="smallfont">
+			<strong>
+				
+				<a href="https://www.doom9.org/">doom9.org</a> -
+				
+				
+				<a href="archive/index.php">Archive</a> -
+				
+				
+				
+				<a href="#top" onclick="self.scrollTo(0, 0); return false;">Top</a>
+			</strong>
+		</div>
+	</td>
+</tr>
+</table>
+
+<br />
+
+<div align="center">
+	<div class="smallfont" align="center">
+	<!-- Do not remove this copyright notice -->
+	Powered by vBulletin&reg; Version 3.8.11<br />Copyright &copy;2000 - 2026, vBulletin Solutions Inc.
+	<!-- Do not remove this copyright notice -->
+	</div>
+
+	<div class="smallfont" align="center">
+	<!-- Do not remove cronimage or your scheduled tasks will cease to function -->
+	
+	<!-- Do not remove cronimage or your scheduled tasks will cease to function -->
+
+	
+	</div>
+</div>
+
+</form>
+
+
+  
+	<br>
+<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2279224607973567"
+     crossorigin="anonymous"></script>
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-format="autorelaxed"
+     data-ad-client="ca-pub-2279224607973567"
+     data-ad-slot="3107692877"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+  
+
+
+
+
+<script nonce="apKXaqdzzJUr1cqqrY-T7AAAAIY" type="text/javascript">
+<!--
+	// Main vBulletin Javascript Initialization
+	vBulletin_init();
+//-->
+</script>
+
+<!-- temp -->
+<div style="display:none">
+	<!-- thread rate -->
+	
+		
+	
+	<!-- / thread rate -->
+</div>
+
+</body>
+</html>

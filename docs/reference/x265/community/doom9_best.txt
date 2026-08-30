@@ -1,0 +1,311 @@
+﻿ 
+Best x265 software and time/quality settings? - Doom9's Forum 
+Welcome to Doom9 's Forum, THE in-place to be for everyone interested in DVD conversion. 
+Before you start posting please read the forum rules . By posting to this forum you agree to abide by the rules. 
+Domains: forum.doom9.org / forum.doom9.net / forum.doom9.se 
+Doom9's Forum 
+ > Video Encoding 
+> High Efficiency Video Coding (HEVC) 
+Best x265 software and time/quality settings?
+User Name 
+Remember Me? 
+Password 
+Register 
+FAQ 
+Today's Posts 
+Search 
+Search Forums 
+Show Threads 
+Show Posts 
+Tag Search 
+Advanced Search 
+Go to Page... 
+Thread Tools 
+Search this Thread 
+6th February 2021, 09:49
+# 1 
+|   Link 
+YaBoyShredderson 
+Registered User
+Join Date: Jul 2020
+Posts: 76
+Best x265 software and time/quality settings? 
+Im thinking of changing my bluray encodes from x264 in handbrake to x265 to squeeze out a little more space.
+In handbrake with x264 i use crf 18, very slow, film tune, high profile, level 4.1. Audio i set it to ac3 5.1 640kbs.
+I was thinking of using staxrip instead as its what i use for my 4k blurays, but im still a little confused with it. Im thinking of using 10bit too, and with 2 pass abr instead of crf as with my current settings, the file sizes can vary so wildy, and some files actually get bigger. Im think of using 7mbits, which im aware is a bit high for x265, but i dont mind bloating the easilt compressed stuff a bit, at least i know the quality will be practically lossless. The harder to compress stuff, where 7mbits can be considered a "low" bitrate, will benefit from x265s efficency and wont be stupid artifacty.
+Im not as familiar with x265 as i am with x264, and i have a couple of questions. In terms of preset, the general wisfom is to go as slow as one can bare, but im wondering what the difference is between slow and slower mainly, im not too concerned about the others. With x264 veryslow i can encode faster than realtime pretty much, 25-30fps give or take, and thats with limiting thread count too. Im asking if theres is maybe a 1-2% improvment in efficency, at like half the speed, and is therefore not worth it, that kind of question.
+I also want to know if i should leave tune at none, as there is no film tune. For my 4k stuff, i essentially set the same settings as film tune manually, but i cant remember what it was. Also, what about thred count? I put threads=18 in the advanced options in handbrake, as i have 12c/24t 5900x, and opening 36 threads is a lot, as the quality loss begins to become noticable at that point. Im thinking, as x265 equals thread count, rather than 1.5x like x264, i should set frame threads to 12, and run 2 encodes at the same time? Or would it be worth going lower, how much difference in quality would it make, or is it just not relevant with 12 threads? 
+Also, what level should i use? If i leave it on automatic, i can only use main, not high for x265. For x264, level 4 was generally what i needed, it only mentioned bitrates and resolutuons n stuff, 25mbits for 1080p which was all i really need. For x265, i read that 12 mbits is the max for 4.0, which seems quite low, but that 30 was the max if i use high? Also, i noticed it was mentioning something to do with luma and stuff, which i dont understand, and i used 5.1 with my 4k stuff to avoid messing with the hdr.
+Also, audio. I use ac3 640kbs for 5.1 as ac3 is a very old inneficient codec, and i was told thay anything less than max can make the difference noticable, but i may as well save space on audio too. What is the "HEVC" of audio coding? I want something that would also generally work with a soundbar or sound system, as i want to get one in the future. I was thinking aac or opus. I heard opus is very efficent. Whst bitratw should i use? 384? 512? 
+Thanks.
+Last edited by YaBoyShredderson; 6th February 2021 at 10:01 .
+YaBoyShredderson 
+View Public Profile 
+Find More Posts by YaBoyShredderson 
+7th February 2021, 23:33
+# 2 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+x265's default tuning is generally just fine. Using --preset slower is where the best features of HEVC generally kick in, but it'll still be a lot slower than x264 veryslow.
+The Main profile of HEVC is equivalent to High in x265. Main10 would be used for 10-bit instead of High10. x265 is generally able to use more threads than x264 at a given frame size. If you are doing 1080p, you probably don't need to be running in parallel with only 12 physical cores, and can just leave it at default. Using more than you have logical cores is pointless, and probably would cause encoding to become slower overall at some point due to the extra overhead of parallelization.
+By Level, do you mean Tier? A typical 1080p encode for distribution/playback would be Main Profile Level 4.0 Main Tier. High Tier is more for creating high-bitrate mezzanine files. High Tier is basically all the same constraints of Profile & Level, except allowing much higher bitrates than Main Tier. But, for the same reason, not as compatible for device decoding.
+For 1080p24, 12 Mbps peak is generally quite ample with x265. 1080p50 would use a higher profile with a higher max bitrate.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+8th February 2021, 18:40
+# 3 
+|   Link 
+YaBoyShredderson 
+Registered User
+Join Date: Jul 2020
+Posts: 76
+Quote:
+Originally Posted by benwaggoner 
+x265's default tuning is generally just fine. Using --preset slower is where the best features of HEVC generally kick in, but it'll still be a lot slower than x264 veryslow.
+The Main profile of HEVC is equivalent to High in x265. Main10 would be used for 10-bit instead of High10. x265 is generally able to use more threads than x264 at a given frame size. If you are doing 1080p, you probably don't need to be running in parallel with only 12 physical cores, and can just leave it at default. Using more than you have logical cores is pointless, and probably would cause encoding to become slower overall at some point due to the extra overhead of parallelization.
+By Level, do you mean Tier? A typical 1080p encode for distribution/playback would be Main Profile Level 4.0 Main Tier. High Tier is more for creating high-bitrate mezzanine files. High Tier is basically all the same constraints of Profile & Level, except allowing much higher bitrates than Main Tier. But, for the same reason, not as compatible for device decoding.
+For 1080p24, 12 Mbps peak is generally quite ample with x265. 1080p50 would use a higher profile with a higher max bitrate.
+So its worth using slower over slow? Not worth going much slower than that?
+I heard that x265 was LESS parralelizable than x264? Would it not still make sense to use only 12 threads out 24 anyway? I can play games while encoding, and when im not playing, i can run a second encode. Does fewer threads not mean higher compression efficiency like with x264? If only marginal?
+Yes thats what i thought, high is just another set of restraints. It wont impact quality unless i max out the main teir of whatever level im on. At first i thought it was like x264, where high is actually more efficient than main.
+So leaving level unrestricted is best?
+YaBoyShredderson 
+View Public Profile 
+Find More Posts by YaBoyShredderson 
+8th February 2021, 21:17
+# 4 
+|   Link 
+lazyjss 
+Registered User
+Join Date: Dec 2020
+Posts: 15
+I am using a nvidia turing gen graphics card to encode my 4k uhd blu ray rips.
+Stax rip is a the best program I have found for this.
+I have done a lot of pixel peeping and it is not worth the long encode times for me, so I am using hardware acceleration.
+hdr metadata gets pass through and files sizes are larger however than software.
+Something to think about.
+lazyjss 
+View Public Profile 
+Find More Posts by lazyjss 
+8th February 2021, 22:27
+# 5 
+|   Link 
+YaBoyShredderson 
+Registered User
+Join Date: Jul 2020
+Posts: 76
+Quote:
+Originally Posted by lazyjss 
+I am using a nvidia turing gen graphics card to encode my 4k uhd blu ray rips.
+Stax rip is a the best program I have found for this.
+I have done a lot of pixel peeping and it is not worth the long encode times for me, so I am using hardware acceleration.
+hdr metadata gets pass through and files sizes are larger however than software.
+Something to think about.
+I tried that, turing nvenc squashed a lot of detail out, even at high bitrates. The only time it didnt was at bitrates so high its not worth compressing in the first place.
+YaBoyShredderson 
+View Public Profile 
+Find More Posts by YaBoyShredderson 
+8th February 2021, 23:01
+# 6 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Quot 
+[QUOTE=YaBoyShredderson;1935598]So its worth using slower over slow? Not worth going much slower than that?/QUOTE]
+veryslow and placebo will give some small incremental gains at the cost of a lot of encoding time. Slower is where most of the good stuff kicks in, so quality tuning between slower-veryslow-placebo is pretty similar.
+Quote:
+I heard that x265 was LESS parralelizable than x264?/QUOTE]
+Not in my experience, but it may vary depending on preset and other parameters. Wavefront Parallel Processing (wpp) is one useful feature for parallelism not in H.264. And x265 has features like --pmode which offer other paths to increase parallelism.
+QUOTE]Would it not still make sense to use only 12 threads out 24 anyway? I can play games while encoding, and when im not playing, i can run a second encode. Does fewer threads not mean higher compression efficiency like with x264? If only marginal?/QUOTE]
+Sure, if you want to do other things, sure. Fewer threads can impact quality slightly because a variety of parameters auto-adjust based on the number of available threads, but you can get the same results by manually setting those parameters. On my dual-socket workstation, I almost always pin encoding to one or the other physical CPU for this reason. It's only with 8K encoding that more than 36 logical threads wind up being more important that the NUMA overhead.
+QUOTE]Yes thats what i thought, high is just another set of restraints. It wont impact quality unless i max out the main teir of whatever level im on. At first i thought it was like x264, where high is actually more efficient than main.
+You're talking about High Profile in x264. The equivalent in x265 would be using Main10 or something. The key tool of High Profile in H.264 is allowing for 8x8 blocks. HEVC's Main allows for up to 32x32 blocks.
+Tier is something orthgonal.
+Quote:
+So leaving level unrestricted is best?
+Letting x265 pick for you is generally fine, unless you're doing something unusual and specific. Unrestricted is bad because you can't predict decoder compatibility. I've only ever had an unrestricted level when doing lossless encoding, since there is no way to control VBV anyway.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+9th February 2021, 01:30
+# 7 
+|   Link 
+YaBoyShredderson 
+Registered User
+Join Date: Jul 2020
+Posts: 76
+Quote:
+Originally Posted by benwaggoner 
+Letting x265 pick for you is generally fine, unless you're doing something unusual and specific. Unrestricted is bad because you can't predict decoder compatibility. I've only ever had an unrestricted level when doing lossless encoding, since there is no way to control VBV anyway.
+Thanks for all this advice. Last thing, should i leave it unrestricted then or lock to either 4.0 or 4.1? I will using 2 pass abr of 7mbits (im aware thats generally considered quite high for x265 1080p?) but am not sure if some content may come out with some scenes on the extremes, needing more than 12mbits.
+YaBoyShredderson 
+View Public Profile 
+Find More Posts by YaBoyShredderson 
+9th February 2021, 17:16
+# 8 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Quote:
+Originally Posted by YaBoyShredderson 
+Thanks for all this advice. Last thing, should i leave it unrestricted then or lock to either 4.0 or 4.1? I will using 2 pass abr of 7mbits (im aware thats generally considered quite high for x265 1080p?) but am not sure if some content may come out with some scenes on the extremes, needing more than 12mbits.
+There are some older devices with 4.0 but not 4.1 decoders, so I'd go for 4.0 unless you find content where the 4.0 limit has a quality impact if you're worried about broad compatibility. If you're only going to use it on 4.1+ devices, then no reason not to use the higher limit. I don't think anyone is still shipping 4.0 only hardware.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+18th January 2022, 22:06
+# 9 
+|   Link 
+DMD 
+Registered User
+Join Date: Jan 2006
+Location: Italy
+Posts: 300
+Good evening.
+I am also interested in the best compromise between speed and quality, personally I am interested in UHD encoding in H265, from what I understand software encoding turns out to be the best.
+As a software I use StaxRip, I don't know if there are better than this.
+Using StaxRip a Slower preset should be a good compromise with the final quality, are there any obvious differences with Very Slow?
+At the CPU level, the minimum number of cores it must have to work at its best?
+Thank you
+Last edited by DMD; 18th January 2022 at 22:08 .
+DMD 
+View Public Profile 
+Find More Posts by DMD 
+21st January 2022, 20:48
+# 10 
+|   Link 
+Kill3rWolf 
+Registered User
+Join Date: Aug 2021
+Posts: 27
+Quote:
+Originally Posted by benwaggoner 
+HEVC's Main allows for up to 32x32 blocks.
+That's why CTU 32 is recommended for HEVC's Main?
+Kill3rWolf 
+View Public Profile 
+Find More Posts by Kill3rWolf 
+22nd January 2022, 01:40
+# 11 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Quote:
+Originally Posted by Kill3rWolf 
+That's why CTU 32 is recommended for HEVC's Main?
+It's more that 32 is the highest "safe" size. 64 is slightly more efficient, but can cause some visible issues with noisy content. I would use it for clean content like cel or computer animation.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+Tags 
+abr , crf , handbrake , x264 , x265 
+« 
+ Previous Thread 
+ |
+ Next Thread 
+ » 
+Thread Tools 
+Show Printable Version 
+Search this Thread 
+Advanced Search 
+Posting Rules
+You may not post new threads
+You may not post replies
+You may not post attachments
+You may not edit your posts
+BB code is On 
+Smilies are On 
+[IMG] code is On 
+HTML code is Off 
+Forum Rules 
+Forum Jump 
+User Control Panel 
+ Private Messages 
+ Subscriptions 
+ Who's Online 
+ Search Forums 
+ Forums Home 
+Announcements and Chat 
+     General Discussion 
+     News 
+     Forum / Site Suggestions & Help 
+ General 
+     Decrypting 
+     Newbies 
+     DVD2AVI / DGIndex 
+     Audio encoding 
+     Subtitles 
+     Linux, Mac OS X, & Co 
+ Capturing and Editing Video 
+     Avisynth Usage 
+     Avisynth Development 
+     VapourSynth 
+     Capturing Video 
+     DV 
+     HDTV / DVB / TiVo 
+     NLE - Non Linear Editing 
+     VirtualDub, VDubMod & AviDemux 
+     New and alternative a/v containers 
+ Video Encoding 
+     (Auto) Gordian Knot 
+     MPEG-4 ASP 
+     MPEG-4 Encoder GUIs 
+     MPEG-4 AVC / H.264 
+     High Efficiency Video Coding (HEVC) 
+     New and alternative video codecs 
+     MPEG-2 Encoding 
+     Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+ (HD) DVD, Blu-ray & (S)VCD 
+     One click suites for DVD backup and DVD creation 
+     DVD & BD Rebuilder 
+     (HD) DVD & Blu-ray authoring 
+     Advanced authoring 
+     IFO/VOB Editors 
+     DVD burning 
+ Hardware & Software 
+     Software players 
+     Hardware players 
+     PC Hard & Software 
+ Programming and Hacking 
+     Development 
+     Translations 
+All times are GMT +1. The time now is 09:26 .
+doom9.org -
+Archive -
+Top 
+Powered by vBulletin® Version 3.8.11
+Copyright ©2000 - 2026, vBulletin Solutions Inc.

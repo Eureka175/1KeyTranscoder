@@ -1,0 +1,279 @@
+The Video Revolution
+Today’s internet-savvy world is being revolutionized by video. This revolution 
+has led to industry experts predicting that IP video traffic will account for over 80 
+percent of the all consumer traffic by 2021.1 
+Consequently, video compression (or encoding, as it is popularly known) has 
+become one of the top workloads running on the cloud today. The goal of video 
+encoding is to compress the video to make it viewable over the limited available 
+bandwidth, while minimizing the visual impact to a human viewer. 
+HEVC: The Future of Video
+The High Efficiency Video Coding (or HEVC, also known as H.265) standard 
+was designed to be the next evolutionary step in video compression to cater 
+to the ever-increasing resolution of consumer devices. 2 When compared to its 
+predecessor Advanced Video Coding AVC (or H.264) 3, HEVC is designed to achieve 
+a 50-percent bandwidth savings at the same quality across a range of resolutions. 
+Additionally, HEVC has tools that are expected to enable streaming of content in 
+Ultra High Definition (UHD, or 4K) with High-Dynamic Range (HDR) 4.
+HEVC support is widespread across a variety of consumer devices today. From 
+hand-held computers, such as mobile phones and tablets, to large-screen 
+televisions, modern chipsets and devices natively support HEVC decoding either 
+in hardware or via software. This capability enables the use of HEVC technology 
+for streaming video over the Internet. Several leading streaming solution providers 
+stream HEVC content not just at the UHD resolution, but also at lower resolution 
+due to the bandwidth savings achieved by HEVC 5.
+The Key Challenge for HEVC: Compute for Encoding
+Due to the more complex tools supported, HEVC encoders are expected to be 2–5X 
+more complex than AVC encoders. 6 As a consequence, performance optimizations 
+that make the computation time manageable are paramount in the design of any 
+HEVC video encoder.
+Today, the most popular open source encoder for HEVC is x265. 7 The x265 HEVC 
+video codec is available under the GPL* v2 license, and is integrated into several 
+popular open-source multimedia frameworks such as ffmpeg*, HandBrake*, and 
+VLC*. The x265 encoder employs a wide variety of tools to make the encoding 
+time for HEVC practical. 8 One of the key tools that it employs is acceleration with 
+the Intel® Advanced Vector Extensions (Intel® AVX) and Intel® Advanced Vector 
+Extensions 2 (Intel® AVX2). Cumulatively, these Single Instruction, Multiple Data 
+(SIMD) extensions offer a 5X average speedup when compared to native C code, 
+making encoding with HEVC practical.
+Accelerating x265, the HEVC 
+Encoder, with Intel® Advanced 
+Vector Extensions 512
+Communications Service Providers
+High Efficiency Video Codec
+Table of Contents
+The Video Revolution   . . . . . . . . . . . . 1
+HEVC: The Future of Video   . . . . . . . 1
+The Key Challenge for HEVC:  
+Compute for Encoding   . . . . . . . . . . . 1
+Leapfrogging HEVC with  
+Intel® Advanced Vector  
+Extensions 512  . . . . . . . . . . . . . . . . . . 2
+Accelerating x265’s HEVC  
+encoding with Intel Advanced  
+Vector Extensions 512   . . . . . . . . . . . 2
+Conclusion  . . . . . . . . . . . . . . . . . . . . . . 3
+Appendix A   . . . . . . . . . . . . . . . . . . . . . 4
+white paper
+Authors
+Praveen Kumar Tiwari and  
+Pradeep Ramachandran
+MulticoreWare, Inc. 
+Sravanthi Kota Venkata,  
+Christopher A Bird, and Kevin Cone
+Intel Corporation, Santa Clara. 
+White Paper | Accelerating x265, the HEVC Encoder, with Intel® Advanced Vector Extensions 512
+Leapfrogging HEVC with Intel® Advanced 
+Vector Extensions 512
+The recently released Intel® Xeon® Scalable processors have 
+introduced the Intel® Advanced Vector Extensions 512 (Intel® 
+AVX-512) instruction set. Intel AVX-512 instructions are 
+capable of performing 2X the number of operations in the 
+same number of cycles compared to the previous-generation 
+Intel AVX2 instructions. This technology therefore focuses 
+on programs that have each instruction operating on data 
+with wide widths. HEVC encoders, such as x265, operate on 
+such data widths, making them prime targets for acceleration 
+with Intel AVX-512. Intel and MulticoreWare Inc. co-funded 
+a program to evaluate the benefits of accelerating the x265 
+HEVC encoder with Intel AVX 512.
+This acceleration is not straightforward. On the one hand, 
+the specific kernels that will benefit from this extra width 
+have to be carefully picked and handwritten to include Intel 
+AVX-512 assembly instructions. On the other hand, using 
+certain Intel AVX-512 instructions may result in lowering 
+the clock frequency as compared to previous-generation 
+instructions, because a higher fraction of the die is activated. 9 
+This reduction in clock frequency may affect parts of the 
+encoder that do not use the Intel AVX-512 instructions, such 
+as kernels in older-generation SIMD or C code.
+Accelerating Compute Kernels with Intel 
+Advanced Vector Extensions 512
+We handpicked and accelerated over 500 kernels in x265 that 
+are used when encoding to the main HEVC profile and over 
+600 kernels when encoding to the main10 HEVC profile.  
+Figure 1 shows the achieved performance improvement over 
+their corresponding Intel AVX2 counterparts; the graphs are 
+sorted in increasing order of cycle-count gains for each profile.
+Figure 1 shows that on average, we gained a 33-percent cycle 
+count by using Intel AVX-512 instructions for the main profile 
+and 40 percent for the main10 profile; individual kernels 
+gained well over 60 percent in both profiles. These results 
+demonstrate that using Intel AVX-512 instructions for the x265 
+kernels may be beneficial, contingent on the reduction in clock 
+frequency to accommodate the increased vector width. 
+Accelerating x265’s HEVC encoding with  
+Intel Advanced Vector Extensions 512
+To test whether the acceleration to the cycle count 
+of individual kernels translates to improved encoder 
+performance, we compared the performance of x265 with 
+the Intel AVX-512 accelerated kernels to one with Intel 
+AVX2 accelerated kernels for a select set of HD (1920x1080) 
+and 4K (3840x2160) clips. We measured the speedup with 
+a wide variety of presets of x265 that represent different 
+trade-offs in performance and quality. The ultrafast  preset 
+is the quickest but results in the lowest quality at a given 
+bitrate, while the veryslow  preset is the slowest but results 
+in the best quality; the others shown in Figure 2 fit on a 
+curve between these end points. We focused on the main 
+profile for HD and the main10 profile for UHD for brevity. 
+We measured the gains on a server with two Intel® Xeon® 
+Platinum 8180 processors and on a workstation with an Intel® 
+Core™ i9-7900X processor to understand the impact across a 
+wide variety of use cases; the appendix describes the entire 
+system configuration. Figure 2 show these results.
+0%
+10%
+20%
+30%
+40%
+50%
+60%
+70%
+80%
+1
+22
+43
+64
+85
+106
+127
+148
+190
+211
+232
+253
+274
+295
+316
+337
+358
+379
+400
+421
+442
+463
+484
+505
+526
+547
+568
+589
+610
+169
+Improvement in Cycle count over Intel® AVX2
+x265 Kernels
+main profile
+main10 profile
+Figure 1 . Cycle count improvements using Intel® Advanced Vector Extensions 512. 
+2
+White Paper | Accelerating x265, the HEVC Encoder, with Intel® Advanced Vector Extensions 512
+From Figures 1 and 2 we can make the following inferences:
+•  For desktop and workstation SKUs (like the Intel Core i9-
+7900X processor that we tested), Intel AVX-512 kernels 
+can be enabled for all encoder configurations, because the 
+reduction in CPU clock frequency is rather low.
+•  For server SKUs (like the Intel Xeon Platinum 8180 
+processor on which we tested), the frequency dip is higher 
+and increases with more cores being active. Therefore, 
+Intel AVX-512 should only be enabled when the amount 
+of computation per pixel is high, because only then is the 
+clock-cycle benefit able to balance out the frequency 
+penalty and result in performance gains for the encoder. 
+Specifically, we recommend enabling Intel AVX-512 only 
+when encoding 4K content using the slower or veryslow 
+preset in the main10 profile. We do not recommend 
+enabling Intel AVX-512 kernels for other settings 
+(resolutions, profiles, or presets), because unexpected 
+inversions with respect to using the Intel AVX2 kernels  
+may result.
+Conclusion
+This paper described our experience with accelerating 
+x265 and open-source HEVC encoders, with Intel AVX-512 
+instructions. From our experience we recommend that 
+for workstation and client CPUs that have Intel AVX-512 
+instructions, the kernels may be used across all profiles of 
+x265. However, for server-grade CPUs that have the Intel 
+AVX-512 instructions, this acceleration should be used only 
+for certain profiles of x265 that focus on encoding high 
+resolution video (4K and higher) in the main10 profile using 
+the slower or veryslow presets due to the impact that the 
+Intel AVX-512 instructions have to clock frequency. For other 
+profiles on server CPUs with Intel AVX-512 instructions, 
+enabling these kernels is not recommended.
+-5%
+0%
+5%
+10%
+15%
+20%
+1080p main 4K main10 1080p main 4K main10 1080p main 4K main10
+Intel® Core™ i9-7900X
+processor (all cores)
+Intel® Xeon® Platinum
+8180 processor (4 active cores)
+Intel® Xeon® Platinum
+8180 processor (8 active cores)
+Performance of Intel® AVX-512 vs Intel® AVX2
+ultrafast veryfast medium slower
+Figure 2 . Improvements in fps over Intel® AVX2 (%).
+3
+White Paper | Creating the Next Generation Central Office with Intel® Architecture CPUs
+Intel® Xeon® Platinum 8180 Processor Intel® Core™ i9 7900X Processor
+System Attribute Value System Attribute Value
+Operating system: Centos Linux* release 7.3.1611 (Core) Operation system: Windows* 10 Enterprise
+Architecture: x86_64 Architecture:         x64
+CPU op-mode(s): 32-bit, 64-bit CPU op-mode(s):     64-bit
+Byte order: Little Endian Byte order:            Little Endian
+CPU(s): 112 CPU(s):               20
+On-line CPU(s) list: 0 –111 Thread(s) per core:    2
+Thread(s) per core: 2 Core(s) per socket:    20
+Core(s) per socket: 28 Socket(s):             1
+Socket(s): 2 NUMA node(s):          1
+NUMA node(s): 2 CPU family:            6
+Vendor ID: GenuineIntel Model:                 5
+CPU family: 6 Model name:           Intel Core i9 7900x processor
+Model: 85 Stepping:              4
+Model name: Intel Xeon Platinum 8180 processor @ 
+2.50 GHz 
+CPU MHz:               1200.11 MHz
+Stepping: 4 Virtualization:        Intel® Virtualization Technology (Intel® VT) 
+for IA-32, Intel® 64 and Intel® Architecture 
+(Intel® VT-x)
+CPU MHz: 1535.742 L1d cache:             32 KB
+BogoMIPS: 5005.31 L1i cache:             32 KB
+Virtualization: Intel VT-x L2 cache:              1024 KB
+L1d cache: 32 K L3 cache:              14080 KB
+L1i cache: 32 K 
+L2 cache: 1024 K 
+L3 cache: 39424 K 
+Appendix A
+ 1  Cisco whitepaper, “The Zettabyte Era: Trends and Analysis,” June, 2017.  
+https://www.cisco.com/c/en/us/solutions/collateral/service-provider/visual-networking-index-vni/vni-hyperconnectivity-wp.html
+ 2  G. J. Sullivan, J. R. Ohm, W. J. Han and T. Wiegand, “Overview of the High Efficiency Video Coding (HEVC) Standard,” IEEE Transactions on Circuits and Systems for Video Technology, vol. 22, no. 
+12, pp. 1649-1668, December, 2012.
+ 3  T. Wiegand, G. J. Sullivan, G. Bjontegaard and A. Luthra, “Overview of the H.264/AVC video coding standard,” IEEE Transactions on Circuits and Systems for Video Technology, vol. 13, no. 7,  
+July 2003.
+ 4  CNET, “What is HDR for TVs, and Why Should You Care?” March, 2017. https://www.cnet.com/news/what-is-hdr-for-tvs-and-why-should-you-care/
+ 5  Amazon, “Amazon Announces 4K Streaming for Instant Video”, December, 2014. https://www.theverge.com/2014/12/9/7359695/amazon-announces-4k-streaming-for-instant-video
+ 6  Tom Vaughan, Deepthi Nandakumar, Pradeep Ramachandran, and Jayram Ramachandran, “Efficiency vs. Performance Trade-Offs in the Design of an HEVC Encoder,” in Proceedings of the 
+National Association of Broadcasters (NAB) Conference, April, 2016.
+ 7  MulticoreWare Inc., x265 HEVC Encoder / H.265 Video Codec. http://x265.org/
+ 8  Tom Vaughan, Deepthi Nandakumar, Pradeep Ramachandran, and Jayram Ramachandran, “Efficiency vs. Performance Trade-Offs in the Design of an HEVC Encoder,” in Proceedings of the 
+National Association of Broadcasters (NAB) Conference, April, 2016.
+ 9  Intel Corporation, “Intel Xeon Processor Scalable Family Specification Update,” February, 2018.  
+https://www.intel.com/content/dam/www/public/us/en/documents/specification-updates/xeon-scalable-spec-update.pdf
+  Intel technologies’ features and benefits depend on system configuration and may require enabled hardware, software or service activation. Performance varies depending on system 
+configuration. No computer system can be absolutely secure. Check with your system manufacturer or retailer or learn more at intel.com.
+  Intel does not control or audit third-party benchmark data or the web sites referenced in this document. You should visit the referenced web site and confirm whether referenced data are accurate.
+  Software and workloads used in performance tests may have been optimized for performance only on Intel microprocessors.
+  Performance tests, such as SYSmark and MobileMark, are measured using specific computer systems, components, software, operations and functions. Any change to any of those factors may 
+cause the results to vary. You should consult other information and performance tests to assist you in fully evaluating your contemplated purchases, including the performance of that product 
+when combined with other products. For more complete information visit www.intel.com/benchmarks .
+  Benchmark results were obtained prior to implementation of recent software patches and firmware updates intended to address exploits referred to as “Spectre” and “Meltdown”. 
+Implementation of these updates may make these results inapplicable to your device or system.
+  Cost reduction scenarios described are intended as examples of how a given Intel-based product, in the specified circumstances and configurations, may affect future costs and provide cost 
+savings. Circumstances will vary. Intel does not guarantee any costs or cost reduction.
+  Intel, the Intel logo, and Xeon are trademarks of Intel Corporation or its subsidiaries in the U.S. and/or other countries.
+  *Other names and brands may be claimed as the property of others. 
+  © Intel Corporation        Printed in USA        0418/KC/MESH/PDF         Please Recycle        337400-001US
+4

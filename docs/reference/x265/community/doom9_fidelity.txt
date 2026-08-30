@@ -1,0 +1,23 @@
+﻿ 
+Doom9's Forum - View Single Post - In terms of fidelity all newer codecs are worse than x264! 
+Thread : In terms of fidelity all newer codecs are worse than x264! 
+View Single Post
+7th November 2024, 16:05
+# 1 
+|   Link 
+Scallywag 
+Registered User
+Join Date: Oct 2024
+Posts: 4
+In terms of fidelity all newer codecs are worse than x264! 
+Hello.
+I have encoded a lot of material for testing purposes over the last few months and I am of the opinion that newer codecs were mainly developed or optimized for low to medium bit rates and work little or no more efficiently with transparent quality. Therefore VP9/AV1 and probably also H266 are not particularly suitable for me. I expect that an encoder is able to compress with almost no or little loss at "higher" bit rates. Currently x264 can do this best, followed by x265, other enocders are blurry and remove fine details.
+I'm mostly talking about 1080p, and I know that newer encoders are more efficient at 4K. I also testet SVT-AV1-PSY but the problem fundamentally remains. 
+My rating therefore looks like this:
+How do you see that?
+Attached Images 
+Screenshot 2024-11-07 160326.png (53.2 KB, 10 views) 
+Last edited by Scallywag; 7th November 2024 at 16:09 .
+Scallywag 
+View Public Profile 
+Find More Posts by Scallywag 

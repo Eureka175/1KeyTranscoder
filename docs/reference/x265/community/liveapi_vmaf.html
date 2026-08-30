@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+
+<html lang="en-US">
+
+<head>
+
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#29272a" />
+  <meta name="msapplication-navbutton-color" content="#29272a" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="#29272a" />
+<!--   <meta name="description" content="Live Video Streaming API Blog"> -->
+<title>What Is VMAF? Netflix&#039;s Video Quality Metric Explained - LiveAPI Blog</title>
+  <link rel="profile" href="https://gmpg.org/xfn/11">
+  <link rel="pingback" href="https://liveapi.com/blog/xmlrpc.php" />
+  <link href="https://fonts.googleapis.com/css?family=Fira+Sans:300,400,500,700&display=swap" rel="stylesheet">
+<style>
+.category-menu ul li a {
+    white-space: nowrap;
+    font-size: 14px;
+    padding: 0px 10px;
+}
+
+.category-menu ul {
+    flex-wrap: wrap;
+}
+
+@media screen and (max-width: 530px) {
+
+.category-menu ul li:last-child a {
+    padding-right: 0px;
+}
+}
+</style>
+  <meta name='robots' content='max-image-preview:large' />
+	<style>img:is([sizes="auto" i], [sizes^="auto," i]) { contain-intrinsic-size: 3000px 1500px }</style>
+	
+<!-- Google Tag Manager for WordPress by gtm4wp.com -->
+<script data-cfasync="false" data-pagespeed-no-defer type="text/javascript">//<![CDATA[
+	var gtm4wp_datalayer_name = "dataLayer";
+	var dataLayer = dataLayer || [];
+//]]>
+</script>
+<!-- End Google Tag Manager for WordPress by gtm4wp.com -->
+	<!-- This site is optimized with the Yoast SEO plugin v15.6.2 - https://yoast.com/wordpress/plugins/seo/ -->
+	<meta name="description" content="Learn what VMAF is, how Netflix&#039;s video quality metric scores footage 0-100, what a good VMAF score is, and how to run VMAF with FFmpeg." />
+	<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+	<link rel="canonical" href="https://liveapi.com/blog/vmaf/" />
+	<meta property="og:locale" content="en_US" />
+	<meta property="og:type" content="article" />
+	<meta property="og:title" content="What Is VMAF? Netflix&#039;s Video Quality Metric Explained - LiveAPI Blog" />
+	<meta property="og:description" content="Learn what VMAF is, how Netflix&#039;s video quality metric scores footage 0-100, what a good VMAF score is, and how to run VMAF with FFmpeg." />
+	<meta property="og:url" content="https://liveapi.com/blog/vmaf/" />
+	<meta property="og:site_name" content="LiveAPI Blog" />
+	<meta property="article:published_time" content="2026-08-06T06:34:11+00:00" />
+	<meta property="article:modified_time" content="2026-08-06T06:34:36+00:00" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:label1" content="Written by">
+	<meta name="twitter:data1" content="govz">
+	<meta name="twitter:label2" content="Est. reading time">
+	<meta name="twitter:data2" content="20 minutes">
+	<script type="application/ld+json" class="yoast-schema-graph">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://liveapi.com/blog/#website","url":"https://liveapi.com/blog/","name":"LiveAPI Blog","description":"Live Video Streaming API Blog","potentialAction":[{"@type":"SearchAction","target":"https://liveapi.com/blog/?s={search_term_string}","query-input":"required name=search_term_string"}],"inLanguage":"en-US"},{"@type":"ImageObject","@id":"https://liveapi.com/blog/vmaf/#primaryimage","inLanguage":"en-US","url":"https://liveapi.com/blog/wp-content/uploads/2026/08/vmaf.jpg","width":1880,"height":1253,"caption":"Photo by Wallace Chuck on Pexels"},{"@type":"WebPage","@id":"https://liveapi.com/blog/vmaf/#webpage","url":"https://liveapi.com/blog/vmaf/","name":"What Is VMAF? Netflix's Video Quality Metric Explained - LiveAPI Blog","isPartOf":{"@id":"https://liveapi.com/blog/#website"},"primaryImageOfPage":{"@id":"https://liveapi.com/blog/vmaf/#primaryimage"},"datePublished":"2026-08-06T06:34:11+00:00","dateModified":"2026-08-06T06:34:36+00:00","author":{"@id":"https://liveapi.com/blog/#/schema/person/98f2ee8b3a0bd93351c0d9e8ce490e4a"},"description":"Learn what VMAF is, how Netflix's video quality metric scores footage 0-100, what a good VMAF score is, and how to run VMAF with FFmpeg.","inLanguage":"en-US","potentialAction":[{"@type":"ReadAction","target":["https://liveapi.com/blog/vmaf/"]}]},{"@type":"Person","@id":"https://liveapi.com/blog/#/schema/person/98f2ee8b3a0bd93351c0d9e8ce490e4a","name":"govz","image":{"@type":"ImageObject","@id":"https://liveapi.com/blog/#personlogo","inLanguage":"en-US","url":"https://secure.gravatar.com/avatar/ab5cbe0543c0a44dc944c720159323bd001fc39a8ba5b1f137cd22e7578e84c9?s=96&d=mm&r=g","caption":"govz"},"sameAs":["https://liveapi.com/blog"]}]}</script>
+	<!-- / Yoast SEO plugin. -->
+
+
+<link rel="alternate" type="application/rss+xml" title="LiveAPI Blog &raquo; Feed" href="https://liveapi.com/blog/feed/" />
+<link rel="alternate" type="application/rss+xml" title="LiveAPI Blog &raquo; Comments Feed" href="https://liveapi.com/blog/comments/feed/" />
+<link rel="alternate" type="application/rss+xml" title="LiveAPI Blog &raquo; What Is VMAF? How Netflix&#8217;s Video Quality Metric Works and How to Use It Comments Feed" href="https://liveapi.com/blog/vmaf/feed/" />
+<script type="text/javascript">
+/* <![CDATA[ */
+window._wpemojiSettings = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/16.0.1\/72x72\/","ext":".png","svgUrl":"https:\/\/s.w.org\/images\/core\/emoji\/16.0.1\/svg\/","svgExt":".svg","source":{"concatemoji":"https:\/\/liveapi.com\/blog\/wp-includes\/js\/wp-emoji-release.min.js?ver=6.8.2"}};
+/*! This file is auto-generated */
+!function(s,n){var o,i,e;function c(e){try{var t={supportTests:e,timestamp:(new Date).valueOf()};sessionStorage.setItem(o,JSON.stringify(t))}catch(e){}}function p(e,t,n){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);var t=new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data),a=(e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(n,0,0),new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data));return t.every(function(e,t){return e===a[t]})}function u(e,t){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);for(var n=e.getImageData(16,16,1,1),a=0;a<n.data.length;a++)if(0!==n.data[a])return!1;return!0}function f(e,t,n,a){switch(t){case"flag":return n(e,"\ud83c\udff3\ufe0f\u200d\u26a7\ufe0f","\ud83c\udff3\ufe0f\u200b\u26a7\ufe0f")?!1:!n(e,"\ud83c\udde8\ud83c\uddf6","\ud83c\udde8\u200b\ud83c\uddf6")&&!n(e,"\ud83c\udff4\udb40\udc67\udb40\udc62\udb40\udc65\udb40\udc6e\udb40\udc67\udb40\udc7f","\ud83c\udff4\u200b\udb40\udc67\u200b\udb40\udc62\u200b\udb40\udc65\u200b\udb40\udc6e\u200b\udb40\udc67\u200b\udb40\udc7f");case"emoji":return!a(e,"\ud83e\udedf")}return!1}function g(e,t,n,a){var r="undefined"!=typeof WorkerGlobalScope&&self instanceof WorkerGlobalScope?new OffscreenCanvas(300,150):s.createElement("canvas"),o=r.getContext("2d",{willReadFrequently:!0}),i=(o.textBaseline="top",o.font="600 32px Arial",{});return e.forEach(function(e){i[e]=t(o,e,n,a)}),i}function t(e){var t=s.createElement("script");t.src=e,t.defer=!0,s.head.appendChild(t)}"undefined"!=typeof Promise&&(o="wpEmojiSettingsSupports",i=["flag","emoji"],n.supports={everything:!0,everythingExceptFlag:!0},e=new Promise(function(e){s.addEventListener("DOMContentLoaded",e,{once:!0})}),new Promise(function(t){var n=function(){try{var e=JSON.parse(sessionStorage.getItem(o));if("object"==typeof e&&"number"==typeof e.timestamp&&(new Date).valueOf()<e.timestamp+604800&&"object"==typeof e.supportTests)return e.supportTests}catch(e){}return null}();if(!n){if("undefined"!=typeof Worker&&"undefined"!=typeof OffscreenCanvas&&"undefined"!=typeof URL&&URL.createObjectURL&&"undefined"!=typeof Blob)try{var e="postMessage("+g.toString()+"("+[JSON.stringify(i),f.toString(),p.toString(),u.toString()].join(",")+"));",a=new Blob([e],{type:"text/javascript"}),r=new Worker(URL.createObjectURL(a),{name:"wpTestEmojiSupports"});return void(r.onmessage=function(e){c(n=e.data),r.terminate(),t(n)})}catch(e){}c(n=g(i,f,p,u))}t(n)}).then(function(e){for(var t in e)n.supports[t]=e[t],n.supports.everything=n.supports.everything&&n.supports[t],"flag"!==t&&(n.supports.everythingExceptFlag=n.supports.everythingExceptFlag&&n.supports[t]);n.supports.everythingExceptFlag=n.supports.everythingExceptFlag&&!n.supports.flag,n.DOMReady=!1,n.readyCallback=function(){n.DOMReady=!0}}).then(function(){return e}).then(function(){var e;n.supports.everything||(n.readyCallback(),(e=n.source||{}).concatemoji?t(e.concatemoji):e.wpemoji&&e.twemoji&&(t(e.twemoji),t(e.wpemoji)))}))}((window,document),window._wpemojiSettings);
+/* ]]> */
+</script>
+<style id='wp-emoji-styles-inline-css' type='text/css'>
+
+	img.wp-smiley, img.emoji {
+		display: inline !important;
+		border: none !important;
+		box-shadow: none !important;
+		height: 1em !important;
+		width: 1em !important;
+		margin: 0 0.07em !important;
+		vertical-align: -0.1em !important;
+		background: none !important;
+		padding: 0 !important;
+	}
+</style>
+<link rel='stylesheet' id='wp-block-library-css' href='https://liveapi.com/blog/wp-includes/css/dist/block-library/style.min.css?ver=6.8.2' type='text/css' media='all' />
+<style id='classic-theme-styles-inline-css' type='text/css'>
+/*! This file is auto-generated */
+.wp-block-button__link{color:#fff;background-color:#32373c;border-radius:9999px;box-shadow:none;text-decoration:none;padding:calc(.667em + 2px) calc(1.333em + 2px);font-size:1.125em}.wp-block-file__button{background:#32373c;color:#fff;text-decoration:none}
+</style>
+<style id='global-styles-inline-css' type='text/css'>
+:root{--wp--preset--aspect-ratio--square: 1;--wp--preset--aspect-ratio--4-3: 4/3;--wp--preset--aspect-ratio--3-4: 3/4;--wp--preset--aspect-ratio--3-2: 3/2;--wp--preset--aspect-ratio--2-3: 2/3;--wp--preset--aspect-ratio--16-9: 16/9;--wp--preset--aspect-ratio--9-16: 9/16;--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgba(6,147,227,1) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgba(252,185,0,1) 0%,rgba(255,105,0,1) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgba(255,105,0,1) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;--wp--preset--spacing--20: 0.44rem;--wp--preset--spacing--30: 0.67rem;--wp--preset--spacing--40: 1rem;--wp--preset--spacing--50: 1.5rem;--wp--preset--spacing--60: 2.25rem;--wp--preset--spacing--70: 3.38rem;--wp--preset--spacing--80: 5.06rem;--wp--preset--shadow--natural: 6px 6px 9px rgba(0, 0, 0, 0.2);--wp--preset--shadow--deep: 12px 12px 50px rgba(0, 0, 0, 0.4);--wp--preset--shadow--sharp: 6px 6px 0px rgba(0, 0, 0, 0.2);--wp--preset--shadow--outlined: 6px 6px 0px -3px rgba(255, 255, 255, 1), 6px 6px rgba(0, 0, 0, 1);--wp--preset--shadow--crisp: 6px 6px 0px rgba(0, 0, 0, 1);}:where(.is-layout-flex){gap: 0.5em;}:where(.is-layout-grid){gap: 0.5em;}body .is-layout-flex{display: flex;}.is-layout-flex{flex-wrap: wrap;align-items: center;}.is-layout-flex > :is(*, div){margin: 0;}body .is-layout-grid{display: grid;}.is-layout-grid > :is(*, div){margin: 0;}:where(.wp-block-columns.is-layout-flex){gap: 2em;}:where(.wp-block-columns.is-layout-grid){gap: 2em;}:where(.wp-block-post-template.is-layout-flex){gap: 1.25em;}:where(.wp-block-post-template.is-layout-grid){gap: 1.25em;}.has-black-color{color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-color{color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-color{color: var(--wp--preset--color--white) !important;}.has-pale-pink-color{color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-color{color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-color{color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-color{color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-color{color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-color{color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-color{color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-color{color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-color{color: var(--wp--preset--color--vivid-purple) !important;}.has-black-background-color{background-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-background-color{background-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-background-color{background-color: var(--wp--preset--color--white) !important;}.has-pale-pink-background-color{background-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-background-color{background-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-background-color{background-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-background-color{background-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-background-color{background-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-background-color{background-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-background-color{background-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-background-color{background-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-background-color{background-color: var(--wp--preset--color--vivid-purple) !important;}.has-black-border-color{border-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-border-color{border-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-border-color{border-color: var(--wp--preset--color--white) !important;}.has-pale-pink-border-color{border-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-border-color{border-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-border-color{border-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-border-color{border-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-border-color{border-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-border-color{border-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-border-color{border-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-border-color{border-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-border-color{border-color: var(--wp--preset--color--vivid-purple) !important;}.has-vivid-cyan-blue-to-vivid-purple-gradient-background{background: var(--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple) !important;}.has-light-green-cyan-to-vivid-green-cyan-gradient-background{background: var(--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan) !important;}.has-luminous-vivid-amber-to-luminous-vivid-orange-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange) !important;}.has-luminous-vivid-orange-to-vivid-red-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-orange-to-vivid-red) !important;}.has-very-light-gray-to-cyan-bluish-gray-gradient-background{background: var(--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray) !important;}.has-cool-to-warm-spectrum-gradient-background{background: var(--wp--preset--gradient--cool-to-warm-spectrum) !important;}.has-blush-light-purple-gradient-background{background: var(--wp--preset--gradient--blush-light-purple) !important;}.has-blush-bordeaux-gradient-background{background: var(--wp--preset--gradient--blush-bordeaux) !important;}.has-luminous-dusk-gradient-background{background: var(--wp--preset--gradient--luminous-dusk) !important;}.has-pale-ocean-gradient-background{background: var(--wp--preset--gradient--pale-ocean) !important;}.has-electric-grass-gradient-background{background: var(--wp--preset--gradient--electric-grass) !important;}.has-midnight-gradient-background{background: var(--wp--preset--gradient--midnight) !important;}.has-small-font-size{font-size: var(--wp--preset--font-size--small) !important;}.has-medium-font-size{font-size: var(--wp--preset--font-size--medium) !important;}.has-large-font-size{font-size: var(--wp--preset--font-size--large) !important;}.has-x-large-font-size{font-size: var(--wp--preset--font-size--x-large) !important;}
+:where(.wp-block-post-template.is-layout-flex){gap: 1.25em;}:where(.wp-block-post-template.is-layout-grid){gap: 1.25em;}
+:where(.wp-block-columns.is-layout-flex){gap: 2em;}:where(.wp-block-columns.is-layout-grid){gap: 2em;}
+:root :where(.wp-block-pullquote){font-size: 1.5em;line-height: 1.6;}
+</style>
+<link rel='stylesheet' id='contact-form-7-css' href='https://liveapi.com/blog/wp-content/plugins/contact-form-7/includes/css/styles.css?ver=5.3.2' type='text/css' media='all' />
+<link rel='stylesheet' id='wtr-css-css' href='https://liveapi.com/blog/wp-content/plugins/worth-the-read/css/wtr.css?ver=6.8.2' type='text/css' media='all' />
+<link rel='stylesheet' id='cb-bootstrap-css-css' href='https://liveapi.com/blog/wp-content/themes/Castr/assets/css/bootstrap.min.css?ver=1787992344' type='text/css' media='all' />
+<link rel='stylesheet' id='cb-slick-css-css' href='https://liveapi.com/blog/wp-content/themes/Castr/assets/css/slick.css?ver=1787992344' type='text/css' media='all' />
+<link rel='stylesheet' id='cb-slick-theme-css-css' href='https://liveapi.com/blog/wp-content/themes/Castr/assets/css/slick-theme.css?ver=1787992344' type='text/css' media='all' />
+<link rel='stylesheet' id='cb-style-css-css' href='https://liveapi.com/blog/wp-content/themes/Castr/assets/css/style.css?ver=2.3' type='text/css' media='all' />
+<link rel='stylesheet' id='cb-responsive-css-css' href='https://liveapi.com/blog/wp-content/themes/Castr/assets/css/responsive.css?ver=1787992344' type='text/css' media='all' />
+<link rel='stylesheet' id='cb-stylesheet-css' href='https://liveapi.com/blog/wp-content/themes/Castr/style.css?ver=6.8.2' type='text/css' media='all' />
+<script type="text/javascript" src="https://liveapi.com/blog/wp-includes/js/jquery/jquery.min.js?ver=3.7.1" id="jquery-core-js"></script>
+<script type="text/javascript" src="https://liveapi.com/blog/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1" id="jquery-migrate-js"></script>
+<script type="text/javascript" src="https://liveapi.com/blog/wp-content/plugins/sticky-menu-or-anything-on-scroll/assets/js/jq-sticky-anything.min.js?ver=2.1.1" id="stickyAnythingLib-js"></script>
+<script type="text/javascript" src="https://liveapi.com/blog/wp-content/plugins/duracelltomi-google-tag-manager/js/gtm4wp-form-move-tracker.js?ver=1.11.6" id="gtm4wp-form-move-tracker-js"></script>
+<link rel="https://api.w.org/" href="https://liveapi.com/blog/wp-json/" /><link rel="alternate" title="JSON" type="application/json" href="https://liveapi.com/blog/wp-json/wp/v2/posts/1243" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://liveapi.com/blog/xmlrpc.php?rsd" />
+<meta name="generator" content="WordPress 6.8.2" />
+<link rel='shortlink' href='https://liveapi.com/blog/?p=1243' />
+<link rel="alternate" title="oEmbed (JSON)" type="application/json+oembed" href="https://liveapi.com/blog/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fliveapi.com%2Fblog%2Fvmaf%2F" />
+<meta name="generator" content="Site Kit by Google 1.89.0" /><style type="text/css">
+.wtr-time-wrap{ 
+	/* wraps the entire label */
+	margin: 0 10px;
+
+}
+.wtr-time-number{ 
+	/* applies only to the number */
+	
+}</style>
+<!-- Google Tag Manager for WordPress by gtm4wp.com -->
+<script data-cfasync="false" data-pagespeed-no-defer type="text/javascript">//<![CDATA[//]]>
+</script>
+<!-- End Google Tag Manager for WordPress by gtm4wp.com --><link rel="icon" href="https://liveapi.com/blog/wp-content/uploads/2025/08/LiveAPI-Icon.png" sizes="32x32" />
+<link rel="icon" href="https://liveapi.com/blog/wp-content/uploads/2025/08/LiveAPI-Icon.png" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://liveapi.com/blog/wp-content/uploads/2025/08/LiveAPI-Icon.png" />
+<meta name="msapplication-TileImage" content="https://liveapi.com/blog/wp-content/uploads/2025/08/LiveAPI-Icon.png" />
+<style type="text/css" title="dynamic-css" class="options-output">.wtr-time-wrap{color:#CCCCCC;font-size:16px;opacity: 1;visibility: visible;-webkit-transition: opacity 0.24s ease-in-out;-moz-transition: opacity 0.24s ease-in-out;transition: opacity 0.24s ease-in-out;}.wf-loading .wtr-time-wrap{opacity: 0;}.ie.wf-loading .wtr-time-wrap{visibility: hidden;}</style><style id="kirki-inline-styles"></style>  <!-- <script type="text/javascript">
+                  window.heap=window.heap||[],heap.load=function(e,t){window.heap.appid=e,window.heap.config=t=t||{};var r=document.createElement("script");r.type="text/javascript",r.async=!0,r.src="https://cdn.heapanalytics.com/js/heap-"+e+".js";var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(r,a);for(var n=function(e){return function(){heap.push([e].concat(Array.prototype.slice.call(arguments,0)))}},p=["addEventProperties","addUserProperties","clearEventProperties","identify","resetIdentity","removeEventProperty","setEventProperties","track","unsetEventProperty"],o=0;o<p.length;o++)heap[p[o]]=n(p[o])};
+                  heap.load("436040532");
+                </script> -->
+</head>
+
+
+
+<body data-rsssl=1 class="wp-singular post-template-default single single-post postid-1243 single-format-standard wp-theme-Castr new-header elementor-default elementor-kit-8">
+<header class="header">
+            <div class="castr-container mx-auto">
+                <div class="row">
+                    <div class="col-12">
+                        <nav class="navbar navbar-expand-lg navbar-light">
+                            <a class="navbar-brand" href="https://liveapi.com/blog/">
+                            <div class="logo-icon-dot"></div>
+                                   <!-- <img class="inactive-logo" src="https://liveapi.com/blog/wp-content/uploads/2025/08/LiveAPI-Text-Only-Transparent-1-1.png" alt="Castr" />
+                                   <img class="active-logo" src="https://castr.com/blog/wp-content/uploads/2021/12/christmas-logo-dark-castr.png" alt="Castr" /> -->
+                                   <img class="inactive-logo" src="https://liveapi.com/blog/wp-content/uploads/2025/08/LiveAPI-Text-Only-Transparent-1-1.png" alt="Castr" />
+                                   <img class="active-logo" src="https://liveapi.com/blog/wp-content/uploads/2025/08/LiveAPI-Text-Only-Transparent-1-1.png" alt="Castr" />
+                            </a>
+                            <!-- <button class="navbar-toggler" type="button" data-toggle="collapse"
+                                data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+                                aria-expanded="false" aria-label="Toggle navigation">
+                                <span class="navbar-toggler-icon"></span>
+                                <span class="navbar-toggler-icon"></span>
+                                <span class="navbar-toggler-icon"></span>
+                            </button> -->
+                            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                                <span class="navbar-toggler-icon"></span>
+                            </button>
+                            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                                                                <div class="header-right my-2 my-lg-0">
+<!--
+                                    <ul>
+                                        <li class="nav-item dropdown">
+                                            <a class="nav-link" href="#" id="dropdownMenuButton4" data-toggle="dropdown"
+                                                aria-haspopup="true" aria-expanded="false">24/7 Support<img
+                                                    src="images/down-arrow.svg" alt="" /> </a>
+                                            <div class="spacer"></div>
+
+                                        </li>
+                                        <li><a href="#">Login</a></li>
+                                    </ul>
+-->
+                                           <a class="btn bn-primary signup-btn" href="https://castr.com/signup">Sign Up</a>
+                                </div>
+                            </div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </header>
+<div class="blog-single-wrapper">
+    <div class="single-container w-100 d-flex align-items-start justify-content-between">
+        <div class="single-left">
+            <div class="single-meta mb-40">
+                <span class="category_name text-uppercase d-block text-grey__lighter text-base font-medium mb-2">Video Quality</span>
+                <h1 class="text-xxl font-medium text-dark mb-2">What Is VMAF? How Netflix&#8217;s Video Quality Metric Works and How to Use It</h1>
+                <div class="m-0 meta-details">
+                    <span class="card--meta post--date text-grey text-s font-normal d-inline-block">August 6, 2026</span>
+                    <span class="card--meta post--reading text-grey text-s font-normal d-inline-block">20 min read</span>
+                </div>
+            </div>
+            <div class="single-image mb-5">
+                <img width="1880" height="1253" src="https://liveapi.com/blog/wp-content/uploads/2026/08/vmaf.jpg" class="w-100 mw-100 h-auto wp-post-image" alt="Video editing suite with monitors showing color grading and quality analysis, illustrating VMAF video quality measurement" decoding="async" fetchpriority="high" />            </div>
+            <div class="single-content text-dark">
+                <span class="rt-reading-time" style="display: block;"><span class="rt-label rt-prefix">Reading Time: </span> <span class="rt-time">13</span> <span class="rt-label rt-postfix">minutes</span></span><p>VMAF is how streaming engineers answer a deceptively hard question: does this encode actually look good? Netflix open-sourced the metric in June 2016, and it now predicts human viewer ratings on a 0-100 scale with a correlation of roughly 0.90-0.95.</p>
+<p>That&#8217;s far better than the pixel-difference math the industry relied on for decades.</p>
+<p>In June 2026, Netflix shipped VMAF v1, the first major model overhaul since v0.6.1. It changes which artifacts the metric can see, which defaults you get, and which model files you should be pointing at. If your pipeline still references <code>vmaf_v0.6.1</code>, some of what follows will be news.</p>
+<h2>What Is VMAF?</h2>
+<p>VMAF (Video Multimethod Assessment Fusion) is a full-reference video quality metric that predicts subjective viewer ratings by fusing several image-quality features through a trained machine learning model, producing a score from 0 to 100 for every frame.</p>
+<p>&#8220;Full-reference&#8221; is the part that trips people up. VMAF needs both files: the pristine source and the compressed output.</p>
+<p>It can&#8217;t look at a single video and tell you how good it is. It tells you how much quality the encode lost relative to what went in, which is exactly the question you&#8217;re asking when you tune a <a href="https://liveapi.com/blog/what-is-video-codec/" target="_blank">video codec</a> or build a bitrate ladder.</p>
+<p>The metric came out of a collaboration between Netflix, the University of Southern California, Nantes Université&#8217;s IPI/LS2N lab, and the LIVE lab at the University of Texas at Austin. Netflix released it under a BSD+Patent license, so anyone can run it, retrain it, or ship it inside a product. The work earned a Technology and Engineering Emmy in 2021.</p>
+<p>VMAF exists because the old metrics lied. Two encodes could post identical PSNR numbers while one looked visibly worse to a person watching it. Netflix needed a number it could trust across thousands of titles and dozens of encoding decisions, so it built one from features that track how human vision actually fails.</p>
+<p>Here&#8217;s what the scale means in practice:</p>
+<figure class="wp-block-table">
+<table>
+<thead>
+<tr>
+<th>VMAF score</th>
+<th>Perceived quality</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>90-100</td>
+<td>Excellent: near-transparent to the source</td>
+<td>Premium tier, mezzanine QC</td>
+</tr>
+<tr>
+<td>80-90</td>
+<td>Good: minor artifacts under scrutiny</td>
+<td>Top rungs of most ABR ladders</td>
+</tr>
+<tr>
+<td>70-80</td>
+<td>Fair to good: visible but acceptable</td>
+<td>Mid ladder rungs, mobile delivery</td>
+</tr>
+<tr>
+<td>50-70</td>
+<td>Fair: noticeable degradation</td>
+<td>Low-bandwidth fallback rungs</td>
+</tr>
+<tr>
+<td>20-50</td>
+<td>Poor: obvious artifacts</td>
+<td>Below most delivery thresholds</td>
+</tr>
+<tr>
+<td>0-20</td>
+<td>Bad: severe distortion</td>
+<td>Failure state</td>
+</tr>
+</tbody>
+</table>
+</figure>
+<h2>VMAF vs PSNR vs SSIM</h2>
+<p>Three full-reference metrics dominate video engineering, and they measure genuinely different things. Picking the wrong one is how teams end up shipping encodes that score well and look bad.</p>
+<p><strong>PSNR</strong> (peak signal-to-noise ratio) measures pixel-level error between two frames and reports it in decibels. It&#8217;s cheap to compute and it&#8217;s been the codec-comparison standard since the 1990s.</p>
+<p>It&#8217;s also close to blind to how people perceive video. A blurry frame and a blocky frame can post the same <a href="https://liveapi.com/blog/psnr/" target="_blank">PSNR</a> while looking nothing alike to a viewer.</p>
+<p><strong>SSIM</strong> (structural similarity index) improved on that by comparing luminance, contrast, and structure across local neighborhoods instead of individual pixels. MS-SSIM, the multi-scale variant, tracks perception better still. Both remain frame-by-frame measurements with no sense of motion.</p>
+<p><strong>VMAF</strong> fuses multiple features, including a temporal one, through a model trained on actual human ratings. That training step is the difference. PSNR and SSIM are formulas someone derived; VMAF is a prediction fitted to what viewers said.</p>
+<figure class="wp-block-table">
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>PSNR</th>
+<th>SSIM</th>
+<th>VMAF</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What it measures</td>
+<td>Pixel error</td>
+<td>Structural similarity</td>
+<td>Predicted viewer opinion</td>
+</tr>
+<tr>
+<td>Scale</td>
+<td>Decibels, logarithmic</td>
+<td>0-1, logarithmic feel</td>
+<td>0-100, roughly linear</td>
+</tr>
+<tr>
+<td>Temporal awareness</td>
+<td>None</td>
+<td>None</td>
+<td>Yes (motion feature)</td>
+</tr>
+<tr>
+<td>Trained on human ratings</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Compute cost</td>
+<td>Very low</td>
+<td>Low</td>
+<td>Moderate to high</td>
+</tr>
+<tr>
+<td>Correlation with MOS</td>
+<td>Weak</td>
+<td>Moderate</td>
+<td>Strong (~0.90-0.95)</td>
+</tr>
+<tr>
+<td>Handles scaling artifacts</td>
+<td>Poorly</td>
+<td>Partially</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+</figure>
+<p>The linear scale matters more than it sounds. Moving PSNR from 38 dB to 40 dB tells you almost nothing about how much better the video looks. Moving VMAF from 85 to 93 maps to something a viewer would actually notice, which makes it usable as a target in automated encoding decisions and in <a href="https://liveapi.com/blog/definition-of-qoe/" target="_blank">quality of experience</a> reporting.</p>
+<p>None of this makes PSNR useless. It&#8217;s fast, it&#8217;s deterministic, and it&#8217;s a decent smoke test for &#8220;did this encode break.&#8221; Most production pipelines compute all three and use VMAF for the decisions that matter.</p>
+<h2>How Does VMAF Work?</h2>
+<p>VMAF doesn&#8217;t compute one thing. It computes several elementary features per frame, then feeds them into a trained regressor that outputs a single number.</p>
+<ol>
+<li><strong>Align the two videos.</strong> Reference and distorted clips have to match in resolution, frame rate, and frame count. Mismatch here is the single most common source of nonsense scores.</li>
+<li><strong>Extract elementary features per frame.</strong> The v0 models use Visual Information Fidelity (VIF) at multiple spatial scales, the Detail Loss Metric (DLM), and Mean Co-Located Pixel Difference (MCPD) for motion. VMAF v1 drops VIF, keeps DLM and MCPD, and adds a banding detector and chroma features.</li>
+<li><strong>Feed the features into the fusion model.</strong> A support vector machine regressor, trained on subjective scores from human viewing sessions, maps the feature vector to a predicted opinion score.</li>
+<li><strong>Clamp to the score range.</strong> Each frame gets a value from 0 to 100, where 100 means indistinguishable from the reference.</li>
+<li><strong>Pool the per-frame scores.</strong> By default VMAF takes the arithmetic mean across every frame to produce the clip-level score you see reported.</li>
+</ol>
+<p>The motion feature is what separates VMAF from its predecessors. MCPD measures how much the luminance channel changes between consecutive frames, which lets the model account for temporal masking: viewers tolerate far more compression artifacts in fast-moving content than in a slow pan across a gradient sky.</p>
+<p>A frame-by-frame metric can&#8217;t make that distinction. That&#8217;s why per-frame metrics penalize action sequences that look fine and wave through static scenes that look terrible.</p>
+<p>The per-frame output is also the part most teams ignore, and the clip average hides everything. A file averaging VMAF 92 with a 30-frame dip to 60 produces a visible glitch the headline number never reveals.</p>
+<p>That kind of dip is a common cause of complaints about <a href="https://liveapi.com/blog/what-is-video-encoding/" target="_blank">video encoding</a> quality that &#8220;tests fine.&#8221;</p>
+<h2>VMAF Models Explained: v0.6.1 vs VMAF v1</h2>
+<p>VMAF isn&#8217;t one model. It&#8217;s a family, and the one you pick encodes an assumption about how your viewers watch. Point at the wrong file and your scores will be internally consistent and externally meaningless.</p>
+<h3>The v0.6.1 family (2016-2026)</h3>
+<p><code>vmaf_v0.6.1</code> is the default model almost every tutorial and blog post references. It assumes a 1080p display viewed from three times the screen height, which is roughly a TV across a living room. Netflix added a phone model in 2017 that applies a polynomial adjustment for small screens held close, and a 4K model in 2018 trained for <a href="https://liveapi.com/blog/4k-live-streaming-encoder/" target="_blank">4K</a> TVs at 1.5x display height.</p>
+<p>There&#8217;s also <code>vmaf_v0.6.1neg</code>, the no-enhancement-gain variant. Netflix published it after researchers showed that sharpening a video before encoding could inflate its VMAF score without improving how it looked. NEG caps the reward for enhancement, which makes it the honest choice for comparing encoders.</p>
+<h3>The VMAF v1 family (June 2026)</h3>
+<p>VMAF v1 is the first structural rewrite in a decade, and it changes four things:</p>
+<ul>
+<li><strong>NEG behavior is on by default.</strong> You no longer opt into the anti-gaming variant; it&#8217;s the baseline.</li>
+<li><strong>Banding detection is built in.</strong> VMAF v1 folds in CAMBI, the Contrast Aware Multiscale Banding Index, so the model finally sees the staircase edges that appear in smooth gradients. The v0 models were blind to banding entirely.</li>
+<li><strong>Chroma artifacts count.</strong> VMAF v0 extracted luma-only features, which meant color quantization and chroma subsampling damage went unscored. VMAF v1 applies a modified SpEED-QA to the chroma channels.</li>
+<li><strong>Viewing distance replaced the phone hack.</strong> Instead of a phone-specific polynomial, v1 uses a contrast-sensitivity model parameterized by viewing distance, and ships a model file per distance.</li>
+</ul>
+<p>Netflix also removed VIF, which was the most expensive feature to compute and stopped contributing accuracy once the other features improved. The net result is a model that sees more artifacts and runs faster than the one it replaces. The <a href="https://netflixtechblog.com/vmaf-v1-good-is-not-good-enough-60d7e4244ea8" target="_blank" rel="nofollow">VMAF v1 announcement</a> documents the accuracy gains in detail.</p>
+<h3>Which model file to use</h3>
+<figure class="wp-block-table">
+<table>
+<thead>
+<tr>
+<th>Model file</th>
+<th>Resolution</th>
+<th>Viewing distance</th>
+<th>Use for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vmaf_v1.0.16_3d0h.json</code></td>
+<td>1080p</td>
+<td>3H</td>
+<td>Living-room TV, general default</td>
+</tr>
+<tr>
+<td><code>vmaf_v1.0.16_5d0h.json</code></td>
+<td>1080p</td>
+<td>5H</td>
+<td>Phone and small-screen viewing</td>
+</tr>
+<tr>
+<td><code>vmaf_v1.0.16_1d5h_2160.json</code></td>
+<td>2160p</td>
+<td>1.5H</td>
+<td>4K close viewing</td>
+</tr>
+<tr>
+<td><code>vmaf_v1.0.16_3d0h_2160.json</code></td>
+<td>2160p</td>
+<td>3H</td>
+<td>4K consumer TV (range 0-110)</td>
+</tr>
+<tr>
+<td><code>vmaf_v0.6.1</code></td>
+<td>1080p</td>
+<td>3H</td>
+<td>Legacy comparisons, historical baselines</td>
+</tr>
+</tbody>
+</table>
+</figure>
+<p>Each v1 model also ships an <code>_hfr</code> variant under <code>model/vmaf_v1.0.16_hfr/</code> for high-frame-rate content around 50-60 fps. One more thing worth knowing: Netflix recommends running VMAF v1 at 10-bit precision for SDR content, because 8-bit processing masks the banding the new model is specifically trained to catch.</p>
+<p>If you have historical VMAF data, don&#8217;t mix generations. A v1 score and a v0.6.1 score on the same file are different numbers answering slightly different questions. Rebaseline before you migrate.</p>
+<h2>What Is a Good VMAF Score?</h2>
+<p>Target 93 or higher for premium delivery, 85-93 for the top rung of a normal ladder, and treat anything below 60 as a complaint waiting to happen. The exact number depends on your delivery tier, but the industry has converged on defensible bands.</p>
+<p><strong>VMAF 93-95 is the transparency threshold.</strong> At 95, most viewers can&#8217;t distinguish the encode from the source in a side-by-side test. This is the target for mezzanine files and premium tiers where storage and bandwidth aren&#8217;t the binding constraint.</p>
+<p><strong>VMAF 85-93 is the sweet spot for top ladder rungs.</strong> You&#8217;re spending far fewer bits than transparency requires, and the difference is invisible during normal viewing. Large UGC platforms typically land in the 84-92 range for their highest rungs.</p>
+<p><strong>VMAF 70-85 covers the middle of an <a href="https://liveapi.com/blog/adaptive-bitrate-streaming/" target="_blank">adaptive bitrate streaming</a> ladder.</strong> Viewers on constrained connections get something that looks fine on a phone and merely acceptable on a TV.</p>
+<p><strong>Below VMAF 60, you&#8217;re in complaint territory</strong> for paid services. Research on acceptance rates puts the 50% acceptability line around VMAF 55 for free services and around 70 for paid ones.</p>
+<h3>The 6-point rule</h3>
+<p>A widely used rule of thumb holds that roughly 6 VMAF points equal one Just Noticeable Difference. If encode A scores 88 and encode B scores 90, stop arguing about it and pick whichever is cheaper. If A scores 88 and B scores 96, that&#8217;s a gap your viewers will see.</p>
+<h3>Pooling changes the answer</h3>
+<p>The default arithmetic mean rewards content that&#8217;s easy to encode and hides localized failures. Human opinion doesn&#8217;t work that way. Viewers weight the worst moments far more heavily than the average, which is why a single bad scene sinks a session that was otherwise clean.</p>
+<p>libvmaf supports alternative pooling methods for exactly this reason: <code>mean</code>, <code>harmonic_mean</code>, <code>median</code>, <code>min</code>, <code>perc5</code>, <code>perc10</code>, and <code>perc20</code>. The harmonic mean and the 5th-percentile score both punish dips the arithmetic mean smooths over.</p>
+<p>A practical setup reports three numbers per file:</p>
+<ul>
+<li><strong>Arithmetic mean</strong> for the headline score</li>
+<li><strong>5th percentile</strong> for the worst stretches</li>
+<li><strong>Frame count below your floor</strong> for localized failures</li>
+</ul>
+<p>Tune your <a href="https://liveapi.com/blog/video-bitrate/" target="_blank">video bitrate</a> against all three, not just the first.</p>
+<h2>Advantages of VMAF</h2>
+<h3>It predicts human opinion, not pixel math</h3>
+<p>VMAF is trained on subjective scores from real viewing sessions, so it&#8217;s fitted to perception rather than derived from an equation someone hoped would match perception. That&#8217;s why it correlates with mean opinion scores at 0.90-0.95 while PSNR sits far below.</p>
+<h3>It works across codecs</h3>
+<p>Because it scores output rather than bitstream internals, VMAF compares encodes from different codecs on the same scale. Benchmark testing has shown it outperforming other metrics across H.265, VP9, <a href="https://liveapi.com/blog/av1-codec/" target="_blank">AV1</a>, and VVC. That&#8217;s what makes it usable for the &#8220;is <a href="https://liveapi.com/blog/hevc-vs-h264/" target="_blank">AV1 worth the encode cost versus H.264</a>&#8221; question that every streaming team eventually faces.</p>
+<h3>The scale is readable</h3>
+<p>A 0-100 linear range means anyone on the team can interpret it. Product managers understand &#8220;we&#8217;re shipping at 91.&#8221; Nobody outside video engineering has an intuition for 41.3 dB.</p>
+<h3>It catches scaling artifacts</h3>
+<p>VMAF accounts for both quantization damage like blockiness and scaling damage like the softness introduced when a 720p encode gets upscaled to a 1080p display. Metrics that compare same-resolution frames miss half of that, which matters enormously for lower ladder rungs where resolution changes are the whole point.</p>
+<h3>It&#8217;s open source and auditable</h3>
+<p>The <a href="https://github.com/Netflix/vmaf" target="_blank" rel="nofollow">open-source VMAF repository</a> ships the C library, the Python bindings, the model files, and the training code. You can retrain on your own subjective data if your content differs from what Netflix trained on. Animation, screen content, and sports all have quirks the default models weren&#8217;t fitted for.</p>
+<h3>Automation makes it cheap to act on</h3>
+<p>Once VMAF is in your pipeline, it stops being a report and becomes a control signal. You can target a score instead of a bitrate, which is the foundation of per-title encoding: encode each title at multiple bitrates and resolutions, find the settings that hit your quality target for the fewest bits, and ship that ladder. Compared against <a href="https://liveapi.com/blog/vp9-codec/" target="_blank">VP9</a> or H.264 baselines, the savings are usually double digits.</p>
+<h2>Limitations of VMAF</h2>
+<p>VMAF is the best general-purpose metric available, and it will still mislead you in specific, predictable ways.</p>
+<h3>It can be gamed</h3>
+<p>Preprocessing a video before encoding can inflate its VMAF score without improving how it looks. Research on <a href="https://arxiv.org/abs/2107.04510" target="_blank" rel="nofollow">preprocessing vulnerability</a> found sharpening and histogram equalization pushing scores up by as much as 218.8% in extreme cases, with subjective quality flat or worse.</p>
+<p>The NEG variant reduces this but doesn&#8217;t eliminate it. The same study found NEG still inflatable by up to 23.6%.</p>
+<p>So if a vendor quotes you a VMAF number, ask what preprocessing ran first.</p>
+<h3>Resolution assumptions distort low-res scores</h3>
+<p>The default model assumes a 1080p display. Feed it a 480p file directly and VMAF treats it as a crop from 1080p, effectively modeling a viewer sitting 6.75 picture heights away, which hides artifacts and returns an implausibly high score. The fix is mandatory: upscale the encode to the model&#8217;s resolution before measuring, and use bicubic if you don&#8217;t know what the actual display device uses.</p>
+<h3>Averaging hides the failures that matter</h3>
+<p>The arithmetic mean over a two-hour film tells you almost nothing about the thirty seconds that made someone close the tab. Percentile pooling and per-frame logs are the mitigation, and most teams skip both.</p>
+<h3>It scores files, not sessions</h3>
+<p>VMAF measures encode quality. It says nothing about rebuffering, startup delay, or ABR switching behavior, which drive abandonment at least as much as picture quality. A ladder with a perfect average VMAF that causes <a href="https://liveapi.com/blog/buffering-when-streaming/" target="_blank">buffering</a> on real connections is a worse product than a slightly softer one that plays through.</p>
+<h3>It&#8217;s expensive at scale</h3>
+<p>Running VMAF across every asset in a large library costs real compute. VMAF v1 is cheaper than v0 after the VIF removal, and GPU acceleration through <code>libvmaf_cuda</code> helps considerably, but a full-reference metric still means decoding two videos in lockstep for every measurement.</p>
+<p>That&#8217;s what VMAF measures and where it breaks down. Now for the practical side: how to install it, how to run it, and how to fit it into a working pipeline.</p>
+<h2>How to Run VMAF with FFmpeg</h2>
+<p>The <code>libvmaf</code> filter is the standard path. Everything below assumes an FFmpeg build with VMAF support compiled in.</p>
+<h3>Check whether your build already has it</h3>
+<pre><code class="language-bash">ffmpeg -filters | grep vmaf</code></pre>
+<p>If nothing comes back, check the configuration flags:</p>
+<pre><code class="language-bash">ffmpeg -version | tr &#x27; &#x27; &#x27;\n&#x27; | grep vmaf</code></pre>
+<p>You want <code>--enable-libvmaf</code> in the output.</p>
+<h3>Install libvmaf and rebuild FFmpeg</h3>
+<p>libvmaf builds with Meson and Ninja. Version 3.0.0 is the current stable release.</p>
+<pre><code class="language-bash">git clone https://github.com/Netflix/vmaf.git
+cd vmaf/libvmaf
+meson setup build --buildtype release
+ninja -C build
+sudo ninja -C build install</code></pre>
+<p>Then rebuild FFmpeg against it:</p>
+<pre><code class="language-bash">./configure --enable-libvmaf --enable-gpl
+make -j&quot;$(nproc)&quot;
+sudo make install</code></pre>
+<p>On macOS, <code>brew install ffmpeg</code> ships with libvmaf enabled in most recent formulas, so check before you build anything.</p>
+<h3>Run a basic comparison</h3>
+<p>Order matters. The first input is the distorted file, the second is the reference.</p>
+<pre><code class="language-bash">ffmpeg -i encoded.mp4 -i source.mp4 \
+  -lavfi libvmaf=log_fmt=json:log_path=vmaf.json \
+  -f null -</code></pre>
+<p>You&#8217;ll see a line like <code>VMAF score: 92.417213</code> when it finishes, and the JSON log will contain every per-frame value.</p>
+<h3>Handle a resolution mismatch</h3>
+<p>This is the step teams skip, and it&#8217;s the one that produces wrong numbers. If your encode is 720p and your source is 1080p, upscale the encode first:</p>
+<pre><code class="language-bash">ffmpeg -i encoded_720p.mp4 -i source_1080p.mp4 \
+  -lavfi &quot;[0:v]scale=1920:1080:flags=bicubic,setsar=1[dist];\
+[1:v]setsar=1[ref];\
+[dist][ref]libvmaf=model=&#x27;version=vmaf_v0.6.1&#x27;:n_threads=8:log_fmt=json:log_path=vmaf.json&quot; \
+  -f null -</code></pre>
+<p>Frame rates have to match too. Add <code>fps=fps=30</code> to whichever branch needs it.</p>
+<h3>Pick a model and a pooling method</h3>
+<pre><code class="language-bash">ffmpeg -i encoded.mp4 -i source.mp4 \
+  -lavfi &quot;libvmaf=model=&#x27;path=/usr/local/share/model/vmaf_v1.0.16_3d0h.json&#x27;:\
+pool=harmonic_mean:n_threads=8:log_fmt=json:log_path=vmaf.json&quot; \
+  -f null -</code></pre>
+<p>The filter&#8217;s useful options are <code>model</code>, <code>feature</code>, <code>log_path</code>, <code>log_fmt</code>, <code>pool</code>, <code>n_threads</code>, and <code>n_subsample</code>. Setting <code>n_subsample=5</code> scores every fifth frame, which cuts runtime by roughly 80% at the cost of missing short dips. Use it for sweeps, not for final QC.</p>
+<h3>Compute PSNR and SSIM in the same pass</h3>
+<pre><code class="language-bash">ffmpeg -i encoded.mp4 -i source.mp4 \
+  -lavfi &quot;libvmaf=feature=&#x27;name=psnr|name=float_ssim&#x27;:log_fmt=json:log_path=metrics.json&quot; \
+  -f null -</code></pre>
+<h3>Use GPU acceleration</h3>
+<p><code>libvmaf_cuda</code> runs the feature extraction on NVIDIA hardware and is dramatically faster on large libraries. It pairs naturally with a <a href="https://liveapi.com/blog/software-vs-hardware-encoding/" target="_blank">hardware encoding</a> workflow where the frames are already on the GPU.</p>
+<pre><code class="language-bash">ffmpeg -hwaccel cuda -hwaccel_output_format cuda -i encoded.mp4 \
+       -hwaccel cuda -hwaccel_output_format cuda -i source.mp4 \
+       -lavfi libvmaf_cuda=log_fmt=json:log_path=vmaf.json \
+       -f null -</code></pre>
+<h3>Skip FFmpeg entirely</h3>
+<p>The standalone <code>vmaf</code> CLI takes raw YUV or Y4M input and gives you more direct control:</p>
+<pre><code class="language-bash">vmaf --reference source.y4m --distorted encoded.y4m \
+     --model version=vmaf_v0.6.1 \
+     --feature psnr --feature float_ssim \
+     --output vmaf.json --json</code></pre>
+<p>For scripted analysis, the <code>ffmpeg-quality-metrics</code> Python package wraps all of this and returns parsed results, which saves you from writing yet another JSON reader. If you&#8217;d rather not touch a terminal, FFMetrics and similar VMAF GUI tools wrap the same libraries with a drag-and-drop interface.</p>
+<h2>Where VMAF Fits in a Streaming Pipeline</h2>
+<p>Measuring VMAF is straightforward. Building the pipeline that acts on it is where the work actually lives.</p>
+<h3>Encoder tuning and codec selection</h3>
+<p>The first place VMAF earns its keep is settings comparison. Encode the same source at a range of CRF or bitrate values, plot VMAF against bitrate, and you get a rate-quality curve that tells you exactly where diminishing returns start. Do it per codec and you have a defensible answer on whether a <a href="https://liveapi.com/blog/what-is-video-transcoding/" target="_blank">transcoding</a> migration pays for itself.</p>
+<h3>Per-title and per-shot ladder construction</h3>
+<p>This is what Netflix built VMAF for. Instead of one static ABR ladder for every asset, you encode each title at multiple bitrate and resolution combinations, score each with VMAF, and keep the points that sit on the convex hull of the rate-quality curve.</p>
+<p>An animated short and a handheld sports clip need very different ladders. A static ladder overspends on one while starving the other, and teams that switch typically cut delivery bitrates by 20-40% at matched quality.</p>
+<h3>Automated QC gates</h3>
+<p>Once VMAF is in CI, it becomes a gate. Any encode landing below your floor fails the build instead of reaching viewers. Pair the aggregate score with a per-frame minimum so a clean average can&#8217;t smuggle a broken scene through.</p>
+<h3>The build-versus-buy reality</h3>
+<p>Running this yourself means a <a href="https://liveapi.com/blog/cloud-based-video-encoding/" target="_blank">cloud-based video encoding</a> farm, a quality-measurement layer, ladder logic, packaging, and CDN delivery. That&#8217;s a team and a roadmap, not a sprint. Most product teams don&#8217;t want to own it.</p>
+<p>This is where a <a href="https://liveapi.com/blog/video-transcoding-api/" target="_blank">video transcoding API</a> changes the math. LiveAPI handles encoding, adaptive bitrate rendition generation, and <a href="https://liveapi.com/blog/what-is-hls-streaming/" target="_blank">HLS</a> output, with instant encoding that makes uploads playable within seconds regardless of file length, support up to 4K, and delivery across Akamai, Cloudflare, and Fastly.</p>
+<p>You still measure VMAF on your own mezzanine files when you need to make a codec or quality decision. You just don&#8217;t operate the encoding farm that produces the renditions, or the <a href="https://liveapi.com/blog/multi-cdn/" target="_blank">multi-CDN</a> layer that delivers them.</p>
+<h2>Is VMAF Worth Measuring Yourself?</h2>
+<p>Not every team needs this. Running VMAF properly means storing mezzanine sources, budgeting compute, and having someone who can interpret the output.</p>
+<p><strong>Measure VMAF yourself if:</strong></p>
+<ul>
+<li>You encode enough volume that a 20% bitrate reduction pays real money</li>
+<li>You&#8217;re evaluating a codec or encoder migration and need evidence</li>
+<li>Your content is unusual (animation, screen recordings, high-motion sports) and generic presets underperform</li>
+<li>You have contractual quality obligations to a customer or licensor</li>
+<li>You&#8217;re building per-title or per-shot ladders</li>
+</ul>
+<p><strong>Skip it if:</strong></p>
+<ul>
+<li>You stream live and never re-encode from a mezzanine</li>
+<li>Your volume is low enough that engineering time costs more than the bandwidth you&#8217;d save</li>
+<li>You&#8217;re using a managed encoding service whose defaults already land above 90</li>
+<li>You don&#8217;t retain source files to compare against</li>
+</ul>
+<p>If you&#8217;re in the second group, the useful move is picking infrastructure with sane defaults and spending your attention on playback reliability instead. Buffering and startup time drive more churn than a few VMAF points ever will.</p>
+<h2>VMAF FAQ</h2>
+<h3>What does VMAF stand for?</h3>
+<p>Video Multimethod Assessment Fusion. The name describes the design: multiple quality assessment methods fused by a trained model into one score.</p>
+<h3>Is a VMAF score of 80 good?</h3>
+<p>For most delivery it&#8217;s acceptable but not premium. VMAF 80 means visible artifacts under scrutiny and fine during normal viewing. Aim for 90+ on your top ladder rung and treat 80 as reasonable for mid-tier renditions.</p>
+<h3>Can VMAF work without the original video?</h3>
+<p>No. VMAF is a full-reference metric and needs both the source and the encode. If you only have the encode, you need a no-reference metric instead, and those are considerably less accurate.</p>
+<h3>Why does my 480p video score higher than expected?</h3>
+<p>The default model assumes a 1080p display. A 480p file gets treated as a small crop of a 1080p frame, which models an unrealistically distant viewer and hides artifacts. Upscale the encode to 1080p with bicubic before measuring.</p>
+<h3>What&#8217;s the difference between VMAF and VMAF NEG?</h3>
+<p>NEG stands for no-enhancement gain. It caps the score boost that preprocessing like sharpening can produce, so it&#8217;s the right choice for honest encoder comparisons. In VMAF v1, NEG behavior is the default rather than a separate model.</p>
+<h3>Should I switch to VMAF v1?</h3>
+<p>For new work, yes. VMAF v1 detects banding and chroma artifacts that v0 was blind to, and it runs faster after VIF was removed. Just don&#8217;t compare v1 scores to historical v0.6.1 numbers directly. Rebaseline first.</p>
+<h3>Does VMAF work for live streaming?</h3>
+<p>Not in the delivery path. Live encoding has no mezzanine reference to compare against in real time, and the compute cost is prohibitive at low latency. Teams use VMAF offline to tune the live encoder profiles they then run in production.</p>
+<h3>How long does VMAF take to run?</h3>
+<p>Roughly real time to several times real time on CPU, depending on resolution, thread count, and model. GPU acceleration through <code>libvmaf_cuda</code> cuts that substantially, and <code>n_subsample</code> trades accuracy for speed when you&#8217;re sweeping settings rather than doing final QC.</p>
+<h3>Can I use VMAF for images?</h3>
+<p>It&#8217;s built for video and its motion feature does nothing on a single frame. For still images, SSIM, MS-SSIM, or a dedicated image metric will serve you better.</p>
+<h3>Which VMAF model should I use for mobile?</h3>
+<p>Use <code>vmaf_v1.0.16_5d0h.json</code>, the 5H viewing-distance model, which replaces the old <code>phone_model=1</code> flag from the v0 generation. Small screens held close tolerate more compression than a TV across a room.</p>
+<h2>The Bottom Line on VMAF</h2>
+<p>VMAF gives you a number that tracks what viewers actually perceive, which makes it the right tool for encoder tuning, codec decisions, and per-title ladder construction. VMAF v1 extends that to banding and chroma artifacts the previous generation couldn&#8217;t see, and it does so at lower compute cost.</p>
+<p>The trap is treating the average score as the whole answer. Match your model to your viewing context, upscale before you measure, watch the per-frame minimums, and remember that a metric tuned against itself stops measuring anything real.</p>
+<p><strong>Ready to ship video without building the encoding stack behind it?</strong> LiveAPI handles transcoding, adaptive bitrate renditions, HLS delivery up to 4K, and global CDN distribution through a single API, so your team can go live in days instead of months. <a href="https://liveapi.com/" target="_blank">Get started with LiveAPI</a>.</p>
+            </div>
+        </div>
+        <div class="single-right">
+            <div class="sidebar-content">
+                <div class="toc_wrapper mb-5">
+                    <h3  class="text-grey__lighter text-base mb-4 font-normal text-uppercase">Table of content</h3>
+                    <div class="table-of-content">
+                    </div>
+                </div>
+                <!-- CTA section -->
+                <div class="sidebar-cta mb-5 px-3">
+                    <div class="sidebar-cta-inner">
+                        <h3 class="text-base text-black font-semi-bold text-center mb-3">PROFESSIONAL LIVE STREAMING TOOL FOR EVERYONE</h3>
+                        <a class="btn btn--secondary text-white text-base font-semi-bold d-block w-100" href="https://castr.com/signup">SIGN UP FOR A 7-DAY TRIAL</a>
+                    </div>
+                </div>
+                <!-- Social Box -->
+                    <div class="social-box mb-5 px-3">
+                        <h3  class="text-grey__lighter text-base mb-4 font-normal text-uppercase">SHARE THIS ARTICLE</h3>
+                        <div class="box-inner">
+                            <ul class="share-box">
+                                <li>
+                                    <a target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=https://liveapi.com/blog/vmaf/"><img src="https://liveapi.com/blog/wp-content/themes/Castr/assets/images/hardcoded/facebook.svg" alt="Facebook"></a>
+                                </li>
+                                <!-- <li>
+                                    <a target="_blank" href="https://www.linkedin.com/shareArticle?mini=true&url=https://liveapi.com/blog/vmaf/"><img src="https://liveapi.com/blog/wp-content/themes/Castr/assets/images/hardcoded/linkedin.svg" alt="Linkedin"></a>
+                                </li> -->
+                                <li>
+                                    <a target="_blank" href="https://twitter.com/intent/tweet?url=https://liveapi.com/blog/vmaf/&text="><img src="https://liveapi.com/blog/wp-content/themes/Castr/assets/images/hardcoded/twitter.svg" alt="Twitter"></a>
+                                </li>
+                                <li>
+                                    <a target="_blank" href="/cdn-cgi/l/email-protection#81bea7f2f4e3ebe4e2f5bca7e2e2bca7e3e2e2bca7e3eee5f8bce9f5f5f1f2bbaeaeede8f7e4e0f1e8afe2eeecaee3edeee6aef7ece0e7aea4b1c0"><img src="https://liveapi.com/blog/wp-content/themes/Castr/assets/images/hardcoded/email.svg" alt="Email"></a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                <!-- Social Box -->
+                <div class="recent-article-box mb-5 px-3">
+                    <h3 class="text-grey__lighter text-base mb-4 font-normal text-uppercase">Recent Articles</h3>
+                    <div class="box-inner">
+                                                                        <div class="card card__featured no-border">
+                                <img src="https://liveapi.com/blog/wp-content/uploads/2026/08/live-stream-monetization.jpg" class="card-img br-8" alt="Live Stream Monetization: Models, Revenue Splits, and How to Build It">
+                                <div class="card-body card-body__featued">
+                                    <h2 class="card--title text-dark text-base font-semi-bold mb-2"><a class="text-base font-medium text-dark d-inline-block" href="https://liveapi.com/blog/live-stream-monetization/">Live Stream Monetization: Models, Revenue Splits, and How to Build It</a></h2>
+                                    <div class="card--meta">
+                                    <span class="card--meta post--date text-grey__lighter text-s font-normal d-inline-block">August 28, 2026</span>
+                                    <span class="card--meta post--reading text-grey__lighter text-s font-normal d-inline-block">21 min read</span>
+                                </div>
+                            </div>
+                            </div>
+                            <div class="border-line mb-3"></div>
+                                                                                <div class="card card__featured no-border">
+                                <img src="https://liveapi.com/blog/wp-content/uploads/2026/08/video-monetization-platform.jpg" class="card-img br-8" alt="What Is a Video Monetization Platform? Types, Features, and How to Choose One">
+                                <div class="card-body card-body__featued">
+                                    <h2 class="card--title text-dark text-base font-semi-bold mb-2"><a class="text-base font-medium text-dark d-inline-block" href="https://liveapi.com/blog/video-monetization-platform/">What Is a Video Monetization Platform? Types, Features, and How to Choose One</a></h2>
+                                    <div class="card--meta">
+                                    <span class="card--meta post--date text-grey__lighter text-s font-normal d-inline-block">August 27, 2026</span>
+                                    <span class="card--meta post--reading text-grey__lighter text-s font-normal d-inline-block">16 min read</span>
+                                </div>
+                            </div>
+                            </div>
+                            <div class="border-line mb-3"></div>
+                                                                                <div class="card card__featured no-border">
+                                <img src="https://liveapi.com/blog/wp-content/uploads/2026/08/geo-blocking.jpg" class="card-img br-8" alt="What Is Geo Blocking? How It Works, Types, and How to Implement It">
+                                <div class="card-body card-body__featued">
+                                    <h2 class="card--title text-dark text-base font-semi-bold mb-2"><a class="text-base font-medium text-dark d-inline-block" href="https://liveapi.com/blog/geo-blocking/">What Is Geo Blocking? How It Works, Types, and How to Implement It</a></h2>
+                                    <div class="card--meta">
+                                    <span class="card--meta post--date text-grey__lighter text-s font-normal d-inline-block">August 26, 2026</span>
+                                    <span class="card--meta post--reading text-grey__lighter text-s font-normal d-inline-block">20 min read</span>
+                                </div>
+                            </div>
+                            </div>
+                            <div class="border-line mb-3"></div>
+                                                                         
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <section class="faq_section"></section>
+    <div class="ccs-1 text-center">
+                <div class="common_section_1 join-castr">
+                    <div class="bl_head_area">
+                        <h2 class="rt-section-title">Join 200,000+ satisfied streamers</h2>
+                        <p>Still on the fence? Take a sneak peek and see what you can do with Castr. </p>
+                    </div><!-- /.col-12 -->
+                    <div class="bl_feature_area">
+                        <div class="rt-single-icon-box">
+                            <div class="icon-thumb">
+                                <img src="https://castr.com/blog/wp-content/uploads/2020/08/b_no_branding.svg" alt="No Castr Branding">
+                            </div><!-- /.icon-thumb -->
+                            <div class="iconbox-content">
+                                <h4>No Castr Branding</h4>
+                                <p>We do not include our branding on your videos.</p>
+                            </div><!-- /.iconbox-content -->
+                        </div><!-- /.rt-single-icon-box -->
+                        <div class="rt-single-icon-box">
+                            <div class="icon-thumb">
+                                <img src="https://castr.com/blog/wp-content/uploads/2020/08/b_unlock.svg" alt="No Commitment">
+                            </div><!-- /.icon-thumb -->
+                            <div class="iconbox-content">
+                                <h4>No Commitment</h4>
+                                <p>No contracts. Cancel or change your plans anytime.</p>
+                            </div><!-- /.iconbox-content -->
+                        </div><!-- /.rt-single-icon-box -->
+                        <div class="rt-single-icon-box">
+                            <div class="icon-thumb">
+                                <img src="https://castr.com/blog/wp-content/uploads/2020/10/chat-bubble.svg" alt="24/7 Support">
+                            </div><!-- /.icon-thumb -->
+                            <div class="iconbox-content">
+                                <h4>24/7 Support</h4>
+                                <p>Highly skilled in-house engineers ready to help.</p>
+                            </div><!-- /.iconbox-content -->
+                        </div><!-- /.rt-single-icon-box -->
+                    </div><!-- /.row -->
+                    <div class="bl_cta_area">
+                        <a href="https://castr.com/signup?utm_campaign=global_blog-cta-button_nov-2020_clicks&amp;utm_medium=blog-article&amp;utm_source=blog">Start 7-day free trial</a>
+                    </div><!-- /.col-12 -->
+                    <div class="bl_feature_list">
+                        <ul class="m-0 p-0 d-flex align-items-center justify-content-center">
+                            <li class="m-0 p-0 d-flex align-items-center justify-content-start"><img src="https://castr.com/blog/wp-content/uploads/2022/01/check-green.png" alt="Check"> <span>Free 7-day trial</span></li>
+                            <li class="m-0 p-0 d-flex align-items-center justify-content-start"><img src="https://castr.com/blog/wp-content/uploads/2022/01/check-green.png" alt="Check"><span>Cancel anytime</span></li>
+                            <li class="m-0 p-0 d-flex align-items-center justify-content-start"><img src="https://castr.com/blog/wp-content/uploads/2022/01/check-green.png" alt="Check"><span>No credit card required</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="related-article">
+                <div class="single-container">
+                    <h3 class="text-l text-dark font-semi-bold w-100 text-left mb-3">Related Articles</h3>
+                    <div class="border-line mb-3"></div>
+                    <div class="related-post-loop pt-4 d-flex align-items-start justify-content-between">
+                                               <div class="card card__related no-border">
+                            <a href="https://liveapi.com/blog/hdr-video/"><img src="https://liveapi.com/blog/wp-content/uploads/2026/08/hdr-video.jpg" class="card-img br-8" alt="What Is HDR Video? Formats, How It Works, and How to Stream It"></a>
+                            <div class="card-body card-body__featued">
+                            <span class="card--category mb-2 text-grey__lighter d-inline-block text-base font-medium">Security</span>
+                            <h2 class="card--title mb-2"><a class="text-decoration-none  text-dark text-l font-semi-bold" href="https://liveapi.com/blog/hdr-video/">What Is HDR Video? Formats, How It Works, and How to Stream It</a></h2>
+                            <div class="border-line mb-3"></div>
+                            <div class="card--meta">
+                                <span class="card--meta post--date text-grey text-s font-normal d-inline-block">August 13, 2026</span>
+                                <span class="card--meta post--reading text-grey text-s font-normal d-inline-block">20 min read</span>
+                            </div>
+                            </div>
+                        </div> 
+                                                   <div class="card card__related no-border">
+                            <a href="https://liveapi.com/blog/ssim/"><img src="https://liveapi.com/blog/wp-content/uploads/2026/08/ssim.jpg" class="card-img br-8" alt="What Is SSIM? Structural Similarity Index Explained for Video Quality"></a>
+                            <div class="card-body card-body__featued">
+                            <span class="card--category mb-2 text-grey__lighter d-inline-block text-base font-medium">Security</span>
+                            <h2 class="card--title mb-2"><a class="text-decoration-none  text-dark text-l font-semi-bold" href="https://liveapi.com/blog/ssim/">What Is SSIM? Structural Similarity Index Explained for Video Quality</a></h2>
+                            <div class="border-line mb-3"></div>
+                            <div class="card--meta">
+                                <span class="card--meta post--date text-grey text-s font-normal d-inline-block">August 7, 2026</span>
+                                <span class="card--meta post--reading text-grey text-s font-normal d-inline-block">21 min read</span>
+                            </div>
+                            </div>
+                        </div> 
+                                                   <div class="card card__related no-border">
+                            <a href="https://liveapi.com/blog/psnr/"><img src="https://liveapi.com/blog/wp-content/uploads/2026/08/psnr.jpg" class="card-img br-8" alt="What Is PSNR? Formula, Good Values, and How to Measure Video Quality"></a>
+                            <div class="card-body card-body__featued">
+                            <span class="card--category mb-2 text-grey__lighter d-inline-block text-base font-medium">Security</span>
+                            <h2 class="card--title mb-2"><a class="text-decoration-none  text-dark text-l font-semi-bold" href="https://liveapi.com/blog/psnr/">What Is PSNR? Formula, Good Values, and How to Measure Video Quality</a></h2>
+                            <div class="border-line mb-3"></div>
+                            <div class="card--meta">
+                                <span class="card--meta post--date text-grey text-s font-normal d-inline-block">August 5, 2026</span>
+                                <span class="card--meta post--reading text-grey text-s font-normal d-inline-block">19 min read</span>
+                            </div>
+                            </div>
+                        </div> 
+                                            </div>
+                </div>
+            </div>
+</div>
+        
+<footer class="footer-dark__secondary footer">
+    <div class="footer-dark-inner">
+        <div class="c-footer-top d-flex align-items-center justify-content-start mt-2">
+        <div class="footer-logo position-relative">
+            <a href="https://liveapi.com/blog/"><div class="logo-icon-dot"></div><img src="https://liveapi.com/blog/wp-content/uploads/2025/08/LiveAPI-Text-Only-Transparent-1-1.png" alt="Castr" /></a>
+            <!-- <a href="https://liveapi.com/blog/"><img height="37" width="150" class="" src="https://castr.com/wp-content/uploads/2021/12/castr_christmas.svg" alt="Castr"></a> -->
+        </div>
+        <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet">
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://assets.calendly.com/assets/external/widget.js" type="text/javascript" async></script>
+        <a class="btn btn--footer" href="https://desktop.castr.com/"> <img width="24" class="mr-3" src="https://castr.com/wp-content/uploads/2022/01/computer-icon.svg" alt="Desktop App"> Download Desktop App</a>
+        </div>
+        <div class="footer-content w-100">
+            <div class="c-menu-wrapper d-flex align-items-start justify-content-between">
+                
+                <div class="castr_footermain c-menu-single">
+                    <div class="c-title">
+                        <p>Castr Live Streaming, Inc</p>
+                    </div>
+                    <p class="c-menu-text castr-address">777 Hornby St, Suite 600, Vancouver, BC Canada V6Z1S4</p>
+                    <div class="c-menu-single social-menu-block">
+             
+                        <ul id="menu-social" class="d-flex flex-wrap align-items-center justify-content-start">
+<li>
+<a href="https://facebook.com/castrlive"> <img src="https://castr.com/wp-content/uploads/2022/01/c-facebook.svg" alt="Facebook"> </a>
+</li>
+<li>
+<a href="https://www.linkedin.com/company/castrlive"> <img src="https://castr.com/wp-content/uploads/2022/01/c-linkedin.svg" alt="LinkedIn"> </a>
+</li>
+<li>
+<a href="https://twitter.com/CastrHQ"> <img src="https://castr.com/wp-content/uploads/2022/01/c-twitter.svg" alt="Twitter"> </a>
+</li>
+<li>
+<a href="https://www.instagram.com/castrhq/"> <img src="https://castr.com/wp-content/uploads/2022/01/c-instagram.svg" alt="Instagram"> </a>
+</li>
+</ul>
+                    </div>
+                </div>
+
+               <div class="c-footer-nav d-flex align-items-start justify-content-between flex-wrap">
+                <div class="castr_footer3 c-menu-single">
+                        <div class="c-title">
+                            <p>Tools</p>
+                        </div>
+                            <div class="content d-flex flex-wrap align-items-start justify-content-start flex-column"></div>
+                    </div>
+
+                    <div class="c-menu-single">
+                        <div class="castr_footer1">
+                            <div class="c-title">
+                                <p>Products</p>
+                            </div>
+                                <div class="content d-flex flex-wrap align-items-start justify-content-start flex-column"></div>
+                        </div>
+                        <div class="castr_footer6">
+                            <div class="c-title">
+                                <p>Features</p>
+                            </div>
+                                <div class="content d-flex flex-wrap align-items-start justify-content-start flex-column"></div>
+                        </div>
+                    </div>
+
+                    <div class="c-menu-single">
+                        <div class="castr_footer2 c-menu-single">
+                            <div class="c-title">
+                                <p>Solutions</p>
+                            </div>
+                                <div class="content d-flex flex-wrap align-items-start justify-content-start flex-column"></div>
+                        </div>
+                        <div class="castr_footer4 c-menu-single">
+                            <div class="c-title">
+                                <p>Compare</p>
+                            </div>
+                                <div class="content d-flex flex-wrap align-items-start justify-content-start flex-column"></div>
+                        </div>
+                    </div>
+
+                    <div class="c-menu-single">
+                        <div class="castr_footer5">
+                            <div class="c-title">
+                                <p>Support</p>
+                            </div>
+                            <div class="content d-flex flex-wrap align-items-start justify-content-start flex-column"></div>
+                            <a href="#" class="open_intercom btn btn--footer">Open Live Chat</a>
+                        </div> 
+                        <div class="c-menu-single claendly-wrapper">
+                            <div class="c-title">
+                                <p>Need a custom plan? Talk to us.</p>
+                            </div>
+                            <p class="calendly-intro c-menu-text mb-2">Let our experts help you out. </p>
+                            <a href="" class="btn btn--footer btn--footer__talk" onclick="Calendly.initPopupWidget({url: 'https://calendly.com/castr-support/lets-connect?hide_event_type_details=1&amp;hide_gdpr_banner=1'});return false;">Book a meeting with us</a>
+                        </div>
+                    </div>
+                            
+               </div>
+            </div>
+
+            <div class="c-footer-bottom">
+                <p>@ 2026 Castr Live Streaming, Inc. All rights reserved</p>
+                <div class="terms-menu">
+                    <!-- <a href="https://castr.com/blog/">Blog</a>
+                    <span>/</span> -->
+                    <a href="https://castr.com/terms/">Terms</a>
+                    <span>/</span>
+                    <a href="https://castr.com/privacypolicy/">Privacy Policy</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<script type="speculationrules">
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"\/blog\/*"},{"not":{"href_matches":["\/blog\/wp-*.php","\/blog\/wp-admin\/*","\/blog\/wp-content\/uploads\/*","\/blog\/wp-content\/*","\/blog\/wp-content\/plugins\/*","\/blog\/wp-content\/themes\/Castr\/*","\/blog\/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
+</script>
+<script data-cfasync="false">
+  document.onreadystatechange = function () {
+    if (document.readyState == "complete") {
+      var logout_link = document.querySelectorAll('a[href*="wp-login.php?action=logout"]');
+      if (logout_link) {
+        for(var i=0; i < logout_link.length; i++) {
+          logout_link[i].addEventListener( "click", function() {
+            Intercom('shutdown');
+          });
+        }
+      }
+    }
+  };
+</script>
+<script data-cfasync="false">
+  window.intercomSettings = {"app_id":""};
+</script>
+<script data-cfasync="false">(function(){var w=window;var ic=w.Intercom;if(typeof ic==="function"){ic('reattach_activator');ic('update',w.intercomSettings);}else{var d=document;var i=function(){i.c(arguments);};i.q=[];i.c=function(args){i.q.push(args);};w.Intercom=i;var l=function(){var s=d.createElement('script');s.type='text/javascript';s.async=true;s.src='https://widget.intercom.io/widget/';var x=d.getElementsByTagName('script')[0];x.parentNode.insertBefore(s, x);};if(document.readyState==='complete'){l();}else if(w.attachEvent){w.attachEvent('onload',l);}else{w.addEventListener('load',l,false);}}})()</script>
+<!-- Google Tag Manager (noscript) --><script type="text/javascript" id="contact-form-7-js-extra">
+/* <![CDATA[ */
+var wpcf7 = {"apiSettings":{"root":"https:\/\/liveapi.com\/blog\/wp-json\/contact-form-7\/v1","namespace":"contact-form-7\/v1"}};
+/* ]]> */
+</script>
+<script type="text/javascript" src="https://liveapi.com/blog/wp-content/plugins/contact-form-7/includes/js/scripts.js?ver=5.3.2" id="contact-form-7-js"></script>
+<script type="text/javascript" id="wpil-frontend-script-js-extra">
+/* <![CDATA[ */
+var wpilFrontend = {"ajaxUrl":"\/blog\/wp-admin\/admin-ajax.php","postId":"1243","postType":"post","openInternalInNewTab":"0","openExternalInNewTab":"0","disableClicks":"0","openLinksWithJS":"0","trackAllElementClicks":"0","clicksI18n":{"imageNoText":"Image in link: No Text","imageText":"Image Title: ","noText":"No Anchor Text Found"}};
+/* ]]> */
+</script>
+<script type="text/javascript" src="https://liveapi.com/blog/wp-content/plugins/link-whisper-premium/js/frontend.js?ver=1638625264" id="wpil-frontend-script-js"></script>
+<script type="text/javascript" id="stickThis-js-extra">
+/* <![CDATA[ */
+var sticky_anything_engage = {"element":"","topspace":"0","minscreenwidth":"0","maxscreenwidth":"999999","zindex":"1","legacymode":"","dynamicmode":"","debugmode":"","pushup":"","adminbar":"1"};
+/* ]]> */
+</script>
+<script type="text/javascript" src="https://liveapi.com/blog/wp-content/plugins/sticky-menu-or-anything-on-scroll/assets/js/stickThis.js?ver=2.1.1" id="stickThis-js"></script>
+<script type="text/javascript" src="https://liveapi.com/blog/wp-content/plugins/worth-the-read/js/wtr.js?ver=6.8.2" id="wtr-js-js"></script>
+<script type="text/javascript" id="rocket-browser-checker-js-after">
+/* <![CDATA[ */
+"use strict";var _createClass=function(){function defineProperties(target,props){for(var i=0;i<props.length;i++){var descriptor=props[i];descriptor.enumerable=descriptor.enumerable||!1,descriptor.configurable=!0,"value"in descriptor&&(descriptor.writable=!0),Object.defineProperty(target,descriptor.key,descriptor)}}return function(Constructor,protoProps,staticProps){return protoProps&&defineProperties(Constructor.prototype,protoProps),staticProps&&defineProperties(Constructor,staticProps),Constructor}}();function _classCallCheck(instance,Constructor){if(!(instance instanceof Constructor))throw new TypeError("Cannot call a class as a function")}var RocketBrowserCompatibilityChecker=function(){function RocketBrowserCompatibilityChecker(options){_classCallCheck(this,RocketBrowserCompatibilityChecker),this.passiveSupported=!1,this._checkPassiveOption(this),this.options=!!this.passiveSupported&&options}return _createClass(RocketBrowserCompatibilityChecker,[{key:"_checkPassiveOption",value:function(self){try{var options={get passive(){return!(self.passiveSupported=!0)}};window.addEventListener("test",null,options),window.removeEventListener("test",null,options)}catch(err){self.passiveSupported=!1}}},{key:"initRequestIdleCallback",value:function(){!1 in window&&(window.requestIdleCallback=function(cb){var start=Date.now();return setTimeout(function(){cb({didTimeout:!1,timeRemaining:function(){return Math.max(0,50-(Date.now()-start))}})},1)}),!1 in window&&(window.cancelIdleCallback=function(id){return clearTimeout(id)})}},{key:"isDataSaverModeOn",value:function(){return"connection"in navigator&&!0===navigator.connection.saveData}},{key:"supportsLinkPrefetch",value:function(){var elem=document.createElement("link");return elem.relList&&elem.relList.supports&&elem.relList.supports("prefetch")&&window.IntersectionObserver&&"isIntersecting"in IntersectionObserverEntry.prototype}},{key:"isSlowConnection",value:function(){return"connection"in navigator&&"effectiveType"in navigator.connection&&("2g"===navigator.connection.effectiveType||"slow-2g"===navigator.connection.effectiveType)}}]),RocketBrowserCompatibilityChecker}();
+/* ]]> */
+</script>
+<script type="text/javascript" id="rocket-preload-links-js-extra">
+/* <![CDATA[ */
+var RocketPreloadLinksConfig = {"excludeUris":"\/blog(\/(?:.+\/)?feed(?:\/(?:.+\/?)?)?$|\/(?:.+\/)?embed\/|\/(index\\.php\/)?wp\\-json(\/.*|$))|\/refer\/|\/go\/|\/recommend\/|\/recommends\/","usesTrailingSlash":"1","imageExt":"jpg|jpeg|gif|png|tiff|bmp|webp|avif|pdf|doc|docx|xls|xlsx|php","fileExt":"jpg|jpeg|gif|png|tiff|bmp|webp|avif|pdf|doc|docx|xls|xlsx|php|html|htm","siteUrl":"https:\/\/liveapi.com\/blog","onHoverDelay":"100","rateThrottle":"3"};
+/* ]]> */
+</script>
+<script type="text/javascript" id="rocket-preload-links-js-after">
+/* <![CDATA[ */
+(function() {
+"use strict";var r="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},e=function(){function i(e,t){for(var n=0;n<t.length;n++){var i=t[n];i.enumerable=i.enumerable||!1,i.configurable=!0,"value"in i&&(i.writable=!0),Object.defineProperty(e,i.key,i)}}return function(e,t,n){return t&&i(e.prototype,t),n&&i(e,n),e}}();function i(e,t){if(!(e instanceof t))throw new TypeError("Cannot call a class as a function")}var t=function(){function n(e,t){i(this,n),this.browser=e,this.config=t,this.options=this.browser.options,this.prefetched=new Set,this.eventTime=null,this.threshold=1111,this.numOnHover=0}return e(n,[{key:"init",value:function(){!this.browser.supportsLinkPrefetch()||this.browser.isDataSaverModeOn()||this.browser.isSlowConnection()||(this.regex={excludeUris:RegExp(this.config.excludeUris,"i"),images:RegExp(".("+this.config.imageExt+")$","i"),fileExt:RegExp(".("+this.config.fileExt+")$","i")},this._initListeners(this))}},{key:"_initListeners",value:function(e){-1<this.config.onHoverDelay&&document.addEventListener("mouseover",e.listener.bind(e),e.listenerOptions),document.addEventListener("mousedown",e.listener.bind(e),e.listenerOptions),document.addEventListener("touchstart",e.listener.bind(e),e.listenerOptions)}},{key:"listener",value:function(e){var t=e.target.closest("a"),n=this._prepareUrl(t);if(null!==n)switch(e.type){case"mousedown":case"touchstart":this._addPrefetchLink(n);break;case"mouseover":this._earlyPrefetch(t,n,"mouseout")}}},{key:"_earlyPrefetch",value:function(t,e,n){var i=this,r=setTimeout(function(){if(r=null,0===i.numOnHover)setTimeout(function(){return i.numOnHover=0},1e3);else if(i.numOnHover>i.config.rateThrottle)return;i.numOnHover++,i._addPrefetchLink(e)},this.config.onHoverDelay);t.addEventListener(n,function e(){t.removeEventListener(n,e,{passive:!0}),null!==r&&(clearTimeout(r),r=null)},{passive:!0})}},{key:"_addPrefetchLink",value:function(i){return this.prefetched.add(i.href),new Promise(function(e,t){var n=document.createElement("link");n.rel="prefetch",n.href=i.href,n.onload=e,n.onerror=t,document.head.appendChild(n)}).catch(function(){})}},{key:"_prepareUrl",value:function(e){if(null===e||"object"!==(void 0===e?"undefined":r(e))||!1 in e||-1===["http:","https:"].indexOf(e.protocol))return null;var t=e.href.substring(0,this.config.siteUrl.length),n=this._getPathname(e.href,t),i={original:e.href,protocol:e.protocol,origin:t,pathname:n,href:t+n};return this._isLinkOk(i)?i:null}},{key:"_getPathname",value:function(e,t){var n=t?e.substring(this.config.siteUrl.length):e;return n.startsWith("/")||(n="/"+n),this._shouldAddTrailingSlash(n)?n+"/":n}},{key:"_shouldAddTrailingSlash",value:function(e){return this.config.usesTrailingSlash&&!e.endsWith("/")&&!this.regex.fileExt.test(e)}},{key:"_isLinkOk",value:function(e){return null!==e&&"object"===(void 0===e?"undefined":r(e))&&(!this.prefetched.has(e.href)&&e.origin===this.config.siteUrl&&-1===e.href.indexOf("?")&&-1===e.href.indexOf("#")&&!this.regex.excludeUris.test(e.href)&&!this.regex.images.test(e.href))}}],[{key:"run",value:function(){"undefined"!=typeof RocketPreloadLinksConfig&&new n(new RocketBrowserCompatibilityChecker({capture:!0,passive:!0}),RocketPreloadLinksConfig).init()}}]),n}();t.run();
+}());
+/* ]]> */
+</script>
+<script type="text/javascript" src="https://liveapi.com/blog/wp-content/themes/Castr/assets/js/jquery.min.js?ver=1787992344" id="jquery-js-js"></script>
+<script type="text/javascript" src="https://liveapi.com/blog/wp-content/themes/Castr/assets/js/bootstrap.min.js?ver=1787992344" id="bootstrap-js-js"></script>
+<script type="text/javascript" src="https://liveapi.com/blog/wp-content/themes/Castr/assets/js/slick.min.js?ver=1787992344" id="slick-js-js"></script>
+<script type="text/javascript" id="main-js-js-extra">
+/* <![CDATA[ */
+var ajax_url_castr = {"ajaxurl":"https:\/\/liveapi.com\/blog\/wp-admin\/admin-ajax.php"};
+/* ]]> */
+</script>
+<script type="text/javascript" src="https://liveapi.com/blog/wp-content/themes/Castr/assets/js/main.js?ver=4.8" id="main-js-js"></script>
+
+</body>
+
+</html>

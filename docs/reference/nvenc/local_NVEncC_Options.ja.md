@@ -1,0 +1,5015 @@
+﻿
+# NVEncC オプションリスト <!-- omit in toc -->
+
+- [コマンドラインの例](#コマンドラインの例)
+  - [基本的なコマンドの表記](#基本的なコマンドの表記)
+  - [もっと実用的なコマンド](#もっと実用的なコマンド)
+    - [hwデコードを使用する例](#hwデコードを使用する例)
+    - [hwデコードを使用する例 (インタレ保持)](#hwデコードを使用する例-インタレ保持)
+    - [avs(Avisynth)の例 (avsやvpyはvfw経由でも読み込み可能です)](#avsavisynthの例-avsやvpyはvfw経由でも読み込み可能です)
+    - [パイプ利用の例](#パイプ利用の例)
+    - [ffmpegからパイプ渡し](#ffmpegからパイプ渡し)
+    - [ffmpegから映像と音声を両方パイプ渡したい](#ffmpegから映像と音声を両方パイプ渡したい)
+    - [ffmpegにNVEncCでのフィルタ処理の結果を渡したい](#ffmpegにnvenccでのフィルタ処理の結果を渡したい)
+    - [可能な限り入力ファイルから音声・字幕・metadataなどをコピーする](#可能な限り入力ファイルから音声字幕metadataなどをコピーする)
+    - [raw H.264/ESのmux](#raw-h264esのmux)
+- [オプションの指定方法](#オプションの指定方法)
+- [表示系オプション](#表示系オプション)
+  - [-h,-? --help](#-h----help)
+  - [-v, --version](#-v---version)
+  - [--option-list](#--option-list)
+  - [--check-device](#--check-device)
+  - [--check-hw \[\<int\>\]](#--check-hw-int)
+  - [--check-features \[\<int\>\]](#--check-features-int)
+  - [--check-preset-params](#--check-preset-params)
+  - [--check-environment](#--check-environment)
+  - [--check-codecs, --check-decoders, --check-encoders](#--check-codecs---check-decoders---check-encoders)
+  - [--check-profiles \<string\>](#--check-profiles-string)
+  - [--check-formats](#--check-formats)
+  - [--check-protocols](#--check-protocols)
+  - [--check-avdevices](#--check-avdevices)
+  - [--check-filters](#--check-filters)
+  - [--check-avversion](#--check-avversion)
+- [エンコードの基本的なオプション](#エンコードの基本的なオプション)
+  - [-d, --device \<int\>](#-d---device-int)
+  - [-c, --codec \<string\>](#-c---codec-string)
+  - [-o, --output \<string\>](#-o---output-string)
+  - [-i, --input \<string\>](#-i---input-string)
+  - [--raw](#--raw)
+  - [--y4m](#--y4m)
+  - [--avi](#--avi)
+  - [--avs](#--avs)
+  - [--vpy](#--vpy)
+  - [--avsw \[\<string\>\]](#--avsw-string)
+  - [--avhw](#--avhw)
+  - [--interlace \<string\>](#--interlace-string)
+  - [--crop \<int\>,\<int\>,\<int\>,\<int\>](#--crop-intintintint)
+  - [--frames \<int\>](#--frames-int)
+  - [--fps \<int\>/\<int\> or \<float\>](#--fps-intint-or-float)
+  - [--input-res \<int\>x\<int\>](#--input-res-intxint)
+  - [--output-res \<int\>x\<int\>\[,\<string\>=\<string\>\]](#--output-res-intxintstringstring)
+  - [--input-csp \<string\>](#--input-csp-string)
+- [エンコードモードのオプション](#エンコードモードのオプション)
+  - [--qvbr  \<float\> (固定品質モード)](#--qvbr--float-固定品質モード)
+  - [--cbr \<int\>   (固定ビットレート)](#--cbr-int---固定ビットレート)
+  - [--vbr \<int\>   (可変ビットレート)](#--vbr-int---可変ビットレート)
+  - [--cqp \<int\> or \<int\>:\<int\>:\<int\>　(固定量子化量)](#--cqp-int-or-intintint固定量子化量)
+- [その他のオプション](#その他のオプション)
+  - [-u, --preset](#-u---preset)
+  - [--tune \<string\>](#--tune-string)
+  - [--output-depth \<int\>](#--output-depth-int)
+  - [--output-csp \<string\>](#--output-csp-string)
+  - [--lossless  \[H.264/HEVC\]](#--lossless--h264hevc)
+  - [--multipass \<string\>](#--multipass-string)
+  - [--max-bitrate \<int\>](#--max-bitrate-int)
+  - [--vbv-bufsize \<int\>](#--vbv-bufsize-int)
+  - [--qp-init \<int\> or \<int\>:\<int\>:\<int\>](#--qp-init-int-or-intintint)
+  - [--qp-min \<int\> or \<int\>:\<int\>:\<int\>](#--qp-min-int-or-intintint)
+  - [--qp-max \<int\> or \<int\>:\<int\>:\<int\>](#--qp-max-int-or-intintint)
+  - [--chroma-qp-offset \<int\>  \[H.264/HEVC\]](#--chroma-qp-offset-int--h264hevc)
+  - [--vbr-quality \<float\>](#--vbr-quality-float)
+  - [--dynamic-rc \<int\>:\<int\>:\<int\>\<int\>,\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\],...](#--dynamic-rc-intintintintparam1value1param2value2)
+  - [--lookahead \<int\>](#--lookahead-int)
+  - [--lookahead-level \<int\>](#--lookahead-level-int)
+  - [--no-i-adapt](#--no-i-adapt)
+  - [--no-b-adapt](#--no-b-adapt)
+  - [--strict-gop](#--strict-gop)
+  - [--gop-len \<int\>](#--gop-len-int)
+  - [-b, --bframes \<int\>](#-b---bframes-int)
+  - [--ref \<int\>](#--ref-int)
+  - [--multiref-l0 \<int\>  \[H.264/HEVC\]](#--multiref-l0-int--h264hevc)
+  - [--multiref-l1 \<int\>  \[H.264/HEVC\]](#--multiref-l1-int--h264hevc)
+  - [--weightp](#--weightp)
+  - [--nonrefp](#--nonrefp)
+  - [--unidirectb](#--unidirectb)
+  - [--aq](#--aq)
+  - [--aq-temporal](#--aq-temporal)
+  - [--aq-strength \<int\>](#--aq-strength-int)
+  - [--bref-mode \<string\>](#--bref-mode-string)
+  - [--temporal-layers \<int\>](#--temporal-layers-int)
+  - [--direct \<string\> \[H.264\]](#--direct-string-h264)
+  - [--hierarchial-p \[H.264\]](#--hierarchial-p-h264)
+  - [--hierarchial-b \[H.264\]](#--hierarchial-b-h264)
+  - [--mv-precision \<string\>](#--mv-precision-string)
+  - [--slices \<int\> \[H.264/HEVC\]](#--slices-int-h264hevc)
+  - [--cabac \[H.264\]](#--cabac-h264)
+  - [--cavlc \[H.264\]](#--cavlc-h264)
+  - [--bluray \[H.264\]](#--bluray-h264)
+  - [--(no-)deblock \[H.264\]](#--no-deblock-h264)
+  - [--cu-max \<int\> \[HEVC\]](#--cu-max-int-hevc)
+  - [--cu-min \<int\> \[HEVC\]](#--cu-min-int-hevc)
+  - [--alpha-bitrate-ratio \<int\> \[HEVC\]](#--alpha-bitrate-ratio-int-hevc)
+  - [--alpha-channel-mode \<string\> \[HEVC\]](#--alpha-channel-mode-string-hevc)
+  - [--tf-level \<int\>](#--tf-level-int)
+  - [--part-size-min \<int\> \[AV1\]](#--part-size-min-int-av1)
+  - [--part-size-max \<int\> \[AV1\]](#--part-size-max-int-av1)
+  - [--tile-columns \<int\> \[AV1\]](#--tile-columns-int-av1)
+  - [--tile-rows \<int\> \[AV1\]](#--tile-rows-int-av1)
+  - [--refs-forward \<int\> \[AV1\]](#--refs-forward-int-av1)
+  - [--refs-backward \<int\> \[AV1\]](#--refs-backward-int-av1)
+  - [--bitstream-padding \[AV1\]](#--bitstream-padding-av1)
+  - [--level \<string\>](#--level-string)
+  - [--profile \<string\>](#--profile-string)
+  - [--tier \<string\>](#--tier-string)
+  - [--sar \<int\>:\<int\>](#--sar-intint)
+  - [--dar \<int\>:\<int\>](#--dar-intint)
+  - [--colorrange \<string\>](#--colorrange-string)
+  - [--videoformat \<string\>](#--videoformat-string)
+  - [--colormatrix \<string\>](#--colormatrix-string)
+  - [--colorprim \<string\>](#--colorprim-string)
+  - [--transfer \<string\>](#--transfer-string)
+  - [--chromaloc \<int\> or "auto"](#--chromaloc-int-or-auto)
+  - [--max-cll \<int\>,\<int\> or "copy" \[HEVC, AV1\]](#--max-cll-intint-or-copy-hevc-av1)
+  - [--master-display \<string\> or "copy" \[HEVC, AV1\]](#--master-display-string-or-copy-hevc-av1)
+  - [--atc-sei \<string\> or \<int\> \[HEVCのみ\]](#--atc-sei-string-or-int-hevcのみ)
+  - [--dhdr10-info \<string\> \[HEVC, AV1\]](#--dhdr10-info-string-hevc-av1)
+  - [--dhdr10-info copy \[HEVC, AV1\]](#--dhdr10-info-copy-hevc-av1)
+  - [--dolby-vision-profile \<string\> \[HEVC, AV1\]](#--dolby-vision-profile-string-hevc-av1)
+  - [--dolby-vision-rpu \<string\> \[HEVC, AV1\]](#--dolby-vision-rpu-string-hevc-av1)
+  - [--dolby-vision-rpu copy \[HEVC, AV1\]](#--dolby-vision-rpu-copy-hevc-av1)
+  - [--dolby-vision-rpu-prm \<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...](#--dolby-vision-rpu-prm-param1value1param2value2)
+  - [--aud \[H.264/HEVC\]](#--aud-h264hevc)
+  - [--repeat-headers](#--repeat-headers)
+  - [--pic-struct \[H.264/HEVC\]](#--pic-struct-h264hevc)
+  - [--split-enc \<string\>](#--split-enc-string)
+  - [--ssim](#--ssim)
+  - [--psnr](#--psnr)
+  - [--vmaf \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vmaf-param1value1param2value2)
+  - [--vship-ssimulacra2](#--vship-ssimulacra2)
+  - [--vship-butteraugli \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vship-butteraugli-param1value1param2value2)
+  - [--vship-cvvdp \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vship-cvvdp-param1value1param2value2)
+- [入出力 / 音声 / 字幕などのオプション](#入出力--音声--字幕などのオプション)
+  - [--input-analyze \<float\>](#--input-analyze-float)
+  - [--input-probesize \<int\>](#--input-probesize-int)
+  - [--trim \<int\>:\<int\>\[,\<int\>:\<int\>\]\[,\<int\>:\<int\>\]...](#--trim-intintintintintint)
+  - [--seek \[\[\<int\>:\]\<int\>:\]\<int\>\[.\<int\>\]](#--seek-intintintint)
+  - [--seekto \[\[\<int\>:\]\<int\>:\]\<int\>\[.\<int\>\]](#--seekto-intintintint)
+  - [--input-format \<string\>](#--input-format-string)
+  - [-f, --output-format \<string\>](#-f---output-format-string)
+  - [--y4m-timestamp](#--y4m-timestamp)
+  - [--video-track \<int\>](#--video-track-int)
+  - [--video-streamid \<int\>](#--video-streamid-int)
+  - [--video-tag \<string\>](#--video-tag-string)
+  - [--video-metadata \[\<int\>?\]\<string\> or \[\<int\>?\]\<string\>=\<string\>](#--video-metadata-intstring-or-intstringstring)
+  - [--avcodec-prms \<string\>](#--avcodec-prms-string)
+  - [--audio-copy \[\<int/string\>;\[,\<int/string\>\]...\]](#--audio-copy-intstringintstring)
+  - [--audio-codec \[\[\<int/string\>?\]\<string\>\[:\<string\>=\<string\>\[,\<string\>=\<string\>\]...\]...\]](#--audio-codec-intstringstringstringstringstringstring)
+  - [--audio-encode-other-codec-only](#--audio-encode-other-codec-only)
+  - [--audio-bitrate \[\<int/string\>?\]\<int\> or \[\<int/string\>?\]\<string\>:\<int\>\[,\<string\>:\<int\>\]\[,...\]](#--audio-bitrate-intstringint-or-intstringstringintstringint)
+  - [--audio-quality \[\<int/string\>?\]\<int\>](#--audio-quality-intstringint)
+  - [--audio-profile \[\<int/string\>?\]\<string\>](#--audio-profile-intstringstring)
+  - [--audio-stream \[\<int/string\>?\]{\<string1\>}\[:\<string2\>\]](#--audio-stream-intstringstring1string2)
+  - [--audio-samplerate \[\<int/string\>?\]\<int\>](#--audio-samplerate-intstringint)
+  - [--audio-resampler \<string\>](#--audio-resampler-string)
+  - [--audio-delay \[\<int/string\>?\]\<float\>](#--audio-delay-intstringfloat)
+  - [--audio-file \[\<int\>\]\[\<string\>?\]\<string\>](#--audio-file-intstringstring)
+  - [--audio-filter \[\<int/string\>?\]\<string\>](#--audio-filter-intstringstring)
+  - [--audio-disposition \[\<int/string\>?\]\<string\>\[,\<string\>\]\[\]...](#--audio-disposition-intstringstringstring)
+  - [--audio-metadata \[\<int/string\>?\]\<string\> or \[\<int/string\>?\]\<string\>=\<string\>](#--audio-metadata-intstringstring-or-intstringstringstring)
+  - [--audio-bsf \[\<int/string\>?\]\<string\>](#--audio-bsf-intstringstring)
+  - [--audio-ignore-decode-error \<int\>](#--audio-ignore-decode-error-int)
+  - [--audio-source \<string\>\[:\[{\<int\>?}\]\[;\<param1\>=\<value1\>...\]/\[\]...\]](#--audio-source-stringintparam1value1)
+  - [--chapter \<string\>](#--chapter-string)
+  - [--chapter-copy](#--chapter-copy)
+  - [--chapter-no-trim](#--chapter-no-trim)
+  - [--key-on-chapter](#--key-on-chapter)
+  - [--keyfile \<string\>](#--keyfile-string)
+  - [--sub-source \<string\>\[:{\<int\>?}\[;\<param1\>=\<value1\>\]...\]...](#--sub-source-stringintparam1value1)
+  - [--sub-copy \[\<int/string\>;\[,\<int/string\>\]...\]](#--sub-copy-intstringintstring)
+  - [--sub-codec \[\[\<int/string\>?\]\<string\>\]](#--sub-codec-intstringstring)
+  - [--sub-disposition \[\<int/string\>?\]\<string\>\[,\<string\>\]\[\]...](#--sub-disposition-intstringstringstring)
+  - [--sub-metadata \[\<int/string\>?\]\<string\> or \[\<int/string\>?\]\<string\>=\<string\>](#--sub-metadata-intstringstring-or-intstringstringstring)
+  - [--sub-bsf \[\<int/string\>?\]\<string\>](#--sub-bsf-intstringstring)
+  - [--data-copy \[\<int/string\>\[,\<int/string\>\]...\]](#--data-copy-intstringintstring)
+  - [--attachment-copy \[\<int\>\[,\<int\>\]...\]](#--attachment-copy-intint)
+  - [--attachment-source \<string\>\[:{\<int\>?}\[;\<param1\>=\<value1\>\]...\]...](#--attachment-source-stringintparam1value1)
+  - [--input-option \<string1\>:\<string2\>](#--input-option-string1string2)
+  - [-m, --mux-option \<string1\>:\<string2\>](#-m---mux-option-string1string2)
+  - [--metadata \<string\> or \<string\>=\<string\>](#--metadata-string-or-stringstring)
+  - [--avsync \<string\>](#--avsync-string)
+  - [--muxer-add-cmd](#--muxer-add-cmd)
+  - [--timecode \[\<string\>\]](#--timecode-string)
+  - [--tcfile-in \<string\>](#--tcfile-in-string)
+  - [--timebase \<int\>/\<int\>](#--timebase-intint)
+  - [--input-hevc-bsf \<string\>](#--input-hevc-bsf-string)
+  - [--adapt-resolution \<int\>x\<int\>](#--adapt-resolution-intxint)
+  - [--input-pixel-format \<string\>](#--input-pixel-format-string)
+  - [--offset-video-dts-advance](#--offset-video-dts-advance)
+  - [--allow-other-negative-pts](#--allow-other-negative-pts)
+- [vppオプション](#vppオプション)
+  - [vppフィルタの適用順](#vppフィルタの適用順)
+  - [--vpp-colorspace \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-colorspace-param1value1param2value2)
+  - [--vpp-libplacebo-tonemapping \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-libplacebo-tonemapping-param1value1param2value2)
+  - [--vpp-libplacebo-tonemapping-lut \<string\>](#--vpp-libplacebo-tonemapping-lut-string)
+  - [--vpp-delogo \<string\>\[,\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-delogo-stringparam1value1param2value2)
+  - [--vpp-deinterlace \<string\>](#--vpp-deinterlace-string)
+  - [--vpp-deint-csp \<string\>](#--vpp-deint-csp-string)
+  - [--vpp-rff](#--vpp-rff)
+  - [--vpp-afs \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-afs-param1value1param2value2)
+  - [--vpp-nnedi \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-nnedi-param1value1param2value2)
+  - [--vpp-rtgmc [\<param1\>=\<value1\>]](#--vpp-rtgmc-param1value1)
+  - [--vpp-rtgmc-bob [\<param1\>=\<value1\>]](#--vpp-rtgmc-bob-param1value1)
+  - [--vpp-rtgmc-search-prefilter [\<param1\>=\<value1\>]](#--vpp-rtgmc-search-prefilter-param1value1)
+  - [--vpp-rtgmc-edi [\<param1\>=\<value1\>]](#--vpp-rtgmc-edi-param1value1)
+  - [--vpp-rtgmc-retouch [\<param1\>=\<value1\>]](#--vpp-rtgmc-retouch-param1value1)
+  - [--vpp-rtgmc-shimmer-repair [\<param1\>=\<value1\>]](#--vpp-rtgmc-shimmer-repair-param1value1)
+  - [--vpp-rtgmc-primitive [\<param1\>=\<value1\>]](#--vpp-rtgmc-primitive-param1value1)
+  - [--vpp-kfm \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vpp-kfm-param1value1param2value2)
+  - [--vpp-yadif \[\<param1\>=\<value1\>\]](#--vpp-yadif-param1value1)
+  - [--vpp-bwdif \[\<param1\>=\<value1\>\]](#--vpp-bwdif-param1value1)
+  - [--vpp-decomb \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-decomb-param1value1param2value2)
+  - [--vpp-ivtc \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vpp-ivtc-param1value1param2value2)
+  - [--vpp-decimate \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-decimate-param1value1param2value2)
+  - [--vpp-mpdecimate \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-mpdecimate-param1value1param2value2)
+  - [--vpp-select-every \<int\>\[,\<param1\>=\<int\>\]](#--vpp-select-every-intparam1int)
+  - [--vpp-rotate \<int\>](#--vpp-rotate-int)
+  - [--vpp-transform \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-transform-param1value1param2value2)
+  - [--vpp-convolution3d \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-convolution3d-param1value1param2value2)
+  - [--vpp-nvvfx-denoise \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-nvvfx-denoise-param1value1param2value2)
+  - [--vpp-nvvfx-artifact-reduction \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-nvvfx-artifact-reduction-param1value1param2value2)
+  - [--vpp-smooth \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-smooth-param1value1param2value2)
+  - [--vpp-msmooth \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-msmooth-param1value1param2value2)
+  - [--vpp-denoise-dct \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-denoise-dct-param1value1param2value2)
+  - [--vpp-bm3d \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-bm3d-param1value1param2value2)
+  - [--vpp-fft3d \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-fft3d-param1value1param2value2)
+  - [--vpp-degrain \[\<param1\>=\<value1\>\]](#--vpp-degrain-param1value1)
+  - [--vpp-knn \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-knn-param1value1param2value2)
+  - [--vpp-nlmeans \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vpp-nlmeans-param1value1param2value2)
+  - [--vpp-pmd \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-pmd-param1value1param2value2)
+  - [--vpp-hqdn3d \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vpp-hqdn3d-param1value1param2value2)
+  - [--vpp-descale \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vpp-descale-param1value1param2value2)
+  - [--vpp-gauss \<int\>](#--vpp-gauss-int)
+  - [--vpp-subburn \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-subburn-param1value1param2value2)
+  - [--vpp-libplacebo-shader \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-libplacebo-shader-param1value1param2value2)
+  - [--vpp-resize \<string\> or \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-resize-string-or-param1value1param2value2)
+  - [--vpp-unsharp \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-unsharp-param1value1param2value2)
+  - [--vpp-vinverse \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vpp-vinverse-param1value1param2value2)
+  - [--vpp-chromashift \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-chromashift-param1value1param2value2)
+  - [--vpp-deblock \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-deblock-param1value1param2value2)
+  - [--vpp-deflicker \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-deflicker-param1value1param2value2)
+  - [--vpp-stab \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vpp-stab-param1value1param2value2)
+  - [--vpp-colorfix \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-colorfix-param1value1param2value2)
+  - [--vpp-dehalo \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vpp-dehalo-param1value1param2value2)
+  - [--vpp-finedehalo \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vpp-finedehalo-param1value1param2value2)
+  - [--vpp-hqdering \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vpp-hqdering-param1value1param2value2)
+  - [--vpp-edgelevel \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-edgelevel-param1value1param2value2)
+  - [--vpp-msharpen \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-msharpen-param1value1param2value2)
+  - [--vpp-cas \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-cas-param1value1param2value2)
+  - [--vpp-detailsharpen \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-detailsharpen-param1value1param2value2)
+  - [--vpp-warpsharp \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-warpsharp-param1value1param2value2)
+  - [--vpp-maa \[\<param1\>=\<value1\>\[,\<param2\>=\<value2\>\]...\]](#--vpp-maa-param1value1param2value2)
+  - [--vpp-curves \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-curves-param1value1param2value2)
+  - [--vpp-softlight \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-softlight-param1value1param2value2)
+  - [--vpp-tweak \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-tweak-param1value1param2value2)
+  - [--vpp-deband \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-deband-param1value1param2value2)
+  - [--vpp-libplacebo-deband \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-libplacebo-deband-param1value1param2value2)
+  - [--vpp-pad \<int\>,\<int\>,\<int\>,\<int\>](#--vpp-pad-intintintint)
+  - [--vpp-overlay \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-overlay-param1value1param2value2)
+  - [--vpp-ngx-truehdr \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-ngx-truehdr-param1value1param2value2)
+  - [--vpp-fruc \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-fruc-param1value1param2value2)
+  - [--vpp-anime4k-shader \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-anime4k-shader-param1value1param2value2)
+  - [--vpp-onnx \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-onnx-param1value1param2value2)
+  - [--vpp-onnx-deint \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-onnx-deint-param1value1param2value2)
+  - [--vpp-onnx-model-dir \<string\>](#--vpp-onnx-model-dir-string)
+  - [--vpp-onnx-cache-dir \<string\>](#--vpp-onnx-cache-dir-string)
+  - [--vpp-rife-ov \[\<param1\>=\<value1\>\]\[,\<param2\>=\<value2\>\],...](#--vpp-rife-ov-param1value1param2value2)
+  - [--vpp-perf-monitor](#--vpp-perf-monitor)
+  - [--vpp-nvvfx-model-dir \<string\>](#--vpp-nvvfx-model-dir-string)
+- [制御系のオプション](#制御系のオプション)
+  - [--parallel \[\<int\>\] or \[\<string\>\]](#--parallel-int-or-string)
+  - [--parallel-force-large-memory-filters](#--parallel-force-large-memory-filters)
+  - [--cuda-schedule \<string\>](#--cuda-schedule-string)
+  - [--cuda-stream \<int\>](#--cuda-stream-int)
+  - [--cuda-mt \<int\>](#--cuda-mt-int)
+  - [--disable-nvml \<int\>](#--disable-nvml-int)
+  - [--disable-dx11](#--disable-dx11)
+  - [--output-buf \<int\>](#--output-buf-int)
+  - [--output-thread \<int\>](#--output-thread-int)
+  - [--log \<string\>](#--log-string)
+  - [--log-level \[\<param1\>=\]\<value\>\[,\<param2\>=\<value\>\]...](#--log-level-param1valueparam2value)
+  - [--log-opt \<param1\>=\<value\>\[,\<param2\>=\<value\>\]...](#--log-opt-param1valueparam2value)
+  - [--log-framelist \[\<string\>\]](#--log-framelist-string)
+  - [--log-packets \[\<string\>\]](#--log-packets-string)
+  - [--log-mux-ts \[\<string\>\]](#--log-mux-ts-string)
+  - [--thread-affinity \[\<string1\>=\]{\<string2\>\[#\<int\>\[:\<int\>\]...\] or 0x\<hex\>}](#--thread-affinity-string1string2intint-or-0xhex)
+  - [--thread-priority \[\<string1\>=\]\<string2\>\[#\<int\>\[:\<int\>\]...\]](#--thread-priority-string1string2intint)
+  - [--thread-throttling \[\<string1\>=\]\<string2\>\[#\<int\>\[:\<int\>\]...\]](#--thread-throttling-string1string2intint)
+  - [--option-file \<string\>](#--option-file-string)
+  - [--max-procfps \<int\>](#--max-procfps-int)
+  - [--lowlatency](#--lowlatency)
+  - [--fallback-bitdepth](#--fallback-bitdepth)
+  - [--avsdll \<string\>](#--avsdll-string)
+  - [--vsdir \<string\> \[Windows専用\]](#--vsdir-string-windows専用)
+  - [--vpy-assume-script-dir](#--vpy-assume-script-dir)
+  - [--process-codepage \<string\>](#--process-codepage-string)
+  - [--task-perf-monitor](#--task-perf-monitor)
+  - [--perf-monitor \[\<string\>\[,\<string\>\]...\]](#--perf-monitor-stringstring)
+  - [--perf-monitor-interval \<int\>](#--perf-monitor-interval-int)
+
+## コマンドラインの例
+
+
+### 基本的なコマンドの表記
+```Batchfile
+NVEncC.exe [Options] -i <filename> -o <filename>
+```
+
+### もっと実用的なコマンド
+#### hwデコードを使用する例
+```Batchfile
+NVEncC --avhw -i "<mp4(H.264/AVC) file>" -o "<outfilename.264>"
+```
+
+#### hwデコードを使用する例 (インタレ保持)
+```Batchfile
+NVEncC --avhw --interlace tff -i "<mp4(H.264/AVC) file>" -o "<outfilename.264>"
+```
+
+#### avs(Avisynth)の例 (avsやvpyはvfw経由でも読み込み可能です)
+```Batchfile
+NVEncC -i "<avsfile>" -o "<outfilename.264>"
+```
+
+#### パイプ利用の例
+```Batchfile
+avs2pipemod -y4mp "<avsfile>" | NVEncC --y4m -i - -o "<outfilename.264>"
+```
+
+#### ffmpegからパイプ渡し
+
+```Batchfile
+ffmpeg -y -i "<ソース動画>" -an -pix_fmt yuv420p -f yuv4mpegpipe - | NVEncC --y4m -i - -o "<outfilename.264>"
+```
+
+#### ffmpegから映像と音声を両方パイプ渡したい
+--> "nut"フォーマットでくるんで受け渡しするとよいでしょう
+```Batchfile
+ffmpeg -y -i "<input>" <options for ffmpeg> -codec:a copy -codec:v rawvideo -pix_fmt yuv420p -f nut - | NVEncC --avsw -i - --audio-codec aac -o "<outfilename.mp4>"
+```
+
+#### ffmpegにNVEncCでのフィルタ処理の結果を渡したい
+--> "nut"フォーマットでフレームと音声を渡すとよいでしょう。
+```Batchfile
+NVEncC -i "<input>" <filter options> --audio-copy -c raw --output-format nut -o - | ffmpeg -y -f nut -i - <encode options for ffmpeg> -o output.mp4
+```
+
+#### 可能な限り入力ファイルから音声・字幕・metadataなどをコピーする
+
+```Batchfile
+NVEncC -i "<input>" <encode options> --colormatrix auto --transfer auto --colorprim auto --chromaloc auto --max-cll copy --master-display copy --dhdr10-info copy --dolby-vision-rpu copy --video-metadata copy --audio-copy --audio-metadata copy  --sub-copy --sub-metadata copy --data-copy --attachment-copy --chapter-copy -o output.mkv
+```
+
+#### raw H.264/ESのmux
+H.264/ESで出力し、mp4に格納したり、AAC音声とmuxする場合には、L-SMASHを使って、
+
+```Batchfile
+muxer.exe -i "<raw H.264/ES file>" -i "<ADTS-AAC>" -o "<muxed mp4 file>"
+```
+
+としてAAC音声と多重化できます。音声がALACの場合には、
+
+```Batchfile
+muxer.exe -i "<raw H.264/ES file>" -o "<video mp4file>"
+remuxer.exe -i "<video mp4file>" -i "<m4a(ALAC in mp4)file>" -o "<muxed mp4 file>"
+```
+
+のように2段階のステップが必要です。
+
+同様にmkvtoolnixに含まれるmkvmergeでmuxし、mkvに格納することもできます。
+
+
+## オプションの指定方法
+
+```
+-<短縮オプション名>、--<オプション名> <引数>  
+引数なしの場合は単体で効果を発揮。
+
+引数のタイプは
+- なし
+- <int>　　 整数で指定
+- <float>　小数点で指定
+- <string> 文字列で指定
+
+引数の [ ] { } 内は、省略可能です。
+"..." は繰り返し意味します。
+
+--(no-)xxx
+と付いている場合は、--no-xxxとすることで、--xxxと逆の効果を得る。  
+例1: --xxx : xxxを有効にする → --no-xxx: xxxを無効にする  
+例2: --xxx : xxxを無効にする → --no-xxx: xxxを有効にする
+```
+
+## 表示系オプション
+
+### -h,-? --help
+ヘルプの表示
+
+### -v, --version
+バージョンの表示
+
+### --option-list
+オプションリストの表示。
+
+### --check-device
+NVEncが認識している利用可能なGPUのDeviceIdとPCI Bus IDを表示。DeviceIdはCUDAのデバイス順。
+
+### --check-hw [&lt;int&gt;]
+ハードウェアエンコの可否の表示。数字でDeviceIDを指定できる。省略した場合は"0"。
+
+### --check-features [&lt;int&gt;]
+NVEncの使用可能なエンコード機能を表示する。数字でDeviceIDを指定できる。省略した場合は"0"。
+
+### --check-preset-params
+--codec, --device, --preset, --tune と組み合わせて、ドライバが設定するパラメータのデフォルト値を表示する。
+
+### --check-environment
+NVEncCの認識している環境情報を表示
+
+### --check-codecs, --check-decoders, --check-encoders
+利用可能な音声コーデック名を表示
+
+### --check-profiles &lt;string&gt;
+利用可能な音声プロファイル名を表示
+
+### --check-formats
+利用可能な出力フォーマットを表示
+
+### --check-protocols
+利用可能なプロトコルを表示
+
+### --check-avdevices
+利用可能なデバイス(libavdeviceのデバイス)を表示
+
+### --check-filters
+利用可能な音声フィルタを表示
+
+### --check-avversion
+dllのバージョンを表示
+
+## エンコードの基本的なオプション
+
+### -d, --device &lt;int&gt;
+NVEncで使用するDeviceIdを指定する。使用できるデバイスは、[--check-device](#--check-device)で確認できる。
+
+デフォルトは自動。複数利用可能なGPUがある場合、自動的に使用するGPUを選択する。
+
+判断基準は  
+- 指定のエンコードが可能かどうか
+- --avhwが指定されていれば入力ファイルのHWデコードが可能かどうか
+- (インタレ保持エンコが指定されていれば、)インタレ保持エンコが可能かどうか
+- Video Engineの使用率が低い方
+- GPUの使用率が低い方
+- GPUの世代が新しい方 (Compute Capabilityで判定)
+- GPUのコア数が多い方
+
+Video Engineの使用率とGPUの使用率の取得には、x64版は[NVMLライブラリ](https://developer.nvidia.com/nvidia-management-library-nvml)、x86版はnvidia-smi.exeを実行して取得している。
+
+nvidia-smi.exeは通常ドライバと一緒に"C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe"にインストールされている。
+
+
+### -c, --codec &lt;string&gt;
+エンコードするコーデックの指定
+ - h264 (デフォルト)
+ - hevc
+ - av1
+ - raw
+ - av_xxx (avcodecエンコーダを使用)
+
+avcodecエンコーダ（av_xxx形式）を使用する場合、`--check-encoders`オプションで利用可能なエンコーダを確認できます。またエンコーダのパラメータは [--avcodec-prms](#--avcodec-prms-string)でのみ指定できます。(通常のパラメータは無視されます)
+
+   ```-c raw```の場合は、エンコードをせず、rawフレームを出力します。
+
+### -o, --output &lt;string&gt;
+出力ファイル名の表示、"-"でパイプ出力
+
+### -i, --input &lt;string&gt;
+入力ファイル名の設定、"-"でパイプ入力
+
+NVEncの入力方法は下の表のとおり。入力フォーマットをしてしない場合は、拡張子で自動的に判定される。
+
+| 使用される読み込み |  対象拡張子 |
+|:---|:---|          
+| Avisynthリーダー    | avs |
+| VapourSynthリーダー | vpy |
+| aviリーダー         | avi |
+| y4mリーダー         | y4m |
+| rawリーダー         | yuv |
+| avhw/avswリーダー | それ以外 |
+
+| 入力方法の対応色空間 | yuv420 | yuy2 | yuv422 | yuv444 | rgb24 | rgb32 |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|
+|               raw    |   ◎   |      |   ◎   |   ◎   |       |       |
+|               y4m    |   ◎   |      |   ◎   |   ◎   |       |       |
+|               avi    |   ○   |  ○  |        |        |   ○  |   ○  |
+|               avs    |   ◎   |  ○  |   ◎   |   ◎   |   ○  |   ○  |
+|               vpy    |   ◎   |      |   ◎   |   ◎   |       |       |
+|               avhw   |   □   |      |        |   ◇   |       |       |
+|               avsw   |   ◎   |      |   ◎   |   ◎   |   ○  |   ○  |
+
+◎ ... 8bit / 9bit / 10bit / 12bit / 14bit / 16bitに対応  
+◇ ... 8bit / 10bit / 12bitに対応  
+□ ... 8bit / 10bitに対応  
+○ ... 8bitのみ対応  
+無印 ... 非対応
+
+### --raw
+入力をraw形式に設定する。
+入力解像度、入力fpsの設定が必要。
+
+### --y4m
+入力をy4m(YUV4MPEG2)形式として読み込む。
+
+### --avi
+入力ファイルをaviファイルとして読み込む。
+
+### --avs
+入力ファイルをAvisynthで読み込む。
+
+NVEncCはデフォルトではUTF-8モードで動作するため、AvisynthスクリプトはUTF-8(BOM無し)とする必要がある。
+一般的なShiftJISがデフォルトの文字コードとなっている環境で、従来のShiftJISのスクリプトを使用する場合には、
+"[--process-codepage](#--process-codepage-string) os" オプションを追加して、モードを切り替えてください。
+
+### --vpy
+入力ファイルをVapourSynthで読み込む。
+
+### --avsw [&lt;string&gt;]
+avformat + sw decoderを使用して読み込む。ffmpegの対応するほとんどのコーデックを読み込み可能。
+
+追加のパラメータで使用するデコーダ名を指定可能。特に指定のない場合、デコーダは自動的に選択される。
+
+### --avhw
+avformat + cuvid decoderを使用して読み込む。
+デコードからエンコードまでを一貫してGPUで行うため高速。
+
+| コーデック | 対応状況 |
+|:---|:---:|
+| MPEG1      | ○ |
+| MPEG2      | ○ |
+| H.264/AVC  | ○ |
+| H.265/HEVC | ○ |
+| VP8        | × |
+| VP9        | ○ |
+| AV1        | ○ |
+| VC-1       | ○ |
+| WMV3/WMV9  | × |
+
+### --interlace &lt;string&gt;
+**入力**フレームがインターレースかどうかと、そのフィールドオーダーを設定する。
+
+[--vpp-deinterlace](#--vpp-deinterlace-string) / [--vpp-afs](#--vpp-afs-param1value1param2value2) によりNVEncC内でインタレ解除を行ったり、そのままインタレ保持エンコードを行う。(インタレ保持エンコードはH.264のみ)
+
+- **パラメータ**
+  - progressive ... プログレッシブ
+  - tff ... トップフィールドファースト
+  - bff ... ボトムフィールドファースト
+  - auto ... 各フレームについて自動的に判断 ([avhw](#--avhw)/[avsw](#--avsw)読み込みのみ)
+
+### --crop &lt;int&gt;,&lt;int&gt;,&lt;int&gt;,&lt;int&gt;
+左、上、右、下の切り落とし画素数。
+
+### --frames &lt;int&gt;
+読み込むフレーム数。 (注: 入力ベースである点に注意、出力ベースではない)
+
+### --fps &lt;int&gt;/&lt;int&gt; or &lt;float&gt;
+--rawを使用した時の入力フレームレートの設定。--raw以外での使用は非推奨。
+
+raw形式の場合のみ有効で、その他の場合は無視されるか、fps推定のヒントとしてのみ扱われる。
+
+### --input-res &lt;int&gt;x&lt;int&gt;
+入力解像度の設定。raw形式の場合の場合のみ有効。
+
+### --output-res &lt;int&gt;x&lt;int&gt;[,&lt;string&gt;=&lt;string&gt;]
+出力解像度の設定。入力解像度と異なる場合、自動的にHW/GPUリサイズを行う。
+
+指定がない場合、入力解像度と同じになり、リサイズは行われない。
+
+- **特殊な値について**
+  - 0 ... 入力解像度と同じ
+  - 縦横のどちらかを負の値  
+    アスペクト比を維持したまま、片方に合わせてリサイズ。ただし、その負の値で割り切れる数にする。
+
+- **パラメータ**
+  - preserve_aspect_ratio=&lt;string&gt;  
+    指定解像度(指定枠)の縦横どちらかに合うよう、入力アスペクト比を維持しながらリサイズする。
+    - increase ... 拡大してアスペクト比を維持する (指定枠に外接するよう調整)
+    - decrease ... 縮小してアスペクト比を維持する (指定枠に収めるように調整)
+  - ignore_sar=&lt;bool&gt;  
+    負の値で自動リサイズする際、入出力のSAR比を無視して計算する。デフォルトでは無効(false)。
+
+- 使用例
+  ```
+  例: 入力が1280x720の場合
+  --output-res 1024x576 -> 通常の指定方法
+  --output-res 960x0    -> 960x720にリサイズ (0のほうは720のまま)
+  --output-res 1920x-2  -> 1920x1080にリサイズ (アスペクト比が維持できるように調整)
+
+  --output-res 1440x1440,preserve_aspect_ratio=increase -> 2560x1440にリサイズ
+  --output-res 1440x1440,preserve_aspect_ratio=decrease -> 1440x810にリサイズ
+  ```
+
+### --input-csp &lt;string&gt;
+raw読み込み時の入力色空間の設定。デフォルトはyv12。
+```
+  yv12, nv12, p010, yuv420p9le, yuv420p10le, yuv420p12le, yuv420p14le, yuv420p16le
+  yuv422p, yuv422p9le, yuv422p10le, yuv422p12le, yuv422p14le, yuv422p16le
+  yuv444p, yuv444p9le, yuv444p10le, yuv444p12le, yuv444p14le, yuv444p16le
+```
+
+## エンコードモードのオプション
+
+デフォルトはQVBR(固定品質モード)。
+
+### --qvbr  &lt;float&gt; (固定品質モード)
+固定品質モードでエンコードを行う。(0.0-51.0, AV1は0.0-63.0, 0 = 自動)
+
+--vbr 0 --vbr-quality &lt;float&gt; と同じ。
+
+### --cbr &lt;int&gt;   (固定ビットレート)
+### --vbr &lt;int&gt;   (可変ビットレート)
+ビットレートをkbps単位で指定してエンコードを行う。
+
+### --cqp &lt;int&gt; or &lt;int&gt;:&lt;int&gt;:&lt;int&gt;　(固定量子化量)
+CQP(固定量子化量)でエンコードを行う。&lt;Iフレーム&gt;:&lt;Pフレーム&gt;:&lt;Bフレーム&gt;のQP値を設定。
+
+基本的にQP値は I &lt; P &lt; B になるように設定することをおすすめ。
+
+
+## その他のオプション
+
+### -u, --preset
+エンコーダの品質プリセット。P1 ～ P7 はAPI v10.0から使用可能。
+- default
+- performance
+- quality
+- P1 (= performance)
+- P2
+- P3
+- P4 (= default)
+- P5
+- P6
+- P7 (= quality)
+
+### --tune &lt;string&gt;
+
+プリセットにチューニングオプション。
+
+- hq (デフォルト)
+- uhq  
+  HEVC, AV1専用。また、Turing世代以降のGPUが必要。
+- lowlatency
+- ultralowlatency
+- lossless  
+  使用すると自動的に [--lossless](#--lossless--h264hevc)も有効になる。
+
+### --output-depth &lt;int&gt;
+出力ビット深度を設定。
+- 8 ... 8bit (デフォルト)
+- 10 ... 10bit
+
+### --output-csp &lt;string&gt;
+出力色空間を設定。
+- yuv420 (デフォルト)
+- yuv422
+- yuv444
+- rgb
+- yuva420
+
+### --lossless  [H.264/HEVC]
+ロスレス出力を行う。(デフォルト: オフ)
+
+### --multipass &lt;string&gt;
+フレームのマルチパス解析の設定。--vbr, --cbr時のみ有効。また、API v10.0以降で使用可能。
+
+1passモードでは、エンコーダはマクロブロックの必要とするQPを推定し、直ちにマクロブロックのエンコードを行う。
+
+2passモードでは、1pass目でフレーム全体を一度分析し、必要なビット量の分布を決定する。2pass目では、その結果をもとにマクロブロックのエンコードを行う。
+これにより、フレーム内で特にCBRモードにおいてビットをより適切に分配することが可能になる。
+
+- none  
+  1passモード(高速)。
+
+- 2pass-quarter  
+  1pass目を1/4サイズの解像度で行う。これにより、より大きな動くベクトルを捕捉し、2pass目に渡すことができる。
+
+- 2pass-full  
+  1pass/2pass共にフル解像度で行う。パフォーマンスは落ちるものの、より詳細な分析情報を2pass目に渡すことができる。
+
+### --max-bitrate &lt;int&gt;
+最大ビットレート(kbps単位)。
+
+### --vbv-bufsize &lt;int&gt;
+VBVバッファサイズ(kbps単位)。 (default: auto)
+
+### --qp-init &lt;int&gt; or &lt;int&gt;:&lt;int&gt;:&lt;int&gt;
+初期QP値を&lt;Iフレーム&gt;:&lt;Pフレーム&gt;:&lt;Bフレーム&gt;で設定する。
+ビットレート指定のエンコードモードを使用する際に、
+エンコード開始時に適用するQP値として指定される。
+
+動画の先頭部分で必要以上にビットレートが割り振られたり、
+逆に圧縮がかかりすぎてひどい画質になる場合など、
+動画の先頭部分の画質を調整したい場合に使用する。
+
+### --qp-min &lt;int&gt; or &lt;int&gt;:&lt;int&gt;:&lt;int&gt;
+最小QP値を&lt;Iフレーム&gt;:&lt;Pフレーム&gt;:&lt;Bフレーム&gt;で設定する。
+ビットレート指定のエンコードモード使用時のみ有効。設定したQP値より低いQP値は使用されなくなる。
+
+ビットレート指定モードなどで、静止画などの部分で過剰にビットレートが割り当てられることがあるのを抑制したりするのに使用する。
+
+### --qp-max &lt;int&gt; or &lt;int&gt;:&lt;int&gt;:&lt;int&gt;
+最大QP値を&lt;Iフレーム&gt;:&lt;Pフレーム&gt;:&lt;Bフレーム&gt;設定する。
+ビットレート指定のエンコードモード使用時のみ有効。設定したQP値より高いQP値は使用されなくなる。
+
+指定したビットレートを超えてでも、動画のどんな部分でもある程度の品質を維持したい場合に使用する。
+
+### --chroma-qp-offset &lt;int&gt;  [H.264/HEVC]
+色差成分のQPオフセット。 (default: 0)
+
+### --vbr-quality &lt;float&gt;
+VBRモード使用時の目標品質を設定する。(0.0-51.0, AV1は0.0-63.0, 0 = 自動)
+
+### --dynamic-rc &lt;int&gt;:&lt;int&gt;:&lt;int&gt;&lt;int&gt;,&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;],...  
+指定した入力フレーム番号または表示時刻の範囲について、レート制御のパラメータを変更する。指定可能なパラメータは各レート制御モードと、最大ビットレート、目標品質(vbr-quality)、multipass。
+
+- **範囲パラメータ**
+  - `start=<int>`, `end=<int>`: 入力フレーム番号で指定する。`start <= フレーム番号 <= end` の両端を含む範囲。`start` は必須で、`end` の省略時は終端まで。
+  - `start-time=<float>`, `end-time=<float>`: 秒単位の表示時刻で指定する。`start-time <= 表示時刻 < end-time` の終了を含まない範囲。省略した側はストリームの先頭または終端になる。
+
+  フレーム番号と表示時刻の範囲パラメータは、同じ `--dynamic-rc` 内では併用できない。複数の `--dynamic-rc` 間では混在でき、ゾーンが重なる場合は表示時刻指定が優先される。
+
+- **必須パラメータ**
+  下記パラメータのうち、必ずひとつは指定が必要。
+  - [cqp](./NVEncC_Options.ja.md#--cqp-int-or-intintint%E5%9B%BA%E5%AE%9A%E9%87%8F%E5%AD%90%E5%8C%96%E9%87%8F)=&lt;int&gt; or cqp=&lt;int&gt;:&lt;int&gt;:&lt;int&gt;
+  - [cbr](./NVEncC_Options.ja.md#--cbr-int---%E5%9B%BA%E5%AE%9A%E3%83%93%E3%83%83%E3%83%88%E3%83%AC%E3%83%BC%E3%83%88)=&lt;int&gt;
+  - [vbr](./NVEncC_Options.ja.md#--vbr-int---%E5%8F%AF%E5%A4%89%E3%83%93%E3%83%83%E3%83%88%E3%83%AC%E3%83%BC%E3%83%88)=&lt;int&gt;
+  - [qvbr](./NVEncC_Options.ja.md#--qvbr-float-%E5%9B%BA%E5%AE%9A%E5%93%81%E8%B3%AA%E3%83%A2%E3%83%BC%E3%83%89)=&lt;float&gt; (0.0-51.0, AV1は0.0-63.0, 0 = 自動)
+
+- **追加パラメータ**
+  - [max-bitrate](./NVEncC_Options.ja.md#--max-bitrate-int)=&lt;int&gt;
+  - [vbr-quality](./NVEncC_Options.ja.md#--vbr-quality-float)=&lt;float&gt; (0.0-51.0, AV1は0.0-63.0, 0 = 自動)
+  - [multipass](./NVEncC_Options.ja.md#--multipass-string)=&lt;string&gt;
+
+- Examples
+  ```
+  例1: 入力フレーム番号 3000-3999 の間はvbrの12000kbpsでエンコード、
+       入力フレーム番号 5000-5999 の間は固定品質の29.0でエンコードし、
+       その他の領域は固定品質の25.0でエンコードする。
+    --vbr 0 --vbr-quality=25.0 --dynamic-rc 3000:3999,vbr=12000 --dynamic-rc 5000:5999,vbr=0,vbr-quality=29.0
+  
+  例2: 入力フレーム番号 3000までは、vbrの6000kbpsでエンコードし、
+       入力フレーム番号 3000以降はvbrの12000kbpsでエンコードする。
+    --vbr 6000 --dynamic-rc start=3000,vbr=12000
+
+  例3: 表示時刻120.5秒以上210.0秒未満をvbrの3000kbpsでエンコードする。
+    --dynamic-rc start-time=120.5,end-time=210.0,vbr=3000
+  ```
+
+### --lookahead &lt;int&gt;
+lookaheadを有効にし、その対象範囲をフレーム数で指定する。(0-32)
+画質の向上に役立つとともに、適応的なI,Bフレーム挿入が有効になる。
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+### --lookahead-level &lt;int&gt;  
+lookaheadのレベルの指定。(0 - 3, default = 0)  
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+大きくするほど、品質が向上する代わりに速度が低下する。
+
+### --no-i-adapt
+lookahead有効時の適応的なIフレーム挿入を無効化する。
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+### --no-b-adapt
+lookahead有効時の適応的なBフレーム挿入を無効化する。
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+### --strict-gop
+固定GOP長を強制する。
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+### --gop-len &lt;int&gt;
+最大GOP長。lookaheadオフでは、この値が常に使用される。(可変ではない)
+
+### -b, --bframes &lt;int&gt;
+連続Bフレーム数。
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+### --ref &lt;int&gt;
+参照距離を設定する。(最大16まで) 
+
+### --multiref-l0 &lt;int&gt;  [H.264/HEVC]
+### --multiref-l1 &lt;int&gt;  [H.264/HEVC]
+複数参照(L0,L1)の最大フレーム数を指定する。(最大7まで)  
+API v9.1 から使用可能。
+
+
+### --weightp
+重み付きPフレームを使用する。
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+### --nonrefp
+non-reference P-framesを自動挿入を有効にする。
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+### --unidirectb
+低遅延用途向けに、ユニディレクショナルBフレーム（両方の参照が過去側）を有効にします。LowLatency/UltraLowLatencyユースケースで圧縮効率が向上します。通常のBフレームを使用している場合、このパラメータの値は無視されます。
+
+### --aq
+フレーム内(空間方向)の適応的量子化を有効にする。(デフォルト:オフ)
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+### --aq-temporal
+フレーム間(時間方向)の適応的量子化を有効にする。(デフォルト:オフ)
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+### --aq-strength &lt;int&gt;
+AQ強度を指定する。(1(弱) ～ 15(強)、0 = 自動)
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+### --bref-mode &lt;string&gt;
+Bフレームの参照モードを指定する。
+- auto (default)
+- disabled
+- each ... すべてのBフレームを参照フレームとして利用する  
+- middle ... 偶数番目のBフレームのみが参照フレームとして利用できる  
+- hierarchical ... 階層型Bフレーム参照を使用する (AV1、NVENC API 13.1以降)
+
+`hierarchical` には次の制約があります。
+
+- `--bframes` は 0、1、3、7、15、31 のいずれかにする必要があります。
+- Lookaheadは無効にする必要があります。有効にする場合は、`--lookahead-level 0`、`--no-i-adapt`、`--no-b-adapt` をすべて指定してください。
+- `--multipass` は `none` にする必要があります。
+- `--split-enc` は `auto` (推奨) または `disable` にする必要があります。
+- PTDを有効にする必要があります。NVEncCではPTDを常に有効にしています。
+
+### --temporal-layers &lt;int&gt;  
+hierarchialフレームの階層数を指定する。
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+
+### --direct &lt;string&gt; [H.264]
+H.264のBDirect modeを指定する。
+- auto(default)
+- disabled
+- spatial
+- temporal
+
+### --hierarchial-p [H.264]
+H.264のhierarchial Pフレームを有効にする。
+
+### --hierarchial-b [H.264]
+H.264のhierarchial Bフレームを有効にする。
+
+### --mv-precision &lt;string&gt;
+動きベクトル精度 / デフォルト: auto
+- auto     ... 自動
+- Q-pel    ... 1/4画素精度 (高精度)
+- half-pel ... 1/2画素精度
+- full-pel ... 1 画素精度 (低精度)
+
+### --slices &lt;int&gt; [H.264/HEVC]
+スライス数。指定なし、あるいは0で自動。
+
+### --cabac [H.264]
+CABACを使用する。 (デフォルト: オン)
+
+### --cavlc [H.264]
+CAVLCを使用する。 (デフォルト: オフ)
+
+### --bluray [H.264]
+Bluray用出力を行う。(デフォルト: オフ)
+
+### --(no-)deblock [H.264]
+デブロックフィルタを有効にする。(デフォルト: オン)
+
+### --cu-max &lt;int&gt; [HEVC]
+### --cu-min &lt;int&gt; [HEVC]
+それぞれCUの最大、最小サイズを指定する。8, 16, 32 を指定可能。
+HEVCの規格では64まで存在するが、現状NVENCでは32までしかサポートされていない。  
+**画質が低下する恐れがあることがわかっているので、--cu-min / --cu-max の使用は非推奨。**
+
+### --alpha-bitrate-ratio &lt;int&gt; [HEVC]
+```--output-csp yuva420```でalphaチャンネルエンコードを行う際に、alphaチャンネルに割り当てるビットレートの割合を指定する。デフォルトは0で「自動」。
+
+この値を"x"に設定すると、ビットレートの約 "1/(x+1)" がalphaチャンネルに割り当てられる。つまり、値が小さいほど、alphaチャンネルに多くのビットレートが使用される。
+
+### --alpha-channel-mode &lt;string&gt; [HEVC]
+```--output-csp yuva420```でalphaチャンネルエンコードを行う際のalphaチャンネルのモードを指定する。(デフォルト: straight)
+- straight
+- premultiplied
+
+### --tf-level &lt;int&gt;  
+temporal filterの指定。Bフレーム数が4以上である必要がある。(デフォルト: 0)
+既定値は[--preset](#-u---preset)と[--tune](#--tune-string)に依存します。
+```
+  0, 4
+```
+
+### --part-size-min &lt;int&gt; [AV1]
+輝度成分の最小符号化ブロックサイズを指定する。 (デフォルト: 0 = auto)
+```
+  0 (auto), 4, 8, 16, 32, 64
+```
+
+### --part-size-max &lt;int&gt; [AV1]
+輝度成分の最大符号化ブロックサイズを指定する。  (デフォルト: 0 = auto)
+```
+  0 (auto), 4, 8, 16, 32, 64
+```
+
+### --tile-columns &lt;int&gt; [AV1]
+列方向のタイルの数を指定する。 (default: 0 = auto)
+
+```
+  0 (auto), 1, 2, 4, 8, 16, 32, 64
+```
+
+### --tile-rows &lt;int&gt; [AV1]
+行方向のタイルの数を指定する。 (default: 0 = auto)
+
+```
+  0 (auto), 1, 2, 4, 8, 16, 32, 64
+```
+
+### --refs-forward &lt;int&gt; [AV1]
+フレーム予測に使用する順方向の参照フレームの最大数を指定する。 (デフォルト: 0 = auto)
+
+1 - 4 の間で指定可能。常にこの値に従うわけではない点に注意。
+
+### --refs-backward &lt;int&gt; [AV1]
+フレーム予測に使用するL1 list参照フレームの最大数を指定する。 (デフォルト: 0 = auto)
+
+1 - 3 の間で指定可能。常にこの値に従うわけではない点に注意。
+
+### --bitstream-padding [AV1]
+AV1 CBRエンコード用のビットストリームパディングを有効にする。 (デフォルト: off)
+
+### --level &lt;string&gt;
+エンコードするコーデックのLevelを指定する。指定しない場合は自動的に決定される。
+```
+h264:  auto, 1, 1b, 1.1, 1.2, 1.3, 2, 2.1, 2.2, 3, 3.1, 3.2, 4, 4.1, 4.2, 5, 5.1, 5.2
+hevc:  auto, 1, 2, 2.1, 3, 3.1, 4, 4.1, 5, 5.1, 5.2, 6, 6.1, 6.2
+av1 :  auto, 2, 2.1, 3, 3.1, 4, 4.1, 5, 5.1, 5.2, 5.3, 6, 6.1
+```
+
+### --profile &lt;string&gt;
+エンコードするコーデックのプロファイルを指定する。指定しない場合は自動的に決定される。
+```
+h264:  auto, baseline, main, high, high10, high422, high444
+hevc:  auto, main, main10, main444
+av1 :  auto, main, high
+```
+
+### --tier &lt;string&gt;
+コーデックのtierを指定する。
+```
+hevc:  main, high
+```
+
+### --sar &lt;int&gt;:&lt;int&gt;
+SAR比 (画素アスペクト比) の指定。
+
+### --dar &lt;int&gt;:&lt;int&gt;
+DAR比 (画面アスペクト比) の指定。
+
+### --colorrange &lt;string&gt;
+"auto"を指定することで、入力ファイルの値をそのまま反映できます。([avhw](#--avhw)/[avsw](#--avsw)読み込みのみ)
+```
+  limited, full, auto
+```
+
+### --videoformat &lt;string&gt;
+```
+  undef, ntsc, component, pal, secam, mac
+```
+### --colormatrix &lt;string&gt;
+"auto"を指定することで、入力ファイルの値をそのまま反映できます。([avhw](#--avhw)/[avsw](#--avsw)読み込みのみ)
+```
+  undef, auto, bt709, smpte170m, bt470bg, smpte240m, YCgCo, fcc, GBR, bt2020nc, bt2020c
+```
+### --colorprim &lt;string&gt;
+"auto"を指定することで、入力ファイルの値をそのまま反映できます。([avhw](#--avhw)/[avsw](#--avsw)読み込みのみ)
+```
+  undef, auto, bt709, smpte170m, bt470m, bt470bg, smpte240m, film, bt2020
+```
+### --transfer &lt;string&gt;
+"auto"を指定することで、入力ファイルの値をそのまま反映できます。([avhw](#--avhw)/[avsw](#--avsw)読み込みのみ)
+```
+  undef, auto, bt709, smpte170m, bt470m, bt470bg, smpte240m, linear,
+  log100, log316, iec61966-2-4, bt1361e, iec61966-2-1,
+  bt2020-10, bt2020-12, smpte2084, smpte428, arib-std-b67
+```  
+
+### --chromaloc &lt;int&gt; or "auto"
+出力データのchroma location flagを 0 ～ 5 の範囲で指定する。  
+デフォルト = 0 (unspecified)
+
+### --max-cll &lt;int&gt;,&lt;int&gt; or "copy" [HEVC, AV1]
+MaxCLL and MaxFall を nits で指定する。"copy"とすると入力ファイルの値を出力ファイルにそのまま設定します。([avhw](#--avhw)/[avsw](#--avsw)読み込みのみ)  
+
+[--repeat-headers](#--repeat-headers)が自動的に有効になる点に注意してください。  
+```
+例1: --max-cll 1000,300
+例2: --max-cll copy  # 入力ファイルから値をコピー
+```
+
+### --master-display &lt;string&gt; or "copy" [HEVC, AV1]
+Mastering display data の設定。"copy"とすると入力ファイルの値を出力ファイルにそのまま設定します。([avhw](#--avhw)/[avsw](#--avsw)読み込みのみ)  
+
+[--repeat-headers](#--repeat-headers)が自動的に有効になる点に注意してください。  
+```
+例1: --master-display G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1)
+例2: --master-display copy  # 入力ファイルから値をコピー
+```
+
+### --atc-sei &lt;string&gt; or &lt;int&gt; [HEVCのみ]
+Alternative transfer characteristics SEI の設定。下記文字列または整数で指定する。
+```
+  undef, auto, bt709, smpte170m, bt470m, bt470bg, smpte240m, linear,
+  log100, log316, iec61966-2-4, bt1361e, iec61966-2-1,
+  bt2020-10, bt2020-12, smpte2084, smpte428, arib-std-b67
+```  
+
+### --dhdr10-info &lt;string&gt; [HEVC, AV1]
+指定したjsonファイルから、HDR10+のメタデータを読み込んで反映する。実行には追加で[hdr10plus_gen.exe](https://github.com/rigaya/hdr10plus_gen)が必要。
+
+### --dhdr10-info copy [HEVC, AV1]
+HDR10+のメタデータを入力ファイルからそのままコピーします。
+avhw読み込みでは、フレームの並び替えにタイムスタンプを使用するため、タイムスタンプの取得できないraw ESのような入力ファイルでは使用できません。
+こうした場合には、avsw読み込みを使用してください。 
+
+### --dolby-vision-profile &lt;string&gt; [HEVC, AV1]
+指定されたdolby visionプロファイルを適用します。[--dolby-vision-rpu](#--dolby-vision-rpu-string)との併用が推奨です。
+
+HEVCのDolby Vision出力では、Dolby Vision用のVUI設定に加え、`--repeat-headers`、`--aud`、`--pic-struct` が自動的に有効になります。
+
+"copy" は、入力ファイルのdolby visionプロファイルを適用します。 ([avhw](#--avhw)/[avsw](#--avsw)読み込みのみ)
+
+```
+unset, copy, 5.0, 8.1, 8.2, 8.4, 10.0, 10.1, 10.2, 10.4
+```
+
+### --dolby-vision-rpu &lt;string&gt; [HEVC, AV1]
+指定のrpuファイルに含まれるdolby visionのmetadataを出力ファイルに挿入します。[--dolby-vision-profile](#--dolby-vision-profile-string)との併用が推奨です。
+
+現在のDolby Vision出力は BL+RPU のみです。BL+EL の出力には対応していません。
+
+Dolby Visionのprofile/level bitrateおよびHRD制約をよりよく満たすには、bitrate/VBV制御可能なモードを使用し、[--max-bitrate](#--max-bitrate-int) / [--vbv-bufsize](#--vbv-bufsize-int) を適切に指定してください。`--cqp` も使用できますが、これらの制約をそれ自体で保証するものではありません。
+
+### --dolby-vision-rpu copy [HEVC, AV1]
+HEVCの入力ファイルから読み取ったdolby visionのmetadataを出力ファイルに挿入します。 [--dolby-vision-profile](#--dolby-vision-profile-string)との併用が推奨です。
+
+avhw読み込みでは、フレームの並び替えにタイムスタンプを使用するため、タイムスタンプの取得できないraw ESのような入力ファイルでは使用できません。
+こうした場合には、avsw読み込みを使用してください。 
+
+### --dolby-vision-rpu-prm &lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...  
+
+```--dolby-vision-rpu```用のパラメータを指定する。
+
+- **パラメータ**
+  
+  - crop=&lt;bool&gt;  
+    RPUのactive area offsetsを0に設定する (レターボックスなしの意味)。
+
+- 使用例
+  ```
+  例:  --dolby-vision-rpu-prm crop=true
+  ```
+
+
+### --aud [H.264/HEVC]
+Access Unit Delimiter NALを挿入する。
+
+### --repeat-headers
+キーフレームごとに VPS,SPS,PPS を出力する。
+
+### --pic-struct [H.264/HEVC]
+picture timing SEIを挿入する。
+
+### --split-enc &lt;string&gt;
+- **パラメータ**
+  - auto  
+    フレーム分割のforced modeが無効、auto modeが有効。
+
+  - auto_forced  
+    適用するフレーム分割のforced modeをドライバが設定から自動的に判断する。
+
+  - forced_2  
+    NVENCの数に応じて、最大で2-stripのフレーム分割エンコードを行う。
+
+  - forced_3  
+    NVENCの数に応じて、最大で3-stripのフレーム分割エンコードを行う。
+
+  - forced_4  
+    NVENCの数に応じて、最大で4-stripのフレーム分割エンコードを行う。
+
+  - disable  
+    フレーム分割のforced modeとauto modeをともに無効にする。
+
+### --ssim
+エンコード結果のSSIMを計算。
+
+### --psnr
+エンコード結果のPSNRを計算。
+
+### --vmaf [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+エンコード結果のVMAFスコアを計算する。なお、VMAFスコアの計算はlibvmafによりCPUで行われるため、
+エンコード速度を律速し非常に遅くなる可能性が高いので注意してください。
+
+- **パラメータ**
+  
+    - model=&lt;string&gt;  
+      libvmafの内蔵モデルファイルのバージョン、あるいは外部のモデルファイルのパスを指定する。デフォルトは内蔵モデル"vmaf_v0.6.1"。
+  
+      同梱のlibvmaf 3.2.0ビルドで利用可能な内蔵モデル名:
+      - `vmaf_v0.6.1`
+      - `vmaf_b_v0.6.3`
+      - `vmaf_v0.6.1neg`
+      - `vmaf_4k_v0.6.1`
+      - `vmaf_4k_v0.6.1neg`
+      - `vmaf_v1.0.16_3d0h`
+      - `vmaf_v1.0.16_3d0h_2160`
+      - `vmaf_v1.0.16_5d0h`
+      - `vmaf_v1.0.16_1d5h_2160`
+      - `vmaf_v1.0.16_hfr_3d0h`
+      - `vmaf_v1.0.16_hfr_3d0h_2160`
+      - `vmaf_v1.0.16_hfr_5d0h`
+      - `vmaf_v1.0.16_hfr_1d5h_2160`
+  
+      外部モデルファイルを使用する場合は、[こちら](https://github.com/Netflix/vmaf/tree/master/model)から
+      json形式のモデルファイルをダウンロードし、実在する`.json`ファイルのパスを指定してください。
+  
+    - threads=&lt;int&gt;  (default: 0)  
+      VMAFスコアを計算するCPUのスレッド数の指定。デフォルトは全物理コア。
+  
+    - subsample=&lt;int&gt;  (default: 1)  
+      VMAFスコアを計算対象とするフレームサブサンプリング間隔の指定。
+  
+    - phone_model=&lt;bool&gt;  (default: false)  
+      電話モデルを使用し、モバイル端末等に適したより高いVMAFスコアを計算する。
+      
+    - enable_transform=&lt;bool&gt;  (default: false)  
+      VMAFスコアの計算でtransformを有効にして計算する。
+      
+- 使用例
+  ```
+  例: --vmaf model=vmaf_v0.6.1
+  例: --vmaf model=/path/to/vmaf_4k_v0.6.1neg.json
+  ```
+
+### --vship-ssimulacra2
+Vshipライブラリを使用してSSIMULACRA2スコアを算出する(GPU加速)。
+終了時に、平均値に加えて標準偏差、中央値、5パーセンタイル、95パーセンタイル、最小値、最大値を1行で表示する。
+
+### --vship-butteraugli [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+Vshipライブラリを使用してButteraugliスコアを算出する(GPU加速)。
+ - **パラメータ**
+   - Qnorm=&lt;int&gt; (デフォルト: 2)  
+     Butteraugli距離の正規化パラメータ。
+   - intensity_multiplier=&lt;float&gt; (デフォルト: 80.0)  
+     計算の強度乗数。
+
+### --vship-cvvdp [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+Vshipライブラリを使用してCVVDP(Compressed Video Visual Difference Predictor)スコアを算出する(GPU加速)。
+フレーム間の時間的依存性を考慮した品質メトリクス。
+ - **パラメータ**
+   - model=&lt;string&gt; (デフォルト: standard_4k)  
+     ディスプレイモデルキー (例: "standard_4k", "standard_fhd")。
+   - model_config_json=&lt;string&gt;  
+     カスタム表示設定JSONファイルのパス。
+   - resize=&lt;bool&gt; (デフォルト: false)  
+     モデルで定義されたディスプレイ解像度にフレームをリサイズする。
+
+## 入出力 / 音声 / 字幕などのオプション
+
+### --input-analyze &lt;float&gt;
+libavが読み込み時に解析するファイルの時間を秒で指定。デフォルトは5。
+音声トラックなどが正しく抽出されない場合、この値を大きくしてみてください(例:60)。
+
+### --input-probesize &lt;int&gt;
+libavが読み込み時に解析する最大のサイズをbyte単位で指定。
+
+### --trim &lt;int&gt;:&lt;int&gt;[,&lt;int&gt;:&lt;int&gt;][,&lt;int&gt;:&lt;int&gt;]...
+指定した範囲のフレームのみをエンコードする。
+
+- 使用例
+  ```
+  例1: --trim 0:1000,2000:3000    (0～1000フレーム目, 2000～3000フレーム目をエンコード)
+  例2: --trim 2000:0              (2000～最終フレームまでをエンコード)
+  ```
+
+### --seek [[&lt;int&gt;:]&lt;int&gt;:]&lt;int&gt;[.&lt;int&gt;]
+書式は、hh:mm:ss.ms。"hh"や"mm"は省略可。
+高速だが不正確なシークをしてからエンコードを開始する。正確な範囲指定を行いたい場合は[--trim](#--trim-intintintintintint)で行う。
+
+- 使用例
+  ```
+  例1: --seek 0:01:15.400
+  例2: --seek 1:15.4
+  例3: --seek 75.4
+  ```
+
+### --seekto [[&lt;int&gt;:]&lt;int&gt;:]&lt;int&gt;[.&lt;int&gt;]
+書式は、hh:mm:ss.ms。"hh"や"mm"は省略可。
+エンコードの終了時刻を指定する。正確な範囲指定を行いたい場合は[--trim](#--trim-intintintintintint)で行う。
+
+- 使用例
+  ```
+  例1: --seekto 0:01:15.400
+  例2: --seekto 1:15.4
+  例3: --seekto 75.4
+  ```
+
+### --input-format &lt;string&gt;
+avhw/avswリーダー使用時に、入力のフォーマットを指定する。
+
+### -f, --output-format &lt;string&gt;
+- 通常エンコード時
+
+  muxerに出力フォーマットを指定して出力する。
+
+出力フォーマットは出力拡張子から自動的に決定されるので、通常、特に指定する必要はないが、このオプションで出力フォーマットを強制できる。
+
+### --y4m-timestamp
+y4m出力の各FRAME行に、ストリーム先頭を0秒とする表示時刻を `Xts=<秒>`、表示時間を `Xdur=<秒>` の形式で付加する。表示時間を取得できないフレームでは `Xdur` を省略する。
+`-c raw --output-format y4m` との併用時のみ有効。
+
+  使用可能なフォーマットは[--check-formats](#--check-formats)で確認できる。H.264/HEVCをElementary Streamで出力する場合には、"raw"を指定する。
+
+- raw出力時 (```-c raw```指定時)
+
+  出力するrawフレームの形式を指定する。  
+
+  - パラメータ
+    - y4m (デフォルト)
+    - raw
+
+### --video-track &lt;int&gt;
+エンコード対象の映像トラックの選択。avsw/avhwリーダー使用時のみ有効。
+ - 1  ... 最も高解像度の映像トラック (デフォルト)
+ - 2  ... 2番目に高解像度の映像トラック
+    ...
+ - -1 ... 最も低解像度の映像トラック
+ - -2 ... 2番目に低解像度の映像トラック
+
+### --video-streamid &lt;int&gt;
+エンコード対象の映像トラックをstream idで選択。
+
+### --video-tag &lt;string&gt;
+映像のcodec tagの指定。
+
+- 使用例
+  ```
+   -o test.mp4 -c hevc --video-tag hvc1
+  ```
+
+### --video-metadata [&lt;int&gt;?]&lt;string&gt; or [&lt;int&gt;?]&lt;string&gt;=&lt;string&gt;
+映像トラックのmetadataを指定する。
+  - copy  ... 入力ファイルからmetadataをコピーする。 
+  - clear ... do not copy metadata (デフォルト)
+
+- 使用例
+  ```
+  例1: 入力ファイルからmetadataをコピー
+  --video-metadata 1?copy
+  
+  例2: 入力ファイルからのmetadataのコピーを行わない
+  --video-metadata 1?clear
+  
+  例3: 指定のmetadataを設定する
+  --video-metadata 1?title="音声の タイトル" --video-metadata 1?language=jpn
+  ```
+
+### --avcodec-prms &lt;string&gt;
+avcodec映像エンコーダのパラメータをkey=value形式でカンマ区切りで指定する。
+このオプションは `-c av_xxx` でavcodecエンコーダを有効にした場合のみ利用可能（例：`-c av_libsvtav1`, `-c av_libvvenc`, `-c av_libvpx-vp9`）。
+
+- 使用例
+  ```
+  例1: libsvtav1でプリセットとCRFを設定
+  -c av_libsvtav1 --avcodec-prms "preset=6,crf=30,svtav1-params=enable-variance-boost=1:variance-boost-strength=2"
+  
+  例2: libvvencで品質とスレッド数を設定
+  -c av_libvvenc --avcodec-prms qp=28,preset=medium,threads=4
+  
+  例3: libvpx-vp9で複数のパラメータを設定
+  -c av_libvpx-vp9 --avcodec-prms crf=30,b=0,cpu-used=2
+  ```
+
+### --audio-copy [&lt;int/string&gt;;[,&lt;int/string&gt;]...]
+音声をそのままコピーしながら映像とともに出力する。avhw/avswリーダー使用時のみ有効。
+
+tsなどでエラーが出るなどしてうまく動作しない場合は、[--audio-codec](#--audio-codec-intstring)で一度エンコードしたほうが安定動作するかもしれない。
+
+[&lt;int&gt;[,&lt;int&gt;]...]で、抽出する音声トラック(1,2,...)を指定したり、[&lt;string&gt;]で指定した言語の音声トラックをコピーすることもできる。
+トラック番号の先頭に `!` を付けると、そのトラックを除外する (例: `!1,!3`)。
+言語の先頭に `!` を付けると、それらの言語以外のすべてのトラックを選択する (例: `!eng,!jpn`)。
+
+- 使用例
+  ```
+  例: 全ての音声トラックを抽出
+  --audio-copy
+  
+  例: トラック番号#1,#2を抽出
+  --audio-copy 1,2
+  
+  例: 日本語と英語の音声トラックを抽出
+  --audio-copy jpn,eng
+
+  例: トラック番号#1を除外して抽出
+  --audio-copy !1
+  ```
+
+### --audio-codec [[&lt;int/string&gt;?]&lt;string&gt;[:&lt;string&gt;=&lt;string&gt;[,&lt;string&gt;=&lt;string&gt;]...]...]
+音声をエンコードして映像とともに出力する。使用可能なコーデックは[--check-encoders](#--check-codecs---check-decoders---check-encoders)で確認できる。
+
+[&lt;int&gt;]で音声トラック(1,2,...)を選択したり、[&lt;string&gt;]で指定した言語の音声トラックを選択することもできる。
+トラック番号の先頭に `!` を付けると、そのトラックを除外する (例: `--audio-codec !1,!3?aac`)。
+言語の先頭に `!` を付けると、それらの言語以外のすべてのトラックを選択する (例: `--audio-codec !eng,!jpn?copy`)。
+
+さらに、":"以降に音声エンコーダのオプションを指定したり、"#"以降に音声デコーダのオプションを指定することもできる。
+
+- 使用例
+  ```
+  例1: 音声をmp3に変換
+  --audio-codec libmp3lame
+  
+  例2: 音声の第2トラックをaacに変換
+  --audio-codec 2?aac
+  
+  例3: 日本語の音声をaacに変換
+  --audio-codec jpn?aac
+  
+  例4: 日本語と英語の音声をaacに変換
+  --audio-codec jpn?aac --audio-codec eng?aac
+  
+  例5: 第1音声トラックを除外してaacに変換
+  --audio-codec !1?aac
+
+  例6: aacエンコーダのパラメータ"aac_coder"に低ビットレートでより高品質な"twoloop"を指定
+  --audio-codec aac:aac_coder=twoloop
+  ```
+
+### --audio-encode-other-codec-only
+`--audio-codec` と併用すると、入力の音声コーデックが `--audio-codec` で指定したコーデックと同じ場合は `--audio-copy` としてコピーし、異なる場合のみ `--audio-codec` に基づいてエンコードを行う。
+
+- 使用例
+  ```
+  例: 入力がAACならコピー、他ならAACへエンコード
+  --audio-codec aac --audio-encode-other-codec-only
+  ```
+
+### --audio-bitrate [&lt;int/string&gt;?]&lt;int&gt; or [&lt;int/string&gt;?]&lt;string&gt;:&lt;int&gt;[,&lt;string&gt;:&lt;int&gt;][,...]
+音声をエンコードする際のビットレートをkbpsで指定する。
+
+```?```の前の[&lt;int&gt;]で音声トラック(1,2,...)を選択したり、[&lt;string&gt;]で指定した言語の音声トラックを選択することもできる。
+
+```?```の後ろの&lt;string&gt;では下記のチャンネル指定により、指定のチャンネルに対して指定値を適用することもできる。
+
+```
+mono, stereo, 2.1, 3.0, 3.0(back), 3.1, 4.0, quad, quad(side), 5.0, 5.1, 6.0, 6.0(front), hexagonal, 6.1, 6.1(front), 7.0, 7.0(front), 7.1, 7.1(wide)
+```
+
+- 使用例
+  ```
+  例1: --audio-bitrate 192   (音声を192kbpsで変換)
+  例2: --audio-bitrate 1?320 --audio-bitrate 2?256 (音声の第1トラックを320kbpsで変換、音声の第2トラックを256kbpsで変換)
+  例3: --audio-bitrate stereo:256,5.1:640 (stereoを256kbpsで、5.1chを640kbpsで変換)
+  ```
+
+### --audio-quality [&lt;int/string&gt;?]&lt;int&gt;
+音声をエンコードする際の品質を指定する。値は使用するコーデックに依存する。
+
+[&lt;int&gt;]で音声トラック(1,2,...)を選択したり、[&lt;string&gt;]で指定した言語の音声トラックを選択することもできる。
+
+### --audio-profile [&lt;int/string&gt;?]&lt;string&gt;
+音声をエンコードする際、そのプロファイルを指定する。
+
+### --audio-stream [&lt;int/string&gt;?]{&lt;string1&gt;}[:&lt;string2&gt;]
+音声チャンネルの分離・統合などを行う。
+--audio-streamが指定された音声トラックは常にエンコードされる。(コピー不可)
+,(カンマ)で区切ることで、入力の同じトラックから複数のトラックを生成できる。
+
+- **書式**  
+  &lt;int&gt;に処理対象のトラックを指定する。
+  
+  &lt;string1&gt;に入力として使用するチャンネルを指定する。省略された場合は入力の全チャンネルを使用する。
+  
+  &lt;string2&gt;に出力チャンネル形式を指定する。省略された場合は、&lt;string1&gt;のチャンネルをすべて使用する。
+
+- 使用例
+  ```
+  例1: --audio-stream FR,FL
+  デュアルモノから左右のチャンネルを2つのモノラル音声に分離する。
+  
+  例2: --audio-stream :stereo
+  どんな音声もステレオに変換する。
+  
+  例3: --audio-stream 2?5.1,5.1:stereo
+  入力ファイルの第２トラックを、5.1chの音声を5.1chとしてエンコードしつつ、ステレオにダウンミックスしたトラックを生成する。
+  実際に使うことがあるかは微妙だが、書式の紹介例としてはわかりやすいかと。
+  ```
+
+- **使用できる記号**  
+  ```
+  mono       = FC
+  stereo     = FL + FR
+  2.1        = FL + FR + LFE
+  3.0        = FL + FR + FC
+  3.0(back)  = FL + FR + BC
+  3.1        = FL + FR + FC + LFE
+  4.0        = FL + FR
+  4.0        = FL + FR + FC + BC
+  quad       = FL + FR + BL + BR
+  quad(side) = FL + FR + SL + SR
+  5.0        = FL + FR + FC + SL + SR
+  5.1        = FL + FR + FC + LFE + SL + SR
+  6.0        = FL + FR + FC + BC + SL + SR
+  6.0(front) = FL + FR + FLC + FRC + SL + SR
+  hexagonal  = FL + FR + FC + BL + BR + BC
+  6.1        = FL + FR + FC + LFE + BC + SL + SR
+  6.1(front) = FL + FR + LFE + FLC + FRC + SL + SR
+  7.0        = FL + FR + FC + BL + BR + SL + SR
+  7.0(front) = FL + FR + FC + FLC + FRC + SL + SR
+  7.1        = FL + FR + FC + LFE + BL + BR + SL + SR
+  7.1(wide)  = FL + FR + FC + LFE + FLC + FRC + SL + SR
+  ```
+
+### --audio-samplerate [&lt;int/string&gt;?]&lt;int&gt;
+音声のサンプリング周波数をHzで指定する。
+[&lt;int&gt;]で音声トラック(1,2,...)を選択したり、[&lt;string&gt;]で指定した言語の音声トラックを選択することもできる。
+
+- 使用例
+  ```
+  例1: --audio-bitrate 44100   (音声を44100Hzに変換)
+  例2: --audio-bitrate 2?22050 (音声の第2トラックを22050Hzに変換)
+  ```
+
+### --audio-resampler &lt;string&gt;
+音声チャンネルのmixやサンプリング周波数変換に使用されるエンジンの指定。
+- swr  ... swresampler (デフォルト)
+- soxr ... sox resampler (libsoxr)
+
+### --audio-delay [&lt;int/string&gt;?]&lt;float&gt;
+音声に設定する遅延をms単位で指定する。[&lt;int&gt;]で音声トラック(1,2,...)を選択したり、[&lt;string&gt;]で指定した言語の音声トラックを選択することもできる。
+
+### --audio-file [&lt;int&gt;][&lt;string&gt;?]&lt;string&gt;
+指定したパスに音声を抽出する。出力フォーマットは出力拡張子から自動的に決定する。avhw/avswリーダー使用時のみ有効。
+
+[&lt;int&gt;]で音声トラック(1,2,...)を選択したり、[&lt;string&gt;]で指定した言語の音声トラックを選択することもできる。
+
+- 使用例
+  ```
+  例: test_out2.aacにトラック番号#2を抽出
+  --audio-file 2?"test_out2.aac"
+  ```
+
+[&lt;string&gt;]では、出力フォーマットを指定することができる。
+
+- 使用例
+  ```
+  例: 拡張子なしでもadtsフォーマットで出力
+  --audio-file 2?adts:"test_out2"  
+  ```
+
+### --audio-filter [&lt;int/string&gt;?]&lt;string&gt;
+音声に音声フィルタを適用する。適用可能なフィルタは[こちら](https://ffmpeg.org/ffmpeg-filters.html#Audio-Filters)。
+
+[&lt;int&gt;]で音声トラック(1,2,...)を選択したり、[&lt;string&gt;]で指定した言語の音声トラックを選択することもできる。
+
+- 使用例
+  ```
+  例1: --audio-filter volume=0.2     (音量を下げる例)
+  例2: --audio-filter 2?volume=-4dB  (第2トラックの音量を下げる例)
+  ```
+
+### --audio-disposition [&lt;int/string&gt;?]&lt;string&gt;[,&lt;string&gt;][]...
+音声のdispositionを指定する。
+
+[&lt;int&gt;]で音声トラック(1,2,...)を選択したり、[&lt;string&gt;]で指定した言語の音声トラックを選択することもできる。
+
+- 指定可能なdisposition
+  ```
+   default
+   dub
+   original
+   comment
+   lyrics
+   karaoke
+   forced
+   hearing_impaired
+   visual_impaired
+   clean_effects
+   attached_pic
+   captions
+   descriptions
+   dependent
+   metadata
+   copy
+  ```
+
+- 使用例
+  ```
+  例:
+  --audio-disposition 2?default,forced
+  ```
+
+### --audio-metadata [&lt;int/string&gt;?]&lt;string&gt; or [&lt;int/string&gt;?]&lt;string&gt;=&lt;string&gt;
+音声トラックのmetadataを指定する。
+  - copy  ... 入力ファイルからmetadataをコピーする。 (デフォルト)
+  - clear ... do not copy metadata
+
+[&lt;int&gt;]で音声トラック(1,2,...)を選択したり、[&lt;string&gt;]で指定した言語の音声トラックを選択することもできる。
+
+- 使用例
+  ```
+  例1: 入力ファイルからmetadataをコピー
+  --audio-metadata 1?copy
+  
+  例2: 入力ファイルからのmetadataのコピーを行わない
+  --audio-metadata 1?clear
+  
+  例3: 指定のmetadataを設定する
+  --audio-metadata 1?title="音声の タイトル" --audio-metadata 1?language=jpn
+  ```
+
+### --audio-bsf [&lt;int/string&gt;?]&lt;string&gt;
+音声トラックにbitstream filterを適用する。使用可能なフィルタは、[こちら](https://ffmpeg.org/ffmpeg-bitstream-filters.html)の中から選択可能。
+
+### --audio-ignore-decode-error &lt;int&gt;
+指定した連続する音声のデコードエラーの数をカウントし、閾値以内ならエラーを無視して処理を継続し、エラーの箇所は無音に置き換える。
+
+デフォルトは10。 0とすれば、1回でもデコードエラーが起これば処理を中断してエラー終了する。
+
+### --audio-source &lt;string&gt;[:[{&lt;int&gt;?}][;&lt;param1&gt;=&lt;value1&gt;...]/[]...]
+外部音声ファイルをmuxする。
+
+- **ファイルのパラメータ**
+  - format=&lt;string&gt;  
+    入力ファイルのフォーマットを指定する。
+  - input_opt=&lt;string&gt;  
+    入力ファイル用のオプションを指定する。
+
+- **トラックのパラメータ**
+  - copy  
+    音声トラックをそのままコピーする。
+  
+  - codec=&lt;string&gt;  
+    音声トラックを指定のコーデックにエンコードする。
+  
+  - profile=&lt;string&gt;  
+    音声エンコード時のプロファイルを指定する。
+  
+  - bitrate=&lt;int&gt;  
+    音声エンコード時のビットレートをkbps単位で指定する。
+    
+  - samplerate=&lt;int&gt;  
+    音声エンコード時のサンプリングレートをHz単位で指定する。
+    
+  - delay=&lt;int&gt;  
+    音声を指定した時間遅延させる。(ms単位)
+  
+  - dec_prm=&lt;string&gt;  
+    音声デコード時のパラメータを指定する。
+  
+  - enc_prm=&lt;string&gt;  
+    音声エンコード時のパラメータを指定する。
+  
+  - filter=&lt;string&gt;  
+    音声エンコード時のフィルタを指定する。
+    
+  - disposition=&lt;string&gt;  
+    音声のdispositionを指定する。
+    
+  - metadata=&lt;string1&gt;=&lt;string2&gt;  
+    音声のmetadataを指定する。
+  
+  - bsf=&lt;string&gt;  
+    音声に適用するbitstream filterを指定する。
+
+- 使用例
+  ```
+  例1: --audio-source "<audio_file>:copy"
+  例2: --audio-source "<audio_file>:codec=aac"
+  例3: --audio-source "<audio_file>:1?codec=aac;bitrate=256/2?codec=aac;bitrate=192;metadata=language=jpn;disposition=default,forced"
+  例4: --audio-source "hw:1:format=alsa/codec=aac;bitrate=256"
+  ```
+
+### --chapter &lt;string&gt;
+指定したチャプターファイルを読み込み反映させる。
+nero形式、apple形式、matroska形式に対応する。--chapter-copyとは併用できない。
+
+- nero形式  
+  ```
+  CHAPTER01=00:00:39.706
+  CHAPTER01NAME=chapter-1
+  CHAPTER02=00:01:09.703
+  CHAPTER02NAME=chapter-2
+  CHAPTER03=00:01:28.288
+  CHAPTER03NAME=chapter-3
+  ```
+
+- apple形式 (UTF-8であること)  
+  ```
+  <?xml version="1.0" encoding="UTF-8" ?>
+    <TextStream version="1.1">
+     <TextStreamHeader>
+      <TextSampleDescription>
+      </TextSampleDescription>
+    </TextStreamHeader>
+    <TextSample sampleTime="00:00:39.706">chapter-1</TextSample>
+    <TextSample sampleTime="00:01:09.703">chapter-2</TextSample>
+    <TextSample sampleTime="00:01:28.288">chapter-3</TextSample>
+    <TextSample sampleTime="00:01:28.289" text="" />
+  </TextStream>
+  ```
+
+- matroska形式 (UTF-8であること)  
+  [その他のサンプル&gt;&gt;](https://github.com/nmaier/mkvtoolnix/blob/master/examples/example-chapters-1.xml)
+  ```
+  <?xml version="1.0" encoding="UTF-8"?>
+  <Chapters>
+    <EditionEntry>
+      <ChapterAtom>
+        <ChapterTimeStart>00:00:00.000</ChapterTimeStart>
+        <ChapterDisplay>
+          <ChapterString>chapter-0</ChapterString>
+        </ChapterDisplay>
+      </ChapterAtom>
+      <ChapterAtom>
+        <ChapterTimeStart>00:00:39.706</ChapterTimeStart>
+        <ChapterDisplay>
+          <ChapterString>chapter-1</ChapterString>
+        </ChapterDisplay>
+      </ChapterAtom>
+      <ChapterAtom>
+        <ChapterTimeStart>00:01:09.703</ChapterTimeStart>
+        <ChapterDisplay>
+          <ChapterString>chapter-2</ChapterString>
+        </ChapterDisplay>
+      </ChapterAtom>
+      <ChapterAtom>
+        <ChapterTimeStart>00:01:28.288</ChapterTimeStart>
+        <ChapterTimeEnd>00:01:28.289</ChapterTimeEnd>
+        <ChapterDisplay>
+          <ChapterString>chapter-3</ChapterString>
+        </ChapterDisplay>
+      </ChapterAtom>
+    </EditionEntry>
+  </Chapters>
+  ```
+
+### --chapter-copy
+チャプターをコピーする。
+
+### --chapter-no-trim
+チャプター読み込みの際、trimを反映させず、そのまま適用する。
+
+### --key-on-chapter
+キーフレーム位置にチャプターを挿入する。
+
+### --keyfile &lt;string&gt;
+キーフレームしたいフレーム番号を記載したファイルを読み込み、指定のフレームをキーフレームに設定する。
+フレーム番号は、先頭から0, 1, 2, .... として、複数指定する場合は都度改行する。
+
+### --sub-source &lt;string&gt;[:{&lt;int&gt;?}[;&lt;param1&gt;=&lt;value1&gt;]...]...
+指定のファイルから字幕を読み込みmuxする。
+
+- **ファイルのパラメータ**
+  - format=&lt;string&gt;  
+    入力ファイルのフォーマットを指定する。
+  - input_opt=&lt;string&gt;  
+    入力ファイル用のオプションを指定する。
+
+- **トラックのパラメータ**
+  - disposition=&lt;string&gt;  
+    字幕のdispositionを指定する。
+    
+  - metadata=&lt;string1&gt;=&lt;string2&gt;  
+    字幕のmetadataを指定する。
+  
+  - bsf=&lt;string&gt;  
+    字幕に適用するbitstream filterを指定する。
+  
+- 使用例
+  ```
+  例1: --sub-source "<sub_file>"
+  例2: --sub-source "<sub_file>:disposition=default,forced;metadata=language=jpn"
+  ```
+
+### --sub-copy [&lt;int/string&gt;;[,&lt;int/string&gt;]...]
+字幕をコピーする。avhw/avswリーダー使用時のみ有効。
+
+[&lt;int&gt;[,&lt;int&gt;]...]で、抽出する字幕トラック(1,2,...)を指定したり、[&lt;string&gt;[,&lt;string&gt;]...]で指定した言語の字幕トラックをコピーすることもできる。
+トラック番号の先頭に `!` を付けると、そのトラックを除外する (例: `!1,!3`)。
+言語の先頭に `!` を付けると、それらの言語以外のすべてのトラックを選択する (例: `!eng,!jpn`)。
+
+対応する字幕は、PGS/srt/txt/ttxtなど。
+
+- 使用例
+  ```
+  例: 全ての字幕トラックをコピー
+  --sub-copy
+  
+  例: 字幕トラック #1と#2をコピー
+  --sub-copy 1,2
+  
+  例: 日本語と英語の音声トラックを抽出
+  --sub-copy jpn,eng
+
+  例: 字幕トラック#1を除外してコピー
+  --sub-copy !1
+  ```
+
+### --sub-codec [[&lt;int/string&gt;?]&lt;string&gt;]
+字幕を指定したコーデックへ変換する。トラック番号または言語による選択と、先頭に `!` を付けた除外指定を使用できる。
+
+- 使用例
+  ```
+  例: 字幕トラック#1を除外してassへ変換
+  --sub-codec !1?ass
+  ```
+
+### --sub-disposition [&lt;int/string&gt;?]&lt;string&gt;[,&lt;string&gt;][]...
+字幕のdispositionを指定する。
+
+- 指定可能なdisposition
+  ```
+   default
+   dub
+   original
+   comment
+   lyrics
+   karaoke
+   forced
+   hearing_impaired
+   visual_impaired
+   clean_effects
+   attached_pic
+   captions
+   descriptions
+   dependent
+   metadata
+   copy
+  ```
+
+### --sub-metadata [&lt;int/string&gt;?]&lt;string&gt; or [&lt;int/string&gt;?]&lt;string&gt;=&lt;string&gt;
+字幕トラックのmetadataを指定する。
+  - copy  ... 入力ファイルからmetadataをコピーする。 (デフォルト)
+  - clear ... do not copy metadata
+
+- 使用例
+  ```
+  例1: 入力ファイルからmetadataをコピー
+  --sub-metadata 1?copy
+  
+  例2: 入力ファイルからのmetadataのコピーを行わない
+  --sub-metadata 1?clear
+  
+  例3: 指定のmetadataを設定する
+  --sub-metadata 1?title="字幕の タイトル" --sub-metadata 1?language=jpn
+  ```
+
+### --sub-bsf [&lt;int/string&gt;?]&lt;string&gt;
+字幕トラックにbitstream filterを適用する。使用可能なフィルタは、[こちら](https://ffmpeg.org/ffmpeg-bitstream-filters.html)の中から選択可能。
+
+### --data-copy [&lt;int/string&gt;[,&lt;int/string&gt;]...]
+データストリームをコピーする。avhw/avswリーダー使用時のみ有効。
+トラック番号または言語で対象を選択できる。先頭に `!` を付けると、そのトラック番号または言語を除外する (例: `!1,!3`, `!eng,!jpn`)。
+
+### --attachment-copy [&lt;int&gt;[,&lt;int&gt;]...]
+attachmentストリームをコピーする。avhw/avswリーダー使用時のみ有効。
+
+
+### --attachment-source &lt;string&gt;[:{&lt;int&gt;?}[;&lt;param1&gt;=&lt;value1&gt;]...]...
+指定のファイルを読み込み、attachmentとしてmuxする。
+
+- **params** 
+  - metadata=&lt;string1&gt;=&lt;string2&gt;  
+    attachmentのmetadataの指定。特に、mimetypeの指定は必須。
+  
+- 使用例
+  ```
+  例1: --attachment-source <png_file>:metadata=mimetype=image/png
+  例2: --attachment-source <font_file>:metadata=mimetype=application/x-truetype-font
+  ```
+
+### --input-option &lt;string1&gt;:&lt;string2&gt;
+avsw/avhwでの読み込み時にオプションパラメータを渡す。&lt;string1&gt;にオプション名、&lt;string2&gt;にオプションの値を指定する。
+
+- 使用例
+  ```
+  例: Blurayのplaylist 1を読み込み
+  -i bluray:D:\ --input-option playlist:1
+  ```
+
+### -m, --mux-option &lt;string1&gt;:&lt;string2&gt;
+mux時にオプションパラメータを渡す。&lt;string1&gt;にオプション名、&lt;string2&gt;にオプションの値を指定する。
+
+- 使用例
+  ```
+  例: HLS用の出力
+  -i <input> -o test.m3u8 -f hls -m hls_time:5 -m hls_segment_filename:test_%03d.ts --gop-len 30
+  
+  例: "default"として設定されている字幕トラックがない場合に、自動的に"default"が付与されるのを抑止しする (mkvのみ)
+  -m default_mode:infer_no_subs
+  ```
+
+### --metadata &lt;string&gt; or &lt;string&gt;=&lt;string&gt;
+出力ファイルの(グローバルな)metadataを指定する。
+  - copy  ... 入力ファイルからmetadataをコピーする。 (デフォルト)
+  - clear ... do not copy metadata
+
+- 使用例
+  ```
+  例1: 入力ファイルからmetadataをコピー
+  --metadata copy
+  
+  例2: 入力ファイルからのmetadataのコピーを行わない
+  --metadata clear
+  
+  例3: 指定のmetadataを設定する
+  --metadata title="動画の タイトル" --metadata language=jpn
+  ```
+
+### --avsync &lt;string&gt;
+  - auto (default)  
+
+  - forcecfr  
+    入力ptsを見ながら、CFRに合うようフレームの水増し・間引きを行い、音声との同期が維持できるようにする。主に、入力がvfrやRFFなどのときに音ズレしてしまう問題への対策。また、--trimとは併用できない。
+
+  - vfr  
+    入力に従い、フレームのタイムスタンプをそのまま引き渡す。avsw/avhwリーダによる読み込みの時のみ使用可能。
+    
+### --muxer-add-cmd
+Muxer metadataの `encoding_tool` に、入力パラメータのコマンドラインを追記します。
+
+### --timecode [&lt;string&gt;]  
+  指定のパスにtimecodeファイルを出力する。パスを省略した場合には、"&lt;出力ファイル名&gt;.timecode.txt"に出力する。
+
+### --tcfile-in &lt;string&gt;  
+timecodeファイルを読み取り、入力フレームのタイムスタンプを設定する。avhw以外の読み込みで使用可能。
+
+### --timebase &lt;int&gt;/&lt;int&gt;  
+時間刻みを設定する。timecodeファイルを読み取り時の時間精度にも使用される。
+
+### --input-hevc-bsf &lt;string&gt;  
+switch hevc bitstream filter used for hw decoder input. (for debug purpose)
+- パラメータ
+
+  - internal  
+    内蔵の実装を使用する。 (default)
+
+  - libavcodec  
+    libavcodec の hevc_mp4toannexb bitstream filter を使用する。
+
+### --adapt-resolution &lt;int&gt;x&lt;int&gt;
+入力途中の解像度変更で許容する最大解像度を指定する。
+
+avhwではCUVIDデコーダの最大解像度、avswでは入力サーフェスの確保解像度として使用する。指定値は入力開始時の解像度以上である必要がある。未指定時はコンテナが宣言している入力解像度を上限として使用する。
+
+上限を大きくするとデコードサーフェスや入力サーフェスのメモリ使用量が増加する。
+
+### --input-pixel-format &lt;string&gt;
+avdeviceで使用する "pixel_format" の設定。(それ以外での用途での使用は想定していません)
+
+### --offset-video-dts-advance  
+先頭のdtsが0になるよう、Bフレームによる遅延の分だけtimestampを補正します。
+
+### --allow-other-negative-pts  
+音声・字幕において負のtimestampを許容する。原則デバッグ用。
+
+## vppオプション
+
+エンコード前にフィルタ処理を追加するオプションです。
+
+### vppフィルタの適用順
+
+vppフィルタの適用順は固定で、コマンドラインの順序によらず下記順番で適用されます。
+
+- [--vpp-deinterlace](#--vpp-deinterlace-string)
+- [--vpp-colorspace](#--vpp-colorspace-param1value1param2value2)
+- [--vpp-libplacebo-tonemapping](#--vpp-libplacebo-tonemapping-param1value1param2value2)
+- [--vpp-rff](#--vpp-rff)
+- [--vpp-delogo](#--vpp-delogo-stringparam1value1param2value2)
+- [--vpp-afs](#--vpp-afs-param1value1param2value2)
+- [--vpp-nnedi](#--vpp-nnedi-param1value1param2value2)
+- [--vpp-rtgmc](#--vpp-rtgmc-param1value1)
+- [--vpp-kfm](#--vpp-kfm-param1value1param2value2)
+- [--vpp-rtgmc-bob](#--vpp-rtgmc-bob-param1value1)
+- [--vpp-rtgmc-search-prefilter](#--vpp-rtgmc-search-prefilter-param1value1)
+- [--vpp-rtgmc-edi](#--vpp-rtgmc-edi-param1value1)
+- [--vpp-degrain](#--vpp-degrain-param1value1) (`mode=analyze`)
+- [--vpp-yadif](#--vpp-yadif-param1value1)
+- [--vpp-bwdif](#--vpp-bwdif-param1value1)
+- [--vpp-decomb](#--vpp-decomb-param1value1param2value2)
+- [--vpp-ivtc](#--vpp-ivtc-param1value1param2value2)
+- [--vpp-decimate](#--vpp-decimate-param1value1param2value2)
+- [--vpp-mpdecimate](#--vpp-mpdecimate-param1value1param2value2)
+- [--vpp-select-every](#--vpp-select-every-intparam1int)
+- [--vpp-transform/rotate](#--vpp-rotate-int)
+- [--vpp-convolution3d](#--vpp-convolution3d-param1value1param2value2)
+- [--vpp-nvvfx-denoise](#--vpp-nvvfx-denoise-param1value1param2value2)
+- [--vpp-nvvfx-artifact-reduction](#--vpp-nvvfx-artifact-reduction-param1value1param2value2)
+- [--vpp-smooth](#--vpp-smooth-param1value1param2value2)
+- [--vpp-denoise-dct](#--vpp-denoise-dct-param1value1param2value2)
+- [--vpp-bm3d](#--vpp-bm3d-param1value1param2value2)
+- [--vpp-knn](#--vpp-knn-param1value1param2value2)
+- [--vpp-nlmeans](#--vpp-nlmeans-param1value1param2value2)
+- [--vpp-pmd](#--vpp-pmd-param1value1param2value2)
+- [--vpp-hqdn3d](#--vpp-hqdn3d-param1value1param2value2)
+- [--vpp-descale](#--vpp-descale-param1value1param2value2)
+- [--vpp-degrain](#--vpp-degrain-param1value1) (`mode=degrain` / `tr=1,2`)
+- [--vpp-rtgmc-shimmer-repair](#--vpp-rtgmc-shimmer-repair-param1value1) (`stage=rep1/rep2`)
+- [--vpp-rtgmc-retouch](#--vpp-rtgmc-retouch-param1value1)
+- [--vpp-rtgmc-primitive](#--vpp-rtgmc-primitive-param1value1)
+- [--vpp-gauss](#--vpp-gauss-int)
+- [--vpp-subburn](#--vpp-subburn-param1value1param2value2)
+- [--vpp-libplacebo-shader](#--vpp-libplacebo-shader-param1value1param2value2)
+- [--vpp-resize](#--vpp-resize-string-or-param1value1param2value2)
+- [--vpp-unsharp](#--vpp-unsharp-param1value1param2value2)
+- [--vpp-vinverse](#--vpp-vinverse-param1value1param2value2)
+- [--vpp-chromashift](#--vpp-chromashift-param1value1param2value2)
+- [--vpp-deblock](#--vpp-deblock-param1value1param2value2)
+- [--vpp-deflicker](#--vpp-deflicker-param1value1param2value2)
+- [--vpp-stab](#--vpp-stab-param1value1param2value2)
+- [--vpp-colorfix](#--vpp-colorfix-param1value1param2value2)
+- [--vpp-dehalo](#--vpp-dehalo-param1value1param2value2)
+- [--vpp-finedehalo](#--vpp-finedehalo-param1value1param2value2)
+- [--vpp-hqdering](#--vpp-hqdering-param1value1param2value2)
+- [--vpp-edgelevel](#--vpp-edgelevel-param1value1param2value2)
+- [--vpp-cas](#--vpp-cas-param1value1param2value2)
+- [--vpp-detailsharpen](#--vpp-detailsharpen-param1value1param2value2)
+- [--vpp-warpsharp](#--vpp-warpsharp-param1value1param2value2)
+- [--vpp-maa](#--vpp-maa-param1value1param2value2)
+- [--vpp-curves](#--vpp-curves-param1value1param2value2)
+- [--vpp-softlight](#--vpp-softlight-param1value1param2value2)
+- [--vpp-tweak](#--vpp-tweak-param1value1param2value2)
+- [--vpp-deband](#--vpp-deband-param1value1param2value2)
+- [--vpp-libplacebo-deband](#--vpp-libplacebo-deband-param1value1param2value2)
+- [--vpp-padding](#--vpp-pad-intintintint)
+- [--vpp-overlay](#--vpp-overlay-param1value1param2value2)
+- [--vpp-ngx-truehdr](#--vpp-ngx-truehdr-param1value1param2value2)
+- [--vpp-fruc](#--vpp-overlay-param1value1param2value2)
+- [--vpp-anime4k-shader](#--vpp-anime4k-shader-param1value1param2value2)
+- [--vpp-onnx](#--vpp-onnx-param1value1param2value2)
+- [--vpp-onnx-deint](#--vpp-onnx-deint-param1value1param2value2)
+- [--vpp-onnx-model-dir](#--vpp-onnx-model-dir-string)
+- [--vpp-onnx-cache-dir](#--vpp-onnx-cache-dir-string)
+- [--vpp-rife-ov](#--vpp-rife-ov-param1value1param2value2)
+
+### --vpp-colorspace [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+色空間変換を行う。x64版のみ使用可能。  
+パラメータに"input"を指定すると、入力ファイルの値を参照できる。(avhww/avsw読み込みのみ)
+
+- **パラメータ**
+  - matrix=&lt;from&gt;:&lt;to&gt;  
+    
+  ```
+    bt709, smpte170m, bt470bg, smpte240m, YCgCo, fcc, GBR, bt2020nc, bt2020c, auto
+  ```
+  
+  - colorprim=&lt;from&gt;:&lt;to&gt;  
+  ```
+    bt709, smpte170m, bt470m, bt470bg, smpte240m, film, bt2020, auto
+  ```
+  
+  - transfer=&lt;from&gt;:&lt;to&gt;  
+  ```
+    bt709, smpte170m, bt470m, bt470bg, smpte240m, linear,
+    log100, log316, iec61966-2-4, iec61966-2-1,
+    bt2020-10, bt2020-12, smpte2084, arib-std-b67, auto
+  ```
+  
+  - range=&lt;from&gt;:&lt;to&gt;  
+  ```
+    limited, full, auto
+  ```
+  
+  - lut3d=&lt;string&gt;  
+    3D LUTを適用する。(.cubeファイルのみの対応)
+    
+  - lut3d_interp=&lt;string&gt;  
+    ```
+    nearest, trilinear, tetrahedral, pyramid, prism
+    ```
+  
+  - hdr2sdr=&lt;string&gt;  
+    tone-mappingを指定してHDRからSDRへの変換を行う。 
+    
+    - none  (デフォルト)  
+      hdr2sdrの処理を行うない。
+  
+    - hable    
+      明部と暗部のディテールの両方をバランスよく保ちながら変換する。(ただし、やや暗めになる)
+      下記のhable tone-mappingの式のパラメータ(a,b,c,d,e,f)の指定も可能。
+  
+      hable(x) = ( (x * (a*x + c*b) + d*e) / (x * (a*x + b) + d*f) ) - e/f  
+      output = hable( input ) / hable( (source_peak / ldr_nits) )
+      
+      デフォルト: a = 0.22, b = 0.3, c = 0.1, d = 0.2, e = 0.01, f = 0.3
+  
+    - mobius  
+      なるべく画面の明るさやコントラストを維持した変換を行うが、明部のディテールがつぶれる可能性がある。
+     
+      - transition=&lt;float&gt;  (デフォルト: 0.3)  
+        線形変換から mobius tone mappingに移行する分岐点。  
+      - peak=&lt;float&gt;  (デフォルト: 1.0)  
+        reference peak brightness
+    
+    - reinhard  
+      - contrast=&lt;float&gt;  (デフォルト: 0.5)  
+        local contrast coefficient  
+      - peak=&lt;float&gt;  (デフォルト: 1.0)  
+        reference peak brightness
+        
+    - bt2390  
+      BT.2390で規定されるtone mapping。
+  
+  
+  - source_peak=&lt;float&gt;  (デフォルト: 1000.0)  
+  
+  - ldr_nits=&lt;float&gt;  (デフォルト: 100.0)  
+  
+  - desat_base=&lt;float&gt;  (デフォルト: 0.18)  
+    hdr2sdrで使用されるdesaturation処理のオフセット。
+  
+  - desat_strength=&lt;float&gt;  (デフォルト: 0.75)  
+    hdr2sdrで使用されるdesaturation処理の強度。0.0では処理が無効化され、1.0では明るい色は白くなる。
+  
+  - desat_exp=&lt;float&gt;  (デフォルト: 1.5)  
+    hdr2sdrで使用されるdesaturation処理の指数で、どのくらいの明るさから処理が行われるかを制御する。
+    低めの値では、より積極的に処理が行われる。
+
+- 使用例
+  ```
+  例1: BT.709(fullrange) -> BT.601 への変換
+  --vpp-colorspace matrix=smpte170m:bt709,range=full:limited
+  
+  例2: hdr2sdrの使用 (hable tone-mapping)
+  --vpp-colorspace hdr2sdr=hable,source_peak=1000.0,ldr_nits=100.0
+  
+  例3: hdr2sdr使用時の追加パラメータの指定例 (下記例ではデフォルトと同じ意味)
+  --vpp-colorspace hdr2sdr=hable,source_peak=1000.0,ldr_nits=100.0,a=0.22,b=0.3,c=0.1,d=0.2,e=0.01,f=0.3
+  
+  例4: lut3dの使用
+  --vpp-colorspace lut3d="example.cube",lut3d_interp=trilinear
+  ```
+
+
+### --vpp-libplacebo-tonemapping [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+[libplacebo](https://code.videolan.org/videolan/libplacebo)を使用したトーンマッピングを行います。
+
+- **パラメータ**
+  - src_csp=&lt;string&gt;  
+    入力の色空間を指定します。
+    ```
+    auto, sdr, hdr10, hlg, dovi, rgb
+    ```
+  
+  - dst_csp=&lt;string&gt;  
+    出力の色空間を指定します。
+    ```
+    auto, sdr, hdr10, hlg, dovi, rgb
+    ```
+
+  - src_max=&lt;float&gt;  
+    入力の最大輝度 (nits)。(デフォルト: 自動、可能なら入力ファイルから情報を取得、できない場合は 1000.0 (HDR) / 203.0 (SDR))
+  - src_min=&lt;float&gt;  
+    入力の最小輝度 (nits)。(デフォルト: 自動、可能なら入力ファイルから情報を取得、できない場合は 0.005 (HDR) / 0.2023 (SDR))
+  - dst_max=&lt;float&gt;  
+    出力の最大輝度 (nits)。(デフォルト: 自動、可能ならパラメータから情報を取得、できない場合は 1000.0 (HDR) / 203.0 (SDR))
+  - dst_min=&lt;float&gt;  
+    出力の最小輝度 (nits)。(デフォルト: 自動、可能ならパラメータから情報を取得、できない場合は 0.005 (HDR) / 0.2023 (SDR))
+  - dynamic_peak_detection=&lt;bool&gt;  
+    HDRトーンマッピングの品質を最適化するための統計の計算を有効にします。デフォルト: true
+  - smooth_period=&lt;float&gt;  
+    スムージング係数。デフォルト: 20.0
+  - scene_threshold_low=&lt;float&gt;  
+    シーン変更検出の下限閾値 (dB)。デフォルト: 1.0
+  - scene_threshold_high=&lt;float&gt;  
+    シーン変更検出の上限閾値 (dB)。デフォルト: 3.0
+  - percentile=&lt;float&gt;  
+    輝度ヒストグラムの考慮するパーセンタイル。デフォルト: 99.995
+  - black_cutoff=&lt;float&gt;  
+    黒レベルのカットオフ強度 (PQ%)。デフォルト: 1.0
+  - gamut_mapping=&lt;string&gt;  
+    ガンママッピングモード。 (デフォルト: perceptual)
+    ```
+    clip, perceptual, softclip, relative, saturation, absolute, desaturate, darken, highlight, linear
+    ```
+
+  - tonemapping_function=&lt;string&gt;  
+    トーンマッピング関数。 (デフォルト: bt2390)
+    ```
+    clip, st2094-40, st2094-10, bt2390, bt2446a, spline, reinhard, mobius, hable, gamma, linear, linearlight
+    ```
+
+  - tonemapping_function=st2094-40, st2094-10, splineの場合  
+  
+    - knee_adaptation=&lt;float&gt;   (float, 0.0 - 1.0, デフォルト: 0.4)  
+      PQ空間における入力と出力の平均輝度の比率としてニーポイントを設定します。
+      - 1.0: 常に入力シーンの平均を調整された出力の平均に適応させます
+      - 0.0: シーンの輝度を一切変更しません
+    
+    - knee_min=&lt;float&gt;   (0.0 - 0.5, デフォルト: 0.1)  
+      PQ輝度範囲の比率における最小ニーポイント。
+    
+    - knee_max=&lt;float&gt;   (0.5 - 1.0, デフォルト: 0.8)  
+      PQ輝度範囲の比率における最大ニーポイント。
+    
+    - knee_default=&lt;float&gt;   (knee_min - knee_max, デフォルト: 0.4)  
+      入力シーンの平均メタデータが利用できない場合に使用されるデフォルトのニーポイント。
+  
+  - tonemapping_function=bt2390の場合
+
+    - knee_offset=&lt;float&gt;   (0.5 - 2.0, デフォルト: 1.0)  
+      ニーポイントのオフセット。
+  
+  - tonemapping_function=splineの場合
+
+    - slope_tuning=&lt;float&gt;   (0.0 - 10.0, デフォルト: 1.5)  
+      スプライン曲線の傾きの係数。
+    
+    - slope_offset=&lt;float&gt;   (0.0 - 1.0, デフォルト: 0.2)  
+      スプライン曲線の傾きのオフセット。
+    
+    - spline_contrast=&lt;float&gt;   (0.0 - 1.5, デフォルト: 0.5)  
+      スプライン関数のコントラスト。高い値は中間調を保持しますが、影や高輝度部分の詳細を失う可能性があります。
+  
+  - tonemapping_function=reinhardの場合
+
+    - reinhard_contrast=&lt;float&gt;   (0.0 - 1.0, デフォルト: 0.5)  
+      reinhard関数のディスプレイピークにおけるコントラスト係数。
+  
+  - tonemapping_function=mobius, gammaの場合
+
+    - linear_knee=&lt;float&gt;   (0.0 - 1.0, デフォルト: 0.3)  
+  
+  - tonemapping_function=linear, linearlightの場合
+
+    - exposure=&lt;float&gt;   (0.0 - 10.0, デフォルト: 1.0)  
+      適用される線形露出/ゲイン。
+  - metadata=&lt;int&gt;  
+    トーンマッピングに使用するデータソース。
+    ```
+    any, none, hdr10, hdr10plus, cie_y
+    ```
+
+  - contrast_recovery=&lt;float&gt;  
+    コントラスト回復強度。デフォルト: 0.3
+  - contrast_smoothness=&lt;float&gt;  
+    コントラスト回復のローパスカーネルサイズ。デフォルト: 3.5
+  - inverse_tone_mapping=&lt;bool&gt;  
+    Inverse tone mapping. デフォルト: false
+  - visualize_lut=&lt;bool&gt;  
+    トーンマッピングカーブ/LUTを可視化します。デフォルト: false
+  - show_clipping=&lt;bool&gt;  
+    クリップされたピクセルを可視化します。デフォルト: false
+  - use_dovi=&lt;bool&gt;  
+    Dolby Vision RPUをST2086メタデータとして使用するかどうか。デフォルト: auto (Dolby Visionからトーンマッピングする場合に有効)
+  - dst_pl_transfer=&lt;string&gt;  
+    出力の転送関数。```dst_pl_colorprim```と一緒に使用する必要があります。
+    ```
+    unknown, srgb, bt1886, linear, gamma18, gamma20, gamma22, gamma24, gamma26, gamma28,
+    prophoto, st428, pq, hlg, vlog, slog1, slog2
+    ```
+
+  - dst_pl_colorprim=&lt;string&gt;  
+    出力の色域。```dst_pl_transfer```と一緒に使用する必要があります。
+    ```
+    unknown, bt601_525, bt601_625, bt709, bt470m, ebu_3213, bt2020, apple, adobe,
+    prophoto, cie_1931, dci_p3, display_p3, v_gamut, s_gamut, film_c, aces_ap0, aces_ap1
+    ```
+
+- **使用例**
+  ```
+  例: Dolby VisionからSDRへのトーンマッピング
+  --vpp-libplacebo-tonemapping src_csp=dovi,dst_csp=sdr
+  ```
+
+### --vpp-libplacebo-tonemapping-lut &lt;string&gt;
+
+  --vpp-libplacebo-tonemapping で使用するlutファイルの指定。
+
+### --vpp-delogo &lt;string&gt;[,&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+ロゴファイルとロゴ消しのオプションを指定する。ロゴファイルは、".lgd",".ldp",".ldp2"に対応。
+
+- **パラメータ**
+  - select=&lt;string&gt;  
+  ロゴパックの場合に、使用するロゴを以下のいずれかで指定する。
+  
+    - ロゴ名
+    - インデックス (1,2,...)
+    - 自動選択用iniファイル  
+      ```
+       [LOGO_AUTO_SELECT]
+       logo<連番数字>=<マッチパターン>,<リストに表示されているロゴ名(完全一致!)>
+      ```
+
+      例:
+      ```ini
+      [LOGO_AUTO_SELECT]
+      logo1= (NHK-G).,NHK総合 1440x1080
+      logo2= (NHK-E).,NHK-E 1440x1080
+      logo3= (MX).,TOKYO MX 1 1440x1080
+      logo4= (CTC).,チバテレビ 1440x1080
+      logo5= (NTV).,日本テレビ 1440x1080
+      logo6= (TBS).,TBS 1440x1088
+      logo7= (TX).,TV東京 50th 1440x1080
+      logo8= (CX).,フジテレビ 1440x1088
+      logo9= (BSP).,NHK BSP v3 1920x1080
+      logo10= (BS4).,BS日テレ 1920x1080
+      logo11= (BSA).,BS朝日 1920x1080
+      logo12= (BS-TBS).,BS-TBS 1920x1080
+      logo13= (BSJ).,BS Japan 1920x1080
+      logo14= (BS11).,BS11 1920x1080 v3
+      ```
+
+  - pos=&lt;int&gt;:&lt;int&gt;  
+    1/4画素精度のロゴ位置の調整。Aviutlで言うところの &lt;位置 X&gt;:&lt;位置 Y&gt;。
+  
+  - depth=&lt;int&gt;  
+    ロゴの透明度の補正。デフォルト128。Aviutlで言うところの &lt;深度&gt;。
+  
+  - y=&lt;int&gt;  
+  - cb=&lt;int&gt;  
+  - cr=&lt;int&gt;  
+    ロゴの各色成分の補正。Aviutlで言うところの &lt;Y&gt;, &lt;Cb&gt;, &lt;Cr&gt;。  
+  
+  - auto_fade=&lt;bool&gt;  
+    ロゴの実際の濃さに合わせて、fade値を自動的に調整する。デフォルト = off。  
+    
+  - auto_nr=&lt;bool&gt;  
+    ロゴの輪郭周辺のノイズを除去する際、その強さを自動的に変化させる。デフォルト = off。  
+  
+  - nr_area=&lt;int&gt;  
+    ロゴの輪郭周辺に対するノイズ除去適用範囲の広さ。(default=0 (オフ), 0 - 3)  
+  
+  - nr_value=&lt;int&gt;  
+    ロゴの輪郭周辺に対するノイズ除去の強さ。(default=0 (オフ), 0 - 4)  
+  
+  - log=&lt;bool&gt;  
+    auto_fade, auto_nrを使用した場合のfade値の推移をログに出力する。
+
+- 使用例
+  ```
+  例:
+  --vpp-delogo logodata.ldp2,select=delogo.auf.ini,auto_fade=true,auto_nr=true,nr_value=3,nr_area=1,log=true
+  ```
+
+
+### --vpp-deinterlace &lt;string&gt;
+[--interlace](#--interlace-string) tff か [--interlace](#--interlace-string) bff が指定されていて、[--avhw](#--avhw-string)使用時のみ有効。HWによるインタレ解除を使用する。
+
+- none   ... インタレ解除を行わない
+- normal ... 標準的な60i→30pインタレ解除。
+- adaptive ... normalと同じ
+- bob ... 60i→60pインタレ解除。
+
+avhwを使用していないがインタレ解除を行いたい場合や、24fps化(Inverse Telecine)を行いたい場合は、[--vpp-afs](#--vpp-afs-param1value1param2value2)を使用する。
+
+### --vpp-deint-csp &lt;string&gt;
+インタレ解除系フィルタを実行する CSP を指定します。デフォルトは `input` です。
+
+- **パラメータ**
+  - input
+    CUDAインタレ解除系フィルタがある場合、インタレ解除とその前後の密接な処理を入力 CSP 側で実行します。
+  - output
+    従来動作と同じく、出力 CSP 側でインタレ解除系フィルタを実行します。
+
+### --vpp-rff
+Repeat Field Flagを反映して、フレームを再構築する。rffによる音ズレ問題が解消できる。[--avhw](#--avsw-string)か[--avhw](#--avsw-string)使用時のみ有効。
+
+rff=1の場合のみの対応。(rff > 1には対応しない) また、[--trim](#--trim-intintintintintint), [--vpp-deinterlace](#--vpp-deinterlace-string)とは併用できない。
+
+### --vpp-afs [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+自動フィールドシフトによるインタレ解除を行う。
+
+- **パラメータ** ... 基本的にはAviutl版のパラメータをそのまま使用する。
+  - top=&lt;int&gt;           (上)
+  - bottom=&lt;int&gt;        (下)
+  - left=&lt;int&gt;          (左)
+  - right=&lt;int&gt;         (右)  
+    判定に使用する領域から除外する範囲の指定。NVEncでは、"左"と"右"は4の倍数である必要がある。
+  
+  - method_switch=&lt;int&gt; (切替点)  (0-256)  
+    切替点が大きいほど、新方式の判定になりやすい(0で常に新方式判定off)
+  
+  - coeff_shift=&lt;int&gt;   (判定比)  (0-256)  
+    判定比率が小さいほど、フィールドをシフトしにくい(0で常にシフト判定off)
+  
+  - thre_shift=&lt;int&gt;    (縞(シフト))  (0-1024)  
+    シフトの判定に使用する縞検出の閾値。値が小さいほど、縞と判定されやすくなる。
+  
+  - thre_deint=&lt;int&gt;    (縞(解除))  (0-1024)  
+    縞解除用の縞検出の閾値。値が小さいほど、縞と判定されやすくなる。
+  
+  - thre_motion_y=&lt;int&gt; (Y動き) (0-1024)  
+  - thre_motion_c=&lt;int&gt; (C動き) (0-1024)  
+    動き検出の閾値。値が小さいほど、動きと判定されやすくなる。
+  
+  - level=&lt;int&gt;         (解除Lv)  
+    縞解除の方法の選択。(0 - 4)
+  
+    | 解除Lv | | |
+    |:---|:---|:---|
+    | Lv0 | 解除なし | 横縞模様の解除を行わない。<br>フィールドシフトで組み合わされた新しいフレームがそのまま出力になる。|
+    | Lv1 | フィールド三重化 | フィールドシフトで組み合わされた新しいフレームに、さらに１つ前の フィールドを残像として足しこむ。<br>動きによる縞模様は完全に残像に変換される。 |
+    | Lv2 | 縞検出二重化 | フレーム内で縞模様を検出して、縞の部分を平均化して残像に変える。<br>フィールド単位の動きが少ない映像向け。 |
+    | Lv3 | 動き検出二重化 | 前のフレームと比較をして、動き(色の変化)があった部分だけ縞の平均化を行う。 <br>解除Lv2だと平均化されてしまう静止した横縞模様を保存できる。<br>静止したテロップの細かい文字や、アニメなどの枠線付きの静止画の 輪郭をつぶしたくない場合に使用する。| 
+    | Lv4 | 動き検出補間 | 前のフレームと比較をして動きがあった部分は、片方のフィールドを潰して残す方のフィールドの画像で補間する。<br>残像はなくなりますが、この解除がかかった部分は縦の解像度が半分になる。 |
+    | Lv5 | 斜め線補正補間 | **非対応** |
+  - shift=&lt;bool&gt;        (フィールドシフト)  
+    フィールドシフトを行う。
+  
+  - drop=&lt;bool&gt;         (間引き)  
+    フィールドシフトを行うことで生じた表示時間の1フレームより短いフレームを間引く。これを有効にするとVFR(可変フレームレート)になるので注意。
+    NVEncCでmuxしながら出力する場合には、このタイムコードは自動的に反映される。
+    一方、raw出力する場合には、タイムコード反映されないので、vpp-afsのオプションにtimecode=trueを追加してタイムコードを別途出力し、あとからtimecodeファイルを含めてmuxする必要がある。
+  
+  - smooth=&lt;bool&gt;       (スムージング)  
+  - 24fps=&lt;bool&gt;        (24fps化)  
+    24fps化を強制する、映画・アニメ用のオプション。フィールドシフトと間引きをonにする必要がある。
+  
+  - tune=&lt;bool&gt;         (調整モード)  
+    縞模様と動きの判定結果の確認用。
+  
+    | 色 | 意味 |
+    |:---:|:---|
+    | 青 | 動きを検出 |
+    | 灰 | 縞を検出 |
+    | 水色 | 動き + 縞を検出 |
+  
+  - rff=&lt;bool&gt;  
+    入力フレームにrffフラグ付きのプログレフレームがある場合、これをチェックしてインタレ解除処理に反映する。rffフラグ付きのプログレフレームについては、フィールドシフトを行わずに、フレームの表示時間の修正のみを行う。
+  
+  - log=&lt;bool&gt;  
+    フレームごとの判定状況等をcsvファイルで出力。(デバッグ用のログ出力)
+  
+  - timecode=&lt;bool&gt;  
+    タイムコードを出力する。
+  
+- **一括設定用オプション**
+
+  たくさんあるパラメータを一括指定するためのオプション。一括設定用オプションは必ず先に読み込まれ、個別オプションの指定があればそちらで上書きされる。
+
+  - ini=&lt;string&gt;  
+    指定したini設定ファイルから設定を読み込む。この設定ファイルはAviutl版自動フィールドシフト 高速化 7.5a+20以降のafs.aufで出力できるものを使用する。
+    
+    ```
+    [AFS_STG]
+    up=8
+    bottom=8
+    left=16
+    right=16
+    method_watershed=91
+    coeff_shift=191
+    thre_shift=447
+    thre_deint=44
+    thre_Ymotion=111
+    thre_Cmotion=222
+    mode=4
+    field_shift=1
+    drop=1
+    smooth=1
+    force24=1
+    tune_mode=0
+    rff=0
+    log=0
+    ```
+  
+  - preset=&lt;string&gt;
+  
+    以下の表のプリセットをロードします。
+    
+    ```
+    例: アニメプリセットをロード後、"24fps"をonに、"rff"を"on"に
+    --vpp-afs preset=anime,24fps=true,rff=true
+    ```
+    
+    |              | default | triple<br>(動き重視) | double<br>(二重化) | anime<br>cinema<br>(アニメ/映画) | min_afterimg<br>(残像最小化) |  24fps<br>(24fps固定)  | 30fps<br>(30fps固定) |
+    |:---          |:---:| :---:| :---:|:---:|:---:| :---:| :---:|
+    |method_switch |     0   |    0   |     0  |       64        |       0      |    92   |   0   |
+    |coeff_shift   |   192   |  192   |   192  |      128        |     192      |   192   |  192  |
+    |thre_shift    |   128   |  128   |   128  |      128        |     128      |   448   |  128  |
+    |thre_deint    |    48   |   48   |    48  |       48        |      48      |    48   |   48  |
+    |thre_motion_y |   112   |  112   |   112  |      112        |     112      |   112   |  112  |
+    |thre_motion_c |   224   |  224   |   224  |      224        |     224      |   224   |  224  |
+    |level         |     3   |    1   |     2  |        3        |       4      |     3   |    3  |
+    |shift         |    on   |  off   |    on  |       on        |      on      |    on   |  off  |
+    |drop          |   off   |  off   |    on  |       on        |      on      |    on   |  off  |
+    |smooth        |   off   |  off   |    on  |       on        |      on      |    on   |  off  |
+    |24fps         |   off   |  off   |   off  |      off        |     off      |    on   |  off  |
+    |tune          |   off   |  off   |   off  |      off        |     off      |   off   |  off  |
+    |rff           |   off   |  off   |   off  |      off        |     off      |   off   |  off  |
+
+- **vpp-afs使用上の注意**  
+  - Aviutl版とは全く同じ挙動にはなりません。
+  - Aviutl版の下記機能には非対応です。
+    - 解除Lv5
+    - シーンチェンジ検出(解除Lv1)
+    - 編集モード
+    - ログ保存
+    - ログ再生
+    - YUY2補間
+    - シフト・解除なし
+
+- 使用例
+  ```
+  例: --vpp-afs preset=24fpsと同じ設定をする例
+  --vpp-afs preset=anime,method_switch=92,thre_shift=448,24fps=true
+  ```
+
+### --vpp-nnedi [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+nnediによるインタレ解除を行う。
+
+- **パラメータ**
+
+  - planes=&lt;string&gt;  
+    対象plane。`all`、または `y`, `u`, `v` を `:` 区切りで指定。デフォルト: `all`。
+  - field=&lt;string&gt;  
+    対象フィールド。`bob`, `auto`(デフォルト), `top`, `bottom`, `bob_tff`, `bob_bff`。
+  - nsize=&lt;string&gt;  
+    NN近傍サイズ。`8x6`, `16x6`, `32x6`, `48x6`, `8x4`, `16x4`, `32x4`(デフォルト)。
+  - nns=&lt;int&gt;  
+    ニューロン数。`16`, `32`(デフォルト), `64`, `128`, `256`。
+  - quality=&lt;string&gt;  
+    品質。`fast`(デフォルト) または `slow`。
+  - prescreen=&lt;int&gt;
+    `2/3/4` をサポート。`0/1` は未対応。デフォルト: `2`。
+
+  - errortype=&lt;string&gt;  
+    誤差種別。`abs`(デフォルト) または `square`。
+  - clamp=&lt;int&gt;  
+    クリップ範囲モード。`0-4`。デフォルト: `1`。
+  - double_height=&lt;bool&gt;  
+    高さ2倍出力。`field=auto/top/bottom` でのみ有効。デフォルト: `off`。
+  - weightfile=&lt;path&gt;
+    `nnedi3_weights.bin` のパス。省略時はWindowsビルドでは `nnedi3_weights.bin` を検索し、Linuxビルドでは組み込みウェイトを使用する。
+
+- **注意**
+  - `prescreen=0/1` は未実装。
+
+- 使用例
+  ```
+  例: --vpp-nnedi field=auto,nns=64,nsize=32x6,quality=slow,prescreen=2,clamp=1
+  ```
+  
+### --vpp-rtgmc [&lt;param1&gt;=&lt;value1&gt;]
+高品質として知られる QTGMC のアルゴリズムを使うインタレ解除フィルタを一部処理をGPU並列向けに緩和したもの。高品質だが処理が重い。
+
+- **主要パラメータ**
+
+  - preset=&lt;string&gt;
+    `slower`, `slow`, `medium`, `fast`, `faster`(デフォルト), `veryfast`, `superfast`, `ultrafast`, `draft`。
+    原則としてオリジナルの値を踏襲。
+  - tuning=&lt;string&gt;
+    `none`(デフォルト), `dv-sd`, `dv-hd`。
+
+  - preset展開表 (実装値)
+
+    | preset | tr0 | tr1 | tr2 | rep0-thin | rep2-thin | edi | nnsize | nneurons | search_refine | search | searchparam | pelsearch | search_early_sad | chroma_motion | precise | prog_sad_mask |
+    |:--|--:|--:|--:|--:|--:|:--|--:|--:|--:|--:|--:|--:|--:|:--|:--|--:|
+    | slower | 2 | 2 | 1 | 4 | 4 | nnedi3 | 1 | 1 | 3 | 4 | 2 | 2 | 0 | on | off | 10.0 |
+    | slow | 2 | 1 | 1 | 4 | 4 | nnedi3 | 1 | 1 | 3 | 4 | 2 | 2 | 0 | off | off | 10.0 |
+    | medium | 2 | 1 | 1 | 3 | 4 | nnedi3 | 5 | 1 | 3 | 4 | 2 | 1 | 8 | off | off | 10.0 |
+    | fast | 2 | 1 | 0 | 3 | 4 | nnedi3 | 5 | 0 | 2 | 4 | 2 | 1 | 8 | off | off | 0.0 |
+    | faster | 1 | 1 | 0 | 0 | 4 | nnedi3 | 4 | 0 | 2 | 4 | 2 | 1 | 16 | off | off | 0.0 |
+    | veryfast | 1 | 1 | 0 | 0 | 4 | nnedi3 | 4 | 0 | 2 | 4 | 1 | 1 | 16 | off | off | 0.0 |
+    | superfast | 1 | 1 | 0 | 0 | 3 | nnedi3 | 4 | 0 | 1 | 0 | 1 | 1 | 16 | off | off | 0.0 |
+    | ultrafast | 1 | 1 | 0 | 0 | 3 | repyadif | 4 | 0 | 1 | 0 | 1 | 1 | 16 | off | off | 0.0 |
+    | draft | 0 | 1 | 0 | 0 | 0 | bob | 4 | 0 | 0 | 0 | 1 | 1 | 16 | off | off | 0.0 |
+
+    - `blksize` は `slower..fast` では `tuning` 依存 (`dv-hd=32`, それ以外=16)、`faster..draft` では固定 `32`。
+    - `overlap` は `slower..faster` で `blksize/2`、`veryfast..draft` で `blksize/4`。
+    - `subpel` は `slower..slow=2`、`medium..draft=1`。
+
+  - source_match=&lt;int&gt;
+    `0-3`。`match_tr1/match_tr2` は `0-2`、`match_enhance` は `0.0-1.0`。
+
+  - edi/match_edi=&lt;string&gt;
+    `bob`, `yadif`, `cyadif`, `repyadif`, `repcyadif`, `nnedi3`, `passthrough`。
+    ただし `source_match>0` 時の `match_edi` は `bob/yadif/cyadif/repyadif/repcyadif/nnedi3` のみ。
+  - tr0/rep0-thin/rep0-pad/search_refine
+    `tr0=-1..2`、`rep0-thin=0-7`、`rep0-pad=0-3`、`search_refine=0-3`。
+
+  - mv_spatial_refine=&lt;int|auto&gt;  
+    モーションベクトルの spatial refine 回数。動きベクトル探索は複数の解像度（解析レベル）を粗→細の順に進む階層構造を取るが、本オプションは各レベルで「**近傍ブロックの動きベクトルを参照してさらに精度を上げる**」spatial refine パスを何回実行するかを指定する。
+    デフォルトは `auto` (`-1`) で、**もっとも解像度の低い最上位レベル（ブロック数が最も少ない階層）でのみ spatial refine を行い、それ以降の下位レベルでは行わない**。ブロック数の少ない階層に spatial 情報による精度向上を集中させ、ブロック数の多い下位階層では GPU の並列性を最大限に活用するための既定戦略。
+    `0` は spatial refine を全レベルで無効化、`1` は全レベルで1回、`2` は全レベルで2回、以降同様。
+
+  - search_early_sad=&lt;int|off&gt;  
+    level0 の予測候補 SAD が指定値未満なら全探索を省略する。値は8x8ブロック・8bit換算で `0-65535`、実際の閾値はblksizeとbit depthに応じて自動スケールされる。`off` (`-1`) で無効。presetの既定値は上表のとおり。
+  - spatial_early_sad=&lt;int|off&gt;  
+    level1 探索で得た SAD が指定値未満なら、そのブロックの spatial refine を省略する。値は8x8ブロック・8bit換算で `0-65535`、実際の閾値はblksizeとbit depthに応じて自動スケールされる。デフォルトは `off` (`-1`)。
+  - rep1-thin/rep1-pad/rep2-thin/rep2-pad
+    `repN-thin=0-7`、`repN-pad=0-3`。
+
+  - noise系
+
+    ノイズ抽出・平滑化・戻し量を制御する段。主に以下のパラメータで構成される。
+
+    - `noise_process`
+      ノイズ処理段の有効化レベル。`0` は無効、`1` はノイズ処理を有効化、`2` は現状未対応。
+    - `denoiser`
+      ノイズ低減器の種類。`nlmeans` は NLMeans 系、`fft3d` は FFT3D 系を使用する。
+    - `noise_deint`
+      抽出ノイズの補間方法。`none` は補間なし、`bob` はボブ補間、`generate` はノイズ生成補間(現状未対応)。
+    - `sigma`
+      ノイズ推定強度。値を上げるほど平滑化が強くなる。
+    - `chroma_noise`
+      色差面もノイズ低減対象に含めるかどうか。
+    - `grain_restore` / `noise_restore`
+      平滑化後に粒状感を戻す量。現実装では `noise_process=1` 時のみ有効。
+    ただし有効範囲は後述の「注意」を参照。
+
+  - motion系
+
+    モーションベクトル探索と時系列参照の挙動を制御する段。
+    - `searchparam` / `pelsearch`
+      探索の広さ・精度側のプリセット係数。`1` は軽量寄り、`2` は精度寄り。
+    - `useflag`
+      参照方向の制限。`0` は前後参照、`1` は過去方向のみ、`2` は未来方向のみ。
+    - `pel` / `levels` / `lambda` / `lsad` / `pnew` / `plevel` / `globalmotion`
+      ブロックマッチングの副パラメータ群。探索の粒度・コスト関数・大域動き補正の重みを調整する。
+    なお `subpelinterp=2`, `truemotion=false`, `dct=0` は CUDA参照実装互換のため固定。
+
+  - retouch系
+
+    出力の輪郭補正と過剰シャープ抑制を行う後段。
+    - `sharpness`
+      基本のシャープ量 (`0.0-1.0`)。大きいほど輪郭強調が強くなる。
+    - `limit`
+      旧来互換の抑制係数 (`0.0-1.0`)。高値側でオーバーシュート抑制を強める。
+    - `smode`
+      シャープ処理の方式選択 (`0-2`)。`0` は実質オフ、`1/2` は補正経路が異なる。
+    - `slmode` / `slrad` / `sovs`
+      シャープ抑制の方式・半径・許容オーバーシュート量 (`slmode=0-4`, `slrad=0-3`, `sovs>=0`)。
+    - `svthin`
+      細線化量 (`0.0-1.0`)。インタレ由来の縦方向太りを抑える。
+    - `sbb`
+      back-blend の適用モード (`0-3`)。シャープ前後の差分混合位置を制御する。
+    - `precise`
+      retouch の精密経路を使うかどうか (`on/off`)。
+
+- **注意**
+  - EDI は bob/yadif/cyadif/repyadif/repcyadif/nnedi3(rnnedi3) 相当のみ対応します。NNEDI2/NNEDI/EEDI3(+NNEDI3)/EEDI2/
+  TDeint、EdiMaxD、EdiThreads は未対応です。
+  - chroma_edi は none または nnedi3(rnnedi3) のみ対応します。
+  - ノイズ処理は noise_process=2、ezkeepgrain、denoise_mc=true、noise_tr>0、noise_deint=generate、ShowNoise、
+  StabilizeNoise、dfttest/KNLMeansCL、lsb/lsbd/DftDither 相当の経路には対応していません。
+  - source_match は 0-3 に対応しますが、MatchPreset/MatchPreset2 による段階別設定、独立した MatchEdi2、EdiMaxD 系の指
+  定は未対応です。match_edi は bob/yadif/cyadif/repyadif/repcyadif/nnedi3 の範囲です。
+  - FPSDivisor、ShutterBlur、ShutterAngleSrc/Out、SBlurLimit によるモーションブラー/フレーム間引きは未対応です。
+
+### --vpp-rtgmc-bob [&lt;param1&gt;=&lt;value1&gt;]
+デバッグ用 `--vpp-rtgmc` bob 単体フィルタ。パラメータ: `order=auto|tff|bff`。
+
+### --vpp-rtgmc-search-prefilter [&lt;param1&gt;=&lt;value1&gt;]
+デバッグ用 `--vpp-rtgmc` search reference prefilter 単体フィルタ。パラメータ: `tr0`, `rep0-thin`, `rep0-pad`, `search_refine`, `tv_range`, `chroma_motion`, `dump_y4m`, `dump_stage`, `dump_max_frames`。
+
+### --vpp-rtgmc-edi [&lt;param1&gt;=&lt;value1&gt;]
+デバッグ用 `--vpp-rtgmc` EDI 単体フィルタ。パラメータ: `mode`, `nnsize`, `nneurons`, `ediqual`, `chroma_edi`。
+
+### --vpp-rtgmc-retouch [&lt;param1&gt;=&lt;value1&gt;]
+デバッグ用 `--vpp-rtgmc` retouch 単体フィルタ。パラメータ: `sharpness`, `limit`, `smode`, `slmode`, `slrad`, `sovs`, `svthin`, `sbb`, `precise`, `tr1`, `tr2`。
+
+### --vpp-rtgmc-shimmer-repair [&lt;param1&gt;=&lt;value1&gt;]
+デバッグ用 `--vpp-rtgmc` shimmer repair 単体フィルタ。パラメータ: `stage=rep1|rep2`, `rep-thin`, `rep-pad`, `rep_chroma`。
+
+### --vpp-rtgmc-primitive [&lt;param1&gt;=&lt;value1&gt;]
+デバッグ用 `--vpp-rtgmc` primitive/debug 単体フィルタ。パラメータ: `op`, `ref`, `mode`, `weight`, `chroma`。
+
+### --vpp-kfm [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+逆テレシネ・24/30/60混合VFR対応の高品質なインタレ解除フィルタ。重いのでdGPUでの使用を推奨。
+
+- **パラメータ**
+
+  - mode=&lt;string&gt;  
+    出力モード。`vfr` (デフォルト), `60`, `24`。
+  - preset=&lt;string&gt;  
+    内部プリセット。`slower`, `slow`, `medium`, `fast`, `faster`(デフォルト), `veryfast`, `superfast`, `ultrafast`, `draft`。
+  - search_early_sad=&lt;int|auto|off&gt;  
+    level0 の全探索を省略するSAD閾値。値は8x8ブロック・8bit換算で `0-65535`、実際の閾値はblksizeとbit depthに応じて自動スケールされる。`auto` (デフォルト) はpresetの値、`off` (`-1`) は無効。
+  - spatial_early_sad=&lt;int|auto|off&gt;  
+    level1 探索で得た SAD が指定値未満なら、そのブロックの spatial refine を省略する。値は8x8ブロック・8bit換算で `0-65535`、実際の閾値はblksizeとbit depthに応じて自動スケールされる。`auto` (デフォルト) はpresetの値 (`slower`/`slow`: 0、`medium`: 16、`fast`: 32、`faster`以降: 64)、`off` (`-1`) は無効。
+  - timing=&lt;string&gt;  
+    タイミング解析モード。`realtime`, `realtime+` (デフォルト), `strict`。
+  - past_cycles=&lt;int&gt;  
+    `realtime+` のcommit delay cycle数。デフォルト: 30。
+
+  - thswitch=&lt;float&gt;  
+    60p切替threshold。デフォルト: 0.5。
+  - ucf=&lt;bool&gt;  
+    UCF段を有効化。デフォルト: off。
+  - nr=&lt;bool&gt;  
+    最終出力に `vpp-degrain` を適用。デフォルト: off。
+  - is120=&lt;bool&gt;  
+    120fps duration補正用の予約フラグ。デフォルト: on。
+  - rff=&lt;bool&gt;  
+    プログレッシブRFF入力フレームをインタレ解除せず、そのまま出力する。タイミングの基準には入力timestampを使用する。デフォルト: on。
+  - debug=&lt;bool&gt;  
+    `timecode` 指定時に `.result.dat` / `.frameinfo.tsv` dumpを出力する。デフォルト: off。
+
+  - debug_stage=&lt;string&gt;  
+    `none`, `switch-flag`(`switch-flag-min`), `contains-combe`, `combe-mask`(`combe-mask-min`)。
+    24p系デバッグ表示に使用。
+  - timecode=&lt;path&gt;  
+    timecode v2 dump path。`mode=24/vfr` では `*.duration.txt` も併せて出力する。
+
+### --vpp-yadif [&lt;param1&gt;=&lt;value1&gt;]
+yadifによるインタレ解除を行う。
+
+- **パラメータ**
+
+  - mode
+  
+    - auto (default)  
+      維持するフィールドを自動的に選択。
+    - tff  
+      トップフィールド維持。
+    - bff  
+      ボトムフィールド維持。
+    - bob   
+      60fps化を行う(field順は自動選択)。
+    - bob_tff   
+      60fps化を行う(tff)。
+    - bob_bff   
+      60fps化を行う(bff)。
+
+### --vpp-bwdif [&lt;param1&gt;=&lt;value1&gt;]
+bwdifによるインタレ解除を行う。
+
+- **パラメータ**
+
+  - mode
+
+    - frame (default)
+      入力と同じフレームレートで出力する。
+    - bob
+      2倍フレームレートで出力する。
+
+  - order
+
+    - auto (default)
+      入力フレームごとのフィールド順を自動判定する。
+    - tff
+      トップフィールド優先として処理する。
+    - bff
+      ボトムフィールド優先として処理する。
+  - deint=&lt;all|interlaced&gt;  
+    インタレ解除する対象フレーム。デフォルト: all。`interlaced` ではプログレッシブ判定フレームをそのまま通す。
+  - thr=&lt;float&gt;  
+    動き判定の閾値。デフォルト 0.0 (0.0 - 100.0)。
+
+### --vpp-decomb [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...  
+decombによるインタレ解除を行う。
+
+- **パラメータ**
+  
+  - full=&lt;bool&gt;  
+    すべてのフレームをインタレ解除する。 デフォルト: on。
+  - threshold=&lt;int&gt;  
+    フレームがインタレ解除が必要か判定する際の閾値。デフォルト 20 (0 - 255)。
+  - dthreshold=&lt;int&gt;  
+    縞検出の閾値。デフォルト 7 (0 - 255)。
+  - blend=&lt;bool&gt;  
+    補間の代わりにブレンドする。デフォルト: off。
+
+
+### --vpp-ivtc [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+ソフトテレシネ/ハードテレシネ向けの inverse telecine を行います。
+
+- **パラメータ**
+  - guide=&lt;int&gt;  (デフォルト: 1)  
+    マッチングモード。
+    - 0
+      C/P/N の中から match-quality 最小の候補を選択。
+    - 1
+      C が十分クリーンなら C を優先し、そうでなければ P/N から選択。
+    - 2
+      PAL 2:2 向けモード。
+  - post=&lt;int&gt;  (デフォルト: 2)  
+    コーミングが残った場合の後処理。
+    - 0
+      後処理なし。
+    - 2
+      combed と判定されたピクセルのみ adaptive blend を行う。
+  - cycle=&lt;auto|int&gt;  (デフォルト: auto)  
+    デシメーション周期。`auto` は入力 fps が 26 以上のときのみ 3:2 decimation を有効化する。
+  - drop=&lt;int&gt;  (デフォルト: 1)  
+    1サイクルあたりにドロップするフレーム数。現状は `1` のみ対応。
+  - combthresh=&lt;float&gt;  (デフォルト: 0.12)  
+    画素単位の combing 判定閾値。`0.0 - 1.0`。
+  - cleanfrac=&lt;float&gt;  (デフォルト: 0.20)  
+    C を clean とみなすために許容する combed 画素の割合。
+  - dthresh=&lt;int&gt;  (デフォルト: 7)  
+    per-pixel deinterlace gate。`0 - 255`。`0` で無効。
+  - chroma=&lt;bool&gt;  
+    U/V 面も match-quality に含める。
+  - back=&lt;int&gt;  
+    P マッチを試す条件。`0` = 常に試す、`1` = C が combed のときのみ試す。
+  - y0=&lt;int&gt;
+  - y1=&lt;int&gt;  
+    combing metric から除外する帯域を指定する。字幕焼き込みの回避用。
+  - nt=&lt;int&gt;  (デフォルト: 10)  
+    match-metric のノイズ許容量。8bitスケール。
+  - cthresh=&lt;int&gt;  (デフォルト: 4)  
+    match scoring で使用する画素単位のcomb閾値。8bitスケール。
+  - combpel=&lt;int&gt;  (デフォルト: 8)  
+    32x8ブロックをcombedとみなすためのcombed画素数。
+  - scthresh=&lt;float&gt;  (デフォルト: 0.0)  
+    最大SADに対する割合で指定するシーンチェンジ閾値。`0.0` で自動閾値を使用。
+  - cadlock=&lt;auto|on|off&gt;  
+    cadence pattern lock を有効化する。`auto` は `guide>=1` で有効。
+  - gthresh=&lt;int&gt;  
+    cadence-predicted match override の許容割合。`0 - 100`。`0` で override 無効。
+  - vthresh=&lt;int&gt;  
+    post-assembly combing veto threshold。`0 - 256`。`0` で無効。
+  - expand=&lt;auto|on|off&gt;  
+    DGDecode 互換の RFF expansion。`auto` は `guide>=1` かつ soft-telecine 検出時に有効。
+  - mixed=&lt;bool&gt;  
+    RFF/progressive 区間と本物のインタレース区間が混在する入力向けの混合モード。`--avsw` または `--avhw` 入力が必要。
+  - hysteresis=&lt;float&gt;  
+    隣接フレーム間で match 種別が切り替わることへの抑制量。`0.0 - 1.0`。
+  - tff=&lt;auto|on|off&gt;  
+    フィールド順。`auto` では入力 `picstruct` から決定する。
+  - log=&lt;path|bool&gt;  
+    フレームごとのマッチ結果ログを出力する。
+
+### --vpp-decimate [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...  
+重複フレームを削除します。
+
+- **パラメータ**
+  - cycle=&lt;int&gt;  (デフォルト: 5)  
+    ドロップするフレームの周期。ここで設定したフレーム数の中から指定フレーム数をドロップする。
+  - drop=&lt;int&gt;  (デフォルト: 1)  
+    cycle内にドロップするフレーム数。ここで設定したフレーム数の中から1枚フレームをドロップする。
+  - thredup=&lt;float&gt;  (デフォルト: 1.1,  0.0 - 100.0)  
+    重複と判定する閾値。
+  - thresc=&lt;float&gt;   (デフォルト: 15.0,  0.0 - 100.0)  
+    シーンチェンジと判定する閾値。
+  - blockx=&lt;int&gt;  
+  - blocky=&lt;int&gt;  
+    重複判定の計算を行うブロックサイズ。デフォルト: 32。 
+    ブロックサイズは 4, 8, 16, 32, 64のいずれかから選択可能。
+    
+  - chroma=&lt;bool&gt;  
+    色差成分を考慮した判定を行う。(デフォルト: on)
+    
+  - log=&lt;bool&gt;  
+    判定結果のログファイルの出力。 (デフォルト: off)
+    
+
+### --vpp-mpdecimate [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...  
+連続した重複フレームを削除し、VFR動画を作ることで、実効的なエンコード速度の向上と圧縮率向上を測ります。
+なお、このフィルタを使用すると[--avsync](./NVEncC_Options.ja.md#--avsync-string) vfrが自動で有効になります。
+
+- **パラメータ**
+  - hi=&lt;int&gt;  (デフォルト: 768)  
+    ドロップ対象とするかどうかの閾値。各8x8ブロックの中の差分の総和が、ひとつでもこの閾値を上回っていれば、ドロップ対象から外す。
+  - lo=&lt;int&gt;  (デフォルト: 320)  
+  - frac=&lt;float&gt;  (デフォルト: 0.33)  
+    ドロップ対象とするかどうかの閾値。各8x8ブロックの中の差分の総和について、閾値"lo"を上回っているブロックの数をカウントし、
+    それが全体のブロック数に占める割合が"frac"以上であればドロップ対象から外す。
+  - max=&lt;int&gt;  (デフォルト: 0)  
+    正の値での指定: 連続ドロップフレーム数の上限。
+    負の値での指定: 間引く1フレームを決めるフレーム間隔の下限。
+  - keep=&lt;int&gt;  (デフォルト: 0)  
+    連続する類似フレームを何枚保持してから破棄を開始するか。
+  - log=&lt;bool&gt;  
+    判定結果のログファイルの出力。 (デフォルト: off)
+
+### --vpp-select-every &lt;int&gt;[,&lt;param1&gt;=&lt;int&gt;]
+指定stepフレームごとに1フレームを選択してフレームを間引きます。フレームレートが1/stepになります。
+
+**パラメータ**
+
+  - step=&lt;int&gt;
+
+  - offset=&lt;int&gt; (デフォルト: 0)
+
+- 使用例
+  ```
+  例1 ("select even"): --vpp-select-every 2
+  例2 ("select odd "): --vpp-select-every 2,offset=1
+  ```
+
+### --vpp-rotate &lt;int&gt;
+
+動画を回転させる。 90, 180, 270 度の回転のみに対応。
+
+
+### --vpp-transform [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+- **パラメータ**
+  - flip_x=&lt;bool&gt;
+
+  - flip_y=&lt;bool&gt;
+
+  - transpose=&lt;bool&gt;
+
+### --vpp-lenscorrection [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+Brown-Conrady の放射歪み係数でレンズ歪みを補正します。
+
+- k1=&lt;float&gt;, k2=&lt;float&gt;: 放射歪み係数。
+- cx=&lt;float&gt;, cy=&lt;float&gt;: 補正中心を画像幅・高さに対する 0.0 - 1.0 で指定します (デフォルト: 0.5)。
+
+```
+--vpp-lenscorrection k1=-0.20,k2=0.04
+```
+
+### --vpp-v360 [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+equirect、flat、cubemap 間の投影変換を行います。
+
+- in=&lt;string&gt;, out=&lt;string&gt;: 入出力投影。equirect / flat / cubemap。
+- yaw=&lt;float&gt;, pitch=&lt;float&gt;, roll=&lt;float&gt;: 視点回転角度。
+- h_fov=&lt;float&gt;: flat 出力の水平画角。
+- w=&lt;int&gt;, h=&lt;int&gt;: 出力解像度。
+
+```
+--vpp-v360 in=equirect,out=flat,yaw=30,pitch=0,h_fov=90,w=1920,h=1080
+```
+
+### --vpp-convolution3d [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+3次元ノイズ除去フィルタ。
+
+- **パラメータ**
+  - matrix=&lt;string&gt;  (デフォルト=original)  
+    使用するmatrixの選択。
+    - standard
+      ```
+      1 2 1 2 4 2 1 2 1 
+      2 4 1 4 8 4 2 4 1 
+      1 2 1 2 4 2 1 2 1 
+      ```
+    - simple
+      ```
+      1 1 1 1 1 1 1 1 1 
+      1 1 1 1 1 1 1 1 1 
+      1 1 1 1 1 1 1 1 1 
+      ```
+  
+  - fast=&lt;bool&gt  (default=false)  
+    計算を簡略化した高速モードを使用する。
+  
+  - ythresh=&lt;float&gt;  (デフォルト=3, 0-255)  
+    空間方向の輝度成分の閾値で、輪郭の保護を行う。値を大きくするとノイズ除去が強くなるものの、輪郭がぼけてしまう可能性が高まる。
+  
+  - cthresh=&lt;float&gt;  (デフォルト=4, 0-255)  
+    空間方向の色差成分の閾値で、輪郭の保護を行う。値を大きくするとノイズ除去が強くなるものの、輪郭がぼけてしまう可能性が高まる。
+  
+  - t_ythresh=&lt;float&gt;  (デフォルト=3, 0-255)  
+    時間方向の輝度成分の閾値で、シーンチェンジでの残像を防止する。値を大きくするとノイズ除去が強くなるものの、シーンチェンジで残像が生じやすくなる。10以下の値が推奨。
+  
+  - t_cthresh=&lt;float&gt;  (デフォルト=4, 0-255)  
+    時間方向の色差成分の閾値で、シーンチェンジでの残像を防止する。値を大きくするとノイズ除去が強くなるものの、シーンチェンジで残像が生じやすくなる。10以下の値が推奨。
+
+- 使用例
+  ```
+  例: simple matrixの使用
+  --vpp-convolution3d matrix=simple
+  ```
+
+### --vpp-nvvfx-denoise [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+[NVIDIA MAXINE VideoEffects SDK](https://github.com/NVIDIA/MAXINE-VFX-SDK)による、元映像の詳細の保持しながらノイズの除去を行う。
+主にウェブカメラによるノイズの除去を主眼とする。
+
+80p - 1080p までの入力解像度に対応しており、実行にはx64版の実行ファイルとTuring世代(RTX20xx)以降のGPUが必要。
+また、あわせて[MAXINE VideoEffects 用のモデルと実行モジュール](https://www.nvidia.com/broadcast-sdk-resources)をダウンロード・インストールしてからお使いください。
+
+- **パラメータ**
+  - strength=&lt;int&gt;
+    - 0  
+      弱めの効果で元映像の詳細の保持を重視する.
+
+    - 1  
+      強めの効果でノイズ除去を重視する。
+
+
+
+### --vpp-nvvfx-artifact-reduction [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+[NVIDIA MAXINE VideoEffects SDK](https://github.com/NVIDIA/MAXINE-VFX-SDK)による映像の圧縮劣化を低減するフィルタ。
+オリジナルの動画の情報を保存しながら、入力ファイルのエンコード時の圧縮劣化を低減する。
+
+90p - 1080p までの入力解像度に対応しており、実行にはx64版の実行ファイルとTuring世代(RTX20xx)以降のGPUが必要。
+また、あわせて[MAXINE VideoEffects 用のモデルと実行モジュール](https://www.nvidia.com/broadcast-sdk-resources)をダウンロード・インストールしてからお使いください。
+
+- **parameters**
+  - mode=&lt;int&gt;
+    - 0 (default)  
+      弱めの効果で副作用を抑える。もとのファイルが比較的高ビットレートの場合に適している。
+
+    - 1  
+      より効果を強くし、圧縮劣化の低減する。もとのファイルが低ビットレートで劣化が激しい場合に適している。
+
+
+### --vpp-smooth [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+  DCTベースのノイズ除去フィルタ。
+
+- **パラメータ**
+  - quality=&lt;int&gt;  (default=3, 1-6)  
+    処理の品質。値が大きいほど高精度だが遅くなる。
+  
+  - qp=&lt;int&gt;  (default=12, 1 - 63)  
+    フィルタの強さ。値が大きいほど強さが増すが、輪郭がぼける等の副作用も強くなる。
+    
+  - prec (デフォルト: auto)  
+    演算精度の選択。
+    - auto  
+      fp16が使用可能かつ使用したほうが高速と思われる場合、fp16を自動的に選択する。
+      現状ではTuring世代のGPUで自動的にfp16が使用される。
+      Pascal世代はfp16を使用できるものの、とても遅いので使用しない。
+    
+    - fp16 (x64版のみ)  
+      半精度浮動小数点をメインに使って計算する。環境によっては高速。Maxwell以前のGPUやx86版の実行ファイルでは使用できません。
+    
+    - fp32  
+      単精度浮動小数点を使って計算する。
+
+
+### --vpp-msmooth [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+エッジを保持しながらスムージングを行うフィルタ。
+
+- **パラメータ**
+  - strength=&lt;int&gt;  (default=3, 0 - 20)  
+    スムージングの強さ（反復回数）。
+  
+  - threshold=&lt;float&gt;  (default=15.0, 0.0 - 255.0)  
+    エッジ判定の閾値。
+  - threshold_c=&lt;float&gt;  (default=-1.0, -1.0 / 0.0 - 255.0)  
+    色差成分のエッジ検出の閾値。-1.0 の場合は threshold と同じ値を使用。
+  - highq=&lt;bool&gt;  (default=true)  
+    高品質モード。エッジ検出点を増やす。
+  
+  - mask=&lt;bool&gt;  (default=false)  
+    エッジマスクを出力する（デバッグ用）。
+  
+- 使用例
+  ```
+  --vpp-msmooth strength=3,threshold=15.0,threshold_c=18.0
+  ```
+
+### --vpp-denoise-dct [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+  もう一つのDCTベースのノイズ除去フィルタ。
+
+- **パラメータ**
+  - step=&lt;int&gt;  
+    処理の品質。値が小さいほど高精度だが遅くなる。  
+    - 1 (high quality, slow)
+    - 2 (default)
+    - 4
+    - 8 (fast)
+  
+  - sigma=&lt;float&gt;  (default=4.0)  
+    フィルタの強さ。値が大きいほど強さが増すが、輪郭がぼける等の副作用も強くなる。
+    
+  - block_size=&lt;int&gt;  (default=8)  
+    - 8
+    - 16 (slow)
+
+### --vpp-fft3d [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+  FFTベースのノイズ除去フィルタ。
+
+- **パラメータ**
+  - sigma=&lt;float&gt;  
+    フィルタ強度。 (default=1.0, 0.0 - 100.0)
+  - sigma2=&lt;float&gt; / sigma3=&lt;float&gt; / sigma4=&lt;float&gt;  
+    中高周波数 / 中低周波数 / 低周波数側のフィルタ強度。0.0 の場合は sigma と同じ値を使用。(default=0.0, 0.0 - 100.0)
+  
+  - amount=&lt;float&gt;  (default=1.0, 0.0 - 1.0)  
+    ノイズ除去量。
+    
+  - block_size=&lt;int&gt;  (default=32)  
+    FFTの計算ブロックサイズ。
+    - 8
+    - 16
+    - 32
+    - 64
+
+  - overlap=&lt;float&gt;  (default=0.5, 0.2 - 0.8)  
+    FFTブロック同士のオーバーラップサイズ。アーティファクト発生を防ぐため、0.5以上が推奨。
+  
+  - method=&lt;int&gt; (default = 0)
+    - 0 ... wiener法
+    - 1 ... 閾値による打ち切り
+
+  - temporal=&lt;int&gt; (default = 1)
+    - 0 ... 空間方向のフィルタリングのみ
+    - 1 ... 時間方向のフィルタリングも行う
+
+  - bt=&lt;int&gt; (default = 0)
+    - 0 ... temporal の指定に従う
+    - 1 ... 空間方向のみ
+    - 2 ... 前フレーム + 現在フレーム
+    - 3 ... 前フレーム + 現在フレーム + 次フレーム
+    - 4 ... 2つ前のフレーム + 前フレーム + 現在フレーム + 次フレーム
+    - -1 ... sharpen/degrid のみ
+
+  - sharpen=&lt;float&gt;  
+    周波数領域でのシャープ化強度。0.0 で無効。(default=0.0, -10.0 - 10.0)
+  - scutoff=&lt;float&gt;  
+    シャープ化のカットオフ周波数。(default=0.30, 0.0 - 1.0)
+  - svr=&lt;float&gt;  
+    シャープ化の垂直方向比率。0.0 で垂直方向を無効化。(default=1.00, 0.0 - 10.0)
+  - smin=&lt;float&gt; / smax=&lt;float&gt;  
+    シャープ化の最小/最大制限。(default=10.0/100.0)
+  - degrid=&lt;float&gt;  
+    ブロック格子補正の強度。0.0 で無効、1.0 で標準補正。(default=0.0, 0.0 - 2.0)
+  - signorm=&lt;bool&gt;  
+    sigma/smin/smax を実ノイズパワー単位として扱う。false では従来互換の scale を使用。(default=false)
+  - prec=&lt;string&gt; (default = auto)
+    - auto ... 可能な場合fp16(半精度浮動小数点)で計算する (高速)
+    - fp32 ... 常にfp32(単精度浮動小数点)で計算する
+
+### --vpp-degrain [&lt;param1&gt;=&lt;value1&gt;]
+動き補償つき degrain デバッグフィルタ。
+
+- **パラメータ**
+  - preset=&lt;string&gt;  
+    surface preset。`custom` (デフォルト), `auto`。原則としてオリジナルの値を踏襲。
+  - mode=&lt;string&gt;  
+    出力モード。`source`, `analyze`, `compb`, `compf`, `compb2`, `compf2`, `degrain` (デフォルト), `mv`, `sad`。
+  - stage=&lt;string&gt;  
+    Step2 stage marker。`auto` (デフォルト), `tr1`, `tr2`。
+  - tr=&lt;int&gt;  
+    Auto preset temporal radius。`1` または `2`。`mode=degrain`, `stage`, `delta` を設定する。
+  - blksize/search/overlap/delta/levels/pel  
+    ブロックマッチングの形状と時間方向参照半径。
+  - thsad/thsadc/thscd1/thscd2  
+    degrain とシーンチェンジの閾値。
+  - tr0/rep0/search_refine  
+    search reference prefilter パラメータ。
+  - searchparam/pelsearch/truemotion/lambda/lsad/pnew/plevel/globalmotion/dct/useflag  
+    モーション探索の調整パラメータ。
+  - mv_spatial_refine=&lt;int|auto&gt;  
+    モーションベクトルの spatial refine 回数。デフォルトは `auto` (`-1`) で、もっとも解像度の低い最上位レベルでのみ近傍ブロック参照による refine を行い、下位（高解像度）レベルでは行わない。
+  - search_early_sad=&lt;int|off&gt;  
+    level0 の予測候補 SAD が指定値未満なら全探索を省略する。値は8x8ブロック・8bit換算で `0-65535`、実際の閾値はblksizeとbit depthに応じて自動スケールされる。デフォルトは `off` (`-1`)。
+  - spatial_early_sad=&lt;int|off&gt;  
+    level1 探索で得た SAD が指定値未満なら、そのブロックの spatial refine を省略する。値は8x8ブロック・8bit換算で `0-65535`、実際の閾値はblksizeとbit depthに応じて自動スケールされる。デフォルトは `off` (`-1`)。
+  - chroma/binomial/tv_range  
+    色差解析、prefilter、レンジ制御。
+
+- **注意**
+  - `mode=analyze` は `--vpp-kfm` の後、`mode=degrain` / `tr=1,2` は denoise 系フィルタの後に挿入されます。これは複数段の degrain pipeline に合わせた順序です。
+  - 解析を伴うモードでは levels=2 が必要です。
+  - 解析時の blksize は 8/16/32 のみ対応します。
+  - overlap は 0 または blksize/2 のみ対応します。
+  - delta は 1-5 に対応しますが、delta>2 は analyze または stage=tr2 の degrain のみ対応します。
+  - pel は 1/2/4 のみ対応します。
+
+
+### --vpp-knn [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+- **パラメータ**
+  - radius=&lt;int&gt;  (default=3, 1-5)  
+    適用半径。値が大きいほど効果が強くなる一方、処理が重くなる。
+  - d=&lt;int&gt;  (default=0, 0 - 2)  
+    時間方向半径。前後フレームを重み計算に含める。
+  - strength=&lt;float&gt;  (default=0.08, 0.0 - 1.0)  
+    フィルタの強さ。値が大きいほど効果が強くなる。
+  
+  - lerp=&lt;float&gt;  (default=0.2, 0.0 - 1.0)  
+    ノイズ除去ピクセルへのオリジナルピクセルのブレンド度合い。
+  
+  - th_lerp=&lt;float&gt;   (default=0.8, 0.0 - 1.0)  
+    エッジ検出の閾値。
+  
+- 使用例
+  ```
+  例: すこし強め
+  --vpp-knn radius=3,strength=0.10,lerp=0.1
+  ```
+
+### --vpp-nlmeans [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+Non local meansを用いたノイズ除去フィルタ。Windowsでは64bit版のみに対応。
+
+- **パラメータ**
+  - sigma=&lt;float&gt;  (default=0.005, 0.0 -)  
+    ノイズの分散。 より大きな値にするとより強くノイズ除去を行う。
+  
+  - h=&lt;float&gt;  (default=0.05, 0.0 <)  
+    パラメータ。 値を大きくすると重みがより均一になる。
+  
+  - patch=&lt;int&gt;  (default=5, 3 - 21)  
+    パッチのサイズ。奇数で指定。
+  
+  - search=&lt;int&gt;  (default=11, 3 - 21)  
+    探索範囲。奇数で指定。
+  - d=&lt;int&gt;  (default=0, 0 - 5)  
+    時間方向の参照半径。`0` では従来の空間方向のみのNLMeansを使用する。
+  - search_t=&lt;int&gt;  (default=11, 3 - 21)  
+    時間方向参照フレームでの探索範囲。奇数で指定。
+  - fp16=&lt;string&gt;  (default=blockdiff)
+    - none  
+      fp16を使用せず、fp32を使用する。高精度だが遅い。
+
+    - blockdiff  
+      ブロックの差分計算にのみfp16を使用する。精度と速度のバランスが良い。
+
+    - all  
+      重みの計算にもfp16を使用する。高速だが低精度。
+  
+- 使用例
+  ```
+  例: 探索範囲を広げてより高精度に
+  --vpp-nlmeans patch=7,search=15
+
+  例: 時間方向のNLMeansを有効化
+  --vpp-nlmeans d=1,search_t=7
+  ```
+
+### --vpp-bm3d [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+ブロックマッチングと3次元協調フィルタリングによるBM3Dノイズ除去。ハードしきい値による基本推定の後、Wienerフィルタで最終推定を行う。12bit以下のplanar YUV形式に対応する。
+
+- **パラメータ**
+  - profile=&lt;string&gt; (default=fast)
+    `block_step`、`group_size`、`bm_range`をまとめて設定する。`fast`、`lc`、`np`、`high`から選択する。`profile`より後に書いた個別パラメータを優先する。
+  - sigma=&lt;float&gt; (default=3.0, 0 または 0.5-100)  
+    8bit換算のノイズ標準偏差。`0`ではbit完全一致のコピーとなる。
+  - block_step=&lt;int&gt; (default=8, 1-8)  
+    参照パッチ間の間隔。ブロックサイズ自体は8固定。
+  - group_size=&lt;int&gt; (default=8, 1-32)  
+    1グループに含める類似ブロックの最大数。時間方向処理では16まで。
+  - bm_range=&lt;int&gt; (default=9, 1-32)  
+    ブロックマッチングの探索半径。
+  - radius=&lt;int&gt; (default=0, 0-4)  
+    時間方向の履歴半径。`0`では空間方向のみ処理する。先頭から利用可能な履歴を使うため、最初の`radius`フレームも空間版へ戻さず、蓄積済みの履歴だけで時間方向処理する。
+  - chroma=&lt;bool&gt; (default=false)  
+    色差プレーンもノイズ除去する。
+### --vpp-pmd [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+正則化pmd法によるノイズ除去。弱めのノイズ除去を行いたいときに使用する。
+
+- **パラメータ**
+  - apply_count=&lt;int&gt;  (default=2, 1- )  
+    適用回数。繰り返し適用することで、より強くノイズが除去されます。デフォルトは2。
+  
+  - strength=&lt;float&gt;  (default=100, 0-100)  
+    1回ごとのフィルタの強さ。
+  
+  - threshold=&lt;float&gt;  (default=100, 0-255)  
+    フィルタの輪郭検出の閾値。小さいほど輪郭を保持するようになるが、フィルタの効果も弱まる。
+  - useexp=&lt;bool&gt;  (default=true)  
+    係数計算にexp関数を使用する。falseにすると簡易式を使用する。
+
+- 使用例
+  ```
+  例: すこし弱め
+  --vpp-pmd apply_count=2,strength=90,threshold=120
+  ```
+
+### --vpp-hqdn3d [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+HQDN3D による空間・時間方向のノイズ除去を行う。CUDA 実装では中間バッファに FP32 を使用する。
+
+- **パラメータ**
+  - luma_spatial=&lt;float&gt;  (default=4.0, 0-255)  
+    輝度の空間方向ノイズ除去の強さ。
+  - chroma_spatial=&lt;float&gt;  (default=3.0, 0-255)  
+    色差の空間方向ノイズ除去の強さ。
+  - luma_temporal=&lt;float&gt;  (default=6.0, 0-255)  
+    輝度の時間方向ノイズ除去の強さ。
+  - chroma_temporal=&lt;float&gt;  (default=4.5, 0-255)  
+    色差の時間方向ノイズ除去の強さ。
+
+- 使用例
+  ```
+  --vpp-hqdn3d luma_spatial=4.0,chroma_spatial=3.0,luma_temporal=6.0,chroma_temporal=4.5
+  ```
+
+### --vpp-descale [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+既知のアップスケールカーネルを逆算し、元の低解像度に近い画像へ縮小します。
+
+- **パラメータ**
+  - kernel=&lt;string&gt;  
+    逆算するアップスケールカーネル。デフォルトは bicubic。
+    ```
+    bilinear, bicubic, spline16, spline36, spline64, lanczos2, lanczos3, lanczos4, auto
+    ```
+
+  - width=&lt;int&gt; / height=&lt;int&gt;  
+    出力する元解像度。明示カーネルでは両方を指定します。
+  - b=&lt;float&gt;, c=&lt;float&gt;  
+    bicubic のパラメータ。デフォルトは b=0.0, c=0.5。
+  - src_left=&lt;float&gt;, src_top=&lt;float&gt;  
+    入力画像のサブピクセルオフセット。デフォルトは 0.0。
+  - src_width=&lt;float&gt;, src_height=&lt;float&gt;  
+    非整数のネイティブサイズを持つソース向けの有効ソース幅/高さ。デフォルト: 0.0 (無効)。
+  - border_handling=&lt;string&gt;  
+    端処理。デフォルトは mirror。
+    ```
+    mirror, zero, repeat
+    ```
+
+  - auto=&lt;bool&gt;
+    `kernel=auto` と解像度探索を有効にします。入力を別途開いて `detect_frames` 枚を解析するため、stdin や pipe では使用できません。
+
+  - search_min=&lt;int&gt;, search_max=&lt;int&gt;, search_step=&lt;int&gt;
+    `auto=true` 時の探索範囲と細かさ。`search_step` のデフォルトは 1。
+
+  - detect_frames=&lt;int&gt;  
+    自動検出で平均化するフレーム数。デフォルトは 10。
+  - show_scores=&lt;bool&gt;  
+    自動検出時の候補スコアをログに出力します。デフォルトは false。
+
+- 使用例
+  ```
+  --vpp-descale kernel=bicubic,width=1280,height=720,b=0,c=0.5
+  --vpp-descale auto=true,detect_frames=8
+  ```
+
+
+### --vpp-gauss &lt;int&gt;
+適用サイズを指定してガウスフィルタをかける。サイズは3,5,7のどれか。
+
+nppc64_11.dll, nppif64_11.dll, nppig64_11.dllをNVEncC64と同じフォルダに配置する必要があり、x64版のみ使用可。
+
+必要なdllは[こちらのリンク](https://github.com/rigaya/NVEnc/releases/tag/8.01)からダウンロードできます。 (npp64_11_dll.7z)
+
+または、CUDA 11をインストールし、```<CUDA 11 インストール先>\bin``` から取得することもできます。
+
+### --vpp-subburn [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+指定した字幕の焼きこみを行う。テキスト形式の字幕については、[libass](https://github.com/libass/libass)を用いたレンダリングを行う。
+
+- **パラメータ**
+  - track=&lt;int&gt;  
+    入力ファイルの指定した字幕トラックを焼きこむ。(--avhw, --avsw時のみ有効、字幕トラックは1,2,3,...で指定)
+    
+  - filename=&lt;string&gt;  
+    指定したファイルの字幕トラックを焼きこむ。
+  
+  - charcode=&lt;string&gt;  
+    字幕の文字コードの指定。(字幕がtext形式の場合)
+  
+  - shaping=&lt;string&gt;  
+    字幕のレンダリングの品質の指定。(字幕がtext形式の場合)
+    - simple
+    - complex (デフォルト)
+  
+  - scale=&lt;float&gt; (デフォルト=0.0 (auto))  
+    bitmap形式の字幕の表示サイズの倍率  
+  
+  - transparency=&lt;float&gt; (デフォルト=0.0, 0.0 - 1.0)  
+    字幕に透過性を追加する。  
+  
+  - brightness=&lt;float&gt; (デフォルト=0.0, -1.0 - 1.0)  
+    字幕の輝度の調整を行う。  
+  
+  - contrast=&lt;float&gt; (デフォルト=1.0, -2.0 - 2.0)  
+    字幕のコントラストの調整を行う。  
+    
+  - vid_ts_offset=&lt;bool&gt;  
+    動画ファイルの最初のタイムスタンプに合わせて、タイムスタンプを補正する。 (デフォルト=on)
+    なお、"track"を使用する場合は、このオプションは常にオンになります。
+  
+  - ts_offset=&lt;float&gt; (デフォルト=0.0)  
+    字幕のtimestampを秒単位で調整(デバッグ用)  
+  
+  - fontsdir=&lt;string&gt;  
+    字幕で使用するフォントの存在するフォルダの指定。
+    
+  - forced_subs_only=&lt;bool&gt;  
+    forced flagのついた字幕のみを焼きこむ。 (デフォルト=off)
+  
+- 使用例
+  ```
+  例1: 入力ファイルの字幕トラックを焼きこみ
+  --vpp-subburn track=1
+  
+  例2: PGS字幕をファイルから焼きこみ
+  --vpp-subburn filename="subtitle.sup"
+  
+  例3: Shift-JISな文字コードのassファイルの焼きこみ
+  --vpp-subburn filename="subtitle.sjis.ass",charcode=sjis,shaping=complex
+  ```
+
+### --vpp-libplacebo-shader [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+[libplacebo](https://code.videolan.org/videolan/libplacebo)を使用して指定されたパスのカスタムシェーダーを適用します。
+
+- **パラメータ**
+    - shader=&lt;string&gt;  
+      対象のshaderファイルのパス。(glslファイル)
+    - &lt;name&gt;=&lt;value&gt;  
+      シェーダーを解析する前に、シェーダー内の `#define &lt;name&gt; ...` の値を置換します。シェーダーソースに対するコンパイル時パラメータで、複数指定できます。`custom=` で指定するパラメータとは別のものです。
+    - custom=&lt;name&gt;=&lt;value&gt;  
+      シェーダー内の `//!PARAM` で宣言された実行時パラメータを設定します。libplaceboによって型と範囲が検証されます。複数指定できます。
+    - res=&lt;int&gt;x&lt;int&gt;  
+      フィルタの出力解像度。
+    - csp=&lt;string&gt;  
+      libplaceboに渡す入力CSPを指定。
+      `yuv444` (デフォルト) では従来通り4:4:4へ変換してから処理し、
+      `yuv420` では4:2:0入力時のアップサンプリングをスキップしてlibplacebo側でクロマ処理を行う。
+      ```
+      yuv444, yuv420
+      ```
+
+    - colorsystem=&lt;string&gt;  
+      使用する色空間を指定。デフォルトでは入力ファイルから自動的に設定される。
+      ```
+      unknown, bt601, bt709, smpte240m, bt2020nc, bt2020c, bt2100pq, bt2100hlg, dolbyvision, ycgco, rgb, xyz, ycgco-re, ycgco-ro
+      ```
+
+    - transfer=&lt;string&gt;  
+      出力のトランスファ関数を指定。デフォルトでは入力ファイルから自動的に設定される。
+      ```
+      unknown, srgb, bt1886, linear,
+      gamma18, gamma20, gamma22, gamma24, gamma26, gamma28,
+      prophoto, st428, pq, hlg, vlog, slog1, slog2
+      ```
+
+    - resampler=&lt;string&gt;  
+      リサンプルが必要な場合に使用するフィルタ関数を指定。デフォルトは libplacebo-ewa-lanczos 。
+      ```
+      libplacebo-spline16, libplacebo-spline36, libplacebo-spline64, libplacebo-nearest,
+      libplacebo-bilinear, libplacebo-gaussian, libplacebo-sinc, libplacebo-lanczos, 
+      libplacebo-ginseng, libplacebo-ewa-jinc, libplacebo-ewa-lanczos, 
+      libplacebo-ewa-lanczossharp, libplacebo-ewa-lanczos4sharpest, 
+      libplacebo-ewa-ginseng, libplacebo-ewa-hann, libplacebo-ewa-hanning, 
+      libplacebo-bicubic, libplacebo-triangle, libplacebo-hermite, libplacebo-catmull-rom, 
+      libplacebo-mitchell, libplacebo-mitchell-clamp, libplacebo-robidoux, 
+      libplacebo-robidouxsharp, libplacebo-ewa-robidoux, libplacebo-ewa-robidouxsharp
+      ```
+
+    - radius=&lt;float&gt;  
+      拡大縮小アルゴリズムの半径。vpp-resizeの表で "resizable" にチェックが入っているもののみ有効。 (0.0 - 16.0、デフォルト = 自動)
+    - clamp=&lt;float&gt;  
+      負の重みに対するクランプ係数。1.0にすると負の重みが0になります。(0.0 -   1.    0、デフォルト = 0.0)
+    - taper=&lt;float&gt;  
+     重み関数の中心部分を平坦化します。(0.0 - 1.0、デフォルト = 0.0)
+    - blur=&lt;float&gt;  
+      追加のぼかし係数。(0.0 - 100.0、デフォルト = 0.0)
+    - antiring=&lt;float&gt;  
+      アンチリンギング強度。(0.0 - 1.0、デフォルト = 0.0)
+    
+    - linear=&lt;bool&gt;  
+      処理前に画像を線形化してスケーリングを行います。(デフォルト = false)
+    - sigmoid=&lt;bool&gt;  
+      スケーリング時に sigmoidization を有効化します。(デフォルト = false)
+      `linear=true` が必要で、主にアップスケーリング経路で有効です。
+
+    - sigmoid_center=&lt;float&gt;  
+      sigmoid の中心値を指定します。(0.0 - 1.0)
+      未指定時は libplacebo の既定値 (0.75) を使用します。
+    - sigmoid_slope=&lt;float&gt;  
+      sigmoid の傾きを指定します。(1.0 - 20.0)
+      未指定時は libplacebo の既定値 (6.5) を使用します。
+
+
+- 使用例
+    ``` 
+    例: カスタムシェーダを使用した 1280x720 -> 2560x1440 へのリサイズ。
+    --vpp-libplacebo-shader shader=default-shader-pack-2.1.0\Anime4K_Upscale_CNN_x2_L.glsl,res=2560x1440
+
+    例: シェーダーの //!PARAM を設定。
+    --vpp-libplacebo-shader shader=example.glsl,custom=GAIN=1.5
+
+    例: シェーダーの #define を設定。
+    --vpp-libplacebo-shader shader=example.glsl,GAIN=1.5
+    ```
+  
+### --vpp-resize &lt;string&gt; or [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+リサイズのアルゴリズムを指定する。
+
+- **オプション**
+  - algo=&lt;string&gt;  
+    デフォルトは "auto" で自動的に適切なものを選択する。
+
+    - CUDAで実装したリサイズフィルタ
+  
+      | 名前 | 説明 |
+      |:---|:---|
+      | bilinear      | 線形補間                                   |
+      | bicubic       | 双3次補間                                  |
+      | spline16      | 4x4 Spline補間                             |
+      | spline36      | 6x6 Spline補間                             |
+      | spline64      | 8x8 Spline補間                             |
+      | lanczos2      | 4x4 lanczos補間                            |
+      | lanczos3      | 6x6 lanczos補間                            |
+      | lanczos4      | 8x8 lanczos補間                            |
+      | lanczos5      | 10x10 lanczos補間                           |
+      | lanczos6      | 12x12 lanczos補間                           |
+      | lanczos7      | 14x14 lanczos補間                           |
+      | lanczos8      | 16x16 lanczos補間                           |
+      | mitchell      | Mitchell-Netravali補間                      |
+      | catmull-rom   | Catmull-Rom補間                             |
+      | hermite       | Hermite補間                                 |
+      | jinc36        | EWA Jinc補間 (radius=3)                     |
+      | jinc64        | EWA Jinc補間 (radius=4)                     |
+      | jinc144       | EWA Jinc補間 (radius=6)                     |
+      | jinc256       | EWA Jinc補間 (radius=8)                     |
+      | nis           | NVIDIA Image Scaling 1.0.3                  |
+      | fsr1          | AMD FidelityFX Super Resolution 1.0 (EASU + RCAS) |
+
+      - fsr1 の追加パラメータ
+
+        - sharpness=&lt;float&gt;  
+          RCASのシャープネス。(0.0 - 1.0、デフォルト = 0.5)
+
+      - nis / bicubic の追加パラメータ
+
+        - sharpness=&lt;float&gt;  
+          nis のシャープネス。(0.0 - 1.0、デフォルト = 0.5)
+        - cascade=&lt;string&gt;  
+          nis の2倍超拡大時のカスケード設定。auto, on, off。
+        - hdr=&lt;string&gt;  
+          nis のシャープ化帯域。auto, sdr, pq。
+        - b=&lt;float&gt;, c=&lt;float&gt;  
+          bicubic の Mitchell-Netravali B/C 係数。(デフォルト B=0.0, C=0.6)
+
+    - nppライブラリのリサイズフィルタ
+ 
+      | 名前 | 説明 |
+      |:---|:---|
+      | nn            | 最近傍点選択                                |
+      | npp_linear    | nppの線形補間                               |
+      | cubic         | 4x4 3次補間                                 |
+      | super         | nppのsuper sampling (縮小のみ)              |
+      | lanczos       | Lanczos法                                   |
+      
+      これらは[NPPライブラリ](https://developer.nvidia.com/npp)を使用しているため、使用には別途nppc64_11.dll, nppif64_11.dll, nppig64_11.dllをダウンロードし、NVEncC64.exeと同じフォルダに配置する必要がある。また、x64版のみ対応。
+
+      必要なdllは[こちらのリンク](https://github.com/rigaya/NVEnc/releases/tag/8.01)からダウンロードできます。 (npp64_11_dll.7z) または、CUDA 11をインストールし、```<CUDAインストール先>\bin``` から取得することもできます。
+
+    - [nvvfx](https://github.com/NVIDIA/MAXINE-VFX-SDK)ライブラリのリサイズフィルタ
+
+      | 名前 | 説明 |
+      |:---|:---|
+      | nvvfx-superres | NVIDIA Video EffectsによるSuper Resolution (拡大のみ)  |  |
+
+      このモードは、[NVIDIA MAXINE VideoEffects SDK](https://github.com/NVIDIA/MAXINE-VFX-SDK)によるAIによって拡大処理を行うので、実行にはx64版の実行ファイルとTuring世代(RTX20xx)以降のGPUが必要。また、あわせて[MAXINE VideoEffects 用のモデルと実行モジュール](https://www.nvidia.com/broadcast-sdk-resources)をダウンロード・インストールしてからお使いください。
+
+      2160p までの入力解像度に対応している。
+      
+      - 追加パラメータ
+        - superres-mode=&lt;int&gt;  
+          nvvfx-superres のモードの選択。
+          - 0 ... 弱め
+          - 1 ... 強め (default)
+      
+        - superres-strength=&lt;float&gt;  
+          nvvfx-superresの強さの指定。 (0.0 - 1.0, デフォルト = 0.4)
+
+    - [NGX](https://docs.nvidia.com/rtx/ngx/programming-guide/index.html)ライブラリのリサイズフィルタ
+  
+      実行にはx64版の実行ファイルとTuring世代(RTX20xx)以降のGPU、そして550.58以降のドライバが必要。
+ 
+      | 名前 | 説明 |
+      |:---|:---|
+      | ngx-vsr       | NVIDIA VSR (Video Super Resolution)  |  |
+
+      - 追加パラメータ
+        - vsr-quality=&lt;int&gt;  
+          ngx-vsr使用時の品質の設定。 (デフォルト=1, 1 - 4)
+          数字が大きいほど高品質。
+
+    - [libplacebo](https://code.videolan.org/videolan/libplacebo)ライブラリのリサイズフィルタ
+    
+      | 名前 | 説明 | resizable |
+      |:---|:---|:---:|
+      | libplacebo-spline16      | 4x4 Spline補間                       | |
+      | libplacebo-spline36      | 6x6 Spline補間                       | |
+      | libplacebo-spline64      | 8x8 Spline補間                       | |
+      | libplacebo-nearest       | 最近傍点選択                         | |
+      | libplacebo-bilinear      | 線形補間                             | &check; |
+      | libplacebo-gaussian      | ガウス補間                           | &check; |
+      | libplacebo-sinc          | Sinc補間                             | &check; |
+      | libplacebo-lanczos       | Lanczos補間                          | &check; |
+      | libplacebo-ginseng       | Ginseng補間                          | &check; |
+      | libplacebo-ewa-jinc      | EWA Jinc補間                         | &check; |
+      | libplacebo-ewa-lanczos   | EWA Lanczos補間                      | &check; |
+      | libplacebo-ewa-lanczossharp | EWA Lanczos Sharp補間             | &check; |
+      | libplacebo-ewa-lanczos4sharpest | EWA Lanczos 4 Sharpest補間    | &check; |
+      | libplacebo-ewa-ginseng  | EWA Ginseng補間                       | &check; |
+      | libplacebo-ewa-hann     | EWA Hann補間                          | &check; |
+      | libplacebo-ewa-hanning  | EWA Hanning補間                       | &check; |
+      | libplacebo-bicubic      | 双3次補間                             | |
+      | libplacebo-triangle     | 三角補間                              | |
+      | libplacebo-hermite      | Hermite補間                           | |
+      | libplacebo-catmull-rom  | Catmull-Rom補間                       | |
+      | libplacebo-mitchell     | Mitchell補間                          | |
+      | libplacebo-mitchell-clamp | Mitchell Clamp補間                  | |
+      | libplacebo-robidoux     | Robidoux補間                          | |
+      | libplacebo-robidouxsharp | Robidoux Sharp補間                   | |
+      | libplacebo-ewa-robidoux | EWA Robidoux補間                      | |
+      | libplacebo-ewa-robidouxsharp | EWA Robidoux Sharp補間           | |
+    
+      Windowsのx64版のみ対応です。
+
+      - 追加パラメータ
+
+        - pl-radius=&lt;float&gt;  
+          libplacebo-resampleで使用される拡大縮小アルゴリズムの半径。表で "resizable" にチェックが入っているもののみ有効。 (0.0 - 16.0、デフォルト = 自動)
+      
+        - pl-clamp=&lt;float&gt;  
+          libplacebo-resampleで使用される負の重みに対するクランプ係数。1.0にすると負の重みが0になります。(0.0 -   1.    0、デフォルト = 0.0)
+      
+        - pl-taper=&lt;float&gt;  
+          libplacebo-resampleの重み関数の中心部分を平坦化します。(0.0 - 1.0、デフォルト = 0.0)
+      
+        - pl-blur=&lt;float&gt;  
+          libplacebo-resampleの追加のぼかし係数。(0.0 - 100.0、デフォルト = 0.0)
+      
+        - pl-antiring=&lt;float&gt;  
+          libplacebo-resampleのアンチリンギング強度。(0.0 - 1.0、デフォルト = 0.0)
+
+- **使用例**
+  ```
+  例: spline64を使用する (短縮表記)
+  --vpp-resize spline64
+
+  例: spline64を使用する
+  --vpp-resize algo=spline64 
+
+  例: nvvfx-superresを効果強めで使用する
+  --vpp-resize algo=nvvfx-superres,superres-mode=1
+
+  例: ngx-vsrを最高品質で使用する
+  --vpp-resize algo=ngx-vsr,vsr-quality=4
+
+  例: libplaceboのリサイズフィルタを使用する
+  --vpp-resize algo=libplacebo-sinc,pl-radius=3.0,pl-antiring=0.5
+
+  例: fsr1を使用する
+  --vpp-resize algo=fsr1,sharpness=0.8
+
+  例: nisを使用する
+  --vpp-resize algo=nis,sharpness=0.5,cascade=auto,hdr=sdr
+
+  例: jinc144を使用する
+  --vpp-resize algo=jinc144
+  ```
+
+### --vpp-unsharp [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+unsharpフィルタ。輪郭・ディテール強調用のフィルタ。
+
+- **パラメータ**
+  - radius=&lt;int&gt; (default=3, 1-9)  
+    輪郭・ディテール検出の範囲。より大きな値とすることで、より広い範囲のディテールに反応して強調をかけるようになる。
+  
+  - weight=&lt;float&gt; (default=0.5, 0-10)  
+    輪郭・ディテール強調の強さ。より大きな値とすることで、強く強調がかかる。
+  
+  - threshold=&lt;float&gt;  (default=10.0, 0-255)  
+    輪郭・ディテール検出の閾値。閾値以上の差異がある画素に対して、輪郭強調を行う。
+  
+- 使用例
+  ```
+  例: やや強め
+  --vpp-unsharp weight=1.0
+  ```
+
+### --vpp-vinverse [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+インタレ解除後に残った縞状の残留を軽減するフィルタ。
+
+- **パラメータ**
+  - mode=&lt;vinverse|vinverse2&gt; (default=vinverse)  
+    フィルタの動作モード。
+  - sstr=&lt;float&gt; (default=2.7, 0.0 - 8.0)  
+    contra reference の強度。
+  - amnt=&lt;float&gt; (default=255.0, 0.0 - 255.0)  
+    8bit スケールでの画素ごとの最大変化量。255.0 で制限なし。
+  - scl=&lt;float&gt; (default=0.25, 0.0 - 4.0)  
+    残留と参照差分の符号が逆の場合のソフトクリップ係数。
+  - thr=&lt;float&gt; (default=0.0, 0.0 - 255.0)  
+    8bit スケールでの残留判定閾値。これ未満の画素は変更しない。
+  - chroma=&lt;bool&gt; (default=true)  
+    色差プレーンにも処理を適用する。
+
+- 使用例
+  ```
+  --vpp-vinverse
+  --vpp-vinverse mode=vinverse2,sstr=2.0,amnt=160,thr=4,chroma=false
+  ```
+
+### --vpp-chromashift [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+色差プレーンをシフトし、輝度と色差の位置ずれを補正するフィルタ。
+
+- **パラメータ**
+  - x=&lt;float&gt; (default=0.0, -4.0 - 4.0)  
+    横方向のシフト量。輝度画素単位で指定する。
+  - y=&lt;float&gt; (default=0.0, -4.0 - 4.0)  
+    縦方向のシフト量。輝度画素単位で指定する。
+  - show=&lt;normal|laplacian&gt; (default=normal)  
+    laplacian 診断画像を出力する。
+  - auto=&lt;bool&gt; (default=false)  
+    冒頭フレームからシフト量を自動検出する。
+  - auto_frames=&lt;int&gt; (default=5, 1-100)  
+    自動検出で採用する解析フレーム数。
+  - auto_min_pairs=&lt;int&gt; (default=200, 10-10000)  
+    解析フレームあたりに必要なゼロクロス対応点数。
+
+- 使用例
+  ```
+  --vpp-chromashift x=1.0,y=-0.5
+  --vpp-chromashift auto=true,auto_frames=5
+  --vpp-chromashift show=laplacian
+  ```
+
+### --vpp-deblock [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+H.264の非強フィルタ相当の空間デブロックフィルタ。エンコーダの `--no-deblock` とは異なり、入力画像に対するVPPフィルタとして動作する。
+
+- **パラメータ**
+  - qp=&lt;int&gt; (default=24, 0-51)  
+    フィルタ強度のQP。
+  - alpha=&lt;int&gt; (default=0, -6 - 6)  
+    alphaオフセット。
+  - beta=&lt;int&gt; (default=0, -6 - 6)  
+    betaオフセット。
+  - chroma=&lt;bool&gt; (default=false)  
+    planar色差プレーンにも適用する。NV12/P010などのsemi-planar色差では無効化される。
+
+- 使用例
+  ```
+  --vpp-deblock
+  --vpp-deblock qp=30,alpha=2,beta=2,chroma=true
+  ```
+
+### --vpp-deflicker [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+フレーム間の輝度ゆらぎを統計的に補正する時間方向フィルタ。
+
+- **パラメータ**
+  - strength=&lt;float&gt; (default=1.0, 0.0-1.0)  
+    補正結果の合成強度。
+  - damping=&lt;float&gt; (default=0.8, 0.0-1.0)  
+    前フレームの補正量を使った時間方向の減衰。
+  - scene_threshold=&lt;float&gt; (default=2.0, 0.5-5.0)  
+    シーンチェンジ判定のしきい値。判定されたフレームは補正せず通過する。
+  - frames=&lt;int&gt; (default=30, 5-300)  
+    参照統計に使用するローリングフレーム数。
+  - predictor=&lt;bool&gt; (default=true)  
+    predictor-corrector による2段補正を使用する。
+  - chroma=&lt;bool&gt; (default=false)  
+    色差プレーンにも補正を適用する。
+
+- 使用例
+  ```
+  --vpp-deflicker
+  --vpp-deflicker strength=0.8,damping=0.9,frames=60,predictor=false,chroma=true
+  ```
+
+### --vpp-stab [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+CUDAによる手ぶれ補正フィルタ。輝度成分から位相相関でフレーム間の平行移動を推定し、フレームをワープして補正する。
+
+- **パラメータ**
+  - strength=&lt;float&gt; (default=1.0, 0.0 - 1.0)  
+    補正の強さ。
+  - damping=&lt;float&gt; (default=0.9, 0.0 - 1.0)  
+    補正量の平滑化の強さ。
+  - trust=&lt;float&gt; (default=0.3, 0.0 - 1.0)  
+    位相相関ピークの信頼度しきい値。
+  - max_shift=&lt;float&gt; (default=32.0, 1 - 256)  
+    補正する最大移動量のピクセル数。
+  - border=&lt;string&gt; (default=black)  
+    境界処理。black, clamp, mirror から選択。
+
+- 使用例
+  ```
+  --vpp-stab
+  --vpp-stab strength=0.8,damping=0.95,trust=0.25,max_shift=48,border=mirror
+  ```
+
+### --vpp-colorfix [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+色かぶりやホワイトバランスを補正するフィルタ。
+
+- **パラメータ**
+  - mode=&lt;manual|auto|gray&gt; (default=manual)  
+    補正モード。
+  - space=&lt;auto|rgb|yuv&gt; (default=auto)  
+    処理する色空間。
+  - matrix=&lt;auto|bt601|bt709|bt2020&gt; (default=auto)  
+    YUV/RGB変換に使用する行列。
+  - white=&lt;rrggbb&gt; (default=ffffff)  
+    manualモードで使用する白点。
+  - black=&lt;rrggbb&gt; (default=000000)  
+    manualモードで使用する黒点。
+  - frames=&lt;int&gt; (default=30, 10-5000)  
+    auto/grayモードの解析フレーム数。
+  - strength=&lt;float&gt; (default=1.0, 0.0-1.0)  
+    auto/grayモードの補正強度。
+  - variance_threshold=&lt;float&gt; (default=2.0, >0)  
+    フラッシュ・フェード除外用の分散しきい値。
+
+- 使用例
+  ```
+  --vpp-colorfix
+  --vpp-colorfix mode=auto,frames=60,strength=0.8
+  --vpp-colorfix mode=manual,space=rgb,white=fff6e8,black=050505
+  ```
+
+### --vpp-dehalo [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+ハロー除去フィルタ。輝度成分に補正を適用し、色差成分は元のままコピーする。
+
+- **パラメータ**
+  - mode=&lt;string&gt; (default=legacy, legacy|alpha)  
+    フィルタモード。`legacy` は従来実装、`alpha` は高精度なハロー検出経路を使用する。
+  - rx=&lt;float&gt; (default=2.0, 0.5 - 10.0)  
+    水平方向のハロー半径。
+  - ry=&lt;float&gt; (default=2.0, 0.5 - 10.0)  
+    垂直方向のハロー半径。
+  - darkstr=&lt;float&gt; (default=1.0, 0.0 - 1.0)  
+    明るいハローを暗く補正する強度。
+  - brightstr=&lt;float&gt; (default=0.0, 0.0 - 1.0)  
+    暗いハローを明るく補正する強度。
+  - lowsens=&lt;int&gt; (default=50, 0 - 100)  
+    感度ランプの下限。
+  - highsens=&lt;int&gt; (default=50, 0 - 100)  
+    感度ランプの上限。
+  - ss=&lt;float&gt; (default=1.5, 1.0 - 4.0)  
+    スーパーサンプリング倍率。
+  - search_rade=&lt;int&gt; (default=auto, 1 - 10)
+    `mode=alpha` のマスク生成で使用するexpand側の探索半径。未指定時は `max(round(max(rx,ry)),3)`。
+  - search_radi=&lt;int&gt; (default=search_rade, 1 - 10)
+    `mode=alpha` のマスク生成で使用するinpand側の探索半径。未指定時は `search_rade` と同じ。
+
+- 使用例
+  ```
+  --vpp-dehalo
+  --vpp-dehalo mode=alpha,rx=2.4,ry=2.0,darkstr=0.8,brightstr=0.1,lowsens=40,highsens=70,ss=1.5,search_rade=3
+  ```
+
+### --vpp-finedehalo [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+エッジ保護付きのハロー除去フィルタ。
+
+- **パラメータ**
+  - mode=&lt;string&gt; (default=alpha, legacy|alpha)  
+    内部 dehalo のモード。
+  - rx, ry, darkstr, lowsens, highsens, ss
+    `--vpp-dehalo` と同じ。
+  - search_rade=&lt;int&gt; (default=1, 1 - 10)
+    `mode=alpha` の内部 dehalo で使用するexpand側の探索半径。
+  - search_radi=&lt;int&gt; (default=search_rade, 1 - 10)
+    `mode=alpha` の内部 dehalo で使用するinpand側の探索半径。未指定時は `search_rade` と同じ。
+  - brightstr=&lt;float&gt; (default=1.0, 0.0 - 1.0)  
+    暗いハローを明るく補正する強度。
+  - thmi=&lt;int&gt; (default=80, 0 - 255)  
+    エッジマスクの下限しきい値。
+  - thma=&lt;int&gt; (default=128, 0 - 255)  
+    エッジマスクの上限しきい値。
+  - thlimi=&lt;int&gt; (default=50, 0 - 255)  
+    弱いエッジマスクの下限しきい値。
+  - thlima=&lt;int&gt; (default=100, 0 - 255)  
+    弱いエッジマスクの上限しきい値。
+  - showmask=&lt;int&gt; (default=0, 0 - 4)  
+    デバッグ用マスク出力。1=outside, 2=shrink, 3=edges, 4=strong。
+  - excl=&lt;bool&gt; (default=true)  
+    強いエッジと近接する弱いエッジの exclusion zone を有効にする。
+  - edgeproc=&lt;float&gt; (default=0.0, 0.0 - 1.0)  
+    outside マスクに strong エッジマスクを加算する。
+  - edge=&lt;string&gt; (default=prewitt)  
+    エッジ検出方式。prewitt, sobel, scharr, kirsch, laplacian から選択。
+
+- 使用例
+  ```
+  --vpp-finedehalo
+  --vpp-finedehalo edge=scharr,thmi=60,thma=160,thlimi=30,thlima=120,showmask=4
+  ```
+
+### --vpp-hqdering [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+DCTリンギング低減フィルタ。デフォルトでは輝度に補正をかける。
+
+- **パラメータ**
+  - mrad=&lt;int&gt; (default=1, 1 - 3)  
+    リングマスクの拡張半径。
+  - mthr=&lt;int&gt; (default=10, 0 - 255)  
+    エッジマスクのしきい値。
+  - sigma=&lt;float&gt; (default=1.5, 0.5 - 5.0)  
+    ガウスぼかしの sigma。
+  - showmask=&lt;bool&gt; (default=false)  
+    有効マスクのみを出力する。
+  - protect=&lt;bool&gt; (default=true)  
+    元のエッジ画素を保護する。
+  - edge=&lt;string&gt; (default=log)  
+    エッジ検出方式。log, sobel, prewitt, scharr, kirsch, laplacian から選択。
+  - thr=&lt;int&gt; (default=0)  
+    1ピクセルあたりの変化量の上限。8bitスケール。`0` で無制限。
+  - elast=&lt;float&gt; (default=2.0, 1.0 - 3.0)
+    `thr` の弾性的な減衰。
+  - darkthr=&lt;int&gt; (default=-1)  
+    暗くする方向の別上限。`-1` で `thr` に従う。
+  - minp=&lt;int&gt; (default=0, 0 - 3)  
+    リングマスクから除外するエッジ芯のinpand回数。
+  - msmooth=&lt;int&gt; (default=0, 0 - 3)  
+    リングマスクの平滑化回数。
+  - drrep=&lt;int&gt; (default=0)  
+    ぼかしクリップの補修。`0`=off, `1`=入力の3x3最小/最大値へclamp。
+  - sharp=&lt;int&gt; (default=0, 0 - 3)  
+    contra-sharpening強度。ぼかしで失われた線の強さを、リンギングを戻さない範囲で復元する。
+  - planes=&lt;string&gt; (default=y)  
+    対象plane。`all`、または `y`, `u`, `v` を `:` 区切りで指定。
+
+- 使用例
+  ```
+  --vpp-hqdering
+  --vpp-hqdering mrad=2,mthr=12,sigma=2.0,protect=true,edge=scharr
+  ```
+
+### --vpp-edgelevel [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+エッジレベル調整フィルタ。輪郭強調用のフィルタ。
+
+- **パラメータ**
+  - strength=&lt;float&gt; (default=5.0, -31 - 31)  
+    輪郭強調の強さ。より大きな値とすることで、輪郭強調が強力になる。
+  
+  - threshold=&lt;float&gt;  (default=20.0, 0 - 255)  
+    輪郭強調を行わないようにするノイズの閾値。より大きな値ほど大きな輝度の変化をノイズとして扱うようになる。
+  
+  - black=&lt;float&gt;  (default=0.0, 0-31)  
+    輪郭の黒い部分について、より黒くシュートさせて輪郭を強調するようにする。
+  
+  - white=&lt;float&gt;  (default=0.0, 0-31)  
+    輪郭の白く部分について、より白くシュートさせて輪郭を強調するようにする。
+  
+- 使用例
+  ```
+  例: やや強め(Aviutl版のデフォルト)
+  --vpp-edgelevel strength=10.0,threshold=16.0,black=0,white=0
+  
+  例: 輪郭の黒い部分を気持ち強める
+  --vpp-edgelevel strength=5.0,threshold=24.0,black=6.0
+  ```
+
+### --vpp-msharpen [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+動的なエッジベースのシャープニングフィルタ。エッジ付近のみをシャープにする。
+
+- **パラメータ**
+  - strength=&lt;float&gt;  (default=1.0, 0.0 - 1.0)  
+    シャープニングの強さ。
+  
+  - threshold=&lt;float&gt;  (default=15.0, 0.0 - 255.0)  
+    エッジ判定の閾値。
+  - slope=&lt;float&gt; (default=0.0, 0.0 -)  
+    シグモイドによるソフトマスクの傾き。0.0では従来の二値マスクを使用する。
+  - luma_limit=&lt;float&gt; (default=0.0, 0.0 - 255.0)  
+    指定値より暗い輝度領域でシャープ化を弱める。0.0では無効。
+  - block_protect=&lt;float&gt; (default=0.0, 0.0 - 1.0)  
+    検出されたDCTブロック境界付近でシャープ化を弱める。0.0では無効。
+  
+  - highq=&lt;bool&gt;  (default=true)  
+    高品質モード。エッジ検出点を増やす。
+  
+  - mask=&lt;bool&gt;  (default=false)  
+    エッジマスクを出力する（デバッグ用）。
+  
+- 使用例
+  ```
+  --vpp-msharpen strength=1.0,threshold=15.0
+
+  例: ソフトマスク、暗部抑制、ブロック保護を使用
+  --vpp-msharpen strength=0.8,threshold=18.0,slope=8.0,luma_limit=32.0,block_protect=0.5
+  ```
+
+### --vpp-cas [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+Contrast Adaptive Sharpeningフィルタ。デフォルトでは輝度へ適用する。
+
+- **パラメータ**
+  - sharpness=&lt;float&gt; (default=0.4, 0.0 - 1.0)  
+    シャープニングの強度。内部ではCASのpeak値に変換される。
+  - hdr=&lt;bool&gt; (default=false)  
+    SDR向けのgamma 2.0輝度近似をスキップする。PQやHLGなどのHDR素材で有効にする。
+  - chroma=&lt;bool&gt; (default=false)  
+    色差planeにもシャープ化を適用する。
+
+- 使用例
+  ```
+  例: デフォルト設定
+  --vpp-cas
+
+  例: 強め
+  --vpp-cas sharpness=0.7
+
+  例: HDR素材
+  --vpp-cas sharpness=0.5,hdr=true
+  ```
+
+### --vpp-detailsharpen [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+微細なディテールを強調するシャープニングフィルタ。大きな輪郭への強調を抑えつつ、テクスチャや低振幅成分を持ち上げる。
+
+- **パラメータ**
+  - z=&lt;float&gt;  (default=4.0, 0.001 - 64.0)  
+    ゼロ点。値を大きくすると、小さな輝度差をより弱く扱う。
+  - sstr=&lt;float&gt;  (default=1.5, 0.0 - 16.0)  
+    強調の強さ。値を大きくするとディテールがより強く持ち上がる。
+  - power=&lt;float&gt;  (default=4.0, 1.0 - 16.0)  
+    非線形強調の指数。値を大きくすると中程度の振幅のディテールをより優先する。
+  - ldmp=&lt;float&gt;  (default=1.0, 0.0 - 1000.0)  
+    低振幅成分の抑制。値を大きくするとノイズに近い小さな変化をより抑える。
+  - mode=&lt;int&gt;  (default=1, 0 - 1)  
+    blur の種類。0 で 3x3 Gauss、1 で 3x3 Box。
+  - med=&lt;bool&gt;  (default=false)  
+    blur に 3x3 median を追加適用する。
+
+- 使用例
+  ```
+  例: デフォルト
+  --vpp-detailsharpen
+
+  例: gauss blur と median を使い、やや強める
+  --vpp-detailsharpen z=3,sstr=2.0,power=3,mode=0,med=true
+  ```
+
+### --vpp-warpsharp [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+細線化フィルタ。輪郭調整用のフィルタ。
+
+- **パラメータ**
+  - threshold=&lt;float&gt;  (default=128.0, 0 - 255)  
+    輪郭検出の閾値。値をあげるほどフィルタの強度が強まる。
+  
+  - blur=&lt;int&gt;  (default=2)  
+    blur処理を行う回数。値をあげるほどフィルタの強度が弱まる。
+  
+  - type=&lt;int&gt;  (default=0)  
+    - 0 ... 13x13のblur処理を行う。
+    - 1 ... 5x5のblur処理を行う。より高品質だが、blur回数を多めにする必要がある。
+    
+  - depth=&lt;float&gt;  (default=16.0, -128.0 - 128.0)  
+    warpの深度。値をあげるほどフィルタの強度が強まる。
+    
+  - chroma=&lt;int&gt;  (default=0)  
+    色差の処理方法の指定。
+    - 0 ... 輝度ベースの輪郭検出を色差成分にも適用する。
+    - 1 ... 各色差成分についてそれぞれ輪郭検出を行う。
+
+  - depth_min=&lt;float&gt;  (default=depthと同じ, -128.0 - 128.0)  
+    輪郭マスクが弱い画素に適用するwarp深度。強い輪郭ほど弱めたい場合は `depth_max` より大きい値も指定できる。
+  - depth_max=&lt;float&gt;  (default=depthと同じ, -128.0 - 128.0)  
+    輪郭マスクが強い画素に適用するwarp深度。
+  - edge_thr=&lt;float&gt;  (default=192.0, 1.0 - 255.0)  
+    adaptive depth が `depth_max` に到達する輪郭マスク値。8bit基準で指定する。
+  - gamma=&lt;float&gt;  (default=1.0, 0.01 - 8.0)  
+    adaptive depth の応答カーブ。1.0未満では弱い輪郭への効果が強まり、1.0より大きいと強い輪郭中心に効果がかかる。
+  
+- 使用例
+  ```
+  例: type=1を使う場合
+  --vpp-warpsharp threshold=128,blur=3,type=1
+
+  例: adaptive depthを使う場合
+  --vpp-warpsharp depth=8,depth_min=4,depth_max=12,edge_thr=192,gamma=0.7
+  ```
+
+### --vpp-maa [&lt;param1&gt;=&lt;value1&gt;[,&lt;param2&gt;=&lt;value2&gt;]...]
+アニメ・セル画調の映像向けの masked anti-aliasing を行う。方向別9コストのAAとエッジマスクを組み合わせ、非エッジ部分を壊さずに斜め線のジャギーを低減する。
+
+- **パラメータ**
+  - ss=&lt;float&gt; (デフォルト=2.0, 1.0 - 4.0)  
+    スーパーサンプリング倍率。
+  - aa=&lt;int&gt; (デフォルト=48, 0 - 255)  
+    輝度のAA強度。
+  - aac=&lt;int&gt; (デフォルト=aa-8, 0 - 255)  
+    色差のAA強度。chroma=on のときのみ使用する。
+  - mask=&lt;bool&gt; (デフォルト=on)  
+    エッジマスクを有効にする。
+  - mthresh=&lt;int&gt; (デフォルト=7, 1 - 255)  
+    エッジ判定の閾値。値を大きくするとエッジとして扱うピクセルが少なくなる。
+  - chroma=&lt;bool&gt; (デフォルト=off)  
+    色差プレーンも処理する。おおよそ50-100%遅くなる。
+  - show=&lt;int&gt; (デフォルト=0)  
+    デバッグ表示。0=通常、1=マスクのみ、2=マスク+AA。
+  - edge=&lt;string&gt; (デフォルト=sobel)  
+    エッジ検出方法。sobel, prewitt, sobel_full, scharr, kirsch, laplacian から選択する。
+
+- 使用例
+  ```
+  例: デフォルト設定
+  --vpp-maa
+
+  例: 輝度AAをやや強め、エッジ判定を少し強める
+  --vpp-maa aa=64,mthresh=8
+
+  例: Scharr エッジ検出を使用する
+  --vpp-maa edge=scharr
+  ```
+
+
+### --vpp-curves [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+指定した変換カーブに基づく色調整を行うフィルタ。
+
+- **パラメータ**
+  - preset=&lt;float&gt;  
+    - none
+    - color_negative
+    - process
+    - darker
+    - lighter
+    - increase_contrast
+    - linear_contrast
+    - medium_contrast
+    - strong_contrast
+    - negative
+    - vintage
+  
+  - m=&lt;string&gt;  
+    輝度調整用のカーブの指定。RGB処理後に、ポスト処理として実行される。
+  - r=&lt;string&gt;  
+    赤成分のカーブの指定。
+  
+  - g=&lt;string&gt;  
+    緑成分のカーブの指定。
+  
+  - b=&lt;string&gt;  
+    青成分のカーブの指定。
+  
+  - all=&lt;string&gt;  
+    全成分のカーブの指定。r,g,bの固有の指定がない場合には、これが適用される。
+  - interp=&lt;string&gt; (default=spline)  
+    補間方式。`spline` は自然3次スプライン、`pchip` は点間のオーバーシュートを抑える単調3次補間。
+
+- 使用例
+  ```
+  例:
+  --vpp-curves r="0/0.11 0.42/0.51 1/0.95":g="0/0 0.50/0.48 1/1":b="0/0.22 0.49/0.44 1/0.8"
+  ```
+
+### --vpp-softlight [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+フレーム全体の統計に基づく軽い色被り中和・明度正規化・コントラスト/彩度強調を行うフィルタ。
+
+- **パラメータ**
+  - mode=&lt;string&gt; (default=neutralize)
+    - neutralize: 色被りを中和し、元の明るさを維持する。
+    - lightness: 明るさを正規化し、元の色相・彩度を維持する。
+    - neutralize_boost_sat: 色被り中和に加えて彩度を強調する。
+    - neutralize_full: 色と明るさを中和し、明るさ復元を行わない。
+    - neutralize_boost: neutralize_full にRGBコントラスト強調を加える。
+    - boost: RGBコントラスト強調のみを行う。
+    - saturation: 彩度強調のみを行う。
+
+  - formula=&lt;string&gt; (default=pegtop)
+    - pegtop
+    - illusionshu
+    - w3c
+
+  - skipblack=&lt;bool&gt; (default=false)  
+    平均値計算から純黒画素を除外する。レターボックス等の暗部が多いソース向け。
+
+- 使用例
+  ```
+  例:
+  --vpp-softlight
+  --vpp-softlight mode=lightness
+  --vpp-softlight mode=boost,formula=w3c
+  --vpp-softlight mode=neutralize,skipblack=true
+  ```
+
+### --vpp-tweak [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+- **パラメータ**
+  - brightness=&lt;float&gt; (default=0.0, -1.0 - 1.0)  
+  
+  - contrast=&lt;float&gt; (default=1.0, -2.0 - 2.0)  
+  
+  - gamma=&lt;float&gt; (default=1.0, 0.1 - 10.0)  
+  
+  - saturation=&lt;float&gt; (default=1.0, 0.0 - 3.0)  
+  
+  - hue=&lt;float&gt; (default=0.0, -180 - 180)
+
+  - coring=&lt;bool&gt;  (default=false)
+
+  - start_hue=&lt;float&gt; (default=0.0, 0.0 - 360.0)
+  - end_hue=&lt;float&gt; (default=360.0, 0.0 - 360.0)  
+    hue/saturation調整を適用する色相角の範囲を制限する。
+  - swapuv=&lt;bool&gt;  (default=false)
+
+  - y_offset=&lt;float&gt; (default=0.0, -1.0 - 1.0)  
+  - y_gain=&lt;float&gt; (default=1.0, -2.0 - 2.0)  
+
+  - cb_offset=&lt;float&gt; (default=0.0, -1.0 - 1.0)  
+  - cb_gain=&lt;float&gt; (default=1.0, -2.0 - 2.0)  
+
+  - cr_offset=&lt;float&gt; (default=0.0, -1.0 - 1.0)  
+  - cr_gain=&lt;float&gt; (default=1.0, -2.0 - 2.0)  
+
+  - r_offset=&lt;float&gt; (default=0.0, -1.0 - 1.0)  
+  - r_gain=&lt;float&gt; (default=1.0, -2.0 - 2.0)  
+  - r_gamma=&lt;float&gt; (default=1.0, 0.1 - 10.0)  
+
+  - g_offset=&lt;float&gt; (default=0.0, -1.0 - 1.0)  
+  - g_gain=&lt;float&gt; (default=1.0, -2.0 - 2.0)  
+  - g_gamma=&lt;float&gt; (default=1.0, 0.1 - 10.0)  
+
+  - b_offset=&lt;float&gt; (default=0.0, -1.0 - 1.0)  
+  - b_gain=&lt;float&gt; (default=1.0, -2.0 - 2.0)  
+  - b_gamma=&lt;float&gt; (default=1.0, 0.1 - 10.0)  
+  
+- 使用例
+  ```
+  例:
+  --vpp-tweak brightness=0.1,contrast=1.5,gamma=0.75
+  ```
+
+### --vpp-deband [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+- **パラメータ**
+  - range=&lt;int&gt; (default=15, 0-127)  
+    ぼかす範囲。この範囲内の近傍画素からサンプルを取り、ブラー処理を行う。
+  
+  - sample=&lt;int&gt; (default=1, 0-2)  
+    - 設定値：0  
+      周辺1画素を参照し、元の画素値を維持したまま処理を行う。
+  
+    - 設定値：1  
+      周辺1画素とその点対称画素の計2画素を参照し、ブラー処理を行う。
+  
+    - 設定値：2  
+      周辺2画素とその点対称画素の計4画素を参照し、ブラー処理を行う。
+  
+  - thre=&lt;int&gt; (一括設定)
+  - thre_y=&lt;int&gt; (default=15, 0-31)
+  - thre_cb=&lt;int&gt; (default=15, 0-31)
+  - thre_cr=&lt;int&gt; (default=15, 0-31)  
+    y,cb,cr 各成分の閾値。この値が高いと階調飛びを減らす一方で、細かい線などが潰れやすくなる。
+  
+  - dither=&lt;int&gt; (一括設定)
+  - dither_y=&lt;int&gt; (default=15, 0-31)
+  - dither_c=&lt;int&gt; (default=15, 0-31)  
+    y成分と cb+cr成分のディザの強さ。
+  
+  - seed=&lt;int&gt;  
+    乱数シードの変更。 (default=1234)
+  
+  - blurfirst (default=off)  
+    ブラー処理を先にすることでディザ強度を減らしつつ、階調飛びが多い素材での効果を上げる。
+    全体的に副作用が強くなり細かい線が潰れやすくなる。
+  
+  - rand_each_frame (default=off)
+    毎フレーム使用する乱数を変更する。
+  - keep_tv_range=&lt;bool&gt; (default=off)  
+    出力をbit深度に応じたTVレンジ (`Y: 16-235`, `Cb/Cr: 16-240`) にclampする。
+
+- 使用例
+  ```
+  例:
+  --vpp-deband range=31,dither=12,rand_each_frame
+  ```
+
+### --vpp-libplacebo-deband [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+
+  [libplacebo](https://code.videolan.org/videolan/libplacebo)を使用したバンディング低減フィルタ。
+
+- **Parameters**
+  - iterations=&lt;int&gt;  
+    イテレーション数。 (default=1, 0-)
+  - threshold=&lt;float&gt;  
+    カットオフ閾値。 (default=4.0, 0-)
+  - radius=&lt;float&gt;  
+    半径 (default=16.0, 0-)
+  - grain_y=&lt;float&gt;  
+    輝度用の追加ノイズ。 (default=6.0, 0-)
+  - grain_c=&lt;float&gt;  
+    色差用の追加ノイズ。 (default=grain_y, 0-)
+  - dither=&lt;string&gt;  
+    ディザリングモード、8bitのみ。
+    - none
+    - blue_noise (default)
+    - ordered_lut
+    - ordered_fixed
+    - white_noise
+
+  - lut_size=&lt;int&gt;  
+    ディザリング用のLUTのサイズ。 (default=64)
+    ```2, 4, 8, 16, 32, 64, 128, 256 ```
+  
+- 使用例
+  ```
+  例:
+  --vpp-libplacebo-deband iterations=1,radius=32
+  ```
+
+### --vpp-pad &lt;int&gt;,&lt;int&gt;,&lt;int&gt;,&lt;int&gt;
+指定のピクセル数(偶数)分のパディングを行う。左、上、右、下の順にピクセル数で指定する。
+
+### --vpp-overlay [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+指定の画像を動画上に焼き込む。
+
+- **パラメータ**
+  - file=&lt;string&gt;  
+    焼き込む画像のパス。
+  
+  - pos=&lt;int&gt;x&lt;int&gt;  
+    焼き込み位置。
+  
+  - size=&lt;int&gt;x&lt;int&gt;  
+    焼き込む画像のサイズ。未指定の場合は、リサイズせず焼き込みを行う。
+  
+  - alpha=&lt;float&gt; (デフォルト: 1.0 (0.0 - 1.0))  
+    焼き込み際の不透明度。
+  
+  - alpha_mode=&lt;string&gt;  
+    - override ... alphaで指定の不透明度で上書きする。 (デフォルト)
+    - mul      ... alphaで指定した不透明度を乗算する。
+    - lumakey  ... 指定の輝度値で不透明度を設定する。
+  
+  - lumakey_threshold=&lt;float&gt; (デフォルト: 0.0 (暗い: 0.0 - 1.0 :明るい))  
+    透明色にする輝度値。
+  
+  - lumakey_tolerance=&lt;float&gt; (デフォルト: 0.1 (0.0 - 1.0))  
+    透明色にする輝度値の範囲の指定。
+  
+  - lumakey_softness=&lt;float&gt; (デフォルト: 0.0 (0.0 - 1.0))  
+    toleranceに対する透明度の変化の具合を指定。
+  
+  - loop=&lt;bool&gt;  (default=false)
+  
+- 使用例
+  ```
+  --vpp-overlay file=logo.png,pos=1620x780,size=300x300
+  --vpp-overlay file=logo.mp4,pos=0x800,alpha_mode=lumakey,lumakey_threshold=0.0,lumakey_tolerance=0.1
+  ```
+
+### --vpp-ngx-truehdr [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...  
+RTX Video SDKを使用したAIベースのSDR→HDR変換を行う。出力はcolormatrix BT.2020に変換される。合わせて ```--colormatrix bt2020nc --colorprim bt2020 --transfer smpte2084``` の指定を推奨。
+
+Turing以降のGPUかつ、Windows x64版で550.58以降のドライバが必要。
+
+デフォルト値は[リンク先](https://www.reddit.com/r/nvidia/comments/1b03yfg/rtx_hdr_paper_white_gamma_reference_settings/)の値。なお、　```contrast``` と ```saturation``` の値は、リンク先表記とは値の範囲にずれがあり、それぞれ "+100" して設定する必要があります。
+
+- **パラメータ**
+  - contrast=&lt;int&gt;  (デフォルト=125, 0 - 200)  
+    明暗のコントラスト比の調整。
+  - saturation=&lt;int&gt;  (デフォルト=75, 0 - 200)  
+    色の濃さの調整。
+  - middlegray=&lt;int&gt;  (デフォルト=44, 10 - 100)  
+    平均の明るさの調整。
+  - maxluminance=&lt;int&gt;  (デフォルト=1000, 400 - 2000)  
+    最大輝度(nits)の指定。
+
+- 使用例
+  ```
+  --vpp-ngx-truehdr maxluminance=1200
+  ```
+
+### --vpp-fruc [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+  [NVIDIA Optical FlowのFRUC(Frame Rate Up Conversion)](https://docs.nvidia.com/video-technologies/optical-flow-sdk/nvfruc-programming-guide/index.html)ベースの動く予測に基づくフレーム補間(フレームレート変換)を行います。
+
+  Turing以降(RTX20xx以降)のGPUが必要なほか、NVIDIAドライバ528.24以降が必要です。また、現状Windowsのみ対応しています。
+
+  現状、NVIDIA Optical FlowのFRUCの制限により、8bitの処理のみに対応しているため、本処理を行うとその段階で8bitに落として処理することになります。
+
+- **パラメータ**
+  - double
+    フレームレートを倍にします。
+  - fps=&lt;int&gt;/&lt;int&gt;  
+    フレームレートを指定の値に変換します。
+
+- 使用例
+  ```
+  例: 倍のフレームレートに変換する場合
+  --vpp-fruc double
+  
+  例: 59.94fpsに変換する場合
+  --vpp-fruc fps=60000/1001
+  ```
+
+### --vpp-anime4k-shader [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+bloc97 Anime4K v3.2ベースのCUDAフィルタによる輝度エンハンス / 2倍アップスケールチェーンを有効にする。現状は8bit YUV420入力のみ対応。
+CNNモデルは含まれておらず、そちらを使用する場合は、[`--vpp-onnx`](#--vpp-onnx-param1value1param2value2) を使用する。
+
+1パスで完結するチェーン: オプションのプリフィルタデノイズ -> メインAnime4Kモード -> オプションのライン強調/細線化/デノイズ -> オプションのハイライトクランプ・アンチリンギング -> クロマ処理 -> 最終リサイズ。
+
+- **パラメータ**
+  - mode=&lt;string&gt; (デフォルト: ani4k_original)  
+    Anime4Kバリアントの選択。
+    - ani4k_original ... エッジ強調2倍アップスケール (strength 0.5)
+    - ani4k_deblur ... エッジ強調2倍アップスケール、より強い (strength 1.0)
+    - ani4k_darken_hq ... ライン暗化2倍アップスケール
+    - ani4k_thin_hq ... ライン細線化2倍アップスケール
+    - ani4k_dog_sharpen ... 1倍 Difference-of-Gaussians シャープ化
+    - ani4k_dog ... 2倍 DoGアップスケール
+    - ani4k_dtd ... 2倍 暗化+細線化+デブラー複合アップスケール
+
+  - scale=&lt;int&gt; (デフォルト: 2)  
+    1 = ソース解像度で強調のみ、2 = 2倍アップスケール + 強調。
+    一部モードはscaleが暗黙的に決まる (dog_sharpen=1, dog/dtd=2)。
+  - strength=&lt;float&gt; (デフォルト: 0.50)  
+    強調の強度倍率。mode=ani4k_deblur で値未指定時は自動的に1.0に引き上げ。
+  - prefilter_denoise=&lt;string&gt; (デフォルト: off)  
+    メインパスの前にデノイズを適用。
+    off / mean / median / mode (bilateral)
+  - darken=&lt;string&gt; (デフォルト: off)  
+    メインパス後のライン暗化パス。
+    off / hq / fast / veryfast
+  - thin=&lt;string&gt; (デフォルト: off)  
+    メインパス後のライン細線化パス。
+    off / hq / fast / veryfast
+  - denoise=&lt;string&gt; (デフォルト: off)  
+    メインパス後のデノイズパス。
+    off / mean / median / mode (bilateral)
+  - denoise_intensity, denoise_spatial, denoise_curve, denoise_hist_reg=&lt;float&gt;  
+    デノイズパスの詳細パラメータ (上級者向け、省略可)。
+  - clamp_highlights=&lt;bool&gt; (デフォルト: false)  
+    出力ハイライトをソースのローカル最大値にクランプ。
+  - antiring=&lt;float&gt; (デフォルト: 0.0)  
+    アンチリンギング強度。各アップスケール輝度ピクセルをソース2x2のmin/maxにクランプする。
+  - chroma_resize=&lt;string&gt; (デフォルト: spline36)  
+    scale=2時のU/Vリサイズカーネル。
+    spline36 / bilinear / bicubic / lanczos3 / joint
+    joint = 輝度ガイド付きジョイントバイラテラルクロマ再構築。
+  - chroma=&lt;bool&gt; (デフォルト: true)  
+    scale=2時にクロマをリサイズするか。falseの場合パススルー。scale=1では常にパススルー。
+  - out_res=&lt;WxH&gt;  
+    Anime4K処理後の最終リサイズ。任意の最終サイズに合わせられる。
+    片方の軸に負の値を指定するとアスペクト比を保持 (例: out_res=-2x1080)。
+  - resize=&lt;string&gt; (デフォルト: spline16)  
+    out_resで使用するリサンプラー。  
+    lanczos4 / spline16 / spline36 / jinc144 / nis / bicubic / ...
+
+- 使用例
+  ```
+  --vpp-anime4k-shader mode=ani4k_original,scale=2
+  --vpp-anime4k-shader mode=ani4k_deblur,antiring=0.8,chroma_resize=joint
+  --vpp-anime4k-shader mode=ani4k_dog_sharpen,strength=0.6,out_res=1920x1080
+  ```
+
+### --vpp-onnx [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+ONNX Runtime CUDA/TensorRT provider を使用してONNXモデルを実行するCNNフィルタ。CUDA 12対応のONNX Runtime GPU版が必要。
+
+#### Windows
+
+必要な ONNX Runtime / cuDNN / TensorRT 関連 DLL を下記リンク先にまとめてある。これをダウンロードし、7z を展開して中身のDLLを `NVEncC64.exe` と同じフォルダに配置する。
+
+- [nvenc_vpp_onnx_dlls_20260627.7z](https://github.com/rigaya/HWEnc-onnx-models/releases/download/20260627/nvenc_vpp_onnx_dlls_20260627.7z)
+
+`provider=cuda` のみ使用する場合も、上記の一式で動作する。`provider=tensorrt` を使用しない場合、TensorRT 関連 DLL は実行時には読み込まれない。
+
+<details>
+<summary>必要モジュール詳細</summary>
+
+手動でDLLを揃える場合は、下記のDLLが `PATH` から見えるか、`NVEncC64.exe` と同じフォルダに配置されている必要がある。
+
+```text
+NVEncC64.exe
+├─ onnxruntime.dll
+│  ├─ onnxruntime_providers_shared.dll
+│  ├─ onnxruntime_providers_cuda.dll
+│  │  ├─ cudart64_12.dll
+│  │  ├─ cublas64_12.dll
+│  │  ├─ cublasLt64_12.dll
+│  │  ├─ cufft64_11.dll
+│  │  └─ cudnn64_9.dll
+│  │     ├─ cudnn_adv64_9.dll
+│  │     ├─ cudnn_cnn64_9.dll
+│  │     ├─ cudnn_ext64_9.dll
+│  │     ├─ cudnn_graph64_9.dll
+│  │     │  ├─ cudnn_heuristic64_9.dll
+│  │     │  ├─ cudnn_engines_precompiled64_9.dll
+│  │     │  ├─ cudnn_engines_runtime_compiled64_9.dll
+│  │     │  └─ cudnn_engines_tensor_ir64_9.dll
+│  │     └─ cudnn_ops64_9.dll
+│  └─ onnxruntime_providers_tensorrt.dll (provider=tensorrt 使用時)
+│     ├─ nvinfer_10.dll
+│     │  └─ nvinfer_builder_resource_*.dll
+│     ├─ nvonnxparser_10.dll
+│     ├─ nvinfer_plugin_10.dll
+│     ├─ cudart64_12.dll
+│     ├─ cublas64_12.dll
+│     └─ cudnn64_9.dll
+```
+
+`provider=tensorrt` を使用する場合も、TensorRTで実行できないopのfallback用に CUDA provider を追加するため、CUDA provider 用DLL一式が必要。
+`nvinfer_builder_resource_*.dll` は TensorRT engine のビルド時に使用されるGPUアーキテクチャ別リソースDLLで、`*` の部分には `sm89` や `ptx` などが入る。`nvinfer_plugin_10.dll` はTensorRT pluginを使用するモデルで必要になるため、TensorRT対応の追加DLL群に含めることを推奨。
+`nvinfer_dispatch_10.dll`、`nvinfer_lean_10.dll`、`nvinfer_vc_plugin_10.dll` は ONNX Runtime TensorRT provider の通常実行では必須ではない。
+
+- ONNX Runtime: [ONNX Runtime Releases](https://github.com/microsoft/onnxruntime/releases) から CUDA 対応の Windows x64 GPU 版 (`onnxruntime-win-x64-gpu-*.zip`) をダウンロードする。例: `onnxruntime-win-x64-gpu-1.23.2.zip`
+- CUDA runtime / cuBLAS / cuFFT: [CUDA Toolkit Downloads](https://developer.nvidia.com/cuda-downloads) または [CUDA Toolkit Archive](https://developer.nvidia.com/cuda-toolkit-archive) から CUDA 12.x 版を導入する。
+- cuDNN: [cuDNN Downloads](https://developer.nvidia.com/cudnn-downloads) から CUDA 12.x 対応の cuDNN 9.x を導入する。
+- TensorRT (`provider=tensorrt` 使用時のみ): [TensorRT Downloads](https://developer.nvidia.com/tensorrt/download) から Windows x64 / CUDA 12.x 対応の TensorRT 10.x を導入する。ダウンロードには NVIDIA Developer へのログインとライセンス同意が必要な場合がある。
+
+</details>
+
+#### Linux
+
+必要な ONNX Runtime / cuDNN / TensorRT 関連モジュールは下記のように導入する。ONNX Runtime は GPU版を展開し、CUDA/cuDNN/TensorRT は NVIDIA の apt repository から導入する。
+
+```bash
+tar xf onnxruntime-linux-x64-gpu-*.tgz
+export LD_LIBRARY_PATH=/path/to/onnxruntime-linux-x64-gpu/lib:/usr/local/cuda/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
+```
+
+CUDA 12.8 を使用する場合の例:
+
+```bash
+sudo apt-get install cuda-cudart-12-8 libcublas-12-8 libcufft-12-8 libcurand-12-8
+```
+
+cuDNN 9 / TensorRT 10 は、NVIDIA の local repository `.deb` を登録してから runtime ライブラリを導入する。
+
+```bash
+sudo dpkg -i cudnn-local-repo-ubuntu2404-9.x.y_1.0-1_amd64.deb
+sudo cp /var/cudnn-local-repo-ubuntu2404-9.x.y/cudnn-*-keyring.gpg /usr/share/keyrings/
+sudo apt-get update
+sudo apt-get install libcudnn9-cuda-12
+```
+
+```bash
+sudo dpkg -i nv-tensorrt-local-repo-ubuntu2404-10.x.x-cuda-12.x_1.0-1_amd64.deb
+sudo cp /var/nv-tensorrt-local-repo-ubuntu2404-10.x.x-cuda-12.x/*-keyring.gpg /usr/share/keyrings/
+sudo apt-get update
+sudo apt-get install libnvinfer10 libnvonnxparsers10
+```
+
+<details>
+<summary>必要モジュール詳細</summary>
+
+Linuxでは ONNX Runtime GPU版の `.so` を展開し、CUDA/cuDNN/TensorRT のruntimeライブラリをaptで導入する。ONNX Runtimeは展開した `lib` ディレクトリを `LD_LIBRARY_PATH` から見えるようにする。
+
+```text
+nvencc
+└─ libonnxruntime.so -> libonnxruntime.so.1 -> libonnxruntime.so.1.23.2
+   ├─ libonnxruntime_providers_shared.so
+   ├─ libonnxruntime_providers_cuda.so
+   │  ├─ libcudart.so.12           (cuda-cudart-12-8)
+   │  ├─ libcublas.so.12           (libcublas-12-8)
+   │  ├─ libcublasLt.so.12         (libcublas-12-8)
+   │  ├─ libcurand.so.10           (libcurand-12-8)
+   │  ├─ libcufft.so.11            (libcufft-12-8)
+   │  └─ libcudnn.so.9             (libcudnn9-cuda-12)
+   │     ├─ libcudnn_adv.so.9
+   │     ├─ libcudnn_cnn.so.9
+   │     ├─ libcudnn_ext.so.9
+   │     ├─ libcudnn_graph.so.9
+   │     ├─ libcudnn_heuristic.so.9
+   │     ├─ libcudnn_engines_precompiled.so.9
+   │     ├─ libcudnn_engines_runtime_compiled.so.9
+   │     ├─ libcudnn_engines_tensor_ir.so.9
+   │     └─ libcudnn_ops.so.9
+   └─ libonnxruntime_providers_tensorrt.so (provider=tensorrt 使用時)
+      ├─ libnvinfer.so.10          (libnvinfer10)
+      │  └─ libnvinfer_builder_resource_*.so.10
+      ├─ libnvonnxparser.so.10     (libnvonnxparsers10)
+      ├─ libcudart.so.12
+      ├─ libcublas.so.12
+      ├─ libcublasLt.so.12
+      └─ libcudnn.so.9
+```
+
+- ONNX Runtime: [ONNX Runtime Releases](https://github.com/microsoft/onnxruntime/releases) から CUDA 対応の Linux x64 GPU 版 (`onnxruntime-linux-x64-gpu-*.tgz`) をダウンロードし、任意の場所に展開する。
+- CUDA runtime / cuBLAS / cuFFT / cuRAND: [CUDA Toolkit Downloads](https://developer.nvidia.com/cuda-downloads) の NVIDIA CUDA apt repository を設定し、使用する CUDA 12.x に合わせたパッケージを導入する。CUDA 12.8 の例:
+
+```bash
+sudo apt-get install cuda-cudart-12-8 libcublas-12-8 libcufft-12-8 libcurand-12-8
+```
+
+- cuDNN: [cuDNN Downloads](https://developer.nvidia.com/cudnn-downloads) から Ubuntu / x86_64 / CUDA 12向けの cuDNN 9 local repository `.deb` を導入し、`libcudnn9-cuda-12` をインストールする。
+
+```bash
+sudo dpkg -i cudnn-local-repo-ubuntu2404-9.x.y_1.0-1_amd64.deb
+sudo cp /var/cudnn-local-repo-ubuntu2404-9.x.y/cudnn-*-keyring.gpg /usr/share/keyrings/
+sudo apt-get update
+sudo apt-get install libcudnn9-cuda-12
+```
+
+- TensorRT (`provider=tensorrt` 使用時のみ): [TensorRT Downloads](https://developer.nvidia.com/tensorrt/download) から Ubuntu / x86_64 / CUDA 12向けの TensorRT 10 local repository `.deb` を導入し、runtimeライブラリをインストールする。ダウンロードには NVIDIA Developer へのログインとライセンス同意が必要な場合がある。
+
+```bash
+sudo dpkg -i nv-tensorrt-local-repo-ubuntu2404-10.x.x-cuda-12.x_1.0-1_amd64.deb
+sudo cp /var/nv-tensorrt-local-repo-ubuntu2404-10.x.x-cuda-12.x/*-keyring.gpg /usr/share/keyrings/
+sudo apt-get update
+sudo apt-get install libnvinfer10 libnvonnxparsers10
+```
+
+`libcudnn*.so.9`、`libnvinfer*.so.10`、`libnvonnxparser.so.10` は通常 `/lib/x86_64-linux-gnu` に配置され、apt導入後は `ldconfig` により参照できる。CUDA系ライブラリが見つからない場合は、CUDAの `lib` ディレクトリも `LD_LIBRARY_PATH` に追加する。
+
+</details>
+
+モデルファイルは [https://github.com/rigaya/HWEnc-onnx-models/releases](https://github.com/rigaya/HWEnc-onnx-models/releases) からダウンロードできる。短縮モデル名 (`model=artcnn_c4f32` など) を使用する場合は、zipを展開したディレクトリを `--vpp-onnx-model-dir` で指定する。
+
+モデルのチャンネル数から前処理/後処理が自動推定される(1ch=輝度SR, 3ch=RGB, 4ch=RGB+ノイズ, 2ch=グレー+ノイズ, 3→2ch=クロマ)。
+
+- **パラメータ**
+  - model=&lt;string&gt;  
+    ONNXモデルファイルのパス (必須)。`--vpp-onnx-model-dir` 指定時は、models.json に登録されたモデル名を拡張子なしで指定可能。
+  - provider=&lt;string&gt; (デフォルト: auto)  
+    推論に使用する実行プロバイダ。auto / cuda / tensorrt (trt)
+  - prec=&lt;string&gt; (デフォルト: auto)  
+    TensorRTの演算精度。auto / fp16 (f16) / fp32 (f32)。autoはTensorRTでfp16を使用する。CUDA providerではfp32を使用する。
+  - colormatrix=&lt;string&gt; (デフォルト: auto)  
+    [`--colormatrix`](#--colormatrix-string) と同じ名前を受け付ける。`--vpp-onnx` で対応するのは auto / auto_res / smpte170m / bt470bg / bt709 / bt2020nc。互換性のため、旧指定名の bt601 と bt2020 も smpte170m / bt2020nc の別名として受け付ける。
+  - colormatrix_out=&lt;string&gt; (デフォルト: auto)  
+    出力側 RGB→YUV 変換の色行列。auto では colormatrix と同じ色行列を使用する。BT.2020/PQ RGB を出力する SDR→HDR モデルでは bt2020nc を指定する。
+  - colorrange=&lt;string&gt; (デフォルト: auto)  
+    [`--colorrange`](#--colorrange-string) と同じ名前を受け付ける。`--vpp-onnx` で対応するのは auto / tv / limited / pc / full。
+  - colorspace=&lt;string&gt; (デフォルト: rgb)  
+    3chモデルの色空間。rgb / ycbcr (ArtCNN *_YCbCr 用)
+  - noise=&lt;int&gt; (デフォルト: 15, 範囲: 0 - 255)  
+    ノイズモデル用のノイズシグマ値。
+  - frames=&lt;int&gt; (デフォルト: 1)  
+    時系列モデルへ渡すフレームウィンドウのサイズ。3ch RGB フレームをチャンネル軸に連結した `T*3` 入力・3ch 出力モデルで使用します。中央フレームを出力するため、1 以上の奇数を指定してください。
+    `models.json` に `frames` が設定された登録モデルでは、その値を優先します。
+  - mask=&lt;string&gt;  
+    2入力ONNXモデルへ渡すグレースケールマスク画像。白を処理対象、黒を保持領域として渡します。マスクは入力解像度に合わせて読み込まれ、静的なロゴ・ウォーターマークの除去などに使用できます。
+  - out_res=&lt;WxH&gt;  
+    モデル実行後の最終リサイズ。任意の最終サイズに合わせられる。
+    片方の軸に負の値を指定するとアスペクト比を保持 (例: out_res=-2x1080)。
+  - resize=&lt;string&gt; (デフォルト: lanczos4)  
+    out_resで使用するリサンプラー。
+
+  - list
+    models.json に登録されたモデル一覧を表示する。`--vpp-onnx-model-dir` の指定が必要。
+
+- **互換用パラメータ**
+  - device=&lt;string&gt;, interop=&lt;string&gt;  
+    QSVEnc/VCEEnc とのCLI互換のため受け付けるが、NVEnc では推論デバイスや転送方式の選択には使用しない。推論はエンコードに使用する CUDA デバイスに紐づき、host-readback 経路を使用する。
+
+- **使用可能なモデル名一覧**
+
+  models.json に登録済みのモデル名は model= で拡張子なしで指定可能 (例: `model=artcnn_c4f32`)。使用するには [`--vpp-onnx-model-dir`](#--vpp-onnx-model-dir-string) でモデルディレクトリを指定する必要がある。
+  models.json では `"colormatrix_out": "bt2020nc"` を指定できる。`colormatrix_out=auto` の場合は、NVEnc が登録された出力側色行列を使用する。
+
+  | ファミリー | モデル名 |
+  |-----------|---------|
+  | ArtCNN | artcnn_c4f16, artcnn_c4f16_dn, artcnn_c4f16_ds, artcnn_c4f32, artcnn_c4f32_dn, artcnn_c4f32_ds, artcnn_r4f32, artcnn_r4f32_dn, artcnn_r8f64, artcnn_r8f64_chroma, artcnn_r8f64_chroma_dn, artcnn_r8f64_chroma_dn_int8_perf, artcnn_r8f64_chroma_int8_perf, artcnn_r8f64_int8_perf, artcnn_r8f64_jpeg420, artcnn_r8f64_jpeg420_ycbcr, artcnn_r8f64_jpeg444, artcnn_r8f64_jpeg444_ycbcr, artcnn_r8f64_rgb, artcnn_r16f96, artcnn_r16f96_int8_perf, artcnn_r16f128, artcnn_r16f128_int8, artcnn_r16f128_int8_perf |
+  | ACNet | acnet_s, acnet_s_box, acnet_s_box_hdn, acnet_s_hdn, acnet_m, acnet_m_box, acnet_m_box_hdn, acnet_m_hdn, acnet_l, acnet_l_box, acnet_l_box_hdn, acnet_l_hdn |
+  | ARNet | arnet_s, arnet_s_box, arnet_s_box_hdn, arnet_s_hdn, arnet_m, arnet_m_box, arnet_m_box_hdn, arnet_m_hdn, arnet_l, arnet_l_box, arnet_l_box_hdn, arnet_l_hdn, arnet_xl, arnet_xl_box, arnet_xl_box_hdn, arnet_xl_hdn |
+  | FSRCNNX | fsrcnnx_s, fsrcnnx_s_dp, fsrcnnx_m, fsrcnnx_m_dp |
+  | Anime3D | anime3d_aa_x2, anime3d_x2 |
+  | Anime4K Restore | anime4k_restore_cnn_l, anime4k_restore_cnn_soft_l, anime4k_restore_cnn_soft_ul, anime4k_restore_cnn_soft_vl, anime4k_restore_cnn_ul, anime4k_restore_cnn_vl |
+  | Anime4K Upscale CNN | anime4k_upscale_cnn_s, anime4k_upscale_cnn_s_dn, anime4k_upscale_cnn_m, anime4k_upscale_cnn_m_dn, anime4k_upscale_cnn_l, anime4k_upscale_cnn_l_dn, anime4k_upscale_cnn_ul, anime4k_upscale_cnn_ul_dn, anime4k_upscale_cnn_vl, anime4k_upscale_cnn_vl_dn |
+  | Anime4K GAN | anime4k_gan_s_x2, anime4k_gan_m_x2, anime4k_gan_l_x3, anime4k_gan_vl_x3, anime4k_gan_ul_x4, anime4k_gan_uul_x4 |
+  | HDRTVNet++ | hdrtvnetpp_agcm_dynamic, hdrtvnetpp_ensemble_dynamic |
+  | FBCNN | fbcnn_color_blind, fbcnn_gray_blind, fbcnn_color_flex, fbcnn_gray_flex |
+  | NAFNet | nafnet_gopro_width32, nafnet_reds_width64, nafnet_sidd_width32, nafnet_sidd_width64 |
+  | super-image | pan_2x/3x/4x, pan_bam_2x/3x/4x, carn_2x/3x/4x, carn_bam_2x/3x/4x, a2n_2x/3x/4x, awsrn_bam_2x/3x/4x, msrn_2x/3x/4x |
+  | WebSR | websr_cnn2x_s_rl, websr_cnn2x_s_an, websr_cnn2x_s_3d, websr_cnn2x_m_rl, websr_cnn2x_m_an, websr_cnn2x_m_3d, websr_cnn2x_l_rl, websr_cnn2x_l_an, websr_cnn2x_l_3d |
+  | waifu2x CUNet | waifu2x_cunet_scale2x, waifu2x_cunet_noise0, waifu2x_cunet_noise0_scale2x, waifu2x_cunet_noise1, waifu2x_cunet_noise1_scale2x, waifu2x_cunet_noise2, waifu2x_cunet_noise2_scale2x, waifu2x_cunet_noise3, waifu2x_cunet_noise3_scale2x |
+  | waifu2x UpConv7 | waifu2x_upconv7_art_scale2x, waifu2x_upconv7_art_noise0_scale2x, waifu2x_upconv7_art_noise1_scale2x, waifu2x_upconv7_art_noise2_scale2x, waifu2x_upconv7_art_noise3_scale2x, waifu2x_upconv7_photo_scale2x, waifu2x_upconv7_photo_noise0_scale2x, waifu2x_upconv7_photo_noise1_scale2x, waifu2x_upconv7_photo_noise2_scale2x, waifu2x_upconv7_photo_noise3_scale2x |
+  | waifu2x VGG7 | waifu2x_vgg7_art_scale2x, waifu2x_vgg7_art_noise0, waifu2x_vgg7_art_noise1, waifu2x_vgg7_art_noise2, waifu2x_vgg7_art_noise3, waifu2x_vgg7_art_y_scale2x, waifu2x_vgg7_art_y_noise1, waifu2x_vgg7_art_y_noise2, waifu2x_vgg7_art_y_noise3, waifu2x_vgg7_photo_scale2x, waifu2x_vgg7_photo_noise0, waifu2x_vgg7_photo_noise1, waifu2x_vgg7_photo_noise2, waifu2x_vgg7_photo_noise3, waifu2x_vgg7_ukbench_scale2x |
+  | Real-CUGAN | up2x_latest_no_denoise, up2x_latest_conservative, up2x_latest_denoise1x, up2x_latest_denoise2x, up2x_latest_denoise3x, up3x_latest_no_denoise, up3x_latest_conservative, up3x_latest_denoise3x, up4x_latest_no_denoise, up4x_latest_conservative, up4x_latest_denoise3x, upcunet2x_no_denoise, upcunet2x_no_denoise_int8, upcunet2x_no_denoise_int8_v2 |
+  | Real-ESRGAN | realesr_animevideov3, realesr_general_x4v3, realesr_general_wdn_x4v3, realesrgan_anime_6b, realesrgan_anime_6b_int8, realesrgan_anime_6b_int8_v3, realesrgan_x2plus, realesrgan_x4plus, realesrgan_x4plus_anime_6b, realesrnet_x4plus |
+  | BSRGAN | bsrgan, bsrganx2, bsrnet |
+  | RAVU | ravu_lite_r2, ravu_lite_r3, ravu_lite_r4, ravu_r2, ravu_r3, ravu_r4, ravu_3x_r2, ravu_3x_r3, ravu_3x_r4, ravu_zoom_2x_r2, ravu_zoom_2x_r2_ar, ravu_zoom_3x_r2, ravu_zoom_3x_r2_ar, ravu_zoom_4x_r2, ravu_zoom_4x_r2_ar, ravu_zoom_2x_r3, ravu_zoom_2x_r3_ar, ravu_zoom_3x_r3, ravu_zoom_3x_r3_ar, ravu_zoom_4x_r3, ravu_zoom_4x_r3_ar |
+  | EDSR | edsr_baseline_x2, edsr_baseline_x3, edsr_baseline_x4 |
+  | ESRGAN/FSSR/RealSR | esrgan, fssr_dped, fssr_jpeg, realsr_dped, realsr_jpeg |
+  | NNEDI3 | nnedi3_nns16_win8x4, nnedi3_nns16_win8x6, nnedi3_nns32_win8x4, nnedi3_nns32_win8x6, nnedi3_nns64_win8x4, nnedi3_nns64_win8x6, nnedi3_nns128_win8x4, nnedi3_nns128_win8x6, nnedi3_nns256_win8x4, nnedi3_nns256_win8x6 |
+  | KAIR Denoise | dncnn3, dncnn_15, dncnn_25, dncnn_50, dncnn_color_blind, dncnn_gray_blind, drunet_color, drunet_color_int8, drunet_gray, drunet_deblocking_color, drunet_deblocking_grayscale, fdncnn_color, fdncnn_color_clip, fdncnn_gray, fdncnn_gray_clip, ffdnet_color, ffdnet_color_clip, ffdnet_gray, ffdnet_gray_clip |
+  | KAIR SR | dpsr_x2, dpsr_x2_int8, dpsr_x3, dpsr_x4, dpsr_x4_gan, srmd_x2, srmd_x3, srmd_x4, srmdnf_x2, srmdnf_x3, srmdnf_x4 |
+
+- 使用例
+  ```
+  --vpp-onnx model=artcnn_c4f32
+  --vpp-onnx model=acnet/acnet_s.onnx,provider=cuda,out_res=1920x1080,resize=lanczos4
+  --vpp-onnx model=anime4k_restore_cnn_l,out_res=-2x1080
+  --vpp-onnx model=hdrtvnetpp_agcm_dynamic,colormatrix=bt709 --output-depth 10 --colormatrix bt2020nc --colorprim bt2020 --transfer smpte2084
+  ```
+
+### --vpp-onnx-deint [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+ONNXモデルを使うデインターレースフィルタ。モデルは `onnx_deint_models.json` に登録された名前で選択し、ONNXファイルの直接パスは受け付けない。マニフェストの `architecture` は内部メタデータであり、コマンドラインからは選択できない。
+
+`stdeint` と `stdeint_fast` は ST-DeInt（3ch入力、半分の高さの6ch出力）、`DDD` は DDD（3フィールドを転置した9ch入力、3ch出力）の登録名。`mode=bob` は入力1フレームから2枚のプログレッシブフレームを出力してフレームレートを2倍にし、`mode=normal` は表示順で先のフィールドを基準に1枚出力する。TFF/BFFのフィールド順を維持し、プログレッシブ入力はニューラル推論せずパススルーする。
+
+入力は8bit YUV420のみで、高さは4以上の偶数である必要がある。推論にはONNX RuntimeのCUDAまたはTensorRT execution providerを使用する。DDDはテンソルのpackと出力weaveをホストメモリで行い、推論自体はGPUで実行する。
+
+- **パラメータ**
+  - enable=&lt;bool&gt; (このオプション指定時のデフォルト: true)  
+    フィルタを有効または無効にする。
+  - model=&lt;string&gt; (必須)  
+    [`--vpp-onnx-model-dir`](#--vpp-onnx-model-dir-string) 配下の `onnx_deint_models.json` に登録された名前。`stdeint`、`stdeint_fast`、`DDD` などを指定し、ファイルパスは指定しない。
+  - precision=&lt;string&gt; (デフォルト: fp32)  
+    推論精度。fp32 / auto。`auto` ではTensorRT fp16を使用できる。
+  - mode=&lt;string&gt; (デフォルト: bob)  
+    出力方式。bob / normal。
+  - colormatrix=&lt;string&gt; (デフォルト: auto)  
+    入力色行列。auto / auto_res / bt709 / smpte170m / bt470bg / bt2020nc。
+  - colorrange=&lt;string&gt; (デフォルト: auto)  
+    入力色域。auto / limited (tv) / full (pc)。
+
+ST-DeIntとDDDのモデルファイルはNVEncにもHWEnc-onnx-modelsのリリースアーカイブにも含まれない。権利条件とライセンスを確認してモデルを別途生成または配置し、[HWEnc-onnx-models リポジトリ](https://github.com/rigaya/HWEnc-onnx-models)の `run_all.py` で `onnx_deint_models.json` を生成すること。
+
+```
+--vpp-onnx-model-dir C:\models\HWEnc-onnx-models
+--vpp-onnx-deint model=stdeint,mode=bob,precision=fp32
+--vpp-onnx-deint model=DDD,mode=normal,precision=auto
+```
+
+### --vpp-onnx-model-dir &lt;string&gt;
+登録済みONNXモデルのmodels.jsonおよびモデルファイルが格納されたディレクトリを指定する。
+
+`--vpp-onnx model=<モデル名>` で短縮名を使用する場合、または `--vpp-onnx list` で登録モデル一覧を表示する場合は、このオプションの指定が必要。
+
+モデルファイルは [https://github.com/rigaya/HWEnc-onnx-models/releases](https://github.com/rigaya/HWEnc-onnx-models/releases) からダウンロードできる。zipファイルを任意のディレクトリに展開し、そのディレクトリを指定する。
+
+リリースアーカイブにはST-DeInt/DDDのモデルファイルとデインターレース用マニフェストは含まれない。これらは別途生成・配置し、権利条件とライセンスを確認したうえで、`run_all.py` で `onnx_deint_models.json` を生成してから `--vpp-onnx-deint` を使用すること。
+
+このオプションはモデルファイルの場所のみを指定する。ONNX Runtime GPU版、CUDA runtime、cuDNN、TensorRTなどのDLLは、別途 `PATH` または `NVEncC64.exe` と同じフォルダから見えるようにする必要がある。
+
+```
+--vpp-onnx-model-dir C:\models\HWEnc-onnx-models
+```
+
+### --vpp-onnx-cache-dir &lt;string&gt;
+TensorRTエンジンのキャッシュ先ディレクトリを指定する。
+
+未指定時はキャッシュを無効にする。初回実行ではエンジンを構築し、同じモデル内容・精度・入力形状・実行環境を使用する以降の実行ではキャッシュを読み込んで起動時間を大幅に短縮できる。
+
+キャッシュはNVEncのバージョンとrevision、ONNX Runtimeのバージョン、CUDAドライバAPIのバージョン、GPUごとに別ディレクトリへ保存する。TensorRTのバージョン不一致はTensorRT自身のengine互換性検証で検出し、該当engineを1回だけ自動再構築する。同じ実行環境ではモデル間でtiming cacheを共有する。古い環境用ディレクトリは自動削除しない。
+
+```
+--vpp-onnx-cache-dir C:\models\HWEnc-onnx-cache
+```
+
+### --vpp-rife-ov [&lt;param1&gt;=&lt;value1&gt;][,&lt;param2&gt;=&lt;value2&gt;],...
+ONNX Runtime CUDA/TensorRTでRIFE v4.x ONNXモデルを実行するフレーム補間フィルタ。入力は8bit YUV420で、幅・高さは32の倍数である必要がある。
+
+- **パラメータ**
+  - model=&lt;string&gt;  
+    登録済みRIFE v4.xモデル名、またはONNXモデルのパス (必須)。`--vpp-onnx-model-dir` 指定時は、`rife_ov_models.json` の `rife_v4_6` のようなモデル名を使用できる。互換性のため、`/`、`\\`、`.` を含む値は直接パスとして扱う。
+  - multi=&lt;int&gt; (デフォルト: 2、範囲: 2以上)  
+    フレームレート倍率。
+  - device=&lt;string&gt; (デフォルト: GPU.0)  
+    エンコーダ間の互換性のため受け付ける。NVEncでは選択済みのCUDAデバイスを使用する。
+  - colormatrix=&lt;string&gt; (デフォルト: auto)  
+    auto / bt601 / bt709 / bt2020。
+  - colorrange=&lt;string&gt; (デフォルト: auto)  
+    auto / tv / pc。
+
+  ```
+  --vpp-onnx-model-dir C:\models\HWEnc-onnx-models --vpp-rife-ov model=rife_v4_6,multi=2
+  --vpp-rife-ov model=C:\models\rife_v4.6.onnx,multi=2
+  ```
+
+### --vpp-perf-monitor
+各フィルタのパフォーマンス測定を行い、適用したフィルタの1フレームあたりの平均処理時間を最後に出力する。全体のエンコード速度がやや遅くなることがある点に注意。
+
+
+### --vpp-nvvfx-model-dir &lt;string&gt;
+NVIDIA MAXINE VideoEffects のモデルを格納しているフォルダの場所を指定する。
+
+
+## 制御系のオプション
+
+### --parallel [&lt;int&gt;] or [&lt;string&gt;]
+ファイル分割による並列エンコードを行う。入力ファイルを複数のチャンクに分割し、それぞれを別スレッドで並列にエンコードすることで、処理を高速化する。
+
+並列数は多くの場合、利用可能なエンコーダ数以下にするのがよさそう。指定可能な並列数の最大値は "システムで利用可能なNVENCのエンコーダの数×2" か "4" のどちらか大きいほう。
+
+- **制約事項**
+  
+  以下の場合、並列エンコードは利用できず、自動的に無効化されます。
+  - 入力がパイプの場合
+  - 入力がシーク不可能な場合
+  - フレームのタイムスタンプが不安定な場合
+  - エンコードしない場合 (-c raw)
+  - avsw/avhw/avs/vpy読み込み以外の場合
+  - --dynamic-rcが指定されている場合
+  - --trimオプションが指定されている場合
+  - --timecodeオプションが指定されている場合
+  - --tcfile-inオプションが指定されている場合
+  - --keyfileオプションが指定されている場合
+  - --key-on-chapterオプションが有効な場合
+  - ssim/psnr/vmafが有効な場合
+  - --vpp-subburn（字幕焼きこみ）が指定されている場合
+  - --vpp-fruc（フレーム補間）が有効な場合
+
+- **使用例**
+  ```
+  例: 自動で並列数を決定
+  --parallel auto
+
+  例: 3並列で実行
+  --parallel 3
+  ```
+
+- **--split-enc (フレーム分割エンコード)と比べて**
+
+  <img width="720" src="./data/nvencc_parallel_encode_20250320.png">
+
+  |                   | --split-enc <br> (フレーム分割エンコード) | --parallel <br> (ファイル分割エンコード) |
+  | :--:              |:--:                                       |:--:                                      |
+  | 並列部分          | エンコードのみ                            | 読み込み/デコード<br>フィルタ/エンコード |
+  | 対応読み込み方式  | すべて                                    | avsw / avhw / avs / vpy                  |
+  | 対応コーデック    | HEVC/AV1                                  | すべて                                   |
+  | マルチGPU並列     | 非対応                                    | 対応                                     |
+  | 圧縮率低下        | 小さい                                    | ごくわずか                               |
+  | 制約事項          | なし                                      | 多い (上述)                              |
+  | メモリ使用量      | 通常と変わらず                            | かなり増加                               |
+
+### --parallel-force-large-memory-filters
+GPUメモリ使用量の大きいフィルタ使用時に、--parallel の並列数をGPU数以下に制限する処理を無効化する。
+
+GPUメモリ不足によるエラーや性能低下が起きやすくなるため、十分なGPUメモリがある場合のみ指定する。
+
+### --cuda-schedule &lt;string&gt;
+  主に、GPUのタスク終了を待機する際のCPUの挙動を決める。デフォルトはauto。
+
+- **パラメータ**
+  - auto (デフォルト)  
+    CUDAのドライバにモード決定を委ねる。
+  
+  - spin  
+    常にCPUを稼働させ、GPUタスクの終了を監視する。復帰のレイテンシが最小となり、最も高速だが、CPU 1コアを常に使用する。
+  
+  - yeild  
+    基本的にはspinと同じだが、他のスレッドがあればそちらに譲る。
+  
+  - sync  
+ GPUタスクの終了まで、スレッドをスリープさせる。性能が落ちる可能性があるかわりに、特にHWデコード使用時に、CPU使用率を大きく削減する。
+
+### --cuda-stream &lt;int&gt;
+CUDAのstream最適化を有効にする。デフォルトは 1 (オン)。
+
+- 注意
+  - 有効化すると、GPUタスクのオーバーラップが進み、性能が向上する場合があります。
+  - 一部のGPU/ドライバ環境では不安定になる可能性があります。ハングやクラッシュが発生する場合は、このオプションを無効にしてください。
+
+### --cuda-mt &lt;int&gt;
+CUDA制御をマルチスレッドで行う最適化を有効にする。デフォルトは 0 (オフ)。オフのままが推奨です。
+
+- 注意
+  - 有効化すると、ホスト側のCUDA制御の並列化によりわずかに高速化が見込める場合があります。
+  - 一部のGPU/ドライバ環境では不安定になる可能性があります。ハングやクラッシュが発生する場合は、このオプションを無効にしてください。
+
+### --disable-nvml &lt;int&gt;
+NVMLによるGPUモニタリングの無効化について指定する。デフォルトは0 (無効化しない)。
+
+- **パラメータ**
+  - 0 (デフォルト)  
+    NVMLを無効化しない。
+
+  - 1
+    CUDAを実行できるGPUが1つの場合にNVMLを無効化する。
+
+  - 2
+    常にNVMLを無効化する。
+
+### --disable-dx11
+DirectX11の初期化をスキップする。NGX, libplacebo等のDX11依存のフィルタが使用できなくなる。
+
+### --output-buf &lt;int&gt;
+出力バッファサイズをMB単位で指定する。デフォルトは8、最大値は128。0で使用しない。
+
+出力バッファはディスクへの書き込みをアプリケーション側で制御し、バッファサイズ分たまるまで書き出さないようにする。
+これにより、ディスクへの書き込み単位が大きくなり、エンコード中のディスクへの読み書きの混在を防ぎ、高速化が期待できる。
+またディスク上でのファイルの断片化の抑止も期待できる。
+
+一方、あまり大きく設定しすぎると、逆に遅くなることがあるので注意。基本的にはデフォルトのままで良いと思われる。
+
+file以外のプロトコルを使用する場合には、この出力バッファは使用されず、この設定は反映されない。
+また、出力バッファ用のメモリは縮退確保するので、必ず指定した分確保されるとは限らない。
+
+
+### --output-thread &lt;int&gt;
+出力スレッドを使用するかどうかを指定する。
+出力スレッドを使用すると、メモリ使用量が増加するが、エンコード速度が向上する場合がある。
+
+- **パラメータ**  
+  - -1 ... 自動(デフォルト)
+  -  0 ... 使用しない
+  -  1 ... 使用する  
+
+### --log &lt;string&gt;
+ログを指定したファイルに出力する。
+
+### --log-level [&lt;param1&gt;=]&lt;value&gt;[,&lt;param2&gt;=&lt;value&gt;]...
+ログ出力の段階を選択する。不具合などあった場合には、```--log-level debug --log log.txt```のようにしてデバッグ用情報を出力したものをコメントなどで教えていただけると、不具合の原因が明確になる場合があります。
+
+- **レベル**
+  - trace ... フレームごとに情報を出力
+  - debug ... デバッグ情報を追加で出力
+  - info ... 一般的なエンコード情報を表示、デフォルト
+  - warn ... エラーと警告を表示
+  - error ... エラーのみ表示
+  - quiet ... ログ出力を停止
+
+- **対象**  
+  ログ出力レベルの設定対象の指定。省略した場合は、```all```として扱う。
+  - all ... すべて
+  - app ... libav, libass, perfmonitor, amf を除いたすべて
+  - device ... デバイス初期化関連
+  - core ... アプリケーションのコア部分 (core_progress, core_result含む)
+  - core_progress ... 進捗表示
+  - core_result ... 結果表示
+  - parallel ... 並列処理関連
+  - gpu_select ... GPU自動選択
+  - decoder ... デコーダ関連
+  - input ... ファイル読み込み関連
+  - output ... ファイル書き出し関連
+  - vpp ... vppフィルタ関連
+  - amf ... amfライブラリ関連
+  - opencl ... opencl関連
+  - libav ... libavライブラリ内部のログ出力
+  - libass ... assライブラリ関連
+  - perfmonitor ... パフォーマンスモニタ関連
+
+- 使用例
+  ```
+  例: デバッグ出力
+  --log-level debug
+  
+  例: 周辺ライブラリを除いたログ出力をデバッグ出力に
+  --log-level app=debug
+  
+  例: 進捗表示のみ
+  --log-level error,core_progress=info
+  ```
+
+### --log-opt &lt;param1&gt;=&lt;value&gt;[,&lt;param2&gt;=&lt;value&gt;]...
+ログ関係の追加オプションの指定。
+- **パラメータ**  
+  - addtime (デフォルト=off)  
+   ログの各行に時刻を表示するように。
+
+  - addlevel (デフォルト=off)  
+    ログの各行にログレベルを表示するように。
+
+  - color (デフォルト=on)
+    ログの色表示の切り替え。
+
+### --log-framelist [&lt;string&gt;]
+avsw/avhw読み込み時のデバッグ情報出力。
+
+### --log-packets [&lt;string&gt;]
+avsw/avhw読み込み時のデバッグ情報出力。
+
+### --log-mux-ts [&lt;string&gt;]
+デバッグ情報出力。
+### --thread-affinity [&lt;string1&gt;=]{&lt;string2&gt;[#&lt;int&gt;[:&lt;int&gt;]...] or 0x&lt;hex&gt;}
+NVEncCのプロセスやスレッドのスレッドアフィニティを設定する。具体的な指定方法は例を確認してください。
+
+- **対象** (&lt;string1&gt;)  
+  スレッドアフィニティを設定する対象を指定する。省略された場合は"all"。
+
+  - all ... 下記すべてを対象とする
+  - process ... NVEncCのプロセス
+  - main ... メインスレッド
+  - decoder ... avhwデコード用スレッド
+  - csp ... CPUの色空間変換用スレッド
+  - input ... 読み込み用スレッド
+  - output ... 出力用スレッド
+  - audio ... 音声処理用スレッド
+  - perfmonitor ... パフォーマンス測定用スレッド
+  - videoquality ... ssim/psnr/vmaf算出用スレッド
+
+- **スレッドアフィニティ** (&lt;string2&gt;)
+  - all ... 全スレッド(制限なし)
+  - pcore ... performanceコアに割り当てる(hybridアーキテクチャのみ有効)
+  - ecore ... efficiencyコアに割り当てる(hybridアーキテクチャのみ有効)
+  - logical ... "#"以降に指定する論理コアに割り当て
+  - physical ... "#"以降に指定する物理コアに割り当て
+  - cachel2 ... "#"以降に指定するL2キャッシュを共有するコアに割り当て
+  - cachel3 ... "#"以降に指定するL3キャッシュを共有するコアに割り当て
+  - <hex> ... 0x<hex>の16進数で直接指定 (start /affinityと同じ)
+
+- 使用例
+  ```
+  例: プロセス全体を物理コア0,1,2,5,6に割り当て
+  --thread-affinity process=physical#0-2:5:6
+  
+  例: プロセス全体を論理コア0,1,2,3に割り当て
+  --thread-affinity process=0x0f
+  --thread-affinity process=logical#0-3
+  --thread-affinity process=logical#0:1:2:3
+  
+  例: hybridアーキテクチャでパフォーマンス測定用スレッドをefficiencyコアに割り当て
+  --thread-affinity perfmonitor=ecore
+  
+  例: Ryzen CPUでプロセス全体を最初のCCXのみに割り当て
+  --thread-affinity process=cachel3#0
+  ```
+
+### --thread-priority [&lt;string1&gt;=]&lt;string2&gt;[#&lt;int&gt;[:&lt;int&gt;]...]
+プロセスやスレッドの優先度を設定する。[Windowsのみ有効]  
+
+- **対象** (&lt;string1&gt;)
+  設定する対象を指定する。省略された場合は"all"。
+  
+  - all ... 下記すべてを対象とする
+  - process ... プロセス全体
+  - main ... メインスレッド
+  - decoder ... avhwデコード用スレッド
+  - csp ... CPUの色空間変換用スレッド
+  - input ... 読み込み用スレッド
+  - encoder ... エンコーダパイプラインのバックグラウンドスレッド
+  - output ... 出力用スレッド
+  - audio ... 音声処理用スレッド
+  - perfmonitor ... パフォーマンス測定用スレッド
+  - videoquality ... ssim/psnr/vmaf算出用スレッド
+  
+- **優先度** (&lt;string2&gt;)
+  - background, idle, lowest, belownormal, normal (default), abovenormal, highest
+  
+### --thread-throttling [&lt;string1&gt;=]&lt;string2&gt;[#&lt;int&gt;[:&lt;int&gt;]...]
+  プロセスやスレッドのスケジューリングの方針を設定する。 [Windowsのみ有効]  
+  
+- **対象** (&lt;string1&gt;)
+  設定する対象を指定する。省略された場合は"all"。
+  
+  - all ... 下記すべてを対象とする
+  - main ... メインスレッド
+  - decoder ... avhwデコード用スレッド
+  - csp ... CPUの色空間変換用スレッド
+  - input ... 読み込み用スレッド
+  - filter ... フィルタ処理用スレッド
+  - encoder ... エンコーダパイプラインのバックグラウンドスレッド
+  - output ... 出力用スレッド
+  - audio ... 音声処理用スレッド
+  - perfmonitor ... パフォーマンス測定用スレッド
+  - videoquality ... ssim/psnr/vmaf算出用スレッド
+  
+- **優先度** (&lt;string2&gt;)
+  - unset (default) ... エンコード設定により自動的に決定
+  - auto            ... OSに自動的に決定させる。
+  - on              ... 電力効率を優先したスケジューリングを行う。
+  - off             ... パフォーマンスを優先したスケジューリングを行う。
+  
+- 使用例
+  ```
+  例: 出力スレッドとパフォーマンス測定用スレッドを電力効率を優先したスケジューリングに設定
+  --thread-throttling output=on,perfmonitor=on
+  
+  例: メインスレッドと読み込みスレッドをパフォーマンスを優先したスケジューリングに設定
+  --thread-throttling main=off,input=off
+  ```
+
+### --option-file &lt;string&gt;
+使用するオプションを記載したファイルを指定する。
+1行に複数のオプションを記載できるが、改行は空白として扱われるので、
+ひとつのオプション名やその値が行をまたがってはならない。
+
+### --max-procfps &lt;int&gt;
+エンコード速度の上限を設定。デフォルトは0 ( = 無制限)。
+複数本NVENCでエンコードをしていて、ひとつのストリームにCPU/GPUの全力を奪われたくないというときのためのオプション。
+
+- 使用例
+  ```
+  例: 最大速度を90fpsに制限
+  --max-procfps 90
+  ```
+
+### --lowlatency
+エンコード遅延を低減するモード。最大エンコード速度(スループット)は低下するので、通常は不要。
+
+pipe出力で `--output-thread` を省略した場合、このモードでは出力スレッドを自動的に無効化し、
+映像muxキューも短くして、入力停止時の終了遅延を抑える。
+
+### --fallback-bitdepth
+有効にすると、利用可能なGPUがすべて10bitエンコードに非対応の場合、自動的に8bitエンコードにフォールバックします。複数GPUがあり、10bitエンコードに対応するGPUが存在する場合は、そのGPUが優先して選択されます。
+
+### --avsdll &lt;string&gt;
+使用するAvsiynth.dllを指定するオプション。特に指定しない場合、システムのAvisynth.dllが使用される。
+
+### --vsdir &lt;string&gt; [Windows専用]
+VapoursynthのPortable版を使用する際に、インストールしたフォルダを指定する。特に指定しない場合、システムにインストールされたVapoursynthが使用される。
+
+### --vpy-assume-script-dir
+vpy reader使用時に、`.vpy` 内の相対パスをカレントディレクトリではなく、スクリプトファイルのあるディレクトリ基準で解決する。
+
+### --process-codepage &lt;string&gt;  
+- **パラメータ**  
+  - utf8  
+    プロセスの文字コードとしてUTF-8を使用する。(デフォルト)
+    
+  - os  
+    プロセスの使用する文字コードをデフォルトのUTF-8から、OSで設定されている(SJIS等の)文字コードに切り替える。
+    通常通りOSでSJISを使用している場合に、SJISのAvisynthスクリプトを読み込ませる際に必要。
+  
+    プロセスの文字コードをUTF-8からOSのデフォルトのものに変更するには、
+    実行ファイルに埋め込まれているmanifestという情報を変更する必要がある。
+    このオプションを指定すると自動的に実行ファイルをコピーしてmanifestを書き換えた一時的な実行ファイルを作成し、
+    それを実行するようになっている。
+
+### --task-perf-monitor
+
+メインスレッドの各処理ごとの待機時間を含んだおおまかな所要時間を出力する。
+
+### --perf-monitor [&lt;string&gt;[,&lt;string&gt;]...]
+エンコーダのパフォーマンス情報を出力する。パラメータとして出力したい情報名を下記から選択できる。デフォルトはall (すべての情報)。
+
+- 情報名
+  ```
+   all          ... monitor all info
+   cpu_total    ... cpu total usage (%)
+   cpu_kernel   ... cpu kernel usage (%)
+   cpu_main     ... cpu main thread usage (%)
+   cpu_enc      ... cpu encode thread usage (%)
+   cpu_in       ... cpu input thread usage (%)
+   cpu_out      ... cpu output thread usage (%)
+   cpu_aud_proc ... cpu aud proc thread usage (%)
+   cpu_aud_enc  ... cpu aud enc thread usage (%)
+   cpu          ... monitor all cpu info
+   gpu_load    ... gpu usage (%)
+   gpu_clock   ... gpu avg clock
+   vee_load    ... gpu video encoder usage (%)
+   ved_load    ... gpu video decoder usage (%)
+   gpu         ... monitor all gpu info
+   queue       ... queue usage
+   mem_private ... private memory (MB)
+   mem_virtual ... virtual memory (MB)
+   mem         ... monitor all memory info
+   io_read     ... io read  (MB/s)
+   io_write    ... io write (MB/s)
+   io          ... monitor all io info
+   fps         ... encode speed (fps)
+   fps_avg     ... encode avg. speed (fps)
+   bitrate     ... encode bitrate (kbps)
+   bitrate_avg ... encode avg. bitrate (kbps)
+   frame_out   ... written_frames
+  ```
+
+### --perf-monitor-interval &lt;int&gt;
+[--perf-monitor](#--perf-monitor-stringstring)でパフォーマンス測定を行う時間間隔をms単位で指定する(50以上)。デフォルトは 500。
+

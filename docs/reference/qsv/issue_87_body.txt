@@ -1,0 +1,9 @@
+TITLE: 7.16+7.17 A380 not working
+STATE: closed  comments: 57  created: 09/17/2022 10:45:09  closed: 11/18/2023 14:15:08
+=====BODY=====
+I'm currently testing on Arc 380, unfortunately 7.17 and 7.16 doesn't work, it just crashes. Version 7.07 or 7.14 runs fine at the moment. Just in case it's not known yet. On my iGPU 7.16 runs fine. 
+
+
+edit: 7.14 doesn't work with AV1.....7.07 works with AV1
+
+7.08 also crashes while 7.07 runs fine as I said. 

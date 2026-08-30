@@ -1,0 +1,49 @@
+﻿ It's only recently been possible to actually use x265 for transparent encodes, p... | Hacker News Hacker News new | past | comments | ask | show | jobs | submit login 
+kristofferR on Feb 5, 2019 | parent | context | favorite | on: X265 3.0 released 
+It's only recently been possible to actually use x265 for transparent encodes, previous versions of x265 removed film grain/digital noice to such a degree that the quality was worse than x264 at equivalent bitrates. Combine that with the massively increased costs in both encoding/decoding time (and worse x265 encoding tools/knowledge), x265 simply wasn't worthwhile except for crappy re-encodes at super low bitrates for people with crappy internet. Recently you've begun to see a lot of x265 releases though, usually with HDR, the only significant feature x264 can't provide. For sub-4K SDR content there's really no incentive for pirates to switch to x265, it's just a nuisance. With torrenting people don't pay for the extra bitrate x264 requires, unlike hosting services like Netflix, the ~20% bitrate savings of x265 are not important at all, especially compared to the other "costs" of compatibility issues and 10X longer encode times.
+stordoff on Feb 6, 2019 | next [–] 
+> It's only recently been possible to actually use x265 for transparent encodes, previous versions of x265 removed film grain/digital noice to such a degree that the quality was worse than x264 at equivalent bitrates. I've noticed this recently - Slow RF16 encodes were _visually_ worse (as in during casual watching I was asking if the source was really this bad, and when I went back to compare it was not[1]). Going to Slower is not tenable (a movie encode already takes ~8 hous, going to Slower makes it take nearly 2 days) (and I'm not even sure it would help), and increasing the RF to 14 would mean as I'm as well off keeping the original file (in some cases, RF16 is already almost as big as the original). [1] Random framegrab, not checking the labels until after - in every case, it was obvious which was which.
+dylan604 on Feb 5, 2019 | prev | next [–] 
+VR took to HEVC pretty much from the beginning for mobile platforms. While it did take longer to encode, the resulting file was much more size friendly for mobile use and even the delivery bandwidth/download times to get it. I worked for a large post house, and developed a backend pipe line for the artists to be able to submit their output to the farm to create optimized h.265 files for their target devices.
+fireattack on Feb 5, 2019 | prev | next [–] 
+> previous versions of x265 removed film grain/digital noice I noticed it as well, glad it gets fixed. Do I need to toggle/change any particular parameter, or just use defaults on newer versions to fix it though?
+kristofferR on Feb 5, 2019 | parent | next [–] 
+Eh frankly, x265 is not worth it unless you're an expert encoder or don't care about transparency. If you're not making multiple test encodes and fiddling with the encoding options, you should stay on x264. If you're interested, here are the settings for four recent transparent expert x265 encodes: https://paste.ubuntu.com/p/PRZFyrgxzc/ You could compare them to find interesting options to review.
+ksec on Feb 6, 2019 | parent | prev | next [–] 
+>I noticed it as well, glad it gets fixed. It is not that it is fixed, it is just that putting out a encoder that is good at PSNR and SSIM are like 10% of the work, actually getting that film grain right takes forever. That is if you care about these sort of things, other wise you can encode a Digitally Cleaned Video with x265 and get ~30% reduction in file size compared to x264.
+mr_toad on Feb 6, 2019 | prev | next [–] 
+> ~20% bitrate savings of x265 Ironically, most x265 movies I’ve seen appear to be HDR blu-ray rips with no attempt to reduce size at all, and they’re usually north of 50GB. You can get 80-90% bitrate savings on these without significant loss of quality.
+solarkraft on Feb 6, 2019 | parent | next [–] 
+What's actually in the Blu-Ray files that makes them so large?
+ddalex on Feb 6, 2019 | root | parent | next [–] 
+Nothing interesting. It's just that it's inconvenient to mass-pirate at those sizes.
+brokenmachine on Feb 7, 2019 | root | parent | prev | next [–] 
+Lots of pixels and lossless multichannel audio.
+tracker1 on Feb 5, 2019 | prev | next [–] 
+It's actually closer to 50% unless you are using hardware assisted encodes which aren't great currently... though I haven't tried on an RTX card yet, which is supposed to be better. So it does come down to time though.
+IntelMiner on Feb 6, 2019 | parent | next [–] 
+Anecdotal evidence. But doing H.264 to HEVC encodes on my GTX 1080 result in significantly smaller files than Blu Ray rips I purchased the X-Files Blu Ray Box Set. Ripping it all to my hard disk resulted in roughly 1.7 terabytes of footage Encoding them with a likely higher than needed bitrate to preserve quality shrank them to a much more palatable 237GB (with subtitles) https://i.imgur.com/eJFuxaV.png Bar removing the film grain (which I prefer, but not everyone does) I think the quality looks absolutely spectacular https://i.imgur.com/xlWJEol.jpg 
+ComputerGuru on Feb 6, 2019 | root | parent | next [–] 
+The image you linked to exhibits horrible artifacts - but then again, you saved the screencap as a JPEG then uploaded it to a service that likely further butchers the image.
+IntelMiner on Feb 6, 2019 | root | parent | next [–] 
+It looks like VLC at saved it as a 1.5 meg PNG, then Imgur chewed it up and spat out a JPEG, irritating Here's a shot from a discussion a few weeks ago on HN I took of Star Trek: The Next Generation. It seems to have survived Imgur-ification much better https://i.imgur.com/VklppOK.png 
+solarkraft on Feb 6, 2019 | root | parent | prev | next [–] 
+Afaik Imgur doesn't process PNGs at all, while I'm not sure about JPGs (they might render previews, but I'd expect direct links to lead to the original file). Besides the weird new social stuff they're still by far the best image hoster I know.
+tracker1 on Feb 6, 2019 | root | parent | prev | next [–] 
+The NVidia GTX compresion for HEVC is really bad, and only intended for use with live streaming. If you compare to similar file sizes or even half the size for x265 (CPU) encoding the quality is a lot better. As you note, the size is a bit larger than probably could be achieved... I also have encoded a bit using my GTX for hardware, but the quality:size difference was a bit much. Now when I do it, I just rip as much as my system can hold, then batch everything up and let it run for days/weeks. Currently using an i7-4790k (nearly 5yo), which doesn't have a the current intel hardware encoding options either. Considering upgrading to a Zen 2 Ryzen or Threadripper when they come out later this year.
+kristofferR on Feb 5, 2019 | parent | prev | next [–] 
+It's nowhere near 50% for transparent encodes, I just checked. GPU encoding is currently incapable of creating transparent encodes. Most x265 2160p->1080p encodes actually use higher bitrates than the x264 1080p encodes they trump, due to the increased noise detail in the UHD Blu-Ray source.
+tracker1 on Feb 6, 2019 | root | parent | next [–] 
+I'm not using GPU encoding, I've tried it, it generally sucks and winds up being about 2/3-3/4 the size of x264 for similar quality. My experience with h.265 via x265 is usually about half the size for similar quality. Again, somewhat subjective as I really don't mind the blurry fallback for h.265 so much, and don't notice it nearly as much.
+ksec on Feb 6, 2019 | parent | prev | next [–] 
+The standards "aims" to have 50% reduction, in reality that is only the best case scenario with x265 encoding 4K video at low bitrate ~2Mbps. I have yet to see a 50% reduction at any bitrate with 1080P videos.
+danmaz74 on Feb 6, 2019 | prev | next [–] 
+When you talk about film grain, are you referring to older movies, or also to recent ones? I usually don't notice it in recent ones.
+brokenmachine on Feb 7, 2019 | parent | next [–] 
+The Marvel movies are notorious for oodles of film grain. I think it looks horrible and adds nothing to the movie.
+tagrun on Feb 7, 2019 | prev | next [–] 
+x265 never removed film grain; you need to enable it via --tune grain option (or -tune when using it via ffmpeg). There's a new --tune animation option in 3.0 if you're encoding anime/cartoon.
+Havoc on Feb 6, 2019 | prev [–] 
+Good points. Thanks for explaining
+Guidelines | FAQ | Lists | API | Security | Legal | Apply to YC | Contact 
+Search: 

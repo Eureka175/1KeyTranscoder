@@ -1,0 +1,619 @@
+----- mikk9 @ 09/17/2022 11:19:21 -----
+Can we have higher CQP values for AV1? Even with the highest supported CQP 51 the files are really big. 
+
+
+qp-i value changed 63 -> 51, must be in range of 0-51
+qp-p value changed 63 -> 51, must be in range of 0-51
+
+
+----- rigaya @ 09/17/2022 13:26:24 -----
+> I'm currently testing on Arc 380, unfortunately 7.17 and 7.16 doesn't work, it just crashes. Version 7.07 or 7.14 runs fine at the moment. Just in case it's not known yet. On my iGPU 7.16 runs fine.
+
+Thank you for your report. However. I'm having no trouble with QSVEnc 7.17 on H.264 encoding. Please make sure you are using at least 3259 driver or later.
+
+Example: x64\QSVEncC64.exe -i sakura_op.mpg -o F:\temp\test.mp4 -c av1 --icq 30
+
+![image](https://user-images.githubusercontent.com/815947/190859243-6a8c4b74-71db-4851-b308-acc139e8e5e2.png)
+
+It might depend on the options and your system, so please let me know the options and the log which crushes H.264/AV1 encoding.
+
+For HEVC encoding, I've always having it unstable with Arc A380. It sometimes can run fine but crushes depending on the ```--icq``` value or other parameters, tends to be more unstable with 10bit encoding or with higher quality settings (such as ```--quality best```). It's simply just weird. It might be because of the app, but might be due to driver, or too high GPU clock ut to 2450MHz. I have decided not to focusing into this right now, as I cannot tell whether it is problem of the app or driver or hardware.
+
+> Can we have higher CQP values for AV1? Even with the highest supported CQP 51 the files are really big.
+
+I recommend using ```--icq``` mode for AV1.
+
+----- mikk9 @ 09/17/2022 15:34:46 -----
+I cannot replicate the problem with 7.17, I don't know why. I will try out more and report back if something doesn't work as expected. 
+
+----- mikk9 @ 09/17/2022 19:33:41 -----
+As for 10 bit AV1 I have to use --output-depth 10 right? What about profile high and pro, does it work for you? When I use this it says Failed to initialize encoder. : invalid video parameters.
+
+----- mikk9 @ 09/17/2022 21:39:19 -----
+When I manually select high profile on h264 QSVEnc 7.17 fails with an error message. Maybe you can check out.
+
+
+--------------------------- Video encoding ---------------------------
+
+QSVEnc 7.17
+
+C:\Staxrip\StaxRip-v2.1.9.0-Beta-x64\Apps\Encoders\QSVEnc\QSVEncC64.exe --avhw --quality best --profile high --gop-len 121 --b-pyramid --d3d11 --cbr 2500 -i C:\Quicksync\7_Intel_Demo_Clip2.mp4 -o "C:\Quicksync\7_Intel_Demo_Clip2_temp\Iris Xe h264 gop 121 cbr 2500 hybrid_out.h264"
+
+Error: Invalid value "high" for "--profile"
+  Option value should be one of below...
+    For H.264/AVC
+      auto, Baseline, Main, High
+    For H.265/HEVC
+      auto, main, main10, main444
+    For MPEG2
+      auto, Simple, Main, High
+    For VP9
+      auto, 0, 1, 2, 3
+    For AV1
+      auto, main, high, pro
+QSVEncC.exe finished with error!
+
+StaxRip.ErrorAbortException: Video encoding returned error exit code: 1 (0x1)
+
+
+--------------------------- Video encoding ---------------------------
+
+QSVEnc 7.17
+
+C:\Staxrip\StaxRip-v2.1.9.0-Beta-x64\Apps\Encoders\QSVEnc\QSVEncC64.exe --avhw --quality best --profile high --gop-len 121 --b-pyramid --d3d11 --cbr 2500 -i C:\Quicksync\7_Intel_Demo_Clip2.mp4 -o "C:\Quicksync\7_Intel_Demo_Clip2_temp\Iris Xe h264 gop 121 cbr 2500 hybrid_out.h264"
+
+Error: Invalid value "high" for "--profile"
+  Option value should be one of below...
+    For H.264/AVC
+      auto, Baseline, Main, High
+    For H.265/HEVC
+      auto, main, main10, main444
+    For MPEG2
+      auto, Simple, Main, High
+    For VP9
+      auto, 0, 1, 2, 3
+    For AV1
+      auto, main, high, pro
+QSVEncC.exe finished with error!
+
+
+
+----- rigaya @ 09/18/2022 01:18:13 -----
+> As for 10 bit AV1 I have to use --output-depth 10 right? 
+
+Yes, ```--output-depth 10``` shall be enough.
+
+> What about profile high and pro, does it work for you?
+
+No, it doesn't either. As yuv420 10bit is supported within main profile in AV1, we won't need high or pro profile.
+
+> When I manually select high profile on h264 QSVEnc 7.17 fails with an error message.
+
+Thanks, fixed in [QSVEnc 7.18](https://github.com/rigaya/QSVEnc/releases/tag/7.18).
+
+----- mikk9 @ 09/18/2022 16:52:47 -----
+My sample video is crashing on 7.18 and H265. Version 7.07 runs fine. Newest driver 3277 installed. You can check out with the sample [from here](https://drive.google.com/file/d/1YX1V0SeSkYaq6Ui41vv1wcOatbLnuLSL/view). 
+
+
+--------------------------- Video encoding ---------------------------
+
+QSVEnc 7.18
+
+C:\Staxrip\StaxRip-v2.13.0-x64\Apps\Encoders\QSVEnc\QSVEncC64.exe --avhw --codec hevc --quality best --profile main10 --gop-len 120 --d3d11 --fixed-func --cbr 2500 -i C:\Quicksync\Intel_Demo_Clip2.mp4 -o "C:\Quicksync\Intel_Demo_Clip2_temp\h265 test_out.hevc"
+
+
+C:\Quicksync\Intel_Demo_Clip2_temp\h265 test_out.hevc
+
+MFXENCODE:   surface alloc request for MFXENCODE: incompatible video parameters.
+Failed to initialize encoder. : invalid video parameters.
+QSVEncC.exe finished with error!
+
+Start:    18:49:05
+End:      18:49:09
+Duration: 00:00:04
+
+General
+Complete name : C:\Quicksync\Intel_Demo_Clip2_temp\h265 test_out.hevc
+File size     : 0.00 Byte
+
+----- mikk9 @ 09/18/2022 17:02:56 -----
+With this sample I found another problem which is AV1 related, I haven't checked if this is related to the input sample. The sample is a 24fps video, encoding stops at 93% and the output file gives me a 25 fps video instead of 24 fps. Just tested with this settings:
+
+--avhw --codec av1 --quality best --gop-len 120 --output-depth 10 --d3d11 --fixed-func --cbr 2500
+
+
+----- mikk9 @ 09/18/2022 20:40:56 -----
+I'm currently trying out version 7.00 and AV1 with bframes and it works??? It works together with bpyramid, quality is better than without bframes in newer QSVEnc versions. In Handbrake there is some stuttering with bframes I would say but QSVEnc seems to work. And Intel seems to use it as well on default. Maybe you can check out. 
+
+av1ehw_base_data.h
+DEFAULT_GOP_PIC_SIZE  = 248;
+DEFAULT_GOP_REF_DIST  = 4;
+
+----- rigaya @ 09/19/2022 12:31:32 -----
+> My sample video is crashing on 7.18 and H265. Version 7.07 runs fine.
+
+Shall be fixed with [QSVEnc 7.19](https://github.com/rigaya/QSVEnc/releases/tag/7.19), --hyper-mode was causing this error.
+
+I'll look further for AV1 problem.
+
+----- mikk9 @ 09/19/2022 19:03:20 -----
+They have bframes+bpyramid on by default for AV1. Encoding quality is better. Maybe it didn't work properly with earlier drivers.
+
+[Encode] Enable B Pyramid by default
+https://github.com/oneapi-src/oneVPL-intel-gpu/blob/8a55fa2a053516a6520ddf74f13c8b9fe7e34327/_studio/mfx_lib/encode_hw/av1/agnostic/base/av1ehw_base_general_defaults.cpp
+
+----- rigaya @ 09/21/2022 13:00:24 -----
+[QSVEnc 7.20](https://github.com/rigaya/QSVEnc/releases/tag/7.20) adds --gop-ref-dist for AV1 encoding and it's default will be 4, as same as Intel. There was a stuttering issue with mp4/mkv output in the previous versions, but now is fixed in [QSVEnc 7.20](https://github.com/rigaya/QSVEnc/releases/tag/7.20).
+
+----- mikk9 @ 09/22/2022 20:05:31 -----
+--gop-ref-dist 8 also works for CBR/VBR/ICQ, even though I haven't checked if it's better. Any higher will crash with EncodeFrameAsynch error. On Handbrake I can go to dist 16 btw. CQP has different limits, it works with up to 33 in QSVEnc. 
+
+----- mikk9 @ 09/22/2022 20:18:04 -----
+> With this sample I found another problem which is AV1 related, I haven't checked if this is related to the input sample. The sample is a 24fps video, encoding stops at 93% and the output file gives me a 25 fps video instead of 24 fps. Just tested with this settings:
+> 
+> --avhw --codec av1 --quality best --gop-len 120 --output-depth 10 --d3d11 --fixed-func --cbr 2500
+
+This is somehow muxing related. With ffmpeg muxing it converts with 25 fps, mkvmerge converts with the correct 24 fps as long as I avoid gop 120, with gop 119 or 121 it's correctly encoded with 24 fps. 
+
+Handbrake is fine with 24 fps but the video stutters, something is not right there and hardware decoding doesn't work.
+
+Do you have infos about AV1 VDEnc PreEnc? 
+
+_[Encode] AV1 VDEnc PreEnc feature enable_
+
+https://github.com/intel/media-driver/commit/11f0fc737190975bb65281227afbdff27b1656fb
+
+
+
+----- rigaya @ 09/22/2022 23:46:30 -----
+In the clip you have mentioned, there are 11708 frames according to ffprobe.
+
+x64\ffprobe.exe -select_streams v:0 -show_entries stream=nb_frames,nb_read_frames -count_frames -hide_banner Intel_Demo_Clip2.mp4
+```
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'Y:\Encoders\Intel_Demo_Clip2.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf54.36.100
+  Duration: 00:08:07.83, start: 0.000000, bitrate: 24613 kb/s
+  Stream #0:0[0x1](eng): Video: h264 (High) (avc1 / 0x31637661), yuv420p(progressive), 1920x1080 [SAR 1:1 DAR 16:9], 24610 kb/s, 24 fps, 24 tbr, 12288 tbn (default)
+    Metadata:
+      handler_name    : VideoHandler
+      vendor_id       : [0][0][0][0]
+[STREAM]
+nb_frames=11708
+nb_read_frames=11708
+[/STREAM]
+```
+
+You can avoid muxing problem, by simply writing in mp4/mkv format directly in QSVEnc, which will preserve timestamps and framerates.
+
+x64\QSVEncC64.exe -i Intel_Demo_Clip2.mp4 -o F:\temp\test.mp4 -c av1 --output-depth 10  --quality best --gop-len 120 --output-depth 10 --d3d11 --fixed-func --cbr 2500
+```
+--------------------------------------------------------------------------------
+F:\temp\test.mp4
+--------------------------------------------------------------------------------
+vidprm.mfx.MaxKbps value changed 15000 -> 2500 by driver
+cop.AUDelimiter value changed off -> auto by driver
+cop.PicTimingSEI value changed off -> auto by driver
+cop.SingleSeiNalUnit value changed off -> auto by driver
+cop3.DirectBiasAdjustment value changed off -> auto by driver
+cop3.GlobalMotionBiasAdjustment value changed off -> auto by driver
+QSVEncC (x64) 7.20 (r2877) by rigaya, Sep 21 2022 09:01:45 (VC 1933/Win)
+OS             Windows 11 x64 (22000) [UTF-8]
+CPU Info       12th Gen Intel Core i9-12900K [5.01GHz] (8P+8E,16C/24T) <DG2>
+GPU Info       Intel Arc A380  Graphics (128EU) 300-2450MHz (31.0.101.3277)
+Media SDK      QuickSyncVideo (hardware encoder) FF, 2nd GPU, API v2.07
+Async Depth    3 frames
+Hyper Mode     off
+Buffer Memory  d3d11, 38 work buffer
+Input Info     avqsv: H.264/AVC, 1920x1080, 24/1 fps
+VPP            ColorFmtConvertion: nv12 -> p010
+AVSync         cfr
+Output         AV1(yuv420 10bit) main @ Level 4
+               1920x1080p 1:1 24.000fps (24/1fps)
+               avwriter: av1 => mp4
+Target usage   1 - best
+Encode Mode    Bitrate Mode - CBR
+Bitrate        2500 kbps
+Max Bitrate    2500 kbps
+VBV Bufsize    5000 kbps
+QP Limit       min: none, max: none
+Trellis        Auto
+Ref frames     3 frames
+GopRefDist     4, B-pyramid: on
+Max GOP Length 120 frames
+
+encoded 11708 frames, 293.25 fps, 2519.14 kbps, 146.50 MB
+encode time 0:00:39, CPU: 4.3%, GPU: 26.7%, VD: 132.2%
+frame type IDR    98
+frame type I      98,  total size   10.62 MB
+frame type P   11610,  total size  135.88 MB
+```
+
+All 11708 frames are encoded without problem, although it look like it stops at around 93%. There are sometimes a file that the duration of the entire file is not detected correctly at initialization phase, which causes mismatch in progress percent.
+
+I also checked the actual frames, and the last frame showed "00:08:07:19" in the input file, and so did the output file, so the entire file was encoded correctly.
+
+> EncodeFrameAsync error
+
+Most of the cases it is whether the app setting an unsupported parameter set. If Handbrake is working fine, it might be that the parameter set differs between QSVEnc and Handbrake, but that will be difficult to figure out...
+
+Or it might be a driver issue. For example, I've gone through EncodeFrameAsync error many times at HEVC encoding with 3276 or previous drivers, but it's now gone with the 3277 driver, HEVC encoding works fine now.
+
+> Do you have infos about AV1 VDEnc PreEnc
+
+Not sure. I'll check oneVPL SDK if it has an option for that.
+
+
+----- mikk9 @ 09/23/2022 20:18:46 -----
+Did you check if the output is 24 fps?
+
+I haven't found VDEnc PreEnc in OneVPL, although I would expect it's coming sometime. There are new low power LA entries, what is this about? Lookahead h264 required GPU support, in low power LA never worked. 
+
+oneVPL GPU Runtime 22.3.2
+HEVC Encode:
+
+    Enabled LPLA
+
+Or even in h264 from enctools
+
+_defined(MFX_ENABLE_ENCTOOLS_LPLA)
+    mfxExtCodingOption2 & extOpt2 = GetExtBufferRef(par);
+    // for game streaming scenario, if option enable lowpower lookahead, check encoder's capability
+    if (IsLpLookaheadSupported(extOpt3.ScenarioInfo, extOpt2.LookAheadDepth, par.mfx.RateControlMethod
+https://github.com/oneapi-src/oneVPL-intel-gpu/blob/8a55fa2a053516a6520ddf74f13c8b9fe7e34327/_studio/mfx_lib/encode_hw/h264/src/mfx_h264_enc_common_hw.cpp_
+
+From Enctools there is also a PreEnc update:
+
+ _[Enctools] Adds new LA Models for higher compression efficiency (#3455)
+
+Uses spatial complexity from PreEnc._
+https://github.com/oneapi-src/oneVPL-intel-gpu/commit/1dd3730375615449e460559f2eec23944ead20f4
+
+----- rigaya @ 09/24/2022 00:57:43 -----
+> Did you check if the output is 24 fps?
+
+I've checked it by MediaInfo and as 24fps.
+
+----- mikk9 @ 09/24/2022 16:21:22 -----
+I have fixed the 25fps problem in Staxrip, it works for me now.
+
+CQP has much higher quantizer parameter limits, they are not comparable to HEVC at all, CQP 63 AV1 produces much higher bitrates than CQP 63 HEVC. I have tested it out on Handbrake. The limit seems to be 255. I have tried 300 and it goes back to 255 in Handbrake, this seems to be the limit. 
+
+] encqsvInit: AV1 Main profile @ level 4.0
+[17:59:13] encqsvInit: TargetUsage 1 AsyncDepth 6
+[17:59:13] encqsvInit: GopRefDist 2 GopPicSize 120 NumRefFrame 2
+[17:59:13] encqsvInit: BFramesMax 1 BRefType off
+[17:59:13] encqsvInit: RateControlMethod CQP with QPI 255 QPP 255 QPB 255
+
+
+Maybe CQP and ICQ have the same 255 limit. Can you increase the limit in QSVEnc?
+
+ENCODE_AV1_MAX_ICQ_QUALITYFACTOR      255
+https://github.com/intel/media-driver/blob/4fcd6796144830e81efcb75c9d3fd4ead0643552/media_common/agnostic/common/codec/shared/codec_def_encode_av1.h
+
+----- mikk9 @ 09/26/2022 23:53:38 -----
+They have changed the GOP_REF_DIST default from 4 to 8. 
+
+[AV1e] Change Default BGOP size from 4 to 8
+https://github.com/oneapi-src/oneVPL-intel-gpu/commit/223e5878cfa63629f612387ff4a1c995ba3e5a7e
+
+----- rigaya @ 09/30/2022 12:40:02 -----
+[QSVEnc 7.21](https://github.com/rigaya/QSVEnc/releases/tag/7.21) changes limit for ICQ/CQP, and changes AV1 default for GopRefDist to 8.
+
+----- mikk9 @ 10/01/2022 12:00:56 -----
+This is great, now I can properly try out CQP. 
+
+----- mikk9 @ 10/06/2022 14:33:10 -----
+Maybe future drivers can work with 16 gopredist: https://github.com/oneapi-src/oneVPL-intel-gpu/commit/5356ab45d2e89d8a295fae1f9855300d99eec30f
+
+They have released OneVPL v2022.2.0: https://github.com/oneapi-src/oneVPL/releases
+
+What do they mean with AV1 temporal layers? 
+
+Can you add ScenarioInfo? 
+
+The ScenarioInfo enumerator itemizes scenarios for the encoding session. */
+
+    MFX_SCENARIO_UNKNOWN             = 0,
+    MFX_SCENARIO_DISPLAY_REMOTING    = 1,
+    MFX_SCENARIO_VIDEO_CONFERENCE    = 2,
+    MFX_SCENARIO_ARCHIVE             = 3,
+    MFX_SCENARIO_LIVE_STREAMING      = 4,
+    MFX_SCENARIO_CAMERA_CAPTURE      = 5,
+    MFX_SCENARIO_VIDEO_SURVEILLANCE  = 6,
+    MFX_SCENARIO_GAME_STREAMING      = 7,
+    MFX_SCENARIO_REMOTE_GAMING       = 8
+https://github.com/oneapi-src/oneVPL-intel-gpu/blob/56230cf9abfa9df91b947815f02000adbf20265e/api/vpl/mfxstructures.h
+
+----- mikk9 @ 10/14/2022 08:53:31 -----
+What’s New in oneVPL GPU Runtime 22.5.4
+
+AV1 Encode:
+
+    Enabled Hierarchical B frames and set Mini-Gop Size to 8 for better compression efficiency.
+https://github.com/oneapi-src/oneVPL-intel-gpu/releases/tag/intel-onevpl-22.5.4
+
+What do they mean with Hierarchical B frames? I don't have b-frames in AV1. 
+
+![bframes](https://user-images.githubusercontent.com/18703109/195805685-7cd449dd-5acc-4d70-95e6-cb21cc57ee97.png)
+
+
+----- mikk9 @ 10/14/2022 10:59:59 -----
+>  AV1 does not use the concept of GOP, but instead uses alternative reference frames (ARF) and golden frames to achieve bi-
+> prediction. The ARF and golden frame distance is set as 16 to imitate the GOP structure.
+> 
+> Though the codec does not explicitly contain B-frames, a method called compound prediction effectively offers the same functionality (although it appears no direct analog of hierarchical B-frames, such as in HEVC, exists).
+https://fastvdo.com/pubs/spie/spie2018/perfCompAV1-spie2018.pdf
+
+----- rigaya @ 10/18/2022 14:46:35 -----
+Although it seems like that AV1 does not have B frames (as shown in the log), oneVPL seems to [use GopRefDist parameter as Mini-GOP size](https://github.com/oneapi-src/oneVPL-intel-gpu/commit/5356ab45d2e89d8a295fae1f9855300d99eec30f) and [B-pyramid settings which was enabled by default recently](https://github.com/oneapi-src/oneVPL-intel-gpu/commit/b7b136b7289e1741f2392c458b228669354586fd) might be mapped to Hierarchical B frames.
+
+Increasing GopRefDist (--gop-ref-dist) has big effect on compression as you know.
+
+----- DedZasshu @ 10/22/2022 07:31:22 -----
+> I have fixed the 25fps problem in Staxrip, it works for me now.
+
+How did you fix the 25fps issue? I've been trying all this time with StaxRip, but still can't seem to get it through.
+
+----- mikk9 @ 10/22/2022 11:09:39 -----
+I'm not using Staxrip anymore for now because it's not reliable. Sometimes it works and the next time it doesn't. You can try out the muxing, try out switching from mkvmerge to mp4box and switch back. 
+
+----- DedZasshu @ 10/22/2022 16:02:10 -----
+> I'm not using Staxrip anymore for now because it's not reliable. Sometimes it works and the next time it doesn't. You can try out the muxing, try out switching from mkvmerge to mp4box and switch back.
+
+~I actually tried that method of switching back and forth muxing, but it was too annoying to do every time, so I went and tried a different approach and instead used the Command Line option for encoder and after experimenting on certain commands for hours I used these commands:
+%app:QSVEnc% --avhw --codec av1 --quality best --ref 8 --bframes 3 --icq 18 -i "%source_file%" -o "%encoder_out_file%" --output-res %target_width%:%target_height%~
+
+~And for "Output File Type" to "mkv" to turn the .av1 file to .mkv to preserve the timecode.~
+
+An even easier way is just to add "--output-format mp4" in the Other > Custom box in Intel AV1 QSVEnc options.
+
+It worked out well.
+
+----- mikk9 @ 10/30/2022 18:35:40 -----
+Regarding the timestamp issues, both Handbrake and ffmpeg are affected. It stutters with bframes/goprefdist. A Handbrake developer told this will be fixed in a next driver update. 
+
+> 
+This is the same root cause. Fix for the timestamp issue is expected in next Arc driver release.
+
+
+I wonder why it works in QSVEnc.
+
+----- DedZasshu @ 10/30/2022 18:54:38 -----
+For Handbrake, I have no idea, but it has stutters and terrible frame pacing when I tried using it once. It was a different issue compared to the ffmpeg problem.
+With ffmpeg's default 25fps issue, seems to be more a muxing thing since it can't mux the timestamps properly or something. It's only until I set --output-format mp4 on QSVEnc StaxRip that somehow the timestamps stayed intact.
+
+----- rigaya @ 10/30/2022 22:58:55 -----
+@mikk9 
+> I wonder why it works in QSVEnc.
+
+Yes, the current driver is somehow returning wrong timestamps in AV1 encoding with bframes/goprefdist.
+
+Handbrake developer seems to have early access to the future driver release?
+
+Anyway QSVEnc 7.20 or later has a workaround for this, overwriting and correcting the timestamp to avoid stuttering, to make it work even with the current driver.
+
+----- mikk9 @ 10/30/2022 23:33:08 -----
+
+
+
+
+> @mikk9
+> 
+> > I wonder why it works in QSVEnc.
+> 
+> Yes, the current driver is somehow returning wrong timestamps in AV1 encoding with bframes/goprefdist.
+> 
+> Handbrake developer seems to have early access to the future driver release?
+> 
+> Anyway QSVEnc 7.20 or later has a workaround for this, overwriting and correcting the timestamp to avoid stuttering, to make it work even with the current driver.
+
+
+He works for Intel: https://github.com/galinart
+
+He should have access to unreleased drivers. I hope the fix is included in the next driver version. 
+
+
+
+----- mikk9 @ 11/13/2022 11:08:41 -----
+Parallel encoding feature added to sample_multi_transcode allows distribution of work between 2 GPUs (2x2 mode) and 2 media engines on 1 GPU (1x2 mode).  See doc/smt-tracer-readme.md for more info
+https://www.intel.com/content/www/us/en/developer/articles/release-notes/oneapi-video-processing-library-release-notes.html
+
+Do you think 1x2 mode is possible for QSVenc? 
+
+----- mikk9 @ 11/13/2022 16:52:24 -----
+2x2 mode can give up to 2x transcoding speed, 1x2 mode depending on workload can give 20-30% faster transcoding speed. They say 1x2 mode uses one decoder that feeds two encoders.
+
+https://github.com/oneapi-src/oneVPL/blob/250d806b58678bdce13820a2dcbc8fd73987724c/doc/smt-tracer-readme.md
+
+----- rigaya @ 11/14/2022 10:09:29 -----
+It seems like it's not part of oneVPL API. Therefore, it is required to implement all the complicated parallel encode control, looking very difficult to implement.
+
+
+
+----- rigaya @ 11/14/2022 10:22:49 -----
+Problem about 1x2 mode is that it should require small GOP size to achieve performance boost (same as Hyper Encode). You can see they are using tiny 30 frame GOP in the example. However, I don't prefer small GOP, as it has negative impact of compression rate.
+
+Also, it'll be difficult to achieve performance boost when not using hw decode, where the bottle neck is likely to be in pre-encode stage (decode and filtering).
+
+----- mikk9 @ 11/18/2022 09:18:15 -----
+Maybe it's can be part of oneVPL later. Timestamp issue isn't fixed in 3802 unfortunately.
+
+
+_We have already checked in to our development branch. It may need some time to release._
+
+https://github.com/oneapi-src/oneVPL-intel-gpu/issues/245
+
+----- rigaya @ 11/18/2022 10:22:49 -----
+> Timestamp issue isn't fixed in 3802 unfortunately.
+
+I have confirmed the workaround of QSVEnc still works fine with 3802, so will have no problem using --gop-ref-dist > 1.
+
+----- mikk9 @ 12/03/2022 18:32:04 -----
+AV1 Lookahead seems to work with ffmpeg (-look_ahead_depth 100) on Windows, VMAF score went up 0.5 with my sample. Maybe this is something you can bring over to QSVEnc as well. 
+![ffmpeg](https://user-images.githubusercontent.com/18703109/205456234-6434caf1-351a-4744-8700-da8cfd95158c.png)
+
+Because there is no driver fix for the timestamp available yet I'm using a patched ffmpeg from here: https://ovcollyer-colebrooke.dyndns.org:4001/d/s/rHO5WopEuLqJUGs1ya7Ab7XONrl4K5Vf/d7sVqPH_PPrwBAYIaEjWKV0CjP-pS8Wz-S7iA0XSfBwo
+
+
+
+
+----- rigaya @ 12/04/2022 00:34:11 -----
+In QSVEnc, you shall be able to use [--la-depth](https://github.com/rigaya/QSVEnc/blob/master/QSVEncC_Options.en.md#--la-depth-int) for setting lookahead depth. It does seem to work with AV1 VBR mode.
+
+----- mikk9 @ 12/04/2022 16:04:37 -----
+It works indeed. 8 bit ffmpeg and QSVEnc are very similar, with 10 bit ffmpeg gets a bigger VMAF boost compared to QSVEnc in this sample, possibly there is a difference in the 10 bit mode to ffmpeg with -pix_fmt p010. 
+
+![ffmpeg10bit_2](https://user-images.githubusercontent.com/18703109/205501705-3d730f2b-290f-4349-b59d-311cc7d85ddb.png)
+
+
+Depth value doesn't matter, 1 or 100 it's the same result. Maybe a driver limitation. But it seems to improve the scores in most samples. 
+
+----- mikk9 @ 12/06/2022 08:11:45 -----
+GPU: Intel Arc A380 Graphics (128EU) 300-2450MHz (31.0.101.3959)
+
+Media SDK Version: Hardware API v2.08
+
+The timestamp issue has been fixed in ffmpeg with this driver and supports API 2.08. I haven't tried QSVEnc yet.
+
+----- rigaya @ 12/06/2022 10:53:18 -----
+?
+
+QSVEnc does not have timestamp issues from QSVEnc 7.20 regardless of the driver version.
+
+----- mikk9 @ 12/06/2022 10:59:57 -----
+Yes I know. I haven't check QSVEnc if there are issues or changes with the new driver.
+
+----- rigaya @ 12/06/2022 11:09:02 -----
+Ok, I see. I think we’ll have no problem with the new driver either,  but I’ll check later with the new driver.
+
+----- rigaya @ 12/06/2022 12:54:21 -----
+I have confirmed that QSVEnc 7.24 has no problem in AV1 encoding with GopRefDist > 1, using the new 31.0.101.3959 driver.
+
+----- mikk9 @ 12/17/2022 13:43:34 -----
+Here is the changelog for API 2.8:
+
+```
+
+
+    Introduced MFX_FOURCC_ABGR16F FourCC for 16-bit float point (per channel) 4:4:4 ABGR format.
+
+    Clarified the mfxExtMasteringDisplayColourVolume::DisplayPrimariesX, mfxExtMasteringDisplayColourVolume::DisplayPrimariesY for the video processing usage.
+
+    Added MFX_CONTENT_NOISY_VIDEO in ContentInfo definition.
+
+    Added Camera Processing API for Camera RAW data.
+
+    Introduced hint to disable external video frames caching for GPU copy.
+
+    Clarified usage of mfxExtMasteringDisplayColourVolume::InsertPayloadToggle and mfxExtContentLightLevelInfo::InsertPayloadToggle during decode operations.
+
+    Fixed multiple spelling errors.
+
+    Experimental API: introduced mfxExtMBQP::Pitch value for QP map defined in mfxExtMBQP.
+
+    Clarified when MFXEnumImplementations() may be called for implementation capabilities query.
+
+    Added table with filenames included in the dispatcher’s search process.
+
+```
+https://spec.oneapi.io/releases/index.html#id11
+https://spec.oneapi.io/releases/index.html#rev-1
+
+
+----- mikk9 @ 12/21/2022 23:02:55 -----
+When you have time could you test if open gop on HEVC works for you with Arc dGPU? When I use open gop I have a 30s seeking no matter if I use fps*5 gop length or the default one with 10s length. 
+
+----- rigaya @ 01/11/2023 12:25:04 -----
+When open-gop is used, --gop-len sets frames between I frames and not IDR frames.
+
+IDR frames is limited when open-gop is used, therefore seeking should be limited.
+
+**-c hevc --gop-len 150 --open-gop**
+IDR frames is 5.
+```
+encoded 3501 frames
+frame type IDR    5 
+frame type I     24,  total size  0.94 MB
+frame type P    868,  total size  9.22 MB
+frame type B   2609,  total size  5.49 MB
+```
+
+**-c hevc --gop-len 150**
+IDR frames is 24.
+```
+encoded 3501 frames
+frame type IDR   24
+frame type I     24,  total size  0.94 MB
+frame type P    887,  total size  9.33 MB
+frame type B   2590,  total size  5.46 MB
+```
+
+----- mikk9 @ 01/16/2023 00:19:11 -----
+FFmpeg uses open gop as default for HEVC and seeking works as expected to me on Arc (like Iris Xe with QSVEnc). It makes no sense for me why it differs. 
+
+I was trying 7.25 with la depth on AV1. The lowest la depth value seems to be 10 in QSVEnc whereas in ffmpeg I can use 8 or 1. I was trying to trigger to enable EncTools, the problem is it requires look_ahead_depth 8.
+
+
+triggers EncTools without low power lookahead (performance boost):
+ffmpeg <...> -g 256 -bf 7 -extbrc 1 -look_ahead_depth 8 <...>
+
+triggers EncTools with low power lookahead (quality boost):
+ffmpeg <...> -g 256 -bf 7 -extbrc 1 -look_ahead_depth 40 <...>
+
+triggers ExtBRC:
+ffmpeg <...> -g 256 -bf 7 -extbrc 1 -look_ahead_depth 0 <...>
+https://github.com/intel/media-delivery/blob/master/doc/quality.rst#enctools-and-extbrc
+
+
+FFmpeg freezes however with extbrc+LA depth but I found another EncTools trigger by using the patched ffmpeg with the option MFX_SCENARIO_GAME_STREAMING which enables enctools. More infos here: https://github.com/oneapi-src/oneVPL/issues/79#issuecomment-1335524179
+
+ 
+
+
+
+
+----- mikk9 @ 01/16/2023 00:59:47 -----
+QSVEnc also freezes with extbrc+la_depth on AV1 which means it's most likely a driver limitation at this point. I don't know if you can patch QSVEnc to include MFX_SCENARIO_GAME_STREAMING because it also triggers Enctools. 
+
+It can be interesting because I see some quality differences. 
+
+Just one example with one of your samples:
+![movie](https://user-images.githubusercontent.com/18703109/212577145-227cd560-92f6-4a5c-8a5c-f9cd7dee1559.jpg)
+
+
+----- rigaya @ 01/21/2023 09:37:21 -----
+[QSVEnc 7.26](https://github.com/rigaya/QSVEnc/releases) adds --scenario-info to set scenario-info parameter in oneVPL.
+
+[QSVEnc 7.26](https://github.com/rigaya/QSVEnc/releases) also changes OpenGOP behavior, and removes lower limit of lookahead depth. 
+
+EncTool seems to be not exposed to oneVPL header, so it cannot be added to QSVEnc.
+
+----- mikk9 @ 01/22/2023 16:15:02 -----
+EncTool BRC works with --scenario-info game_streaming preset on AV1 and CBR/VBR which opens some new possibilities. 
+
+Tried the same on HEVC and got this error:
+
+Failed to get output frame info!: insufficient buffer at input/output.
+
+
+QSVEncC.exe finished with error!
+
+----- mikk9 @ 02/26/2023 00:15:07 -----
+QSVEnc 7.26 also changes OpenGOP behavior
+
+I have tried open gop on HEVC today and I think it's not working, the files are identical between strict and open gop. It's all strict gop, open gop has no effect.
+
+----- rigaya @ 02/26/2023 00:24:52 -----
+I will revert the change in QSVEnc 7.26 in the next release.
+
+----- rigaya @ 03/07/2023 12:50:47 -----
+[QSVEnc 7.35](https://github.com/rigaya/QSVEnc/releases/tag/7.35) will improve handling of ```--open-gop```.
+
+----- mikk9 @ 03/11/2023 10:42:53 -----
+It works which is great. HEVC CQP with 16 bframes and open gop is really good by the way.
+
+

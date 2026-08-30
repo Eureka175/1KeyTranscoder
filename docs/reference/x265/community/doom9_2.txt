@@ -1,0 +1,163 @@
+﻿ 
+X265 Veryslow no better than slow??? - Doom9's Forum 
+Welcome to Doom9 's Forum, THE in-place to be for everyone interested in DVD conversion. 
+Before you start posting please read the forum rules . By posting to this forum you agree to abide by the rules. 
+Domains: forum.doom9.org / forum.doom9.net / forum.doom9.se 
+Doom9's Forum 
+ > Video Encoding 
+> High Efficiency Video Coding (HEVC) 
+X265 Veryslow no better than slow???
+User Name 
+Remember Me? 
+Password 
+Register 
+FAQ 
+Today's Posts 
+Search 
+Search Forums 
+Show Threads 
+Show Posts 
+Tag Search 
+Advanced Search 
+Go to Page... 
+Thread Tools 
+Search this Thread 
+16th February 2021, 13:15
+# 1 
+|   Link 
+YaBoyShredderson 
+Registered User
+Join Date: Jul 2020
+Posts: 76
+X265 Veryslow no better than slow??? 
+I tested out several different crf values with the veryslow preset, and found that crf 20 gave me an average bitrate of about 7 accross different kinds of content. I then found the clips that had a bitrate around the average and encoded them with 2 pass 7mbits, with slow, slower and veryslow. I used the staxrip video comparison tool, and as far as i can twll, there is essentially no difference between them? Did i do something wrong here? There is a difference in the background noise, but its mot better or worse really, just a bit different flipping between the frames. Only in a few frames did i actually see a very very minor difference in small details, a single hair being a bit less blurry etc. Have i done something wrong or is veryslow really not that much more efficent than slow? Is it maybe because of the high bitrate?
+YaBoyShredderson 
+View Public Profile 
+Find More Posts by YaBoyShredderson 
+17th February 2021, 01:35
+# 2 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+With x265, using higher presets doesn't reduce the bitrate nearly as often as it increases quality. At the same bitrate, slower presets will look better. But sometimes a slower preset with CRF can increase bitrate AND quality, as new tools find new places to spend bits to improve quality.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+17th February 2021, 01:51
+# 3 
+|   Link 
+YaBoyShredderson 
+Registered User
+Join Date: Jul 2020
+Posts: 76
+Quote:
+Originally Posted by benwaggoner 
+With x265, using higher presets doesn't reduce the bitrate nearly as often as it increases quality. At the same bitrate, slower presets will look better. But sometimes a slower preset with CRF can increase bitrate AND quality, as new tools find new places to spend bits to improve quality.
+I used abr to test different presets at the same bitrate. In a normal encode i would use crf 20, averaging around 7mbits.
+YaBoyShredderson 
+View Public Profile 
+Find More Posts by YaBoyShredderson 
+17th February 2021, 19:42
+# 4 
+|   Link 
+benwaggoner 
+Moderator
+Join Date: Jan 2006
+Location: Portland, OR
+Posts: 5,168
+Also, for typical continuous tone film and video content, veryslow and slower aren't going to look that different. It'd take a pretty big double-blind comparison to get statistics on the quantitative difference; there won't be much of a qualitative one since the same tools are generally used, just less aggressively in slower. Qualitative difference are more visible between the faster presets. Slow to slower can look different in a way that slower to placebo rarely does.
+However, for atypical content qualitative differences can be seen. For example, in lossless compression, placebo can have a bigger jump in reduced file size from veryslow than from slower to veryslow, which is the opposite for normal encoding. And things like graphics and text can benefit more from more exhaustive use of tools.
+__________________
+Ben Waggoner
+Principal Video Specialist, Amazon Prime Video
+My Compression Book 
+benwaggoner 
+View Public Profile 
+Visit benwaggoner's homepage! 
+Find More Posts by benwaggoner 
+Tags 
+efficiency , hevc , preset , slow , x265 
+« 
+ Previous Thread 
+ |
+ Next Thread 
+ » 
+Thread Tools 
+Show Printable Version 
+Search this Thread 
+Advanced Search 
+Posting Rules
+You may not post new threads
+You may not post replies
+You may not post attachments
+You may not edit your posts
+BB code is On 
+Smilies are On 
+[IMG] code is On 
+HTML code is Off 
+Forum Rules 
+Forum Jump 
+User Control Panel 
+ Private Messages 
+ Subscriptions 
+ Who's Online 
+ Search Forums 
+ Forums Home 
+Announcements and Chat 
+     General Discussion 
+     News 
+     Forum / Site Suggestions & Help 
+ General 
+     Decrypting 
+     Newbies 
+     DVD2AVI / DGIndex 
+     Audio encoding 
+     Subtitles 
+     Linux, Mac OS X, & Co 
+ Capturing and Editing Video 
+     Avisynth Usage 
+     Avisynth Development 
+     VapourSynth 
+     Capturing Video 
+     DV 
+     HDTV / DVB / TiVo 
+     NLE - Non Linear Editing 
+     VirtualDub, VDubMod & AviDemux 
+     New and alternative a/v containers 
+ Video Encoding 
+     (Auto) Gordian Knot 
+     MPEG-4 ASP 
+     MPEG-4 Encoder GUIs 
+     MPEG-4 AVC / H.264 
+     High Efficiency Video Coding (HEVC) 
+     New and alternative video codecs 
+     MPEG-2 Encoding 
+     Royalty free video codecs (VP8, VP9, AV1 and AV2) 
+ (HD) DVD, Blu-ray & (S)VCD 
+     One click suites for DVD backup and DVD creation 
+     DVD & BD Rebuilder 
+     (HD) DVD & Blu-ray authoring 
+     Advanced authoring 
+     IFO/VOB Editors 
+     DVD burning 
+ Hardware & Software 
+     Software players 
+     Hardware players 
+     PC Hard & Software 
+ Programming and Hacking 
+     Development 
+     Translations 
+All times are GMT +1. The time now is 09:22 .
+doom9.org -
+Archive -
+Top 
+Powered by vBulletin® Version 3.8.11
+Copyright ©2000 - 2026, vBulletin Solutions Inc.
