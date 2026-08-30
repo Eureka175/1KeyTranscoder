@@ -133,6 +133,56 @@ class GpacContainerBackend:
             raise GpacError(f"MP4Box -diso produced no XML for {src}")
         return text[start:]
 
+    def info(self, src: Path) -> str:
+        """MP4Box -info merged output (text)."""
+        proc = _run(
+            [str(self.mp4box), "-info", str(src)],
+            f"MP4Box -info {src.name}",
+        )
+        return proc.stdout or ""
+
+    @staticmethod
+    def parse_info(text: str) -> tuple[int, list[dict]]:
+        """Parse MP4Box -info text: (movie_timescale, [track dicts]).
+
+        Track enumeration that stays robust where -diso XML parsing
+        fails (DJI files carry a hidden mjpeg cover track whose sample
+        entry breaks ElementTree). Each track dict:
+        {number, id, timescale, handler, entry, sample_count}.
+        """
+        movie_ts = 0
+        m = re.search(
+            r"# Movie Info - (\d+) tracks? - TimeScale (\d+)", text
+        )
+        if m:
+            movie_ts = int(m.group(2))
+        tracks: list[dict] = []
+        cur: dict | None = None
+        for line in text.splitlines():
+            m = re.match(
+                r"# Track (\d+) Info - ID (\d+) - TimeScale (\d+)", line
+            )
+            if m:
+                cur = {
+                    "number": int(m.group(1)),
+                    "id": int(m.group(2)),
+                    "timescale": int(m.group(3)),
+                    "handler": "",
+                    "entry": "",
+                    "sample_count": 0,
+                }
+                tracks.append(cur)
+                continue
+            if cur is None:
+                continue
+            mt = re.search(r"Media Type:\s*(\w+):(\w+)", line)
+            if mt:
+                cur["handler"], cur["entry"] = mt.group(1), mt.group(2)
+            ms = re.search(r"Media Samples:\s*(\d+)", line)
+            if ms:
+                cur["sample_count"] = int(ms.group(1))
+        return movie_ts, tracks
+
     # -- extraction -----------------------------------------------------
 
     def raw_track(self, src: Path, track_id: int, out: Path) -> None:

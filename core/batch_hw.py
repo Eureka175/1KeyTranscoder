@@ -71,6 +71,7 @@ from .probe import build_source_info, count_frames, probe_source
 from preservation.gpac import GpacContainerBackend
 from preservation.pipeline import run_sony_pipeline
 from preservation.sony import ParsedFile
+from preservation import dji, isobmf
 
 StatusCb = Callable[[str, str], None]
 
@@ -889,6 +890,281 @@ def encode_one_hw_classic(
     return "done"
 
 
+def encode_one_dji_hw(
+    *,
+    src: Path,
+    dst: Path,
+    source_summary: dict[str, Any],
+    src_info: SourceInfo,
+    vfr: bool,
+    profile: dict[str, Any],
+    preset: str,
+    backend,
+    ffprobe: Path,
+    postprobe_csv: Path,
+    postprobe_stream_csv: Path,
+    gpac: GpacContainerBackend,
+    gyroflow: Path | None,
+    work_root: Path,
+    preserve_reports: Path,
+    keep_work: bool,
+    no_downgrade: bool,
+    logger: logging.Logger,
+    file_logger: logging.Logger,
+    dry_run: bool,
+    status_cb: StatusCb | None = None,
+    show_progress: bool = True,
+    throughput_cb: Callable[[float], None] | None = None,
+) -> str:
+    """DJI preservation path (Osmo Action / drones).
+
+    Video re-encoded; audio + djmd/dbgi/tmcd container-copied verbatim
+    from the source (payload sha256-verified); Gyroflow consumer check
+    compares per-frame quaternions. Track enumeration goes through
+    MP4Box -info — -diso XML parsing fails on DJI files (hidden mjpeg
+    cover track). The mjpeg cover and udta are not addressable by
+    GPAC 26.02: dropped by policy and logged, never silently.
+    """
+    work_dir = work_root / job_id_for(src)
+    encoded_mov = work_dir / "video" / "encoded.mov"
+    final = work_dir / "final" / "output.mov"
+    report_path = work_dir / "report.json"
+
+    planned, needs_downgrade = plan_initial_format(
+        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth
+    )
+    log_hw_header(
+        logger=logger, file_logger=file_logger, src=src, preset=preset,
+        backend=backend, source_summary=source_summary, src_info=src_info,
+        vfr=vfr, planned=planned, needs_downgrade=needs_downgrade,
+        profile=profile,
+    )
+    file_logger.info(
+        "POLICY | DJI source (djmd): video re-encoded; audio + "
+        "djmd/dbgi/tmcd preserved natively; mjpeg cover + udta dropped "
+        "(not addressable by GPAC 26.02)"
+    )
+    logger.info(
+        "[POLICY] %s | DJI: video re-encoded, djmd/dbgi/tmcd preserved, "
+        "cover/udta dropped",
+        src.name,
+    )
+
+    def build_cmd(chroma: str, depth: int) -> list[str]:
+        cmd, _, _ = backend.command(
+            src, encoded_mov, profile, chroma, depth, vfr,
+            audio_copy=False, color=src_info.color,
+        )
+        return cmd
+
+    if dry_run:
+        cmd = build_cmd(*planned)
+        file_logger.info(
+            "DRY-RUN | planned encode: %s | %s",
+            f"{planned[0]}/{planned[1]}",
+            subprocess.list2cmdline(cmd),
+        )
+        return "dry-run"
+
+    started = time.monotonic()
+    warnings: list[str] = []
+    if status_cb:
+        status_cb("preserve", "dji djmd pipeline")
+
+    def encode_video(source: Path, out_mov: Path) -> None:
+        if status_cb:
+            status_cb("encoding", f"{planned[0]}/{planned[1]}")
+        enc_warnings, used, enc_fps = hw_encode_with_fallback(
+            label="nvencc" if backend.kind == "nvencc" else "qsvencc",
+            backend=backend, source=source, output=out_mov,
+            profile=profile, src_info=src_info, vfr=vfr,
+            work_dir=work_dir,
+            total_frames=source_summary["total_frames"],
+            ffprobe=ffprobe, audio_copy=False, do_frame_check=not vfr,
+            no_downgrade=no_downgrade, gpac=gpac,
+            logger=logger, file_logger=file_logger,
+            show_progress=show_progress,
+        )
+        warnings.extend(enc_warnings)
+        file_logger.info("ENCODE_FORMAT | %s/%s", used[0], used[1])
+        if throughput_cb is not None:
+            throughput_cb(enc_fps)
+
+    def pipe_log(msg: str) -> None:
+        logger.info("[DJI] %s", msg)
+        file_logger.info("DJI_PIPELINE | %s", msg)
+
+    try:
+        report: dict[str, Any] | None = None
+        if (
+            final.is_file()
+            and final.stat().st_size > 0
+            and report_path.is_file()
+        ):
+            try:
+                cached = json.loads(
+                    report_path.read_text(encoding="utf-8")
+                )
+            except (OSError, ValueError):
+                cached = {}
+            if cached.get("structural_success") is True:
+                pipe_log(f"resume: final output already rebuilt: {final}")
+                report = cached
+            else:
+                pipe_log("previous run did not pass validation; rebuilding")
+                safe_unlink(final)
+
+        if report is None:
+            # 1. track manifest (MP4Box -info; diso XML fails on DJI)
+            movie_ts, src_tracks = dji.track_manifest(gpac, src)
+            specs = dji.dji_track_specs(src_tracks)
+            if not specs["data_ids"]:
+                raise RuntimeError(
+                    "no DJI data track found (djmd/dbgi/tmcd)"
+                )
+            if specs["video_id"] is None:
+                raise RuntimeError("no video track found")
+            pipe_log(
+                f"dji manifest: movie ts={movie_ts}, "
+                f"audio={len(specs['audio_ids'])}, "
+                f"data={[e for _, e in specs['data_ids']]}"
+            )
+
+            # 2. video-only encode (reuse validated intermediate)
+            if not _encoded_ok(ffprobe, encoded_mov):
+                try:
+                    encoded_mov.unlink()
+                except OSError:
+                    pass
+                encode_video(src, encoded_mov)
+            if not _encoded_ok(ffprobe, encoded_mov):
+                raise RuntimeError(
+                    f"video intermediate unreadable: {encoded_mov}"
+                )
+
+            # 3. GPAC mux: encoded video + source audio + data tracks
+            gpac.movie_timescale = movie_ts
+            adds = [f"{encoded_mov}#video"]
+            for aid in specs["audio_ids"]:
+                adds.append(f"{src}#{aid}")
+            for did, _ in specs["data_ids"]:
+                adds.append(f"{src}#{did}")
+            final.parent.mkdir(parents=True, exist_ok=True)
+            safe_unlink(final)
+            pipe_log("muxing video+audio+data tracks with MP4Box...")
+            gpac.mux_new(final, adds)
+
+            # 4. duration repair at the final's OWN mvhd timescale
+            # (GPAC -new sets it to the first track's media timescale;
+            # DJI quaternions align by frame index, so the timescale
+            # itself is cosmetic — but track durations must be exact).
+            out_ts, _ = dji.track_manifest(gpac, final)
+            for desc in isobmf.patch_track_durations(
+                final, out_ts, from_stts=True
+            ):
+                pipe_log(desc)
+            mv_desc = isobmf.patch_movie_duration(final)
+            if mv_desc:
+                pipe_log(mv_desc)
+
+            # 5. checks (payload sha256 + inventory + Gyroflow)
+            pipe_log("validating original vs final (dji check)...")
+            report = dji.run_dji_check(
+                original=src,
+                final=final,
+                gpac=gpac,
+                ffprobe=ffprobe,
+                gyroflow=gyroflow,
+                scratch=work_dir / "validate",
+                vfr=vfr,
+                log=pipe_log,
+            )
+            report["job_dir"] = str(work_dir)
+            report_path.write_text(
+                json.dumps(report, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            s = report["summary"]
+            pipe_log(
+                f"done: PRESERVED={s['PRESERVED']} "
+                f"MODIFIED={s['MODIFIED']} MISSING={s['MISSING']} "
+                f"UNKNOWN={s['UNKNOWN']} "
+                f"structural_success={report['structural_success']}"
+            )
+    except Exception as exc:
+        logger.error("[FAIL] dji pipeline | %s | %s", src, exc)
+        file_logger.exception("DJI PIPELINE FAILED")
+        return "failed"
+
+    if not report.get("structural_success"):
+        logger.error(
+            "[FAIL] dji structural preservation failed | %s | "
+            "missing=%s modified=%s",
+            src, report.get("critical_missing"),
+            report.get("critical_modified"),
+        )
+        file_logger.error(
+            "DJI STRUCTURAL VALIDATION FAILED | missing=%s | modified=%s",
+            report.get("critical_missing"), report.get("critical_modified"),
+        )
+        return "failed"
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        safe_unlink(dst)
+        os.replace(final, dst)
+    except OSError as exc:
+        logger.error("[RENAME-FAIL] %s -> %s | %s", final, dst, exc)
+        file_logger.exception(
+            "RENAME FAILED | elapsed=%.3f sec",
+            time.monotonic() - started,
+        )
+        return "failed"
+
+    elapsed = time.monotonic() - started
+    s = report["summary"]
+    gyro = report.get("gyroflow")
+    logger.info(
+        "[PRESERVE-OK] %s | PRESERVED=%d MODIFIED=%d MISSING=%d | "
+        "gyroflow=%s | warnings=%d",
+        src.name, s["PRESERVED"], s["MODIFIED"], s["MISSING"],
+        gyro.get("status") if gyro else "not-run",
+        len(warnings),
+    )
+    file_logger.info(
+        "DJI_PRESERVATION_REPORT | %s",
+        json.dumps(
+            {
+                "summary": s,
+                "structural_success": report["structural_success"],
+                "gyroflow": gyro,
+                "warnings": warnings,
+                "report": str(report_path),
+            },
+            ensure_ascii=False,
+        ),
+    )
+
+    postprobe_and_log(
+        src=src, dst=dst, preset=preset, elapsed=elapsed,
+        source_summary=source_summary, ffprobe=ffprobe,
+        postprobe_csv=postprobe_csv,
+        postprobe_stream_csv=postprobe_stream_csv,
+        logger=logger, file_logger=file_logger,
+    )
+
+    cleanup_work_dir(
+        work_dir=work_dir,
+        job_id=job_id_for(src),
+        preserve_reports=preserve_reports,
+        keep_work=keep_work,
+        logger=logger,
+        file_logger=file_logger,
+    )
+
+    return "done"
+
+
 def is_sony_source(streams: list[dict[str, Any]]) -> bool:
     """Sony XAVC detection: a data stream carrying the rtmd codec tag."""
     return any(
@@ -896,6 +1172,40 @@ def is_sony_source(streams: list[dict[str, Any]]) -> bool:
         and st.get("codec_tag_string") == "rtmd"
         for st in streams
     )
+
+
+def is_dji_source(streams: list[dict[str, Any]]) -> bool:
+    """DJI detection: a data stream carrying the djmd codec tag
+    (Osmo Action series / drones; gyro quaternions live here)."""
+    return any(
+        st.get("codec_type") == "data"
+        and st.get("codec_tag_string") == "djmd"
+        for st in streams
+    )
+
+
+def _encoded_ok(ffprobe: Path, path: Path) -> bool:
+    """A reusable intermediate must be a real file with >=1 video
+    packet, not a partial artifact of an interrupted encode."""
+    if not (path.is_file() and path.stat().st_size > 0):
+        return False
+    try:
+        proc = subprocess.run(
+            [str(ffprobe), "-v", "error", "-count_packets",
+             "-select_streams", "v:0", "-show_entries",
+             "stream=nb_read_packets", "-of", "json", str(path)],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True, encoding="utf-8",
+            errors="replace", check=False,
+        )
+        if proc.returncode != 0:
+            return False
+        streams = json.loads(proc.stdout).get("streams", [])
+        return bool(streams and int(
+            streams[0].get("nb_read_packets") or 0
+        ) > 0)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -1011,6 +1321,34 @@ def process_file_hw(
             keep_work=ctx.keep_work,
             no_downgrade=ctx.no_downgrade,
             check_level=ctx.check_level,
+            logger=logger,
+            file_logger=file_logger,
+            dry_run=ctx.dry_run,
+            status_cb=_status_cb_for(ctx, src),
+            show_progress=ctx.show_progress,
+            throughput_cb=lambda fps: ctx.throughput.append(
+                (backend.name, fps)
+            ),
+        )
+    elif is_dji_source(source_streams):
+        result = encode_one_dji_hw(
+            src=src,
+            dst=dst,
+            source_summary=source_summary,
+            src_info=src_info,
+            vfr=vfr,
+            profile=ctx.profile,
+            preset=ctx.preset,
+            backend=backend,
+            ffprobe=ctx.ffprobe,
+            postprobe_csv=ctx.postprobe_csv,
+            postprobe_stream_csv=ctx.postprobe_stream_csv,
+            gpac=ctx.gpac,
+            gyroflow=ctx.gyroflow,
+            work_root=ctx.work_root,
+            preserve_reports=ctx.preserve_reports,
+            keep_work=ctx.keep_work,
+            no_downgrade=ctx.no_downgrade,
             logger=logger,
             file_logger=file_logger,
             dry_run=ctx.dry_run,
