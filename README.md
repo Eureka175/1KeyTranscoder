@@ -167,6 +167,14 @@ docs/
 - VFR 素材自动 `--avsync forcecfr` 规范化（WARNING 记录）；
 - 经典路径无 1:1 帧闸门（不误杀 VFR）；Sony/DJI 路径有。
 
+## 许可证
+
+**GNU Lesser General Public License v3.0 或更高版本（LGPL-3.0-or-later）**，
+全部开源。详见 [`LICENSE`](LICENSE)。
+
+> 第三方工具（NVEncC/QSVEncC、GPAC、ffmpeg、Gyroflow）以独立可执行文件
+> 形式调用，各按其自身许可证分发，不并入本项目。
+
 ## 回滚
 
 ```powershell
