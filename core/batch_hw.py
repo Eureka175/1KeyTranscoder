@@ -70,7 +70,6 @@ from .probe import build_source_info, count_frames, probe_source
 
 from preservation.gpac import GpacContainerBackend
 from preservation.pipeline import run_sony_pipeline
-from preservation.sony import ParsedFile
 from preservation import dji, isobmf
 
 StatusCb = Callable[[str, str], None]
@@ -111,14 +110,13 @@ def emit_warning(
 
 
 def audio_track_ids(gpac: GpacContainerBackend, source: Path) -> list[int]:
-    """Source audio track IDs via MP4Box -diso (handler = soun)."""
-    parsed = ParsedFile(gpac.diso_xml(source))
-    ids: list[int] = []
-    for trak in parsed.tracks():
-        info = parsed.track_info(trak)
-        if info["handler_type"] == "soun":
-            ids.append(info["track_id"])
-    return ids
+    """Source audio track IDs via MP4Box -info (handler = soun).
+
+    Uses -info text parsing rather than -diso XML: DJI files' diso
+    output fails ElementTree parsing (hidden mjpeg cover track), and
+    the strip fallback must work for every source family."""
+    _, tracks = gpac.parse_info(gpac.info(source))
+    return [t["id"] for t in tracks if t["handler"] == "soun"]
 
 
 def strip_video_audio(
@@ -581,8 +579,16 @@ def record_failure(
 
 
 def load_retry_list(path: Path) -> list[Path]:
-    """Load a failed_files.json (or plain list) into source paths."""
-    data = json.loads(path.read_text(encoding="utf-8"))
+    """Load a failed_files.json (or plain path list) into source paths.
+
+    Plain-text lists (one path per line) are supported as documented by
+    --retry-list; malformed JSON falls back to line parsing instead of
+    crashing the run."""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    try:
+        data = json.loads(text)
+    except ValueError:
+        data = None
     sources = []
     if isinstance(data, list):
         for item in data:
@@ -590,6 +596,11 @@ def load_retry_list(path: Path) -> list[Path]:
                 sources.append(Path(item["source"]))
             elif isinstance(item, str):
                 sources.append(Path(item))
+    if not sources:
+        for line in text.splitlines():
+            line = line.strip()
+            if line and not line.startswith(("#", "//")):
+                sources.append(Path(line))
     return [s for s in sources if s.is_file()]
 
 
