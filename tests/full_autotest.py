@@ -436,7 +436,9 @@ def l1_x265() -> None:
     import json
     cfg = json.loads((ROOT / "x265.json").read_text(encoding="utf-8"))
     for tier, p in cfg["profile"].items():
-        record(f"x265.{tier}.rd>=3 (psy-rd 激活)", int(p["rd"]) >= 3)
+        # rd 值域 2-6 均合法; FAST 档按用户决定保持 rd=2
+        # (psy-rd 在 rd<3 时静默失效, 属已知取舍, 不改)
+        record(f"x265.{tier}.rd 值域合法", 2 <= int(p["rd"]) <= 6)
         record(f"x265.{tier}.info=false (可复现)", p["info"] is False)
         record(f"x265.{tier}.无 no-strong-intra-smoothing",
                "no_strong_intra_smoothing" not in p)
@@ -469,6 +471,48 @@ def l1_x265() -> None:
     record("x265.CPB 审计链",
            eff.audit.get("vbv-bufsize", {}).get("mode") == "cpb_clamp",
            f"audit={eff.audit.get('vbv-bufsize', {}).get('mode')}")
+
+
+def l1_av1() -> None:
+    section("L1 AV1")
+    from encoders.caps import _parse_nvenc, _parse_qsv
+    from encoders.hw import plan_initial_format
+    from encoders.caps import BackendCaps, CodecCaps
+    caps = _parse_nvenc(
+        "H.265/HEVC: nv12, yv12(10bit), yuv422(10bit)\n"
+        "AV1: nv12, yv12, yv12(10bit)\n"
+    )
+    record("av1.caps nvenc 解析", caps.get("av1") is not None
+           and caps["av1"].bit10 and not caps["av1"].csp_422,
+           f"av1={caps.get('av1')}")
+    qcaps = _parse_qsv(
+        "Codec: AV1 FF\n10bit depth       o o o\n"
+        "Codec: H.265/HEVC FF\n10bit depth       o o o o\n"
+    )
+    record("av1.caps qsv FF 解析", qcaps.get("av1") is not None
+           and qcaps["av1"].bit10, f"av1={qcaps.get('av1')}")
+    b = BackendCaps(codecs={"av1": CodecCaps(bit10=True)})
+    record("av1.plan 422/10 恒转 420",
+           plan_initial_format(b, "nvencc", "4:2:2", 10, "av1")
+           == (("4:2:0", 10), True))
+    record("av1.plan 420/10 无降级",
+           plan_initial_format(b, "nvencc", "4:2:0", 10, "av1")
+           == (("4:2:0", 10), False))
+    import json
+    for name, path in (("nvenc_av1.json", ROOT / "nvenc_av1.json"),
+                       ("qsv_av1.json", ROOT / "qsv_av1.json")):
+        cfg = json.loads(path.read_text(encoding="utf-8"))
+        tiers = set(cfg["profile"])
+        record(f"av1.{name} 四档完整", tiers == {"UHQ", "HQ", "SMALL", "FAST"},
+               f"tiers={sorted(tiers)}")
+        for t, p in cfg["profile"].items():
+            if name.startswith("nvenc"):
+                record(f"av1.{name}.{t} profile=high (10bit)",
+                       p.get("profile") == "high" and p.get("bframes", 0) <= 7)
+            else:
+                record(f"av1.{name}.{t} FF+icq",
+                       p.get("function_mode") == "FF"
+                       and isinstance(p.get("icq"), int))
 
 
 # ===========================================================================
@@ -773,6 +817,53 @@ def l3_pipeline() -> None:
            and {"djmd", "dbgi", "tmcd"} <= tags,
            f"rc={rc} tags={sorted(tags - {None})}")
 
+    # C15 nvenc-av1 DJI basic (AV1 保留管线: av01 + 数据轨)
+    out = OUT_DIR / "c15_nvenc_av1_dji"
+    rc, _ = _run_1kt(cases["dji"], out,
+                     "--encoder", "nvenc-av1", "--preset", "hq",
+                     "--check", "basic", "--jobs", "1")
+    final = out / "DJI_20260830095031_0009_D.MP4"
+    v = ffprobe_json(final) if final.is_file() else {}
+    vs = next((s for s in v.get("streams", [])
+               if s.get("codec_type") == "video"), {})
+    tags = {s.get("codec_tag_string") for s in v.get("streams", [])}
+    expect("C15_nvenc_av1_dji_av01+元数据", rc == 0 and final.is_file()
+           and vs.get("codec_name") == "av1"
+           and vs.get("pix_fmt") == "yuv420p10le"
+           and {"djmd", "dbgi", "tmcd"} <= tags,
+           f"rc={rc} codec={vs.get('codec_name')} "
+           f"pix_fmt={vs.get('pix_fmt')}")
+
+    # C16 nvenc-av1 Sony -> 合规路由经典路径 + WARNING (无 rtmd)
+    out = OUT_DIR / "c16_nvenc_av1_sony"
+    rc, tail = _run_1kt(cases["sony"], out,
+                        "--encoder", "nvenc-av1", "--preset", "hq",
+                        "--check", "basic", "--jobs", "1")
+    final = out / "C9037.MP4"
+    v = ffprobe_json(final) if final.is_file() else {}
+    vs = next((s for s in v.get("streams", [])
+               if s.get("codec_type") == "video"), {})
+    rtmd = any(s.get("codec_tag_string") == "rtmd"
+               for s in v.get("streams", []))
+    expect("C16_nvenc_av1_sony_合规路由", rc == 0 and final.is_file()
+           and vs.get("codec_name") == "av1" and not rtmd
+           and "XAVC" in tail,
+           f"rc={rc} codec={vs.get('codec_name')} rtmd={rtmd} "
+           f"warn={'XAVC' in tail}")
+
+    # C17 qsv-av1 DJI basic
+    out = OUT_DIR / "c17_qsv_av1_dji"
+    rc, _ = _run_1kt(cases["dji"], out,
+                     "--encoder", "qsv-av1", "--preset", "hq",
+                     "--check", "basic", "--jobs", "1")
+    final = out / "DJI_20260830095031_0009_D.MP4"
+    v = ffprobe_json(final) if final.is_file() else {}
+    vs = next((s for s in v.get("streams", [])
+               if s.get("codec_type") == "video"), {})
+    expect("C17_qsv_av1_dji", rc == 0 and final.is_file()
+           and vs.get("codec_name") == "av1",
+           f"rc={rc} codec={vs.get('codec_name')}")
+
 
 # ===========================================================================
 # runner
@@ -787,6 +878,7 @@ SUITES: dict[str, list[tuple[str, Callable[[], None]]]] = {
         ("classifier/scaling", l1_classifier_scaling),
         ("gpac/dji", l1_gpac_dji),
         ("x265 P0", l1_x265),
+        ("av1", l1_av1),
     ],
     "toolchain": [("toolchain", l2_toolchain)],
     "full": [("pipeline", l3_pipeline)],

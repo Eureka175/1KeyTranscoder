@@ -257,7 +257,7 @@
       "description": "Fast - Production Ready 285H@10fps",
       "preset": "fast",
       "crf": 22,
-      "rd": 3,
+      "rd": 2,
       "rdoq_level": 0,
       "ref": 2,
       "bframes": 4,

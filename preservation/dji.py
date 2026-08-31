@@ -243,6 +243,7 @@ def dji_rebuild(
     vfr: bool,
     level: str,
     fix_hw_timing: bool,
+    video_entry: str = "hvc1",
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """Shared DJI rebuild tail (encoder-agnostic).
@@ -251,6 +252,9 @@ def dji_rebuild(
     djmd/dbgi/tmcd native copies) -> optional stts duration repair
     (hardware rigaya intermediates only; ffmpeg/x265 intermediates
     pass fix_hw_timing=False) -> run_dji_check -> report.json.
+
+    video_entry: expected sample entry of the re-encoded video track
+    ("hvc1" for HEVC backends, "av01" for AV1 backends).
 
     Used by the hardware DJI path (core/batch_hw) and the x265 DJI
     path (1kt.py) so both keep identical container fidelity.
@@ -305,6 +309,7 @@ def dji_rebuild(
         scratch=work_dir / "validate",
         vfr=vfr,
         level=level,
+        video_entry=video_entry,
         log=log,
     )
     report["job_dir"] = str(work_dir)
@@ -331,6 +336,7 @@ def run_dji_check(
     scratch: Path,
     vfr: bool = False,
     level: str = "basic",
+    video_entry: str = "hvc1",
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """ORIGINAL vs FINAL structural + payload + consumer check for DJI.
@@ -343,6 +349,9 @@ def run_dji_check(
       full     : advanced + deep items (per-track timescale/media
                  duration, payload head/tail bytes, ffprobe stream
                  facts incl. data-track tags)
+
+    video_entry: expected sample entry of the re-encoded video track
+    ("hvc1" HEVC / "av01" AV1).
 
     Critical items: data-track payloads (djmd/dbgi/tmcd) byte-identical,
     track inventory, audio streams, video frame count/fps (CFR only),
@@ -388,19 +397,20 @@ def run_dji_check(
     )
     eq("dji.track_inventory", s_inv, o_inv)
 
-    # video: re-encoded HEVC expected
+    # video: re-encoded (HEVC hvc1 / AV1 av01 expected)
     o_video = next(
         (t for t in out_tracks if t["handler"] == "vide"), None
     )
     if o_video is None:
         note("dji.video.track", MISSING, "no video track in final")
-    elif o_video["entry"] != "hvc1":
+    elif o_video["entry"] != video_entry:
         note(
             "dji.video.track", MODIFIED,
-            f"final video entry {o_video['entry']!r} (hvc1 expected)",
+            f"final video entry {o_video['entry']!r} "
+            f"({video_entry} expected)",
         )
     else:
-        note("dji.video.track", PRESERVED, "vide:hvc1")
+        note("dji.video.track", PRESERVED, f"vide:{video_entry}")
 
     # --- data-track payloads (byte-identical) ---
     for track_id, entry in s_specs["data_ids"]:
@@ -538,9 +548,12 @@ def run_dji_check(
                 {},
             )
             return {
+                # profile is deliberately NOT compared: the video is
+                # re-encoded (HEVC Main 10 -> AV1 Main etc.); the
+                # expected sample entry is checked by dji.video.track.
                 "video": (
                     video.get("width"), video.get("height"),
-                    video.get("pix_fmt"), video.get("profile"),
+                    video.get("pix_fmt"),
                 ),
                 "audio": sorted(
                     (

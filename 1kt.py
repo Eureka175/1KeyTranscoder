@@ -742,12 +742,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--encoder",
-        choices=["x265", "nvenc", "qsv"],
+        choices=["x265", "nvenc", "qsv", "nvenc-av1", "qsv-av1"],
         default=None,
         help=(
             "Encoder backend. Default: declared by the config file's "
             "'encoder' field. Hardware paths never fall back to "
-            "software encoding."
+            "software encoding. AV1 后端 (nvenc-av1/qsv-av1) 仅服务"
+            "非 Sony 素材: Sony 源自动路由经典路径并显著 WARNING "
+            "(XAVC 标准只定义 H.264/HEVC)。"
         ),
     )
     parser.add_argument("--config", default=None,
@@ -867,6 +869,8 @@ def main() -> int:
             "x265": "x265.json",
             "nvenc": "nvenc.json",
             "qsv": "qsv.json",
+            "nvenc-av1": "nvenc_av1.json",
+            "qsv-av1": "qsv_av1.json",
         }
         if args.config:
             config_path = resolve_config_file(
@@ -895,11 +899,15 @@ def main() -> int:
                 f"{config_path.name} must contain 'profile' with "
                 f"{', '.join(PRESETS)}"
             )
-        is_hardware = encoder_name in ("nvenc", "qsv")
-        if args.experimental_multihw and not is_hardware:
+        is_hardware = encoder_name in (
+            "nvenc", "qsv", "nvenc-av1", "qsv-av1"
+        )
+        if args.experimental_multihw and encoder_name not in (
+            "nvenc", "qsv"
+        ):
             raise ValueError(
-                "--experimental-multihw requires a hardware backend "
-                "(nvenc/qsv); it manages both backends itself."
+                "--experimental-multihw requires a HEVC hardware "
+                "backend (nvenc/qsv); it manages both backends itself."
             )
 
         ffmpeg = find_executable("ffmpeg", script_dir, args.ffmpeg)

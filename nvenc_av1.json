@@ -1,0 +1,86 @@
+{
+  "encoder": "nvenc-av1",
+  "codec": "av1",
+  "_comment": "NVENC AV1 档位 (CQP 路线, 依 av1_hw_tuning_guide.md §3.1)。10bit 必须 --profile high (rigaya 映射 main=8bit/high=10bit); CQP 模式不写 tune (官方论坛实测降画质); 非层级 GOP 下 B 帧 <=7 (本机实测); tier/aud/repeat-headers/pic-struct/tf-level/mv-precision 等 HEVC 专属键一律不写。数值为标定起点, 待 VMAF/SSIMULACRA 重标。",
+  "profile": {
+    "UHQ": {
+      "preset": "quality",
+      "profile": "high",
+      "level": "6.1",
+      "output_depth": 10,
+      "cqp": [20, 22, 24],
+      "qp_min": [18, 20, 22],
+      "qp_max": [32, 36, 40],
+      "aq": true,
+      "aq_strength": 6,
+      "aq_temporal": true,
+      "lookahead": 32,
+      "bframes": 7,
+      "bref_mode": "middle",
+      "refs_forward": 4,
+      "refs_backward": 3,
+      "gop_len": 0,
+      "tile_columns": 2
+    },
+
+    "HQ": {
+      "preset": "quality",
+      "profile": "high",
+      "level": "6.1",
+      "output_depth": 10,
+      "cqp": [22, 24, 26],
+      "qp_min": [20, 22, 24],
+      "qp_max": [35, 40, 45],
+      "aq": true,
+      "aq_strength": 6,
+      "aq_temporal": true,
+      "lookahead": 32,
+      "bframes": 7,
+      "bref_mode": "middle",
+      "refs_forward": 3,
+      "refs_backward": 2,
+      "gop_len": 0,
+      "tile_columns": 2
+    },
+
+    "SMALL": {
+      "preset": "quality",
+      "profile": "high",
+      "level": "6.1",
+      "output_depth": 10,
+      "cqp": [25, 27, 29],
+      "qp_min": [22, 24, 26],
+      "qp_max": [38, 42, 45],
+      "aq": true,
+      "aq_strength": 6,
+      "aq_temporal": true,
+      "lookahead": 24,
+      "bframes": 7,
+      "bref_mode": "each",
+      "refs_forward": 3,
+      "refs_backward": 2,
+      "gop_len": 0,
+      "tile_columns": 2
+    },
+
+    "FAST": {
+      "preset": "default",
+      "profile": "high",
+      "level": "6.1",
+      "output_depth": 10,
+      "cqp": [23, 25, 27],
+      "qp_min": [20, 22, 24],
+      "qp_max": [38, 42, 45],
+      "aq": true,
+      "aq_strength": 4,
+      "aq_temporal": true,
+      "lookahead": 16,
+      "bframes": 4,
+      "bref_mode": "each",
+      "refs_forward": 2,
+      "refs_backward": 1,
+      "gop_len": 0,
+      "tile_columns": 1
+    }
+  }
+}

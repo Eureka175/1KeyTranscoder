@@ -20,7 +20,7 @@ x265 为手动高压缩选项。**主入口：`1kt.py`。**
 | QSVEncC（Intel QSV HEVC） | ✅ 生产 | `qsv.json` / **`qsv_aligned.json`** | 第二后端。`qsv_aligned.json` 为按 NVENC 同档质量标定的对齐版（见下） |
 | x265（软件 HEVC） | ✅ 手动高压缩档（P0 修复完成） | `x265.json` + `x265_scaling.json` | 质量优先冷归档 / 4:2:2 保真唯一软件路径（吞吐受限，缩放规则仍 PROVISIONAL，见 `work/x265_test/`） |
 | VCEEncC（AMD VCE HEVC） | 预留（JSON 已备未接） | `vce.json` | AMD 机器扩展 |
-| AV1（NVENC/QSV/SVT） | 📋 评估完成、待实施 | 草案见调参指南 | 仅限非 XAVC 经典路径（XAVC 合规决策） |
+| **AV1**（NVENC/QSV 硬件） | ✅ 已实施（仅非 Sony 素材） | `nvenc_av1.json` / `qsv_av1.json` | 免版税/体积优化备选；`--encoder nvenc-av1\|qsv-av1`；Sony 源自动合规路由经典路径；数值为标定起点，详见 AV1 实现评估 |
 
 > ⚠️ 档位 JSON 内的数值为作者实测标定值，请勿改动；调参须以测试集回归
 > 与 `tests/full_autotest.py` 为依据。
@@ -39,6 +39,9 @@ python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset all
 
 # x265 手动高压缩档（软件，慢）
 python 1kt.py --input D:\素材 --output D:\归档 --encoder x265 --preset hq
+
+# AV1 硬件档（仅非 Sony 素材; Sony 源自动合规路由经典路径 + WARNING）
+python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc-av1 --preset hq
 
 # 无人值守 (不弹看板窗口, 全部落日志)
 python 1kt.py ... --headless

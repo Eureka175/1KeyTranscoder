@@ -22,6 +22,7 @@ PARAM_MAP = {
     # "tu" = Intel target-usage knob; QSVEncC exposes it as --quality
     # (best, higher, high, balanced(default), fast, faster, fastest).
     "tu": ("-u --quality", "value"),
+    "quality": ("-u --quality", "value"),
     "icq": ("--icq", "value"),
     "profile": ("--profile", "value"),
     "tier": ("--tier", "value"),
@@ -56,6 +57,15 @@ PARAM_MAP = {
     # With plain --icq the LA depth is inert; see design doc 5.5
     # (Arc has no LA) — kept mapped for platforms that support LA.
     "lookahead": ("--la-depth", "value"),
+    # AV1 keys: B 帧由 --gop-ref-dist 表达 (--bframes 对 AV1 静默无效);
+    # lookahead 新用法 = --la-depth + --extbrc + adaptive_i/b;
+    # AV1 只有 FF 固定功能路径 -> --function-mode FF。
+    "gop_ref_dist": ("--gop-ref-dist", "value"),
+    "extbrc": ("--extbrc", "flag"),
+    "la_depth": ("--la-depth", "value"),
+    "function_mode": ("--function-mode", "value"),
+    "tile_col": ("--tile-col", "value"),
+    "tile_row": ("--tile-row", "value"),
 }
 
 _SKIPPED_ALWAYS = ("output_depth",)
@@ -65,10 +75,18 @@ class QsvBackend:
     name = "qsv"
     kind = "qsvencc"
 
-    def __init__(self, tool: Path, caps: BackendCaps | None = None) -> None:
+    def __init__(
+        self,
+        tool: Path,
+        caps: BackendCaps | None = None,
+        codec: str = "hevc",
+    ) -> None:
         self.tool = tool
         self.caps = caps or CONSERVATIVE_CAPS
         self.known = known_flags(tool)
+        self.codec = codec
+        if codec != "hevc":
+            self.name = f"{self.name}-{codec}"
 
     def build_args(
         self,
@@ -81,13 +99,18 @@ class QsvBackend:
         args, skipped = build_flag_args(profile, PARAM_MAP, self.known)
         cargs, cnotes = color_flag_args(color, self.known)
         args = [
-            "--avsw", "--video-track", "1", "-c", "hevc",
+            "--avsw", "--video-track", "1", "-c", self.codec,
             "--output-depth", str(depth),
             *args,
         ]
         # atc_sei ("auto") is a legit rigaya CLI value and would be
-        # swallowed by the AUTO token check in build_flag_args.
-        if profile.get("atc_sei") and "atc-sei" in self.known:
+        # swallowed by the AUTO token check in build_flag_args. HEVC
+        # only (alternative transfer characteristics SEI, HLG).
+        if (
+            self.codec == "hevc"
+            and profile.get("atc_sei")
+            and "atc-sei" in self.known
+        ):
             args += ["--atc-sei", str(profile["atc_sei"])]
         args += cargs
         # 4:2:2 sources: planned 4:2:0 conversion (policy, see module

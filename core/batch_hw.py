@@ -192,8 +192,12 @@ def hw_backend_for(
     work_root: Path,
     logger: logging.Logger,
 ):
-    """Build a hardware backend + probe/save capabilities at run start."""
-    kind = "nvencc" if encoder_name == "nvenc" else "qsvencc"
+    """Build a hardware backend + probe/save capabilities at run start.
+
+    encoder_name: "nvenc"/"qsv" (HEVC) or "nvenc-av1"/"qsv-av1" (AV1)."""
+    base = encoder_name.split("-", 1)[0]
+    kind = "nvencc" if base == "nvenc" else "qsvencc"
+    codec = "av1" if encoder_name.endswith("-av1") else "hevc"
     exe_name = "NVEncC64.exe" if kind == "nvencc" else "QSVEncC64.exe"
     explicit = args.tool_nvencc if kind == "nvencc" else args.tool_qsvencc
     tool = find_hw_tool(script_dir, exe_name, explicit)
@@ -205,21 +209,25 @@ def hw_backend_for(
             "(8bit 4:2:0) assumed",
             exe_name,
         )
-        caps = BackendCaps(tool=exe_name, codecs={"hevc": CodecCaps()})
+        caps = BackendCaps(
+            tool=exe_name, codecs={"hevc": CodecCaps(), "av1": CodecCaps()}
+        )
     json_path, raw_path = caps.save(caps_dir)
     logger.info(
-        "Caps %s: device=%s driver=%s hevc(10bit=%s,422=%s,422-10bit=%s)",
+        "Caps %s: device=%s driver=%s hevc(10bit=%s,422=%s,422-10bit=%s) "
+        "av1(10bit=%s)",
         exe_name,
         caps.device,
         caps.driver,
         caps.codecs.get("hevc", CodecCaps()).bit10,
         caps.codecs.get("hevc", CodecCaps()).csp_422,
         caps.codecs.get("hevc", CodecCaps()).bit10_422,
+        caps.codecs.get("av1", CodecCaps()).bit10,
     )
     logger.info("Caps files: %s | %s", json_path, raw_path)
-    if encoder_name == "nvenc":
-        return NvencBackend(tool, caps)
-    return QsvBackend(tool, caps)
+    if kind == "nvencc":
+        return NvencBackend(tool, caps, codec=codec)
+    return QsvBackend(tool, caps, codec=codec)
 
 
 def _last_encode_fps(raw_log: Path) -> float:
@@ -267,7 +275,7 @@ def hw_encode_with_fallback(
     depth = src_info.bit_depth
 
     planned, needs_downgrade = plan_initial_format(
-        caps, backend.kind, chroma, depth
+        caps, backend.kind, chroma, depth, backend.codec
     )
     if needs_downgrade:
         if no_downgrade:
@@ -640,7 +648,7 @@ def encode_one_sony_hw(
     encoded_mov = work_dir / "video" / "encoded.mov"
 
     planned, needs_downgrade = plan_initial_format(
-        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth
+        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth, backend.codec
     )
 
     def build_cmd(chroma: str, depth: int) -> list[str]:
@@ -822,7 +830,7 @@ def encode_one_hw_classic(
     safe_unlink(part_dst)
 
     planned, needs_downgrade = plan_initial_format(
-        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth
+        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth, backend.codec
     )
     log_hw_header(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
@@ -943,7 +951,7 @@ def encode_one_dji_hw(
     report_path = work_dir / "report.json"
 
     planned, needs_downgrade = plan_initial_format(
-        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth
+        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth, backend.codec
     )
     log_hw_header(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
@@ -1051,6 +1059,9 @@ def encode_one_dji_hw(
                 vfr=vfr,
                 level=check_level,
                 fix_hw_timing=True,
+                video_entry=(
+                    "av01" if backend.codec == "av1" else "hvc1"
+                ),
                 log=pipe_log,
             )
     except Exception as exc:
@@ -1264,7 +1275,7 @@ def process_file_hw(
             )
         return "failed"
 
-    if is_sony_source(source_streams):
+    if is_sony_source(source_streams) and backend.codec != "av1":
         result = encode_one_sony_hw(
             src=src,
             dst=dst,
@@ -1284,6 +1295,41 @@ def process_file_hw(
             keep_work=ctx.keep_work,
             no_downgrade=ctx.no_downgrade,
             check_level=ctx.check_level,
+            logger=logger,
+            file_logger=file_logger,
+            dry_run=ctx.dry_run,
+            status_cb=_status_cb_for(ctx, src),
+            show_progress=ctx.show_progress,
+            throughput_cb=lambda fps: ctx.throughput.append(
+                (backend.name, fps)
+            ),
+        )
+    elif is_sony_source(source_streams):
+        # XAVC 标准只定义 H.264/HEVC: AV1 后端遇 Sony 源不得进入保留
+        # 管线 (保留 XAVC brand 的 AV1 文件是伪标准产物) — 按策略路由
+        # 经典路径 (元数据丢弃) + 显著 WARNING。
+        emit_warning(
+            logger,
+            file_logger,
+            "AV1 与 XAVC 标准不兼容 (XAVC 仅定义 H.264/HEVC): "
+            f"Sony 源 {src.name} 按策略走经典路径, rtmd/nrtm/uuid "
+            "元数据不保留; XAVC 归档请用 hevc 后端",
+        )
+        result = encode_one_hw_classic(
+            src=src,
+            dst=dst,
+            source_summary=source_summary,
+            src_info=src_info,
+            vfr=vfr,
+            profile=ctx.profile,
+            preset=ctx.preset,
+            backend=backend,
+            ffprobe=ctx.ffprobe,
+            postprobe_csv=ctx.postprobe_csv,
+            postprobe_stream_csv=ctx.postprobe_stream_csv,
+            gpac=ctx.gpac,
+            work_root=ctx.work_root,
+            no_downgrade=ctx.no_downgrade,
             logger=logger,
             file_logger=file_logger,
             dry_run=ctx.dry_run,
