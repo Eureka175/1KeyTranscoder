@@ -23,6 +23,8 @@
 |---|---|
 | `av1_feasibility_report.md` | AV1 实现可行性总报告（含 ★XAVC 合规边界决策） |
 | `av1_hw_tuning_guide.md` | AV1 硬件后端调参指南：NVENC/QSV/VCE 支持度矩阵 + HEVC→AV1 逐键参数翻译表 + 预设 JSON 草案 |
+| `av1_implementation_assessment.md` | **AV1 三后端（svtav1/nvenc-av1/qsv-av1）实现评估**：Sony/DJI 保留管线（不打 XAVC tag）+ 端到端实测 + 标定状态 |
+| `av1_calibration.md` | **★AV1 档位标定报告（2026-08-31 实测定案）**：SVT-AV1 四档 + 硬件 QVBR/ICQ 重标定, VMAF/XPSNR 矩阵与定案依据 |
 | `hevc_implementation_assessment.md` | **HEVC 实现生产就绪度评估（重写版）**：全量代码重读 + 官方文档/社区实测调研 + 本机复测，判定"有条件生产就绪"与上线条件 |
 | `x265_production_assessment.md` | **x265 实现生产就绪评估（重写版）**：官方文档逐参数核查 + 本机实证 + 生产判定与条件清单 |
 | `svt_av1_archival_assessment.md` | **SVT-AV1（含 PSY fork）归档可行性评估**：主线/PSY 关系、归档调参、质量与吞吐、集成定位 |
@@ -36,6 +38,7 @@
 | `SVT-AV1_Parameters.md` | 官方参数文档（master = v4.2.0） |
 | `SVT-AV1_CHANGELOG.md` | 版本历史 |
 | `SVT-AV1_CommonQuestions.md` | 官方常见问题 |
+| `SVT-AV1_archival_tuning_report.md` | **v4.2.0 归档调参调研**（官方文档 + community 全带 URL：CRF 刻度/preset 甜点/tune/enable-qm/ac-bias/film-grain/mbr 等） |
 | `psy/`（24 份） | **SVT-AV1-PSY fork 调研**原始抓取 + 来源索引（00-sources-index.md） |
 | `community/`（22 份） | **社区归档实践调研**：Doom9/r·AV1/DataHoarder 帖 + 主报告 svt-av1-archival-community-report.md |
 | `official/`（6 份） | 官方文档抓取（Parameters/Encoder User Guide/FGS 附录/FFmpeg 说明等） |

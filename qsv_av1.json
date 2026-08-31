@@ -1,10 +1,10 @@
 {
   "encoder": "qsv-av1",
   "codec": "av1",
-  "_comment": "QSV AV1 档位 (ICQ 路线, 依 av1_hw_tuning_guide.md §3.2)。AV1 只有 FF 固定功能路径 (--function-mode FF); ICQ 为 0-255 刻度 (HEVC 1-51, 数值不可照搬, 现为标定起点); B 帧由 --gop-ref-dist 表达 (--bframes 对 AV1 静默无效, 8=甜点); lookahead 新用法 = --la-depth + --extbrc + adaptive_i/b; tier/sao/ctu/tskip/weightp/weightb/gpb/open-gop 等 HEVC 专属键一律不写。",
+  "_comment": "QSV AV1 档位 (ICQ 路线, 2026-08-31 实测重标定, 详见 docs/evaluation/av1_calibration.md)。AV1 只有 FF 固定功能路径 (--function-mode FF); ICQ 为 0-255 刻度; B 帧由 --gop-ref-dist 表达 (--bframes 对 AV1 静默无效, 8=甜点); lookahead 新用法 = --la-depth + --extbrc + adaptive_i/b。icq 实测阶梯 (car_6s): 23=28.6Mbps/XPSNR 42.21 (对齐 NVENC UHQ 42.28 带), 26=15.7/41.63, 28=12.4/41.25, 32=7.3/40.17; 干净内容: 22=10.5/38.99, 26=3.5/38.39, 28=2.8/38.12, 32=1.6/37.17。tier/sao/ctu/tskip/weightp/weightb/gpb/open-gop 等 HEVC 专属键一律不写。",
   "profile": {
     "UHQ": {
-      "icq": 24,
+      "icq": 23,
       "profile": "main",
       "level": "auto",
       "output_depth": 10,
@@ -52,7 +52,7 @@
     },
 
     "SMALL": {
-      "icq": 30,
+      "icq": 32,
       "profile": "main",
       "level": "auto",
       "output_depth": 10,

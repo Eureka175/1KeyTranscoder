@@ -1,0 +1,67 @@
+{
+  "encoder": "svtav1",
+  "schema_version": "1.0",
+  "status": "PROVISIONAL - all ratio, threshold and clamp values in this file are calibration candidates, not final production values",
+  "enabled": true,
+
+  "reference": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 59.94,
+    "note": "4K60 reference configuration. The base profiles in svtav1.json are tuned for this. Scaling factors are computed relative to these values."
+  },
+
+  "classification": {
+    "metric": "normalized_ob = container_ob_bits_per_sec / (width * height * fps)",
+    "unit": "bits per pixel-frame",
+    "note": "Metadata-only source-efficiency indicator (identical scheme to x265_scaling.json).",
+    "intra_like_codecs": ["prores", "dnxhd", "dnxhr"],
+    "thresholds": {
+      "low_max": 0.12,
+      "high_min": 0.25,
+      "status": "PROVISIONAL - inherited from x265_scaling.json calibration"
+    }
+  },
+
+  "param_rules": {
+    "_comment": "Modes: fixed (default for anything not listed), fps (FR* expressions evaluated against source fps). keyint/lookahead are FR*-based; everything else stays fixed (crf/tune/aq/... are intentionally never scaled).",
+    "keyint": {
+      "mode": "fps",
+      "cap": 600,
+      "note": "FR*10 = 10s GOP; capped at 600 frames to bound seek granularity/memory at >60fps sources."
+    },
+    "lookahead": {
+      "mode": "fps",
+      "cap": 120,
+      "note": "FR*2 lookahead; cap bounds SVT-AV1 lookahead memory at high-FPS sources."
+    }
+  },
+
+  "dynamic_vbv": {
+    "_comment": "mbr_kbps = clamp(OB * target_ratio, OB * min_ratio, OB * max_ratio). OB = original container bitrate in kbps. CRF remains the primary quality control; mbr is the capped-CRF bitrate ceiling (translation of x265 CRF+VBV). Missing class entry falls back to the static base-profile vbv_maxrate. bufsize_factor has no SVT-AV1 equivalent (no VBV buffer parameter) and is ignored.",
+    "UHQ": {
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.55, "target_ratio": 0.70, "max_ratio": 0.85, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.70, "target_ratio": 0.85, "max_ratio": 1.00, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.90, "target_ratio": 1.00, "max_ratio": 1.25, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.30, "target_ratio": 0.40, "max_ratio": 0.55, "status": "PROVISIONAL_UNCALIBRATED"}
+    },
+    "HQ": {
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.35, "target_ratio": 0.50, "max_ratio": 0.65, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.60, "target_ratio": 0.75, "max_ratio": 0.90, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.85, "target_ratio": 1.00, "max_ratio": 1.15, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.25, "target_ratio": 0.35, "max_ratio": 0.45, "status": "PROVISIONAL_UNCALIBRATED"}
+    },
+    "SMALL": {
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.20, "target_ratio": 0.30, "max_ratio": 0.40, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.40, "target_ratio": 0.55, "max_ratio": 0.70, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.75, "target_ratio": 0.90, "max_ratio": 1.05, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.15, "target_ratio": 0.25, "max_ratio": 0.35, "status": "PROVISIONAL_UNCALIBRATED"}
+    },
+    "FAST": {
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.30, "target_ratio": 0.40, "max_ratio": 0.50, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.50, "target_ratio": 0.65, "max_ratio": 0.80, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.80, "target_ratio": 0.95, "max_ratio": 1.10, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.20, "target_ratio": 0.30, "max_ratio": 0.40, "status": "PROVISIONAL_UNCALIBRATED"}
+    }
+  }
+}

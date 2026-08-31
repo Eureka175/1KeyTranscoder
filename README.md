@@ -20,7 +20,8 @@ x265 为手动高压缩选项。**主入口：`1kt.py`。**
 | QSVEncC（Intel QSV HEVC） | ✅ 生产 | `qsv.json` / **`qsv_aligned.json`** | 第二后端。`qsv_aligned.json` 为按 NVENC 同档质量标定的对齐版（见下） |
 | x265（软件 HEVC） | ✅ 手动高压缩档（P0 修复完成） | `x265.json` + `x265_scaling.json` | 质量优先冷归档 / 4:2:2 保真唯一软件路径（吞吐受限，缩放规则仍 PROVISIONAL，见 `work/x265_test/`） |
 | VCEEncC（AMD VCE HEVC） | 预留（JSON 已备未接） | `vce.json` | AMD 机器扩展 |
-| **AV1**（NVENC/QSV 硬件） | ✅ 已实施（仅非 Sony 素材） | `nvenc_av1.json` / `qsv_av1.json` | 免版税/体积优化备选；`--encoder nvenc-av1\|qsv-av1`；Sony 源自动合规路由经典路径；数值为标定起点，详见 AV1 实现评估 |
+| **SVT-AV1（软件 AV1）** | ✅ 已实施（四档标定中，见评估） | `svtav1.json` + `svtav1_scaling.json` | `--encoder svtav1`；ffmpeg 9.0.1 内置 SVT-AV1 v4.2.0；Sony/DJI 元数据保留管线；软件 AV1 体积/细节优势 |
+| **AV1**（NVENC/QSV 硬件） | ✅ 已实施 | `nvenc_av1.json` / `qsv_av1.json` | 免版税备选；`--encoder nvenc-av1\|qsv-av1`；Sony 源同样走保留管线（不打 XAVC tag） |
 
 > ⚠️ 档位 JSON 内的数值为作者实测标定值，请勿改动；调参须以测试集回归
 > 与 `tests/full_autotest.py` 为依据。
@@ -40,14 +41,19 @@ python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset all
 # x265 手动高压缩档（软件，慢）
 python 1kt.py --input D:\素材 --output D:\归档 --encoder x265 --preset hq
 
-# AV1 硬件档（仅非 Sony 素材; Sony 源自动合规路由经典路径 + WARNING）
+# 软件 AV1（SVT-AV1，元数据保留管线，不打 XAVC tag）
+python 1kt.py --input D:\素材 --output D:\归档 --encoder svtav1 --preset hq
+
+# AV1 硬件档（Sony/DJI 均走保留管线, 不打 XAVC tag）
 python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc-av1 --preset hq
 
 # 无人值守 (不弹看板窗口, 全部落日志)
 python 1kt.py ... --headless
 ```
 
-**三条自动路径**：Sony XAVC（rtmd）→ 元数据保留管线；DJI（djmd）→ DJI
+**三条自动路径**：Sony XAVC（rtmd）→ 元数据保留管线（AV1 后端同样
+保留 rtmd/nrtm/uuid，但按策略不打 XAVC tag — AV1 不在 XAVC 规范内）；
+DJI（djmd）→ DJI
 保留管线（视频重编码 + djmd/dbgi/tmcd 原生复制 + 载荷 sha256 + Gyroflow
 四元数校验；mjpeg 封面与 udta 因 GPAC 26.02 不可寻址而丢弃并显式记录）；
 其余素材 → 经典单趟（按策略仅视频+音频，日志显式声明）。输出为同名
@@ -59,7 +65,7 @@ python 1kt.py ... --headless
 |---|---|
 | GPAC / MP4Box | `C:\Program Files\GPAC`（或 `--gpac-dir`）——容器重建与元数据保留核心（**行为绑定 26.02**，升级须回归） |
 | NVEncC / QSVEncC | `tools/NVEncC_9.31_x64/`、`tools/QSVEncC_8.26_x64/`（或 `--tool-*`） |
-| ffmpeg / ffprobe | 9.0.1 gyan full（tools/ 自带，内置 libx265/libsvtav1/libvmaf） |
+| ffmpeg / ffprobe | 9.0.1 gyan full（tools/ 自带，内置 libx265/libsvtav1 v4.2.0/libvmaf；**必须用项目自带版本**，PATH 老版本不支持 AV1 新特性） |
 | Gyroflow（可选） | 消费端校验（`--check advanced/full`；未安装则提示并跳过） |
 
 ## 编码后验证：`--check basic|advanced|full`
@@ -141,24 +147,28 @@ docs/
 ├── README.md            分类索引
 ├── FINAL_REPORT.md      ★ 四份评估汇总结论与路线图
 ├── design/              设计文档：硬件后端设计 / 实施报告(含 DJI §15) / 集成报告 / HEVC 4:2:2 Rext 播放兼容性
-├── evaluation/          评估：HEVC 生产就绪度(重写版) / x265 生产就绪 / AV1 可行性 / AV1 调参 / SVT-AV1 归档
-└── reference/           第三方一手资料存档（x265 / SVT-AV1 / NVENC / QSV / VCE）
+├── evaluation/          评估：HEVC 生产就绪度(重写版) / x265 生产就绪 / AV1 可行性 / AV1 调参 / SVT-AV1 归档 / AV1 档位标定
+└── reference/           第三方一手资料存档（x265 / SVT-AV1 含 v4.2.0 调参调研报告 / NVENC / QSV / VCE）
 ```
 
 ## 关键决策记录
 
-1. **AV1 与 XAVC 边界**：XAVC 标准只定义 H.264/HEVC，保留 XAVC brand 的
-   AV1 文件是伪标准产物 → AV1 不默认集成保留管线，XAVC 素材恒用 HEVC。
+1. **AV1 与 XAVC 边界**：XAVC 标准只定义 H.264/HEVC。AV1 后端（svtav1 /
+   nvenc-av1 / qsv-av1）对 Sony 源保留 rtmd/nrtm/uuid 元数据管线，但
+   **不打 XAVC tag**（brand 改 av01）——保留 XAVC brand 的 AV1 文件是
+   伪标准产物；XAVC 合规归档请用 HEVC 后端。AV1 统一 4:2:0 输出
+   （4:2:2 源 WARNING 后降采样，不用 AOM）。
 2. **DJI 专线**：djmd 即运动数据载体（Gyroflow 官方支持 Action 4/5/6、
    Avata、Neo）；`MP4Box -diso` XML 对 DJI 文件解析失败 → 轨道枚举全部
    走 `-info` 文本解析；mjpeg 封面/udta GPAC 不可寻址，按策略丢弃。
 3. **HEVC 生产就绪度**：硬件双后端"有条件生产就绪"（15/15 验收 +
    色彩元数据端到端 + 质量对齐）；4:2:2 输出为 Rext，硬解仅 Blackwell，
    归档定位为"压缩归档副本"（母版标准是 FFV1/ProRes）。
-4. **x265 定位**：手动高压缩档。P0 修复已落地并回归（FAST rd 2→3 激活
-   psy-rd、info=false 可复现、删除 no-strong-intra-smoothing、level 6.2 +
-   CPB 钳位 240Mbit）；DJI 素材走同构保留管线（djmd 原生保留）；
-   缩放规则仍 PROVISIONAL。详见 `work/x265_test/x265_test_report.md`。
+4. **x265 定位**：手动高压缩档。P0 修复已落地并回归（info=false
+   可复现、删除 no-strong-intra-smoothing、level 6.2 + CPB 钳位
+   240Mbit；FAST rd 保持 2 不动）；DJI 素材走同构保留管线（djmd 原生
+   保留）；缩放规则仍 PROVISIONAL。详见
+   `work/x265_test/x265_test_report.md`。
 5. **档位数值权威性**：JSON 数值为作者实测标定，调参须回归测试集。
 
 ## 已知限制与说明
@@ -170,6 +180,10 @@ docs/
   特性不生效）；驱动/QSVEncC 版本对需钉住（6557/6559 曾有批量编码回归史）；
 - Sony 4:2:2 成品 = HEVC Rext，播放硬解仅 NVIDIA 50 系，其余需软解播放器
   （VLC/mpv）；分发请出 4:2:0 副本；
+- **AV1**：统一 4:2:0 输出（所有 AV1 后端）；Sony 源保留元数据但不打
+  XAVC tag（brand av01）；SVT-AV1 无场景关键帧（scd 只管码率分配）、
+  mbr 为软上限（非 VBV 硬钳）；4K60 UHQ 档（preset 2）编码耗时极高，
+  属基准档非生产实用；
 - 非 Sony 非 DJI 素材按策略丢弃元数据（仅视频+音频）；
 - VFR 素材自动 `--avsync forcecfr` 规范化（WARNING 记录）；
 - 经典路径无 1:1 帧闸门（不误杀 VFR）；Sony/DJI 路径有。

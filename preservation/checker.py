@@ -33,9 +33,13 @@ def run_checks(
     gyroflow: Path | None,
     work_dir: Path,
     known_facts: dict[str, Any],
+    codec: str = "hevc",
     log: Callable[[str], None],
 ) -> dict[str, Any]:
-    """Run the level-gated post-encode checks; returns the report."""
+    """Run the level-gated post-encode checks; returns the report.
+
+    codec: expected re-encoded video codec ("hevc" | "av1"); drives the
+    sample-entry/codec expectations and the XAVC-brand policy."""
     compare_level = "basic" if level == "basic" else "advanced"
     report = compare(
         original=original,
@@ -45,6 +49,7 @@ def run_checks(
         scratch=work_dir / "validate",
         known_facts=known_facts,
         level=compare_level,
+        codec=codec,
     )
 
     if level != "basic":
@@ -86,6 +91,7 @@ def run_checks(
                 ffprobe=ffprobe,
                 log_dir=selfcheck_dir,
                 gyroflow=gyroflow,
+                codec=codec,
             )
             report["selfcheck"] = {
                 "overall": sc["overall"],

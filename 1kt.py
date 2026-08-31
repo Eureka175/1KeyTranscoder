@@ -40,6 +40,7 @@ from core.config import (
     load_config,
     load_json_file,
     load_scaling_config,
+    load_svtav1_config,
     resolve_config_file,
     verify_executable,
 )
@@ -62,6 +63,7 @@ from core.postprobe import postprobe_and_log
 from core.probe import build_source_info, count_frames, probe_source
 from core.scaling import ScalingEngine
 from core.source_classifier import SourceClassifier
+from encoders.svtav1 import SvtAv1Backend
 from encoders.x265 import X265Backend
 from preservation.gpac import GpacContainerBackend
 from preservation.gyroflow import find_gyroflow
@@ -423,19 +425,25 @@ def encode_one_sony(
     gyroflow: Path | None,
     work_root: Path,
     check_level: str = "basic",
+    codec: str = "hevc",
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
 ) -> str:
-    """x265 Sony preservation path (manual --encoder x265 only;
-    --check levels apply like on hardware backends)."""
+    """Sony preservation path (rtmd) for ffmpeg software backends
+    (x265 / svtav1; --check levels apply like on hardware backends).
+    codec="av1" 保留元数据但不恢复 XAVC brand (AV1 不在 XAVC 规范内)。"""
     import time
 
     from core.paths import job_id_for, safe_unlink
 
     source_summary = prepared.summary
     work_dir = work_root / job_id_for(src)
-    encoded_mov = work_dir / "video" / "encoded.mov"
+    # AV1 中间文件必须是 MP4 (ffmpeg 9 的 MOV muxer 不接受 AV1;
+    # GPAC 对 MP4/MOV 一视同仁, 时间轴保真不受影响)
+    encoded_mov = work_dir / "video" / (
+        "encoded.mp4" if codec == "av1" else "encoded.mov"
+    )
 
     cmd, effective_params = backend.build_video_command(
         ffmpeg, src, encoded_mov, profile,
@@ -485,6 +493,16 @@ def encode_one_sony(
         file_logger.info("PIPELINE | %s", msg)
 
     try:
+        if codec == "av1":
+            logger.info(
+                "[POLICY] %s | AV1 保留管线: rtmd/nrtm/uuid 元数据保留, "
+                "不打 XAVC tag (AV1 不在 XAVC 规范内)",
+                src.name,
+            )
+            file_logger.info(
+                "POLICY | AV1 Sony preserve: rtmd/nrtm/uuid kept, "
+                "XAVC brand NOT restored (AV1 not in XAVC spec)"
+            )
         report = run_sony_pipeline(
             source=src,
             work_dir=work_dir,
@@ -495,6 +513,8 @@ def encode_one_sony(
             gyroflow=gyroflow,
             fix_hw_timing=False,
             check_level=check_level,
+            codec=codec,
+            encoded_path=encoded_mov,
             log=pipe_log,
         )
     except Exception as exc:
@@ -579,16 +599,17 @@ def encode_one_dji_x265(
     gyroflow: Path | None,
     work_root: Path,
     check_level: str = "basic",
+    video_entry: str = "hvc1",
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
 ) -> str:
-    """DJI preservation path for the x265 backend.
+    """DJI preservation path for ffmpeg software backends (x265/svtav1).
 
-    Video-only libx265 encode (video intermediate is an FFmpeg MOV —
-    no rigaya millisecond quantization, so fix_hw_timing=False) +
-    shared GPAC rebuild (djmd/dbgi/tmcd native copies) + dji check.
-    """
+    Video-only encode (video intermediate is an FFmpeg MOV — no rigaya
+    millisecond quantization, so fix_hw_timing=False) + shared GPAC
+    rebuild (djmd/dbgi/tmcd native copies) + dji check.
+    video_entry: "hvc1" (HEVC) / "av01" (AV1)."""
     import time
 
     from core.paths import job_id_for, safe_unlink
@@ -596,7 +617,10 @@ def encode_one_dji_x265(
 
     source_summary = prepared.summary
     work_dir = work_root / job_id_for(src)
-    encoded_mov = work_dir / "video" / "encoded.mov"
+    # AV1 中间文件必须是 MP4 (ffmpeg 9 的 MOV muxer 不接受 AV1)
+    encoded_mov = work_dir / "video" / (
+        "encoded.mp4" if video_entry == "av01" else "encoded.mov"
+    )
 
     cmd, effective_params = backend.build_video_command(
         ffmpeg, src, encoded_mov, profile,
@@ -608,12 +632,13 @@ def encode_one_dji_x265(
         effective_params=effective_params, cmd=cmd,
     )
     file_logger.info(
-        "POLICY | DJI source (djmd): x265 保留管线 "
-        "(视频重编码 + djmd/dbgi/tmcd 原生保留)"
+        "POLICY | DJI source (djmd): %s 保留管线 "
+        "(视频重编码 + djmd/dbgi/tmcd 原生保留)",
+        backend.name,
     )
     logger.info(
-        "[POLICY] %s | DJI: x265 保留管线, djmd/dbgi/tmcd 原生保留",
-        src.name,
+        "[POLICY] %s | DJI: %s 保留管线, djmd/dbgi/tmcd 原生保留",
+        src.name, backend.name,
     )
 
     if dry_run:
@@ -655,6 +680,7 @@ def encode_one_dji_x265(
             vfr=detect_vfr(prepared.src_info),
             level=check_level,
             fix_hw_timing=False,
+            video_entry=video_entry,
             log=pipe_log,
         )
     except Exception as exc:
@@ -742,21 +768,22 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--encoder",
-        choices=["x265", "nvenc", "qsv", "nvenc-av1", "qsv-av1"],
+        choices=["x265", "svtav1", "nvenc", "qsv", "nvenc-av1", "qsv-av1"],
         default=None,
         help=(
             "Encoder backend. Default: declared by the config file's "
             "'encoder' field. Hardware paths never fall back to "
-            "software encoding. AV1 后端 (nvenc-av1/qsv-av1) 仅服务"
-            "非 Sony 素材: Sony 源自动路由经典路径并显著 WARNING "
-            "(XAVC 标准只定义 H.264/HEVC)。"
+            "software encoding. AV1 后端 (svtav1/nvenc-av1/qsv-av1) 对 "
+            "Sony 源保留 rtmd/nrtm/uuid 元数据但按策略不打 XAVC tag "
+            "(AV1 不在 XAVC 规范内); AV1 统一输出 4:2:0, 4:2:2 源 "
+            "WARNING 后降采样。"
         ),
     )
     parser.add_argument("--config", default=None,
                         help="Path to the encoder profile JSON.")
     parser.add_argument(
         "--scaling-config", default=None,
-        help="Path to x265 scaling rules JSON (x265 backend only).",
+        help="Path to the scaling rules JSON (x265/svtav1 backends).",
     )
     parser.add_argument("--tool-nvencc", default=None,
                         help="Explicit NVEncC64.exe path.")
@@ -867,6 +894,7 @@ def main() -> int:
     try:
         default_config_name = {
             "x265": "x265.json",
+            "svtav1": "svtav1.json",
             "nvenc": "nvenc.json",
             "qsv": "qsv.json",
             "nvenc-av1": "nvenc_av1.json",
@@ -934,6 +962,15 @@ def main() -> int:
             classifier = SourceClassifier(scaling_config)
             engine = ScalingEngine(scaling_config)
             backend = X265Backend()
+        elif encoder_name == "svtav1":
+            config = load_svtav1_config(config_path)
+            scaling_path = resolve_config_file(
+                script_dir, args.scaling_config, "svtav1_scaling.json"
+            )
+            scaling_config = load_scaling_config(scaling_path)
+            classifier = SourceClassifier(scaling_config)
+            engine = ScalingEngine(scaling_config)
+            backend = SvtAv1Backend()
     except Exception as exc:
         print(f"[FATAL] {exc}", file=sys.stderr)
         return 2
@@ -1046,13 +1083,15 @@ def main() -> int:
                 dst = output_path_for(
                     src, input_root, output_root, preset, multiple_presets
                 )
-                part_dst = dst.with_name(dst.stem + ".part.mov")
+                # AV1 中间/临时文件必须是 MP4 (ffmpeg 9 MOV muxer 不接受 AV1)
+                part_ext = ".part.mp4" if backend.name == "svtav1" else ".part.mov"
+                part_dst = dst.with_name(dst.stem + part_ext)
                 file_log = per_file_log_path(
                     src, input_root, logs_root, preset
                 )
                 file_logger = build_file_logger(file_log)
                 if status is not None:
-                    status.start(src, preset, "x265")
+                    status.start(src, preset, backend.name)
                 if dst.is_file() and dst.stat().st_size > 0:
                     logger.info("[SKIP] %s | %s", src, dst)
                     file_logger.info(
@@ -1076,7 +1115,8 @@ def main() -> int:
                     file_logger.error("PREPROBE FAILED | %s", exc)
                     record_failure(
                         failed_path,
-                        source=src, preset=preset, backend_name="x265",
+                        source=src, preset=preset,
+                        backend_name=backend.name,
                         stage="probe", error=str(exc),
                         log_path=str(file_log),
                     )
@@ -1084,6 +1124,21 @@ def main() -> int:
                     if status is not None:
                         status.finish(src, "failed")
                     continue
+                codec = "av1" if getattr(backend, "name", "") == "svtav1" else "hevc"
+                video_entry = "av01" if codec == "av1" else "hvc1"
+                if (
+                    codec == "av1"
+                    and prepared.src_info.chroma not in ("4:2:0", "mono", "")
+                ):
+                    logger.warning(
+                        "[WARNING] %s | AV1 统一输出 4:2:0: 源色度 %s 降采样"
+                        "为 4:2:0 (SVT-AV1 420 策略)",
+                        src.name, prepared.src_info.chroma,
+                    )
+                    file_logger.warning(
+                        "CHROMA_DOWNGRADE | av1 420 policy: source chroma "
+                        "%s -> 4:2:0", prepared.src_info.chroma,
+                    )
                 if any(
                     st.get("codec_type") == "data"
                     and st.get("codec_tag_string") == "rtmd"
@@ -1096,7 +1151,7 @@ def main() -> int:
                         postprobe_csv=postprobe_csv,
                         postprobe_stream_csv=postprobe_stream_csv,
                         gpac=gpac, gyroflow=gyroflow, work_root=work_root,
-                        check_level=args.check,
+                        check_level=args.check, codec=codec,
                         logger=logger, file_logger=file_logger,
                         dry_run=args.dry_run,
                     )
@@ -1108,7 +1163,7 @@ def main() -> int:
                         postprobe_csv=postprobe_csv,
                         postprobe_stream_csv=postprobe_stream_csv,
                         gpac=gpac, gyroflow=gyroflow, work_root=work_root,
-                        check_level=args.check,
+                        check_level=args.check, video_entry=video_entry,
                         logger=logger, file_logger=file_logger,
                         dry_run=args.dry_run,
                     )
@@ -1125,7 +1180,8 @@ def main() -> int:
                 if result == "failed":
                     record_failure(
                         failed_path,
-                        source=src, preset=preset, backend_name="x265",
+                        source=src, preset=preset,
+                        backend_name=backend.name,
                         stage="encode", error="see per-file log",
                         log_path=str(file_log),
                     )

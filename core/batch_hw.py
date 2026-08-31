@@ -705,6 +705,16 @@ def encode_one_sony_hw(
         file_logger.info("PIPELINE | %s", msg)
 
     try:
+        if backend.codec == "av1":
+            logger.info(
+                "[POLICY] %s | AV1 保留管线: rtmd/nrtm/uuid 元数据保留, "
+                "不打 XAVC tag (AV1 不在 XAVC 规范内)",
+                src.name,
+            )
+            file_logger.info(
+                "POLICY | AV1 Sony preserve: rtmd/nrtm/uuid kept, "
+                "XAVC brand NOT restored (AV1 not in XAVC spec)"
+            )
         report = run_sony_pipeline(
             source=src,
             work_dir=work_dir,
@@ -715,6 +725,7 @@ def encode_one_sony_hw(
             gyroflow=gyroflow,
             fix_hw_timing=True,
             check_level=check_level,
+            codec=backend.codec,
             log=pipe_log,
         )
     except Exception as exc:
@@ -1275,7 +1286,7 @@ def process_file_hw(
             )
         return "failed"
 
-    if is_sony_source(source_streams) and backend.codec != "av1":
+    if is_sony_source(source_streams):
         result = encode_one_sony_hw(
             src=src,
             dst=dst,
@@ -1295,41 +1306,6 @@ def process_file_hw(
             keep_work=ctx.keep_work,
             no_downgrade=ctx.no_downgrade,
             check_level=ctx.check_level,
-            logger=logger,
-            file_logger=file_logger,
-            dry_run=ctx.dry_run,
-            status_cb=_status_cb_for(ctx, src),
-            show_progress=ctx.show_progress,
-            throughput_cb=lambda fps: ctx.throughput.append(
-                (backend.name, fps)
-            ),
-        )
-    elif is_sony_source(source_streams):
-        # XAVC 标准只定义 H.264/HEVC: AV1 后端遇 Sony 源不得进入保留
-        # 管线 (保留 XAVC brand 的 AV1 文件是伪标准产物) — 按策略路由
-        # 经典路径 (元数据丢弃) + 显著 WARNING。
-        emit_warning(
-            logger,
-            file_logger,
-            "AV1 与 XAVC 标准不兼容 (XAVC 仅定义 H.264/HEVC): "
-            f"Sony 源 {src.name} 按策略走经典路径, rtmd/nrtm/uuid "
-            "元数据不保留; XAVC 归档请用 hevc 后端",
-        )
-        result = encode_one_hw_classic(
-            src=src,
-            dst=dst,
-            source_summary=source_summary,
-            src_info=src_info,
-            vfr=vfr,
-            profile=ctx.profile,
-            preset=ctx.preset,
-            backend=backend,
-            ffprobe=ctx.ffprobe,
-            postprobe_csv=ctx.postprobe_csv,
-            postprobe_stream_csv=ctx.postprobe_stream_csv,
-            gpac=ctx.gpac,
-            work_root=ctx.work_root,
-            no_downgrade=ctx.no_downgrade,
             logger=logger,
             file_logger=file_logger,
             dry_run=ctx.dry_run,

@@ -31,7 +31,8 @@ def main() -> int:
     ap.add_argument("--input", required=True)
     ap.add_argument("--output", required=True)
     ap.add_argument("--encoder", default="nvenc",
-                    choices=["nvenc", "qsv", "x265"])
+                    choices=["nvenc", "qsv", "x265", "svtav1",
+                             "nvenc-av1", "qsv-av1"])
     ap.add_argument("--preset", default="hq")
     ap.add_argument("--check", default="basic",
                     choices=["basic", "advanced", "full"])

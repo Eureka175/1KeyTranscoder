@@ -1,14 +1,16 @@
-# 1KeyTranscoder · AV1 硬件编码实现评估（详尽版）
+# 1KeyTranscoder · AV1 编码实现评估（详尽版）
 
 > 评估日期：2026-08-31。方法：①上一轮 AV1 评估会话全量转储（18 个子代理，
 > `.dsh-drop` 会话包）结构化回读（`work/av1_drop/findings_synthesis.md`）；
-> ②本机实现与端到端实测（NVENC AV1 + QSV AV1 双后端真实管线）；
-> ③官方文档与社区实测交叉（详见 `docs/reference/` 与
-> `docs/evaluation/av1_hw_tuning_guide.md`）。
+> ②本机实现与端到端实测（SVT-AV1 + NVENC AV1 + QSV AV1 三后端真实管线）；
+> ③官方文档与社区实测交叉（详见 `docs/reference/`、
+> `docs/evaluation/av1_hw_tuning_guide.md` 与
+> `docs/reference/svt-av1/SVT-AV1_archival_tuning_report.md`）。
 >
-> **结论前置：硬件 AV1 已实现并端到端实测通过；定位为非 XAVC 素材的
-> 体积优化备选后端（免版税 + QSV 侧 ~20% 码率节省），非 Sony 归档的
-> 默认替代——XAVC 合规边界使 Sony 素材恒用 HEVC。**
+> **结论前置：三后端 AV1（软件 SVT-AV1 + 硬件 NVENC/QSV）已实现并
+> 端到端实测通过；Sony/DJI 元数据保留管线对 AV1 同样生效（rtmd/nrtm/
+> uuid/djmd 全保留，仅按 XAVC 规范边界不打 XAVC tag）；四档数值已按
+> VMAF/XPSNR 实测标定（`docs/evaluation/av1_calibration.md`）。**
 
 ---
 
@@ -16,13 +18,14 @@
 
 | 项 | 内容 |
 |---|---|
-| 新后端 | `--encoder nvenc-av1` / `qsv-av1`（与 HEVC 后端同构，复用白名单/降级梯/失败分类/调度/看板全部机制） |
+| 新后端 | `--encoder svtav1`（软件）/ `nvenc-av1` / `qsv-av1`（硬件，与 HEVC 后端同构，复用白名单/降级梯/失败分类/调度/看板全部机制） |
 | 能力探测 | caps 新增 AV1 段解析（NVENC `AV1: nv12, yv12, yv12(10bit)` / QSV `Codec: AV1 FF` 10bit 行），本机实测双后端 `av1(10bit=True)` |
-| 格式规划 | `plan_initial_format(codec="av1")`：**任何非 4:2:0 源恒计划 4:2:0 转换**（三大硬件 AV1 均无 4:2:2/4:4:4 编码，色度降采样不可逆 + WARNING） |
-| 档位 JSON | `nvenc_av1.json`（QVBR 路线，与 HEVC 同构）/ `qsv_av1.json`（ICQ 路线），四档 UHQ/HQ/SMALL/FAST，数值为标定起点 |
-| Sony 合规路由 | AV1 后端遇 Sony 源（rtmd）→ **自动路由经典路径**（元数据按策略丢弃）+ 显著 WARNING（XAVC 标准只定义 H.264/HEVC，保留 XAVC brand 的 AV1 文件是伪标准产物） |
+| 格式规划 | `plan_initial_format(codec="av1")`（硬件）与 `av1_pix_fmt()`（svtav1）：**任何非 4:2:0 源恒输出 4:2:0**（三大硬件 AV1 与 SVT-AV1 均无 4:2:2 编码；软件路径调度层 WARNING 后降采样，不用 AOM） |
+| 档位 JSON | `svtav1.json` + `svtav1_scaling.json`（CRF+MBR，preset 2/4/4/7）/ `nvenc_av1.json`（QVBR）/ `qsv_av1.json`（ICQ），四档 UHQ/HQ/SMALL/FAST，**已按 VMAF/XPSNR 实测标定**（见 av1_calibration.md） |
+| Sony 保留管线 | AV1 后端遇 Sony 源（rtmd）→ **保留管线照常**（rtmd/nrtm/uuid 字节保真），但**不打 XAVC tag**（brand av01）——XAVC 标准只定义 H.264/HEVC，保留 XAVC brand 的 AV1 文件是伪标准产物；XAVC 合规归档请用 HEVC 后端 |
 | DJI 路径 | AV1 后端照常走 DJI 保留管线（djmd/dbgi/tmcd 原生保留 + 载荷校验 + Gyroflow 逐帧四元数），视频轨断言泛化为 av01 |
 | 色彩/HDR | 复用 `core/color.py`（bt709 四件套 + mdcv/clli；`--atc-sei` 为 HEVC 专属，AV1 档自动不写） |
+| 软件 AV1 专用 | AV1 中间文件必须 MP4（ffmpeg 9 的 MOV muxer 不接受 AV1）；SVT-AV1 v4.2.0 参数经 smoke-encode 逐键验证（bias-pct 等不可用键已剔除） |
 
 ## 2. 硬件能力事实（官方 + 本机实测）
 
@@ -73,19 +76,27 @@ CQP 模式下 `--tune` 实测降画质（NVIDIA 论坛）——QVBR/VBR 路线�
 | DJI Action4 30fps ×2 | nvenc-av1 | basic | **15/0/0**，av01 Main 10bit + djmd/dbgi/tmcd 保真 |
 | DJI Action4 ×2 | qsv-av1 | basic | **15/0/0** 同上 |
 | DJI Action4 ×2 | nvenc-av1 | **full** | **26/0/0 + Gyroflow PASS**（105/330 运动样本逐帧一致） |
-| Sony C9037（合规路由） | nvenc-av1 | basic | rc=0，av1 视频 + 音频，rtmd 按策略丢弃 + XAVC 合规 WARNING |
-| 自动化测试 | 全量 | full | **117/117 PASS**（新增 AV1 L1 断言 19 项 + L3 C15/C16/C17） |
+| Sony C9037 | nvenc-av1 | basic | **36/0/0**，av01 + rtmd 保留 + brand av01（无 XAVC） |
+| Sony C9037 | svtav1 | basic | **36/0/0**，av01 + rtmd 保留 + 4:2:2→4:2:0 WARNING + brand av01 |
+| DJI Action4 | svtav1 | basic | **15/0/0**，av01 + djmd/dbgi/tmcd 保真 |
+| Sony AV1 / DJI AV1 Gyroflow | 消费端 | — | Gyroflow 正常读 AV1 + rtmd（13013 IMU 样本）/ djmd（四元数） |
+| 自动化测试 | 全量 | full | L1 96 项 + L2 + L3（C16 改为保留管线断言 + 新增 C18-C21 svtav1 四例） |
 
 修复记录：full 级 `dji.video.ffprobe` 深检查项原比对视频 profile
 （转码后 HEVC Main 10 → AV1 Main 必然变化）→ 改为只比
-宽/高/pix_fmt，profile 由 video_entry 项（av01/hvc1）把关。
+宽/高/pix_fmt，profile 由 video_entry 项（av01/hvc1）把关；
+ffmpeg 9 的 MOV muxer 拒绝 AV1 → AV1 中间文件改 MP4（GPAC 无差别）。
 
-## 5. XAVC 合规边界（决策不变，已落地为路由代码）
+## 5. XAVC 合规边界（新策略：保留管线 + 不打 XAVC tag）
 
-- XAVC 标准只定义 H.264/HEVC；**AV1 后端遇 Sony 源不进保留管线**
-  （路由经典路径 + WARNING），Sony 元数据保留的唯一默认 codec 恒 HEVC；
-- AV1 服务面：DJI（保留管线）/ 经典路径（策略丢弃）素材；
-- 三大硬件 AV1 全 4:2:0 → 4:2:2 源走色度降采样（WARNING 记录）。
+- XAVC 标准只定义 H.264/HEVC；保留 XAVC brand 的 AV1 文件是伪标准
+  产物 → **AV1 后端对 Sony 源保留 rtmd/nrtm/uuid 元数据管线，但
+  brand 改 av01**（GPAC -brand 通行同时恢复 movie timescale，
+  validate/selfcheck 的 ftyp 断言按 AV1 策略改写: 断言"无 XAVC"
+  而非"与源一致"）；
+- XAVC 合规归档（需保留 XAVC brand）请用 HEVC 后端；
+- 三大硬件 AV1 与 SVT-AV1 全 4:2:0 → 4:2:2 源走色度降采样
+  （WARNING 记录）。
 
 ## 6. 消费端兼容（AV1 4:2:0 Main 10）
 
@@ -96,20 +107,30 @@ CQP 模式下 `--tune` 实测降画质（NVIDIA 论坛）——QVBR/VBR 路线�
 
 ## 7. 待办与边界（诚实清单）
 
-1. **档位标定未做**（P0 for "生产"）：CQP/ICQ 数值是文档推导起点，
-   需 testsets × 4 档 VMAF/SSIMULACRA 重标（与 HEVC 档对齐质量层）；
+1. ~~**档位标定**~~ **已完成**（2026-08-31）：
+   `docs/evaluation/av1_calibration.md`（SVT-AV1 四档 + 硬件双后端
+   QVBR/ICQ 重标定, VMAF/XPSNR/PSNR/SSIM 实测矩阵）；
 2. NVENC AV1 的 hierarchical B 帧（SDK 13.1+新驱动）与 QSV 新驱动
    mbbrc/extbrc 实效——工具/驱动升级后按能力探测重测；
 3. 工具升级顺手项：NVEncC 9.31→9.33、QSVEncC 8.26→8.28
-   （白名单机制兜底）；
+   （白名单机制兜底）；ffmpeg 升级会带新 SVT-AV1（4.x 迭代快，
+   档位需按新版本回归）；
 4. 质量定位诚实声明：硬件 AV1 相对硬件 HEVC **不是质量升级**（NVIDIA
-   打平），换码收益是免版税/体积/生态——README 与档位说明已按此表述。
+   打平），换码收益是免版税/体积/生态；软件 SVT-AV1 实测在噪点素材
+   上比 x265 slow 档 +0.7 XPSNR（+31% 码率）或同码率 +0.4 XPSNR，
+   干净素材持平——价值 = 免版税 + film-grain 极噪体积选项
+   （-54% 码率） + 全平台解码覆盖。
 
 ## 8. 证据索引
 
+- `work/av1_calib/` — 档位标定全量数据（calib.py / results.csv /
+  results_table.md / 各矩阵 spec 与日志）
+- `docs/evaluation/av1_calibration.md` — 标定报告（★档位定案）
+- `docs/reference/svt-av1/SVT-AV1_archival_tuning_report.md` — SVT-AV1
+  v4.2.0 调参调研（官方文档 + community, 全带 URL）
 - `work/av1_drop/findings_synthesis.md` — 前轮 18 子代理结论汇总（带来源 id）
 - `docs/evaluation/av1_hw_tuning_guide.md` — 支持度矩阵 + 逐键翻译 + 预设草案
 - `docs/evaluation/av1_feasibility_report.md` — 可行性总报告（★XAVC 决策）
 - `docs/reference/nvenc/`、`docs/reference/qsv/`、`docs/reference/svt-av1/` — 一手资料
-- 本机实测日志：`work/ct_av1_out/`（AV1 管线产物）、`work/autotest/av1_run.log`
+- 本机实测日志：`work/ct_av1_out/`（AV1 管线产物）、`work/autotest/`、`work/av1_calib/smoke_*`
 - git tag `post_av1` — 实现基线

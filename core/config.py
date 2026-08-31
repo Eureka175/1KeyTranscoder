@@ -93,6 +93,43 @@ def load_config(path: Path) -> dict[str, Any]:
     return data
 
 
+def load_svtav1_config(path: Path) -> dict[str, Any]:
+    """Load and validate the SVT-AV1 base profile JSON (svtav1.json)."""
+    data = load_json_file(path)
+
+    profiles = data.get("profile")
+    if not isinstance(profiles, dict):
+        raise ValueError("JSON must contain an object named 'profile'.")
+
+    missing = [preset for preset in PRESETS if preset not in profiles]
+    if missing:
+        raise ValueError(
+            f"Missing profile(s): {', '.join(missing)}"
+        )
+
+    for preset in PRESETS:
+        profile = profiles[preset]
+        if not isinstance(profile, dict):
+            raise ValueError(f"profile.{preset} must be an object.")
+
+        required = ("preset", "tune", "crf", "keyint", "lookahead",
+                    "vbv_maxrate")
+        missing_fields = [key for key in required if key not in profile]
+        if missing_fields:
+            raise ValueError(
+                f"profile.{preset} missing: {', '.join(missing_fields)}"
+            )
+
+        svt_preset = profile["preset"]
+        if not isinstance(svt_preset, int) or not -2 <= svt_preset <= 13:
+            raise ValueError(
+                f"profile.{preset}.preset must be an integer in -2..13 "
+                f"(SVT-AV1 preset range)."
+            )
+
+    return data
+
+
 def load_scaling_config(path: Path) -> dict[str, Any]:
     """Load and validate x265_scaling.json (source-dependent rules)."""
     data = load_json_file(path)
