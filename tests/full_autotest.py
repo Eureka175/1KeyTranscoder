@@ -436,7 +436,9 @@ def l1_x265() -> None:
     import json
     cfg = json.loads((ROOT / "x265.json").read_text(encoding="utf-8"))
     for tier, p in cfg["profile"].items():
-        record(f"x265.{tier}.rd>=3 (psy-rd 激活)", int(p["rd"]) >= 3)
+        # rd 值域 2-6 均合法; FAST 档按用户决定保持 rd=2
+        # (psy-rd 在 rd<3 时静默失效, 属已知取舍, 不改)
+        record(f"x265.{tier}.rd 值域合法", 2 <= int(p["rd"]) <= 6)
         record(f"x265.{tier}.info=false (可复现)", p["info"] is False)
         record(f"x265.{tier}.无 no-strong-intra-smoothing",
                "no_strong_intra_smoothing" not in p)
