@@ -507,8 +507,10 @@ def l1_av1() -> None:
                f"tiers={sorted(tiers)}")
         for t, p in cfg["profile"].items():
             if name.startswith("nvenc"):
-                record(f"av1.{name}.{t} profile=high (10bit)",
-                       p.get("profile") == "high" and p.get("bframes", 0) <= 7)
+                record(f"av1.{name}.{t} qvbr+profile=high",
+                       p.get("profile") == "high"
+                       and 0 <= int(p.get("qvbr", -1)) <= 63
+                       and p.get("bframes", 0) <= 7)
             else:
                 record(f"av1.{name}.{t} FF+icq",
                        p.get("function_mode") == "FF"

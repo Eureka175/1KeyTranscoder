@@ -19,7 +19,7 @@
 | 新后端 | `--encoder nvenc-av1` / `qsv-av1`（与 HEVC 后端同构，复用白名单/降级梯/失败分类/调度/看板全部机制） |
 | 能力探测 | caps 新增 AV1 段解析（NVENC `AV1: nv12, yv12, yv12(10bit)` / QSV `Codec: AV1 FF` 10bit 行），本机实测双后端 `av1(10bit=True)` |
 | 格式规划 | `plan_initial_format(codec="av1")`：**任何非 4:2:0 源恒计划 4:2:0 转换**（三大硬件 AV1 均无 4:2:2/4:4:4 编码，色度降采样不可逆 + WARNING） |
-| 档位 JSON | `nvenc_av1.json`（CQP 路线）/ `qsv_av1.json`（ICQ 路线），四档 UHQ/HQ/SMALL/FAST，数值为标定起点 |
+| 档位 JSON | `nvenc_av1.json`（QVBR 路线，与 HEVC 同构）/ `qsv_av1.json`（ICQ 路线），四档 UHQ/HQ/SMALL/FAST，数值为标定起点 |
 | Sony 合规路由 | AV1 后端遇 Sony 源（rtmd）→ **自动路由经典路径**（元数据按策略丢弃）+ 显著 WARNING（XAVC 标准只定义 H.264/HEVC，保留 XAVC brand 的 AV1 文件是伪标准产物） |
 | DJI 路径 | AV1 后端照常走 DJI 保留管线（djmd/dbgi/tmcd 原生保留 + 载荷校验 + Gyroflow 逐帧四元数），视频轨断言泛化为 av01 |
 | 色彩/HDR | 复用 `core/color.py`（bt709 四件套 + mdcv/clli；`--atc-sei` 为 HEVC 专属，AV1 档自动不写） |
@@ -36,7 +36,7 @@
 - **关键坑（已按坑避让）**：`--profile main` = 8bit、`high` = 10bit
   （main+output-depth 10 会**静默产出 8bit**）→ 档位统一 `profile: high`；
   非层级 GOP 下 **B 帧 ≤7**（本机实测 16 报错）→ 档位用 7/4；
-  CQP 模式下 `--tune` 实测**降画质**（NVIDIA 论坛）→ CQP 档不写 tune。
+CQP 模式下 `--tune` 实测降画质（NVIDIA 论坛）——QVBR/VBR 路线按官方指南沿用 tune hq/uhq。
 - 质量基线：本机 4K60 实测 73fps（cqp 30 短样，前轮会话数据）；
   Tom's Hardware 实测 **Ada NVENC AV1 与 NVENC HEVC 同码率质量无大差异**
   （NVIDIA "40% 节省" 是 AV1 vs H.264 口径）。
