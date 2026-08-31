@@ -186,5 +186,9 @@ git checkout pre_S1S5              # S1-S5 前基线
 git tag -l                         # pre_S1S5 / post_S1S5 / pre_ui / post_1kt_ui
                                    # post_adaptive / post_hw_fulltest / post_color_meta
                                    # post_dji / post_dji_checklevels / post_quality_align
-                                   # post_autotest / v0.4.0
+                                   # post_autotest / post_x265 / v0.4.0 / v0.4.1
 ```
+
+> 分支约定: `main` 仅保留 HEVC/265 实现; **AV1 (svtav1/nvenc-av1/qsv-av1)
+> 实现在 `av1` 分支** (`git checkout av1`, 含 post_av1 / post_av1_calib /
+> v0.5.0 tag)。
