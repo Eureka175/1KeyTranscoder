@@ -18,7 +18,7 @@ x265 为手动高压缩选项。**主入口：`1kt.py`。**
 |---|---|---|---|
 | NVEncC（NVIDIA NVENC HEVC） | ✅ 生产默认 | `nvenc.json` | 主后端。本机 5070 Laptop：HQ 4K60 ≈ 23fps，4:2:2 直编 Rext 保真 |
 | QSVEncC（Intel QSV HEVC） | ✅ 生产 | `qsv.json` / **`qsv_aligned.json`** | 第二后端。`qsv_aligned.json` 为按 NVENC 同档质量标定的对齐版（见下） |
-| x265（软件 HEVC） | ⚠️ 手动高压缩档 | `x265.json` + `x265_scaling.json` | 质量优先冷归档（吞吐受限，缩放规则 PROVISIONAL） |
+| x265（软件 HEVC） | ✅ 手动高压缩档（P0 修复完成） | `x265.json` + `x265_scaling.json` | 质量优先冷归档 / 4:2:2 保真唯一软件路径（吞吐受限，缩放规则仍 PROVISIONAL，见 `work/x265_test/`） |
 | VCEEncC（AMD VCE HEVC） | 预留（JSON 已备未接） | `vce.json` | AMD 机器扩展 |
 | AV1（NVENC/QSV/SVT） | 📋 评估完成、待实施 | 草案见调参指南 | 仅限非 XAVC 经典路径（XAVC 合规决策） |
 
@@ -152,7 +152,11 @@ docs/
 3. **HEVC 生产就绪度**：硬件双后端"有条件生产就绪"（15/15 验收 +
    色彩元数据端到端 + 质量对齐）；4:2:2 输出为 Rext，硬解仅 Blackwell，
    归档定位为"压缩归档副本"（母版标准是 FFV1/ProRes）。
-4. **档位数值权威性**：JSON 数值为作者实测标定，调参须回归测试集。
+4. **x265 定位**：手动高压缩档。P0 修复已落地并回归（FAST rd 2→3 激活
+   psy-rd、info=false 可复现、删除 no-strong-intra-smoothing、level 6.2 +
+   CPB 钳位 240Mbit）；DJI 素材走同构保留管线（djmd 原生保留）；
+   缩放规则仍 PROVISIONAL。详见 `work/x265_test/x265_test_report.md`。
+5. **档位数值权威性**：JSON 数值为作者实测标定，调参须回归测试集。
 
 ## 已知限制与说明
 

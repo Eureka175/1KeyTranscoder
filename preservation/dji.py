@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .gpac import GpacContainerBackend
+from . import isobmf
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -229,6 +230,95 @@ def gyroflow_dji_check(
         "original": {"parsed": sf, "camera": ss},
         "final": {"parsed": of_, "camera": os_},
     }
+
+
+def dji_rebuild(
+    *,
+    original: Path,
+    encoded_mov: Path,
+    work_dir: Path,
+    gpac: GpacContainerBackend,
+    ffprobe: Path,
+    gyroflow: Path | None,
+    vfr: bool,
+    level: str,
+    fix_hw_timing: bool,
+    log: Callable[[str], None] = print,
+) -> dict[str, Any]:
+    """Shared DJI rebuild tail (encoder-agnostic).
+
+    Track manifest -> GPAC -new (encoded video + per-track audio +
+    djmd/dbgi/tmcd native copies) -> optional stts duration repair
+    (hardware rigaya intermediates only; ffmpeg/x265 intermediates
+    pass fix_hw_timing=False) -> run_dji_check -> report.json.
+
+    Used by the hardware DJI path (core/batch_hw) and the x265 DJI
+    path (1kt.py) so both keep identical container fidelity.
+    """
+    final = work_dir / "final" / "output.mov"
+    report_path = work_dir / "report.json"
+
+    movie_ts, src_tracks = track_manifest(gpac, original)
+    specs = dji_track_specs(src_tracks)
+    if not specs["data_ids"]:
+        raise RuntimeError("no DJI data track found (djmd/dbgi/tmcd)")
+    if specs["video_id"] is None:
+        raise RuntimeError("no video track found")
+    log(
+        f"dji manifest: movie ts={movie_ts}, "
+        f"audio={len(specs['audio_ids'])}, "
+        f"data={[e for _, e in specs['data_ids']]}"
+    )
+
+    gpac.movie_timescale = movie_ts
+    adds = [f"{encoded_mov}#video"]
+    for aid in specs["audio_ids"]:
+        adds.append(f"{original}#{aid}")
+    for did, _ in specs["data_ids"]:
+        adds.append(f"{original}#{did}")
+    final.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if final.exists():
+            final.unlink()
+    except OSError:
+        pass
+    log("muxing video+audio+data tracks with MP4Box...")
+    gpac.mux_new(final, adds)
+
+    if fix_hw_timing:
+        out_ts, _ = track_manifest(gpac, final)
+        for desc in isobmf.patch_track_durations(
+            final, out_ts, from_stts=True
+        ):
+            log(desc)
+        mv_desc = isobmf.patch_movie_duration(final)
+        if mv_desc:
+            log(mv_desc)
+
+    log(f"validating original vs final (dji check={level})...")
+    report = run_dji_check(
+        original=original,
+        final=final,
+        gpac=gpac,
+        ffprobe=ffprobe,
+        gyroflow=gyroflow,
+        scratch=work_dir / "validate",
+        vfr=vfr,
+        level=level,
+        log=log,
+    )
+    report["job_dir"] = str(work_dir)
+    report_path.write_text(
+        json.dumps(report, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    s = report["summary"]
+    log(
+        f"done: PRESERVED={s['PRESERVED']} MODIFIED={s['MODIFIED']} "
+        f"MISSING={s['MISSING']} UNKNOWN={s['UNKNOWN']} "
+        f"structural_success={report['structural_success']}"
+    )
+    return report
 
 
 def run_dji_check(

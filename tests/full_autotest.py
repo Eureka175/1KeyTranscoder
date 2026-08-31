@@ -431,6 +431,46 @@ Media Type: tmcd:tmcd
            and not _quat_close([0.1], [0.2]))
 
 
+def l1_x265() -> None:
+    section("L1 x265 P0 修复断言")
+    import json
+    cfg = json.loads((ROOT / "x265.json").read_text(encoding="utf-8"))
+    for tier, p in cfg["profile"].items():
+        record(f"x265.{tier}.rd>=3 (psy-rd 激活)", int(p["rd"]) >= 3)
+        record(f"x265.{tier}.info=false (可复现)", p["info"] is False)
+        record(f"x265.{tier}.无 no-strong-intra-smoothing",
+               "no_strong_intra_smoothing" not in p)
+        record(f"x265.{tier}.level 6.2", p["level_idc"] == 6.2)
+    # CPB 钳位: 高码率源动态 VBV 产出超限 bufsize -> 应钳到 240000
+    from core.models import SourceInfo
+    from core.scaling import ScalingEngine
+    from core.source_classifier import SourceClassifier
+    from encoders.x265 import X265Backend
+    from core.config import load_scaling_config
+    scfg = load_scaling_config(ROOT / "x265_scaling.json")
+    eng = ScalingEngine(scfg)
+    clf = SourceClassifier(scfg)
+    src = SourceInfo(
+        path=Path("x.mp4"), size_bytes=1, duration_sec=1.0,
+        width=3840, height=2160, fps=59.94,
+        r_frame_rate="60000/1001", avg_frame_rate="60000/1001",
+        codec="hevc", profile="Main 10", pix_fmt="yuv420p10le",
+        bit_depth=10, chroma="4:2:0", ob_kbps=150000.0,
+        video_bitrate_kbps=150000.0, video_stream_count=1,
+        stream_info=(),
+    )
+    eff = eng.build(
+        cfg["profile"]["UHQ"], "UHQ", src,
+        clf.classify(src), X265Backend.param_order,
+        X265Backend.format_fixed,
+    )
+    buf = int(eff.values.get("vbv-bufsize", "0"))
+    record("x265.CPB 钳位 ≤240000", buf <= 240000, f"bufsize={buf}")
+    record("x265.CPB 审计链",
+           eff.audit.get("vbv-bufsize", {}).get("mode") == "cpb_clamp",
+           f"audit={eff.audit.get('vbv-bufsize', {}).get('mode')}")
+
+
 # ===========================================================================
 # L2 — 工具链
 # ===========================================================================
@@ -706,6 +746,33 @@ def l3_pipeline() -> None:
            and (out / "DJI_20260830095031_0009_D.MP4").is_file(),
            f"rc={rc}")
 
+    # C10 x265 Sony FAST basic (4:2:2 保真是 x265 的独有价值)
+    out = OUT_DIR / "c10_x265_sony"
+    rc, _ = _run_1kt(cases["sony"], out,
+                     "--encoder", "x265", "--preset", "fast",
+                     "--check", "basic", timeout=3600)
+    final = out / "C9037.MP4"
+    v = ffprobe_json(final) if final.is_file() else {}
+    vs = next((s for s in v.get("streams", [])
+               if s.get("codec_type") == "video"), {})
+    expect("C10_x265_sony_422保真", rc == 0 and final.is_file()
+           and vs.get("pix_fmt") == "yuv422p10le"
+           and vs.get("color_primaries") == "bt709",
+           f"rc={rc} pix_fmt={vs.get('pix_fmt')} "
+           f"primaries={vs.get('color_primaries')}")
+
+    # C11 x265 经典路径 DJI (全流复制, 数据轨存活)
+    out = OUT_DIR / "c11_x265_classic_dji"
+    rc, _ = _run_1kt(cases["dji"], out,
+                     "--encoder", "x265", "--preset", "fast",
+                     "--check", "basic", timeout=3600)
+    final = out / "DJI_20260830095031_0009_D.MP4"
+    v = ffprobe_json(final) if final.is_file() else {}
+    tags = {s.get("codec_tag_string") for s in v.get("streams", [])}
+    expect("C11_x265_classic_dji_数据轨存活", rc == 0 and final.is_file()
+           and {"djmd", "dbgi", "tmcd"} <= tags,
+           f"rc={rc} tags={sorted(tags - {None})}")
+
 
 # ===========================================================================
 # runner
@@ -719,6 +786,7 @@ SUITES: dict[str, list[tuple[str, Callable[[], None]]]] = {
         ("probe/paths", l1_probe_paths),
         ("classifier/scaling", l1_classifier_scaling),
         ("gpac/dji", l1_gpac_dji),
+        ("x265 P0", l1_x265),
     ],
     "toolchain": [("toolchain", l2_toolchain)],
     "full": [("pipeline", l3_pipeline)],

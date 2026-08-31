@@ -1,63 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-x265 recursive archive encoder for Windows (orchestration layer).
+[DEPRECATED 2026-08] x265 recursive archive encoder for Windows.
 
-Architecture
-------------
-    x265_archive.py          CLI, discovery, batch loop, resume, process
-                             execution, postprobe, CSV/log orchestration
-    core/models.py           SourceInfo / SourceClassification /
-                             ScalingContext / EffectiveParams
-    core/probe.py            probe_source() (metadata-only, behavior
-                             unchanged) + SourceInfo adapter
-    core/source_classifier.py
-                             metadata-only source-efficiency classes
-    core/scaling.py          ScalingEngine (generic modes; every number
-                             lives in x265_scaling.json)
-    core/config.py           explicit loading of x265.json and
-                             x265_scaling.json, executable discovery
-    core/logging_utils.py    loggers + CSV field lists / row builders
-    encoders/base.py         minimal backend protocol (future
-                             NVENC/QSV/VCE plug in here)
-    encoders/x265.py         PARAM_MAP, x265 serialization, FFmpeg
-                             command construction
-
-Behavior
---------
-- Base profiles are read from x265.json beside this script (or --config).
-- Source-dependent scaling rules are read from x265_scaling.json
-  (or --scaling-config). NVENC/QSV/VCE JSON files beside the script are
-  ignored by this tool.
-- Recursively scans the input directory for video files.
-- Supports UHQ / HQ / SMALL / FAST / all.
-- Video stream #0 is encoded with libx265.
-- All additional video streams (e.g. DJI attached pictures) are copied.
-- Audio / subtitle / data / attachment streams are copied.
-- Output container is MOV and filename is <stem>_comp.mov.
-- Original directory hierarchy is preserved.
-- Logs are created beside the input directory:
-      <input_parent>\\logs\\
-          total.log
-          preprobe.csv
-          preprobe_streams.csv
-          postprobe.csv
-          postprobe_streams.csv
-          scaling.csv
-          files\\<relative path>\\<filename>_<preset>.log
-- Resumable: an existing non-empty final output is skipped.
-- A .part.mov file is used until encoding succeeds.
-- Failed files are logged and the queue continues.
-- Live progress is printed:
-      current frames / total frames | elapsed sec | bitrate kbps
-- FR* expressions are rounded upward.
-- Lookahead values are FPS-scaled and then capped. The cap is configured
-  in x265_scaling.json (param_rules.*.cap, default 200 frames) so that
-  high-FPS material cannot create excessive lookahead / memory usage.
-- Resolution / FPS scaling, metadata-only source classification and
-  dynamic (source-relative) VBV are computed by the scaling engine
-  BEFORE command construction; command construction never rescales.
+本文件为 x265 单体旧入口, 已被 `1kt.py --encoder x265` 取代
+(同一代码路径 + 失败记录/看板/Sony-DJI-经典三路分发)。请勿再以本文件
+作为入口使用; 保留仅作历史参考, 后续版本将移除。原架构说明见 git 历史。
 """
+
 
 from __future__ import annotations
 

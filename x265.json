@@ -76,15 +76,14 @@
       "deblock": [-1, -1],
       "sao": false,
       "limit_sao": false,
-      "no_strong_intra_smoothing": true,
       "threaded_me": false,
 
       "high_tier": true,
-      "level_idc": 6.1,
+      "level_idc": 6.2,
       "aud": true,
       "repeat_headers": true,
       "hrd": true,
-      "info": true,
+      "info": false,
       "weightp": true
     },
 
@@ -161,15 +160,14 @@
       "deblock": [-1, -1],
       "sao": true,
       "limit_sao": true,
-      "no_strong_intra_smoothing": true,
       "threaded_me": false,
 
       "high_tier": true,
-      "level_idc": 6.1,
+      "level_idc": 6.2,
       "aud": true,
       "repeat_headers": true,
       "hrd": true,
-      "info": true
+      "info": false
     },
 
     "SMALL": {
@@ -245,22 +243,21 @@
       "deblock": [0, -1],
       "sao": true,
       "limit_sao": false,
-      "no_strong_intra_smoothing": true,
       "threaded_me": false,
 
       "high_tier": true,
-      "level_idc": 6.1,
+      "level_idc": 6.2,
       "aud": true,
       "repeat_headers": true,
       "hrd": true,
-      "info": true
+      "info": false
     },
 
     "FAST": {
       "description": "Fast - Production Ready 285H@10fps",
       "preset": "fast",
       "crf": 22,
-      "rd": 2,
+      "rd": 3,
       "rdoq_level": 0,
       "ref": 2,
       "bframes": 4,
@@ -329,15 +326,14 @@
       "deblock": [0, 0],
       "sao": false,
       "limit_sao": false,
-      "no_strong_intra_smoothing": true,
       "threaded_me": false,
 
       "high_tier": true,
-      "level_idc": 6.1,
+      "level_idc": 6.2,
       "aud": true,
       "repeat_headers": true,
       "hrd": true,
-      "info": true
+      "info": false
     }
   }
 }

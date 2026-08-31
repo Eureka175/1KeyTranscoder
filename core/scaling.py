@@ -321,6 +321,25 @@ class ScalingEngine:
                 ),
             }
 
+        # HEVC level compliance: Level 6.x High tier MaxCPB is
+        # 240000 kbit/s. Clamp the FINAL resolved vbv-bufsize (static
+        # or dynamic) so the declared level/high-tier combination is
+        # always truthful; the clamp is recorded in the audit trail.
+        CPB_CAP_KBPS = 240000
+        if "vbv-bufsize" in values:
+            raw_buf = int(values["vbv-bufsize"])
+            if raw_buf > CPB_CAP_KBPS:
+                values["vbv-bufsize"] = str(CPB_CAP_KBPS)
+                audit["vbv-bufsize"] = {
+                    "mode": "cpb_clamp",
+                    "raw_kbps": raw_buf,
+                    "cap_kbps": CPB_CAP_KBPS,
+                    "final_kbps": CPB_CAP_KBPS,
+                    "note": (
+                        "HEVC Level 6.x High tier MaxCPB = 240000 kbit/s"
+                    ),
+                }
+
         return EffectiveParams(
             values=values,
             audit=audit,

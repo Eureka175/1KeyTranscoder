@@ -70,7 +70,7 @@ from .probe import build_source_info, count_frames, probe_source
 
 from preservation.gpac import GpacContainerBackend
 from preservation.pipeline import run_sony_pipeline
-from preservation import dji, isobmf
+from preservation import dji
 
 StatusCb = Callable[[str, str], None]
 
@@ -1027,22 +1027,7 @@ def encode_one_dji_hw(
                 safe_unlink(final)
 
         if report is None:
-            # 1. track manifest (MP4Box -info; diso XML fails on DJI)
-            movie_ts, src_tracks = dji.track_manifest(gpac, src)
-            specs = dji.dji_track_specs(src_tracks)
-            if not specs["data_ids"]:
-                raise RuntimeError(
-                    "no DJI data track found (djmd/dbgi/tmcd)"
-                )
-            if specs["video_id"] is None:
-                raise RuntimeError("no video track found")
-            pipe_log(
-                f"dji manifest: movie ts={movie_ts}, "
-                f"audio={len(specs['audio_ids'])}, "
-                f"data={[e for _, e in specs['data_ids']]}"
-            )
-
-            # 2. video-only encode (reuse validated intermediate)
+            # 1. video-only encode (reuse validated intermediate)
             if not _encoded_ok(ffprobe, encoded_mov):
                 try:
                     encoded_mov.unlink()
@@ -1054,55 +1039,19 @@ def encode_one_dji_hw(
                     f"video intermediate unreadable: {encoded_mov}"
                 )
 
-            # 3. GPAC mux: encoded video + source audio + data tracks
-            gpac.movie_timescale = movie_ts
-            adds = [f"{encoded_mov}#video"]
-            for aid in specs["audio_ids"]:
-                adds.append(f"{src}#{aid}")
-            for did, _ in specs["data_ids"]:
-                adds.append(f"{src}#{did}")
-            final.parent.mkdir(parents=True, exist_ok=True)
-            safe_unlink(final)
-            pipe_log("muxing video+audio+data tracks with MP4Box...")
-            gpac.mux_new(final, adds)
-
-            # 4. duration repair at the final's OWN mvhd timescale
-            # (GPAC -new sets it to the first track's media timescale;
-            # DJI quaternions align by frame index, so the timescale
-            # itself is cosmetic — but track durations must be exact).
-            out_ts, _ = dji.track_manifest(gpac, final)
-            for desc in isobmf.patch_track_durations(
-                final, out_ts, from_stts=True
-            ):
-                pipe_log(desc)
-            mv_desc = isobmf.patch_movie_duration(final)
-            if mv_desc:
-                pipe_log(mv_desc)
-
-            # 5. checks (payload sha256 + inventory + Gyroflow, level-gated)
-            pipe_log(f"validating original vs final (dji check={check_level})...")
-            report = dji.run_dji_check(
+            # 2-4. shared DJI rebuild: manifest -> GPAC mux ->
+            # stts duration repair (hardware intermediate) -> dji check
+            report = dji.dji_rebuild(
                 original=src,
-                final=final,
+                encoded_mov=encoded_mov,
+                work_dir=work_dir,
                 gpac=gpac,
                 ffprobe=ffprobe,
                 gyroflow=gyroflow,
-                scratch=work_dir / "validate",
                 vfr=vfr,
                 level=check_level,
+                fix_hw_timing=True,
                 log=pipe_log,
-            )
-            report["job_dir"] = str(work_dir)
-            report_path.write_text(
-                json.dumps(report, indent=2, ensure_ascii=False) + "\n",
-                encoding="utf-8",
-            )
-            s = report["summary"]
-            pipe_log(
-                f"done: PRESERVED={s['PRESERVED']} "
-                f"MODIFIED={s['MODIFIED']} MISSING={s['MISSING']} "
-                f"UNKNOWN={s['UNKNOWN']} "
-                f"structural_success={report['structural_success']}"
             )
     except Exception as exc:
         logger.error("[FAIL] dji pipeline | %s | %s", src, exc)

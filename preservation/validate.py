@@ -244,7 +244,7 @@ def compare(
         ))
         items.append(_item(
             "video.encode", PRESERVED,
-            "libx265 intermediate, temporally 1:1",
+            "video re-encoded, temporally 1:1",
         ))
     else:
         items.append(_item("video.track", MISSING, "no vide track in final"))

@@ -27,10 +27,13 @@ from typing import Any
 
 from core.batch_hw import (
     BatchCtx,
+    detect_vfr,
     hw_backend_for,
+    is_dji_source,
     run_hw_pool,
     run_multihw_pool,
     load_retry_list,
+    record_failure,
 )
 from core.config import (
     find_executable,
@@ -559,6 +562,164 @@ def encode_one_sony(
     return "done"
 
 
+def encode_one_dji_x265(
+    *,
+    src: Path,
+    dst: Path,
+    prepared: Prepared,
+    profile: dict[str, Any],
+    preset: str,
+    backend,
+    engine,
+    ffmpeg: Path,
+    ffprobe: Path,
+    postprobe_csv: Path,
+    postprobe_stream_csv: Path,
+    gpac: GpacContainerBackend,
+    gyroflow: Path | None,
+    work_root: Path,
+    check_level: str = "basic",
+    logger: logging.Logger,
+    file_logger: logging.Logger,
+    dry_run: bool,
+) -> str:
+    """DJI preservation path for the x265 backend.
+
+    Video-only libx265 encode (video intermediate is an FFmpeg MOV —
+    no rigaya millisecond quantization, so fix_hw_timing=False) +
+    shared GPAC rebuild (djmd/dbgi/tmcd native copies) + dji check.
+    """
+    import time
+
+    from core.paths import job_id_for, safe_unlink
+    from preservation import dji
+
+    source_summary = prepared.summary
+    work_dir = work_root / job_id_for(src)
+    encoded_mov = work_dir / "video" / "encoded.mov"
+
+    cmd, effective_params = backend.build_video_command(
+        ffmpeg, src, encoded_mov, profile,
+        prepared.effective, prepared.src_info,
+    )
+    log_encode_header(
+        logger=logger, file_logger=file_logger, src=src, preset=preset,
+        prepared=prepared, engine=engine,
+        effective_params=effective_params, cmd=cmd,
+    )
+    file_logger.info(
+        "POLICY | DJI source (djmd): x265 保留管线 "
+        "(视频重编码 + djmd/dbgi/tmcd 原生保留)"
+    )
+    logger.info(
+        "[POLICY] %s | DJI: x265 保留管线, djmd/dbgi/tmcd 原生保留",
+        src.name,
+    )
+
+    if dry_run:
+        file_logger.info("DRY-RUN | no encode performed.")
+        return "dry-run"
+
+    started = time.monotonic()
+
+    def pipe_log(msg: str) -> None:
+        logger.info("[DJI] %s", msg)
+        file_logger.info("DJI_PIPELINE | %s", msg)
+
+    try:
+        encoded_mov.parent.mkdir(parents=True, exist_ok=True)
+        raw_log = encoded_mov.with_name(encoded_mov.name + ".ffmpeg.log")
+        rc, _ = run_ffmpeg(
+            cmd, raw_log, source_summary["total_frames"], file_logger
+        )
+        if rc is None or rc != 0:
+            raise RuntimeError(f"video encode failed (rc={rc})")
+        if not encoded_mov.is_file() or encoded_mov.stat().st_size <= 0:
+            raise RuntimeError("video encode produced no output")
+        out_frames, out_fps = count_frames(ffprobe, encoded_mov)
+        src_frames = source_summary["total_frames"]
+        if src_frames and out_frames != src_frames:
+            raise RuntimeError(
+                f"frame count mismatch: source {src_frames} vs "
+                f"encoded {out_frames}"
+            )
+        pipe_log(f"video ready: {encoded_mov}")
+
+        report = dji.dji_rebuild(
+            original=src,
+            encoded_mov=encoded_mov,
+            work_dir=work_dir,
+            gpac=gpac,
+            ffprobe=ffprobe,
+            gyroflow=gyroflow,
+            vfr=detect_vfr(prepared.src_info),
+            level=check_level,
+            fix_hw_timing=False,
+            log=pipe_log,
+        )
+    except Exception as exc:
+        logger.error("[FAIL] dji x265 pipeline | %s | %s", src, exc)
+        file_logger.exception("DJI X265 PIPELINE FAILED")
+        return "failed"
+
+    if not report.get("structural_success"):
+        logger.error(
+            "[FAIL] dji structural preservation failed | %s | "
+            "missing=%s modified=%s",
+            src, report.get("critical_missing"),
+            report.get("critical_modified"),
+        )
+        file_logger.error(
+            "DJI STRUCTURAL VALIDATION FAILED | missing=%s | modified=%s",
+            report.get("critical_missing"), report.get("critical_modified"),
+        )
+        return "failed"
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    final = work_dir / "final" / "output.mov"
+    try:
+        safe_unlink(dst)
+        os.replace(final, dst)
+    except OSError as exc:
+        logger.error("[RENAME-FAIL] %s -> %s | %s", final, dst, exc)
+        file_logger.exception(
+            "RENAME FAILED | elapsed=%.3f sec",
+            time.monotonic() - started,
+        )
+        return "failed"
+
+    elapsed = time.monotonic() - started
+    s = report["summary"]
+    gyro = report.get("gyroflow")
+    logger.info(
+        "[PRESERVE-OK] %s | PRESERVED=%d MODIFIED=%d MISSING=%d | "
+        "gyroflow=%s | check=%s",
+        src.name, s["PRESERVED"], s["MODIFIED"], s["MISSING"],
+        gyro.get("status") if gyro else "not-run",
+        check_level,
+    )
+    file_logger.info(
+        "DJI_PRESERVATION_REPORT | %s",
+        json.dumps(
+            {
+                "summary": s,
+                "structural_success": report["structural_success"],
+                "gyroflow": gyro,
+                "report": str(work_dir / "report.json"),
+            },
+            ensure_ascii=False,
+        ),
+    )
+    postprobe_and_log(
+        src=src, dst=dst, preset=preset, elapsed=elapsed,
+        source_summary=source_summary, ffprobe=ffprobe,
+        postprobe_csv=postprobe_csv,
+        postprobe_stream_csv=postprobe_stream_csv,
+        logger=logger, file_logger=file_logger,
+    )
+    return "done"
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -871,7 +1032,8 @@ def main() -> int:
         logger.info("---------- PRESET %s ----------", preset)
 
         if not is_hardware:
-            # x265 legacy path (sequential, unchanged behavior)
+            # x265 path (sequential; failure records + dashboard status
+            # mirror the hardware path)
             for src in sources:
                 dst = output_path_for(
                     src, input_root, output_root, preset, multiple_presets
@@ -881,12 +1043,16 @@ def main() -> int:
                     src, input_root, logs_root, preset
                 )
                 file_logger = build_file_logger(file_log)
+                if status is not None:
+                    status.start(src, preset, "x265")
                 if dst.is_file() and dst.stat().st_size > 0:
                     logger.info("[SKIP] %s | %s", src, dst)
                     file_logger.info(
                         "SKIP | output already exists | output=%s", dst
                     )
                     counters["skipped"] += 1
+                    if status is not None:
+                        status.finish(src, "skipped")
                     continue
                 try:
                     prepared = prepare_source(
@@ -900,7 +1066,15 @@ def main() -> int:
                 except Exception as exc:
                     logger.error("[PROBE-FAIL] %s | %s", src, exc)
                     file_logger.error("PREPROBE FAILED | %s", exc)
+                    record_failure(
+                        failed_path,
+                        source=src, preset=preset, backend_name="x265",
+                        stage="probe", error=str(exc),
+                        log_path=str(file_log),
+                    )
                     counters["failed"] += 1
+                    if status is not None:
+                        status.finish(src, "failed")
                     continue
                 if any(
                     st.get("codec_type") == "data"
@@ -908,6 +1082,18 @@ def main() -> int:
                     for st in prepared.streams
                 ):
                     result = encode_one_sony(
+                        src=src, dst=dst, prepared=prepared, profile=profile,
+                        preset=preset, backend=backend, engine=engine,
+                        ffmpeg=ffmpeg, ffprobe=ffprobe,
+                        postprobe_csv=postprobe_csv,
+                        postprobe_stream_csv=postprobe_stream_csv,
+                        gpac=gpac, gyroflow=gyroflow, work_root=work_root,
+                        check_level=args.check,
+                        logger=logger, file_logger=file_logger,
+                        dry_run=args.dry_run,
+                    )
+                elif is_dji_source(prepared.streams):
+                    result = encode_one_dji_x265(
                         src=src, dst=dst, prepared=prepared, profile=profile,
                         preset=preset, backend=backend, engine=engine,
                         ffmpeg=ffmpeg, ffprobe=ffprobe,
@@ -928,7 +1114,16 @@ def main() -> int:
                         engine=engine, logger=logger,
                         file_logger=file_logger, dry_run=args.dry_run,
                     )
+                if result == "failed":
+                    record_failure(
+                        failed_path,
+                        source=src, preset=preset, backend_name="x265",
+                        stage="encode", error="see per-file log",
+                        log_path=str(file_log),
+                    )
                 counters[result] += 1
+                if status is not None:
+                    status.finish(src, result)
             continue
 
         # hardware backend(s)
