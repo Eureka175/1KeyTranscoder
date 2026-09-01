@@ -55,6 +55,7 @@ from core.models import PRESETS, EffectiveParams
 from core.paths import (
     discover_sources,
     format_path_relation,
+    job_id_for,
     output_path_for,
     per_file_log_path,
 )
@@ -343,10 +344,16 @@ def encode_one(
     preset: str,
     backend,
     engine,
+    check_level: str = "basic",
+    quality_opts: dict[str, Any] | None = None,
+    quality_csv: Path | None = None,
+    work_dir: Path | None = None,
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
 ) -> str:
+    """Classic single-pass (x265 software backend). At check_level=
+    'full' the PSNR/SSIM sample gates delivery."""
     from core.paths import safe_unlink
 
     safe_unlink(part_dst)
@@ -388,6 +395,27 @@ def encode_one(
         file_logger.error("FAILED | ffmpeg returned 0 but output missing/empty")
         safe_unlink(part_dst)
         return "failed"
+
+    # PSNR/SSIM quality sample (check=full) gates delivery
+    if check_level == "full":
+        from preservation.quality import run_quality_sample
+
+        q = run_quality_sample(
+            original=src,
+            final=part_dst,
+            ffmpeg=ffmpeg,
+            ffprobe=ffprobe,
+            scratch=(work_dir or part_dst.parent) / "quality",
+            opts=quality_opts,
+            csv_path=quality_csv,
+            log=lambda msg: logger.info("[QUALITY] %s | %s", src.name, msg),
+        )
+        if q["status"] == "FAIL":
+            logger.error("[FAIL] quality sample | %s | %s", src, q["detail"])
+            file_logger.error("QUALITY SAMPLE FAILED | %s", q["detail"])
+            safe_unlink(part_dst)
+            return "failed"
+
     try:
         os.replace(part_dst, dst)
     except OSError as exc:
@@ -423,6 +451,8 @@ def encode_one_sony(
     gyroflow: Path | None,
     work_root: Path,
     check_level: str = "basic",
+    quality_opts: dict[str, Any] | None = None,
+    quality_csv: Path | None = None,
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
@@ -495,6 +525,9 @@ def encode_one_sony(
             gyroflow=gyroflow,
             fix_hw_timing=False,
             check_level=check_level,
+            ffmpeg=ffmpeg,
+            quality_opts=quality_opts,
+            quality_csv=quality_csv,
             log=pipe_log,
         )
     except Exception as exc:
@@ -579,6 +612,8 @@ def encode_one_dji_x265(
     gyroflow: Path | None,
     work_root: Path,
     check_level: str = "basic",
+    quality_opts: dict[str, Any] | None = None,
+    quality_csv: Path | None = None,
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
@@ -655,6 +690,9 @@ def encode_one_dji_x265(
             vfr=detect_vfr(prepared.src_info),
             level=check_level,
             fix_hw_timing=False,
+            ffmpeg=ffmpeg,
+            quality_opts=quality_opts,
+            quality_csv=quality_csv,
             log=pipe_log,
         )
     except Exception as exc:
@@ -943,6 +981,10 @@ def main() -> int:
     preserve_reports = logs_root / "preserve_reports"
     failed_path = logs_root / "failed_files.json"
 
+    quality_opts = (
+        config.get("quality_check") if isinstance(config, dict) else None
+    )
+
     work_root = output_root / ".1ktwork"
     logger = setup_logger(total_log)
 
@@ -957,6 +999,43 @@ def main() -> int:
             backend_qsv = hw_backend_for("qsv", script_dir, args, work_root, logger)
         else:
             backend = hw_backend_for(encoder_name, script_dir, args, work_root, logger)
+
+    # 环境版本记录 (软件 + 驱动) -> 结构化 JSON/CSV, 供行为复现
+    try:
+        from core.versions import collect_versions, write_version_report
+
+        nvencc_path = None
+        qsvencc_path = None
+        if is_hardware:
+            from core.config import find_hw_tool
+
+            if encoder_name == "nvenc" or args.experimental_multihw:
+                nvencc_path = find_hw_tool(script_dir, "NVEncC64.exe")
+            if encoder_name == "qsv" or args.experimental_multihw:
+                qsvencc_path = find_hw_tool(script_dir, "QSVEncC64.exe")
+        versions = collect_versions(
+            ffmpeg=ffmpeg,
+            ffprobe=ffprobe,
+            gpac_version=gpac.version(),
+            nvencc=nvencc_path,
+            qsvencc=qsvencc_path,
+            gyroflow=gyroflow,
+            probe_svt=False,
+            encoder=backend.name,
+        )
+        vj, vc = write_version_report(versions, logs_root)
+        logger.info(
+            "ENV VERSIONS | ffmpeg=%s | encoder=%s | %s",
+            versions["tools"].get("ffmpeg", "?"),
+            backend.name,
+            "; ".join(
+                f"{d['gpu']}={d['driver_version']}"
+                for d in versions.get("gpu_drivers", [])
+            )[:160],
+        )
+        logger.info("ENV REPORT | %s | %s", vj, vc)
+    except Exception as exc:
+        logger.warning("ENV VERSIONS FAILED | %s", exc)
 
     requested = (
         list(PRESETS)
@@ -1076,6 +1155,10 @@ def main() -> int:
                     if status is not None:
                         status.finish(src, "failed")
                     continue
+                quality_csv = (
+                    logs_root / "quality_samples.csv"
+                    if args.check == "full" else None
+                )
                 if any(
                     st.get("codec_type") == "data"
                     and st.get("codec_tag_string") == "rtmd"
@@ -1089,6 +1172,8 @@ def main() -> int:
                         postprobe_stream_csv=postprobe_stream_csv,
                         gpac=gpac, gyroflow=gyroflow, work_root=work_root,
                         check_level=args.check,
+                        quality_opts=quality_opts,
+                        quality_csv=quality_csv,
                         logger=logger, file_logger=file_logger,
                         dry_run=args.dry_run,
                     )
@@ -1101,6 +1186,8 @@ def main() -> int:
                         postprobe_stream_csv=postprobe_stream_csv,
                         gpac=gpac, gyroflow=gyroflow, work_root=work_root,
                         check_level=args.check,
+                        quality_opts=quality_opts,
+                        quality_csv=quality_csv,
                         logger=logger, file_logger=file_logger,
                         dry_run=args.dry_run,
                     )
@@ -1111,7 +1198,11 @@ def main() -> int:
                         postprobe_csv=postprobe_csv,
                         postprobe_stream_csv=postprobe_stream_csv,
                         profile=profile, preset=preset, backend=backend,
-                        engine=engine, logger=logger,
+                        engine=engine, check_level=args.check,
+                        quality_opts=quality_opts,
+                        quality_csv=quality_csv,
+                        work_dir=work_root / job_id_for(src),
+                        logger=logger,
                         file_logger=file_logger, dry_run=args.dry_run,
                     )
                 if result == "failed":
@@ -1146,6 +1237,8 @@ def main() -> int:
             keep_work=args.keep_work,
             no_downgrade=args.no_downgrade,
             check_level=args.check,
+            ffmpeg=ffmpeg,
+            quality_opts=quality_opts,
             dry_run=args.dry_run,
             failed_path=failed_path,
             status=status,

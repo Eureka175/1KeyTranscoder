@@ -2,6 +2,16 @@
   "encoder": "x265",
   "codec": "hevc",
   "baseline_version": "1.0",
+  "quality_check": {
+    "_comment": "full 检查附加的 PSNR/SSIM 抽样: 源文件名 sha256 确定性 10 取 1, 仅 <=60s 短视频; setpts=N 帧索引对齐; 阈值防花屏/出错 (非质量门槛); 结果输出 quality_<stem>.json + logs/quality_samples.csv",
+    "enabled": true,
+    "sample_rate": 10,
+    "max_duration_sec": 60,
+    "psnr_min_db": 25.0,
+    "ssim_min": 0.80,
+    "garbage_psnr_db": 12.0,
+    "max_garbage_frac": 0.02
+  },
   "profile": {
     "UHQ": {
       "description": "UHQ Slowest - Not Practical 285H@0.8fps",

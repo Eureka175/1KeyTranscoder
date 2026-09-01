@@ -243,6 +243,9 @@ def dji_rebuild(
     vfr: bool,
     level: str,
     fix_hw_timing: bool,
+    ffmpeg: Path | None = None,
+    quality_opts: dict[str, Any] | None = None,
+    quality_csv: Path | None = None,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """Shared DJI rebuild tail (encoder-agnostic).
@@ -305,6 +308,9 @@ def dji_rebuild(
         scratch=work_dir / "validate",
         vfr=vfr,
         level=level,
+        ffmpeg=ffmpeg,
+        quality_opts=quality_opts,
+        quality_csv=quality_csv,
         log=log,
     )
     report["job_dir"] = str(work_dir)
@@ -331,6 +337,9 @@ def run_dji_check(
     scratch: Path,
     vfr: bool = False,
     level: str = "basic",
+    ffmpeg: Path | None = None,
+    quality_opts: dict[str, Any] | None = None,
+    quality_csv: Path | None = None,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """ORIGINAL vs FINAL structural + payload + consumer check for DJI.
@@ -342,7 +351,7 @@ def run_dji_check(
                  type-3 per-frame quaternions)
       full     : advanced + deep items (per-track timescale/media
                  duration, payload head/tail bytes, ffprobe stream
-                 facts incl. data-track tags)
+                 facts incl. data-track tags) + PSNR/SSIM quality sample
 
     Critical items: data-track payloads (djmd/dbgi/tmcd) byte-identical,
     track inventory, audio streams, video frame count/fps (CFR only),
@@ -580,6 +589,34 @@ def run_dji_check(
     else:
         gyro = {"status": SKIP, "detail": "Gyroflow not installed"}
 
+    # --- PSNR/SSIM quality sample (full only) ---
+    quality: dict[str, Any] | None = None
+    if level == "full" and ffmpeg is not None:
+        from .quality import run_quality_sample
+
+        log("PSNR/SSIM quality sample (full)...")
+        try:
+            quality = run_quality_sample(
+                original=original,
+                final=final,
+                ffmpeg=ffmpeg,
+                ffprobe=ffprobe,
+                scratch=scratch / "quality",
+                opts=quality_opts,
+                csv_path=quality_csv,
+                log=log,
+            )
+        except Exception as exc:
+            quality = {
+                "status": FAIL,
+                "detail": f"quality sample error: {exc}",
+            }
+            log(f"quality sample: FAIL ({exc})")
+        if quality["status"] == FAIL:
+            log(f"quality sample: FAIL ({quality['detail']})")
+    elif level == "full":
+        log("WARNING: ffmpeg 路径缺失 — full 检查的 PSNR/SSIM 抽样跳过")
+
     summary = {
         PRESERVED: sum(1 for i in items if i["status"] == PRESERVED),
         MODIFIED: sum(1 for i in items if i["status"] == MODIFIED),
@@ -598,10 +635,12 @@ def run_dji_check(
         if i["status"] == MODIFIED
         and i["item"].startswith(critical_prefixes)
     ]
+    quality_failed = quality is not None and quality["status"] == FAIL
     structural_success = (
         not critical_missing
         and not critical_modified
         and (gyro is None or gyro["status"] != FAIL)
+        and not quality_failed
     )
     return {
         "original": str(original),
@@ -612,4 +651,5 @@ def run_dji_check(
         "critical_modified": critical_modified,
         "items": items,
         "gyroflow": gyro,
+        "quality": quality,
     }

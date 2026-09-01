@@ -431,6 +431,91 @@ Media Type: tmcd:tmcd
            and not _quat_close([0.1], [0.2]))
 
 
+def l1_quality() -> None:
+    section("L1 质量抽样 + 版本记录")
+    from preservation.quality import (
+        DEFAULTS,
+        _evaluate,
+        _parse_psnr_stats,
+        effective_opts,
+        sample_selected,
+    )
+    from core.versions import write_version_report
+
+    opts = effective_opts(None)
+    record("quality.opts 默认值", opts == DEFAULTS,
+           f"keys={sorted(opts)}")
+    merged = effective_opts(
+        {"sample_rate": 3, "ssim_min": 0.9, "_comment": "x",
+         "unknown_key": 1}
+    )
+    record("quality.opts 覆盖+忽略未知",
+           merged["sample_rate"] == 3 and merged["ssim_min"] == 0.9
+           and "unknown_key" not in merged,
+           f"rate={merged['sample_rate']}")
+    bad = effective_opts({"sample_rate": 0, "psnr_min_db": "x"})
+    record("quality.opts 非法值回退默认",
+           bad == DEFAULTS, f"bad={bad}")
+
+    # 确定性伪随机: 同一名称结果稳定; 1000 样本抽样率 ~10%
+    names = [f"clip_{i}.MP4" for i in range(1000)]
+    picked = sum(1 for n in names if sample_selected(n, opts))
+    stable = all(
+        sample_selected(n, opts) == sample_selected(n, opts)
+        for n in names[:100]
+    )
+    record("quality.sample 确定性 1-in-10",
+           stable and 60 <= picked <= 140,
+           f"picked={picked}/1000")
+
+    ok, _ = _evaluate(40.0, 0.95, 0.0, opts)
+    bad1, why1 = _evaluate(20.0, 0.95, 0.0, opts)
+    bad2, why2 = _evaluate(40.0, 0.70, 0.0, opts)
+    bad3, why3 = _evaluate(40.0, 0.95, 0.05, opts)
+    bad4, why4 = _evaluate(None, None, 0.0, opts)
+    record("quality.evaluate 阈值判定",
+           ok and not bad1 and not bad2 and not bad3 and not bad4
+           and "psnr" in why1 and "ssim" in why2 and "垃圾帧" in why3,
+           f"{why1} | {why2} | {why3} | {why4}")
+
+    stats = WORK / "quality_test_psnr.csv"
+    stats.write_text(
+        "n:1 mse_avg:1.0 psnr_avg:45.0\n"
+        "n:2 mse_avg:1000.0 psnr_avg:10.0\n"
+        "n:3 mse_avg:1.0 psnr_avg:44.0\n",
+        encoding="utf-8",
+    )
+    vals = _parse_psnr_stats(stats)
+    record("quality.parse stats 逐帧",
+           vals == [45.0, 10.0, 44.0], f"vals={vals}")
+
+    # 版本报告: 合成 dict -> JSON+CSV 双落盘, 结构可解析
+    import json as _json
+    vj, vc = write_version_report(
+        {
+            "generated": "2026-08-31 00:00:00",
+            "encoder": "nvenc",
+            "tools": {
+                "ffmpeg": "9.0.1",
+                "ffmpeg_libs": {"libsvtav1": "4.2.0"},
+                "nvencc": "NVEncC 9.31",
+            },
+            "gpu_drivers": [
+                {"gpu": "NVIDIA RTX 5070", "driver_version": "596.36"}
+            ],
+        },
+        WORK / "ver_test",
+    )
+    vdata = _json.loads(vj.read_text(encoding="utf-8"))
+    csv_text = vc.read_text(encoding="utf-8-sig")
+    record("versions.report json+csv",
+           vdata["tools"]["ffmpeg"] == "9.0.1"
+           and vdata["gpu_drivers"][0]["driver_version"] == "596.36"
+           and "libsvtav1" in csv_text
+           and "596.36" in csv_text,
+           f"json={vj.name} csv={vc.name}")
+
+
 def l1_x265() -> None:
     section("L1 x265 P0 修复断言")
     import json
@@ -775,6 +860,60 @@ def l3_pipeline() -> None:
            and {"djmd", "dbgi", "tmcd"} <= tags,
            f"rc={rc} tags={sorted(tags - {None})}")
 
+    # C12 质量抽样 PASS (真实管线产物: C10 x265 Sony 输出 vs 源)
+    from core.config import find_executable
+    from preservation.quality import run_quality_sample
+    ffmpeg = find_executable("ffmpeg", ROOT)
+    ffprobe = find_executable("ffprobe", ROOT)
+    c10_final = OUT_DIR / "c10_x265_sony" / "C9037.MP4"
+    if c10_final.is_file():
+        q = run_quality_sample(
+            original=cases["sony"] / "C9037.MP4",
+            final=c10_final,
+            ffmpeg=ffmpeg,
+            ffprobe=ffprobe,
+            scratch=WORK / "quality_c12",
+            opts={"sample_rate": 1, "max_duration_sec": 600},
+            log=lambda m: None,
+        )
+        expect("C12_quality_sample_PASS",
+               q["status"] == "PASS"
+               and q["psnr_avg_db"] and q["psnr_avg_db"] > 25
+               and q["ssim_all"] and q["ssim_all"] > 0.8,
+               f"status={q['status']} psnr={q['psnr_avg_db']} "
+               f"ssim={q['ssim_all']} detail={q['detail']}")
+    else:
+        expect("C12_quality_sample_PASS", False, "C10 输出缺失")
+
+    # C13 质量抽样 FAIL (灰屏垃圾文件: 同分辨率同帧数, PSNR 必然崩溃)
+    if "classic" in cases:
+        garbage = WORK / "quality_c13_garbage.mp4"
+        r = sh(ffmpeg, "-hide_banner", "-nostdin", "-y",
+               "-i", cases["classic"] / "classic_test.MP4",
+               "-map", "0:v:0", "-an",
+               "-vf", "drawbox=x=0:y=0:w=iw:h=ih:color=gray:t=fill",
+               "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+               "-pix_fmt", "yuv420p", garbage, timeout=900)
+        if r.returncode == 0 and garbage.is_file():
+            q = run_quality_sample(
+                original=cases["classic"] / "classic_test.MP4",
+                final=garbage,
+                ffmpeg=ffmpeg,
+                ffprobe=ffprobe,
+                scratch=WORK / "quality_c13",
+                opts={"sample_rate": 1, "max_duration_sec": 600},
+                log=lambda m: None,
+            )
+            expect("C13_quality_sample_FAIL_捕获",
+                   q["status"] == "FAIL",
+                   f"status={q['status']} psnr={q['psnr_avg_db']} "
+                   f"ssim={q['ssim_all']} detail={q['detail']}")
+        else:
+            expect("C13_quality_sample_FAIL_捕获", False,
+                   f"garbage 生成失败 rc={r.returncode}")
+    else:
+        expect("C13_quality_sample_FAIL_捕获", False, "classic 输入未生成")
+
 
 # ===========================================================================
 # runner
@@ -789,6 +928,7 @@ SUITES: dict[str, list[tuple[str, Callable[[], None]]]] = {
         ("classifier/scaling", l1_classifier_scaling),
         ("gpac/dji", l1_gpac_dji),
         ("x265 P0", l1_x265),
+        ("quality/versions", l1_quality),
     ],
     "toolchain": [("toolchain", l2_toolchain)],
     "full": [("pipeline", l3_pipeline)],

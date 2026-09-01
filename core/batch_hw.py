@@ -628,6 +628,9 @@ def encode_one_sony_hw(
     keep_work: bool,
     no_downgrade: bool,
     check_level: str,
+    ffmpeg: Path | None = None,
+    quality_opts: dict[str, Any] | None = None,
+    quality_csv: Path | None = None,
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
@@ -707,6 +710,9 @@ def encode_one_sony_hw(
             gyroflow=gyroflow,
             fix_hw_timing=True,
             check_level=check_level,
+            ffmpeg=ffmpeg,
+            quality_opts=quality_opts,
+            quality_csv=quality_csv,
             log=pipe_log,
         )
     except Exception as exc:
@@ -809,6 +815,10 @@ def encode_one_hw_classic(
     gpac: GpacContainerBackend,
     work_root: Path,
     no_downgrade: bool,
+    check_level: str = "basic",
+    ffmpeg: Path | None = None,
+    quality_opts: dict[str, Any] | None = None,
+    quality_csv: Path | None = None,
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
@@ -817,7 +827,8 @@ def encode_one_hw_classic(
     throughput_cb: Callable[[float], None] | None = None,
 ) -> str:
     """Non-Sony material: video + audio only, single-tool single pass.
-    (DJI/非 Sony 全轨道适配留待后续独立 session.)"""
+    At check_level='full' the PSNR/SSIM sample gates delivery (FAIL
+    deletes the part file and fails the batch entry)."""
     part_dst = dst.with_name(dst.stem + ".part.mov")
     safe_unlink(part_dst)
 
@@ -877,6 +888,32 @@ def encode_one_hw_classic(
         safe_unlink(part_dst)
         return "failed"
 
+    # PSNR/SSIM quality sample (check=full) gates delivery: a corrupted
+    # encode must never land in the output tree.
+    if check_level == "full" and ffmpeg is not None:
+        from preservation.quality import run_quality_sample
+
+        q = run_quality_sample(
+            original=src,
+            final=part_dst,
+            ffmpeg=ffmpeg,
+            ffprobe=ffprobe,
+            scratch=work_dir / "quality",
+            opts=quality_opts,
+            csv_path=quality_csv,
+            log=lambda msg: logger.info("[QUALITY] %s | %s", src.name, msg),
+        )
+        if q["status"] == "FAIL":
+            logger.error(
+                "[FAIL] quality sample | %s | %s", src, q["detail"]
+            )
+            file_logger.error(
+                "QUALITY SAMPLE FAILED | %s | report=%s",
+                q["detail"], work_dir / "quality",
+            )
+            safe_unlink(part_dst)
+            return "failed"
+
     try:
         os.replace(part_dst, dst)
     except OSError as exc:
@@ -921,6 +958,9 @@ def encode_one_dji_hw(
     keep_work: bool,
     no_downgrade: bool,
     check_level: str,
+    ffmpeg: Path | None = None,
+    quality_opts: dict[str, Any] | None = None,
+    quality_csv: Path | None = None,
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
@@ -1051,6 +1091,9 @@ def encode_one_dji_hw(
                 vfr=vfr,
                 level=check_level,
                 fix_hw_timing=True,
+                ffmpeg=ffmpeg,
+                quality_opts=quality_opts,
+                quality_csv=quality_csv,
                 log=pipe_log,
             )
     except Exception as exc:
@@ -1197,6 +1240,8 @@ class BatchCtx:
     keep_work: bool = False
     no_downgrade: bool = False
     check_level: str = "basic"
+    ffmpeg: Path | None = None
+    quality_opts: dict[str, Any] | None = None
     dry_run: bool = False
     failed_path: Path | None = None
     status: DashboardStatus | None = None
@@ -1264,6 +1309,12 @@ def process_file_hw(
             )
         return "failed"
 
+    quality_csv = (
+        ctx.logs_root / "quality_samples.csv"
+        if ctx.check_level == "full"
+        else None
+    )
+
     if is_sony_source(source_streams):
         result = encode_one_sony_hw(
             src=src,
@@ -1284,6 +1335,9 @@ def process_file_hw(
             keep_work=ctx.keep_work,
             no_downgrade=ctx.no_downgrade,
             check_level=ctx.check_level,
+            ffmpeg=ctx.ffmpeg,
+            quality_opts=ctx.quality_opts,
+            quality_csv=quality_csv,
             logger=logger,
             file_logger=file_logger,
             dry_run=ctx.dry_run,
@@ -1313,6 +1367,9 @@ def process_file_hw(
             keep_work=ctx.keep_work,
             no_downgrade=ctx.no_downgrade,
             check_level=ctx.check_level,
+            ffmpeg=ctx.ffmpeg,
+            quality_opts=ctx.quality_opts,
+            quality_csv=quality_csv,
             logger=logger,
             file_logger=file_logger,
             dry_run=ctx.dry_run,
@@ -1338,6 +1395,10 @@ def process_file_hw(
             gpac=ctx.gpac,
             work_root=ctx.work_root,
             no_downgrade=ctx.no_downgrade,
+            check_level=ctx.check_level,
+            ffmpeg=ctx.ffmpeg,
+            quality_opts=ctx.quality_opts,
+            quality_csv=quality_csv,
             logger=logger,
             file_logger=file_logger,
             dry_run=ctx.dry_run,
