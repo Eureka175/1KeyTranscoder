@@ -20,10 +20,20 @@ x265 为手动高压缩选项。**主入口：`1kt.py`。**
 | QSVEncC（Intel QSV HEVC） | ✅ 生产 | `qsv.json` / **`qsv_aligned.json`** | 第二后端。`qsv_aligned.json` 为按 NVENC 同档质量标定的对齐版（见下） |
 | x265（软件 HEVC） | ✅ 手动高压缩档（P0 修复完成） | `x265.json` + `x265_scaling.json` | 质量优先冷归档 / 4:2:2 保真唯一软件路径（吞吐受限，缩放规则仍 PROVISIONAL，见 `work/x265_test/`） |
 | VCEEncC（AMD VCE HEVC） | 预留（JSON 已备未接） | `vce.json` | AMD 机器扩展 |
-| AV1（NVENC/QSV/SVT） | 📋 评估完成、待实施 | 草案见调参指南 | 仅限非 XAVC 经典路径（XAVC 合规决策） |
+| AV1（NVENC/QSV/SVT） | 📋 评估完成；**实现在 `av1` 分支**（发布包 v0.5.1，见下载节） | `av1` 分支：`svtav1.json`/`nvenc_av1.json`/`qsv_av1.json` | 免版税备选线；Sony/DJI 元数据保留管线（不打 XAVC tag，brand av01） |
 
 > ⚠️ 档位 JSON 内的数值为作者实测标定值，请勿改动；调参须以测试集回归
 > 与 `tests/full_autotest.py` 为依据。
+
+## 下载（自包含发布包）
+
+无需自行搭建工具链：发布包内置 **ffmpeg/ffprobe 9.0.1 + NVEncC 9.31 +
+QSVEncC 8.26 + GPAC 26.02**，解压即用（另需 Python 3.11+ 与对应 GPU
+驱动；Gyroflow 为可选消费端工具，请从 gyroflow.xyz 单独安装）。
+
+- **v0.4.2**（本 `main` 分支 · HEVC/265 线）：
+  [1KeyTranscoder-v0.4.2-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.4.2/1KeyTranscoder-v0.4.2-win64-selfcontained.zip)
+- AV1 线（软件 SVT-AV1 + 硬件 AV1）发布包见 **`av1` 分支**：v0.5.1
 
 ## 快速开始
 
@@ -199,9 +209,9 @@ git checkout pre_S1S5              # S1-S5 前基线
 git tag -l                         # pre_S1S5 / post_S1S5 / pre_ui / post_1kt_ui
                                    # post_adaptive / post_hw_fulltest / post_color_meta
                                    # post_dji / post_dji_checklevels / post_quality_align
-                                   # post_autotest / post_x265 / v0.4.0 / v0.4.1
+                                   # post_autotest / post_x265 / v0.4.0 / v0.4.1 / v0.4.2
 ```
 
-> 分支约定: `main` 仅保留 HEVC/265 实现; **AV1 (svtav1/nvenc-av1/qsv-av1)
-> 实现在 `av1` 分支** (`git checkout av1`, 含 post_av1 / post_av1_calib /
-> v0.5.0 tag)。
+> 分支约定: `main` 仅保留 HEVC/265 实现 (发布包 v0.4.2); **AV1
+> (svtav1/nvenc-av1/qsv-av1) 实现在 `av1` 分支** (`git checkout av1`,
+> 发布包 v0.5.1, 含 post_av1 / post_av1_calib / v0.5.0 / v0.5.1 tag)。
