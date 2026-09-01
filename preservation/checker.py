@@ -4,7 +4,8 @@
 
     basic    : 仅必要核心元数据 (validate.compare level=basic)
     advanced : 完整结构校验 (validate.compare) + Gyroflow 消费端校验
-    full     : advanced + 详细自检 (64 项, preservation/selfcheck);
+    full     : advanced + 详细自检 (64 项, preservation/selfcheck)
+               + PSNR/SSIM 质量抽样 (1-in-N 短视频, 防花屏阈值);
                先探测 Gyroflow, 未安装则提示并跳过消费端对比
 
 返回与 validate.compare 相同形态的 report dict (含 gyroflow /
@@ -34,12 +35,17 @@ def run_checks(
     work_dir: Path,
     known_facts: dict[str, Any],
     codec: str = "hevc",
+    ffmpeg: Path | None = None,
+    quality_opts: dict[str, Any] | None = None,
+    quality_csv: Path | None = None,
     log: Callable[[str], None],
 ) -> dict[str, Any]:
     """Run the level-gated post-encode checks; returns the report.
 
     codec: expected re-encoded video codec ("hevc" | "av1"); drives the
-    sample-entry/codec expectations and the XAVC-brand policy."""
+    sample-entry/codec expectations and the XAVC-brand policy.
+    At level='full' additionally runs the PSNR/SSIM quality sample
+    (1-in-N short clips; FAIL escalates to structural failure)."""
     compare_level = "basic" if level == "basic" else "advanced"
     report = compare(
         original=original,
@@ -124,5 +130,50 @@ def run_checks(
                 }
             )
             log(f"selfcheck: FAIL ({exc})")
+
+        if ffmpeg is not None:
+            from .quality import run_quality_sample
+
+            log("PSNR/SSIM quality sample (full)...")
+            try:
+                q = run_quality_sample(
+                    original=original,
+                    final=final,
+                    ffmpeg=ffmpeg,
+                    ffprobe=ffprobe,
+                    scratch=work_dir / "validate" / "quality",
+                    opts=quality_opts,
+                    csv_path=quality_csv,
+                    log=log,
+                )
+                report["quality"] = q
+                if q["status"] == "FAIL":
+                    report["structural_success"] = False
+                    report["critical_missing"].append(
+                        {
+                            "item": "quality.psnr_ssim",
+                            "status": "FAIL",
+                            "detail": q["detail"],
+                        }
+                    )
+                    log(f"quality sample: FAIL ({q['detail']})")
+            except Exception as exc:
+                report["quality"] = {
+                    "status": "FAIL",
+                    "detail": f"quality sample error: {exc}",
+                }
+                report["structural_success"] = False
+                report["critical_missing"].append(
+                    {
+                        "item": "quality.psnr_ssim",
+                        "status": "FAIL",
+                        "detail": f"quality sample error: {exc}",
+                    }
+                )
+                log(f"quality sample: FAIL ({exc})")
+        elif level == "full":
+            log(
+                "WARNING: ffmpeg 路径缺失 — full 检查的 PSNR/SSIM 抽样跳过"
+            )
 
     return report

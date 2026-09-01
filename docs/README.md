@@ -5,6 +5,7 @@
 > 调研报告；reference = 第三方一手资料存档（按厂商分目）；misc = 网络调研
 > 碎片存档。** 配置 JSON（nvenc.json 等）是运行时配置，不属于文档，留在
 > 根目录；`metadata_forensics/` 是取证数据目录，`work/` 是实验产物，均不入档。
+> 历史代码快照与废弃脚本在根目录 **`olddocs/`**（详见 olddocs/README.md）。
 >
 > ★ **`FINAL_REPORT.md`** — 最终报告：四份评估的汇总结论、决策记录与路线图。
 

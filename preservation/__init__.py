@@ -21,5 +21,6 @@ precision on GPAC 26.02). isobmf.patch_track_durations() is kept as a
 Level-3 fallback only; it is not part of the normal pipeline.
 
 pipeline.py orchestrates the Sony production path for 1keytransc.py;
-sony_poc.py is the original standalone POC (reference).
+the original standalone POC is archived at olddocs/sony_poc.py
+(reference only, no longer imported).
 """

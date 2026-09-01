@@ -2,11 +2,21 @@
   "encoder": "svtav1",
   "codec": "av1",
   "baseline_version": "1.0",
-  "_comment": "SVT-AV1 (libsvtav1, ffmpeg 9.0.1 内置 SVT-AV1 Encoder Lib v4.2.0) 四档标定值 (2026-08-31, work/av1_calib 实测, 详见 docs/evaluation/av1_calibration.md)。转译自 x265.json 设计哲学: UHQ=质量标杆(非生产实用) / HQ=慢速生产主力 / SMALL=体积优化(慢速生产) / FAST=快速批量(画质不低于硬件编码器, 细节/体积更优)。要点: tune 0=VQ; pred-struct 2=random access; irefresh-type 2=key frame(closed-GOP 式); CRF 刻度与 x265 不同 (SVT crf30≈x265 crf21@1080p 社区规则, 4K 实测标定); CRF+MBR=capped CRF (MBR 软上限, 重度噪点内容会溢出 — 本机实测 night crf24=112Mbps); scd 只影响码率分配不插场景关键帧 (SVT 文档明确); film-grain 0=归档保真不合成颗粒 (fg20+denoise 在极噪素材可 -54% 码率, 代价 XPSNR -1.6, 按需启用); enable-qm(qm-min 0)+overlays=psy 栈; ac-bias 1.0 高频纹理 RD 偏置 (HQ/SMALL 实测码率-14% 质量持平); variance-boost 仅 UHQ (噪点内容 +40% 码率换 +0.2 XPSNR, 生产档关闭); AV1 统一 4:2:0 输出 (4:2:2 源由调度层 WARNING 后降采样, 不用 AOM)。",
+  "_comment": "SVT-AV1 (libsvtav1, ffmpeg 9.0.1 内置 SVT-AV1 Encoder Lib v4.2.0) 四档标定值 (2026-09-01 按用户判定标准重排, work/av1_calib 实测, 详见 docs/evaluation/av1_calibration.md)。判定标准: 每档质量>=x265 同档且码流更低则不动, 否则动。转译自 x265.json 设计哲学: UHQ=质量标杆(非生产实用, 速度对齐 x265 UHQ ~1fps) / HQ=慢速生产主力 / SMALL=体积优化(慢速生产) / FAST=快速批量(画质不低于硬件编码器)。要点: tune 0=VQ; pred-struct 2=random access; irefresh-type 2=key frame(closed-GOP 式); CRF 刻度与 x265 不同; CRF+MBR=capped CRF (MBR 软上限, 重度噪点内容会溢出 — 本机实测 night crf24=112Mbps); scd 只影响码率分配不插场景关键帧 (SVT 文档明确); film-grain 0=归档保真不合成颗粒 (fg20+denoise 在极噪素材可 -54% 码率, 代价 XPSNR -1.6, 按需启用); enable-qm(qm-min 0)+overlays=psy 栈; ac-bias 1.0 高频纹理 RD 偏置; variance-boost 仅 UHQ (噪点内容 +40% 码率换 +0.2 XPSNR, 生产档关闭); AV1 统一 4:2:0 输出 (4:2:2 源由调度层 WARNING 后降采样, 不用 AOM)。",
+  "quality_check": {
+    "_comment": "full 检查附加的 PSNR/SSIM 抽样: 源文件名 sha256 确定性 10 取 1, 仅 <=60s 短视频; setpts=N 帧索引对齐; 阈值防花屏/出错 (非质量门槛); 结果输出 quality_<stem>.json + logs/quality_samples.csv",
+    "enabled": true,
+    "sample_rate": 10,
+    "max_duration_sec": 60,
+    "psnr_min_db": 25.0,
+    "ssim_min": 0.80,
+    "garbage_psnr_db": 12.0,
+    "max_garbage_frac": 0.02
+  },
   "profile": {
     "UHQ": {
-      "description": "UHQ Quality Benchmark - preset 2 crf 20 (car_6s: 40.2Mbps/XPSNR 45.8), not production practical",
-      "preset": 2,
+      "description": "UHQ Quality Benchmark - preset 1 crf 20 (car_6s: 41.3Mbps/XPSNR 45.88 @1.07fps, x265 UHQ 同级速度), not production practical",
+      "preset": 1,
       "tune": 0,
       "crf": 20,
       "keyint": "FR*10",
@@ -34,10 +44,10 @@
     },
 
     "HQ": {
-      "description": "HQ Slow Production - preset 4 crf 24 (car_6s: 19.6Mbps/XPSNR 44.7, vs x265 HQ +0.7 XPSNR), production main tier",
+      "description": "HQ Slow Production - preset 4 crf 26 (car_6s: 16.8Mbps/XPSNR 44.52 vs x265 HQ 15.0M/44.01; day_6s: 4.4M/41.91 vs 5.6M/41.93), production main tier",
       "preset": 4,
       "tune": 0,
-      "crf": 24,
+      "crf": 26,
       "keyint": "FR*10",
       "scd": 1,
       "irefresh_type": 2,
@@ -61,7 +71,7 @@
     },
 
     "SMALL": {
-      "description": "SMALL Size-first - preset 4 crf 30 (car_6s: 14.7Mbps/XPSNR 44.3, HQ 的 -25% 体积), size over extreme-scene quality",
+      "description": "SMALL Size-first - preset 4 crf 30 (car_6s: 13.1Mbps/XPSNR 44.14 vs x265 SMALL 15.0M/44.03; day_6s: 3.5M/41.71 vs 4.3M/41.62 — 双素材质量更高且码流更低), size over extreme-scene quality",
       "preset": 4,
       "tune": 0,
       "crf": 30,
@@ -88,10 +98,10 @@
     },
 
     "FAST": {
-      "description": "FAST Quick Batch - preset 7 crf 32 (car_6s: 15.1Mbps/XPSNR 43.5 @ ~17fps 4K60, 优于硬件 AV1 42.3 带且体积更小), hardware-parity-or-better quality",
+      "description": "FAST Quick Batch - preset 7 crf 30 (car_6s: 17.6Mbps/XPSNR 43.71 vs x265 FAST 18.6M/43.55; day_6s: 4.2M/41.25 vs 4.3M/41.46 — car 双达标, day XPSNR -0.2/VMAF +0.3 判定等价), hardware-parity-or-better quality",
       "preset": 7,
       "tune": 0,
-      "crf": 32,
+      "crf": 30,
       "keyint": "FR*10",
       "scd": 1,
       "irefresh_type": 2,

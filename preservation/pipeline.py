@@ -89,6 +89,9 @@ def run_sony_pipeline(
     check_level: str = "advanced",
     codec: str = "hevc",
     encoded_path: Path | None = None,
+    ffmpeg: Path | None = None,
+    quality_opts: dict[str, Any] | None = None,
+    quality_csv: Path | None = None,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """codec: "hevc" (XAVC 合规路径, 恢复 XAVC brand) 或 "av1"
@@ -346,6 +349,9 @@ def run_sony_pipeline(
         work_dir=work_dir,
         known_facts=known_facts,
         codec=codec,
+        ffmpeg=ffmpeg,
+        quality_opts=quality_opts,
+        quality_csv=quality_csv,
         log=step,
     )
 

@@ -74,9 +74,20 @@ DJI（djmd）→ DJI
 |---|---|---|
 | `basic`（默认） | 时间线/轨清单/rtmd 载荷 sha256+时序+tref+timecode | 轨道清单 + djmd/dbgi/tmcd 载荷 sha256/size/样本数 + 音频流 + 帧数 |
 | `advanced` | + lens/XML/uuid 完整结构 + Gyroflow 消费端 | + Gyroflow 逐帧四元数（type-2 机型/镜头配置 + type-3 org_quat/stab_quat） |
-| `full` | + 详细自检（逐项 PASS/FAIL 落盘） | + 逐轨时基/媒体时长、载荷首尾 32 字节、ffprobe 流级事实 |
+| `full` | + 详细自检（逐项 PASS/FAIL 落盘）+ **PSNR/SSIM 质量抽样** | + 逐轨时基/媒体时长、载荷首尾 32 字节、ffprobe 流级事实 + **PSNR/SSIM 质量抽样** |
 
 任何 critical MISSING/MODIFIED 或 Gyroflow FAIL 都会使该文件判定失败。
+
+**PSNR/SSIM 质量抽样**（`full` 级，防花屏/出错，不是质量门槛）：
+源文件名 sha256 确定性 **10 取 1**，仅 **≤60s 短视频**；`setpts=N`
+帧索引对齐（规避容器 timebase 失配）；阈值 psnr ≥25dB、ssim ≥0.80、
+垃圾帧（psnr<12dB）占比 ≤2%，达标外判定该文件失败（经典路径在
+交付前拦截）。阈值可经各档位 JSON 的 `quality_check` 节调整；
+结果落盘 `quality_<名>.json` + 批次汇总 `logs/quality_samples.csv`。
+
+**环境版本记录**：每批次启动时收集软件/驱动版本
+（ffmpeg/SVT-AV1 库/NVEncC/QSVEncC/GPAC/Gyroflow + GPU 驱动）→
+`logs/env_versions.json` + `env_versions.csv`，供编码行为复现。
 
 ## 质量对齐（NVENC ↔ QSV）
 
@@ -149,6 +160,8 @@ docs/
 ├── design/              设计文档：硬件后端设计 / 实施报告(含 DJI §15) / 集成报告 / HEVC 4:2:2 Rext 播放兼容性
 ├── evaluation/          评估：HEVC 生产就绪度(重写版) / x265 生产就绪 / AV1 可行性 / AV1 调参 / SVT-AV1 归档 / AV1 档位标定
 └── reference/           第三方一手资料存档（x265 / SVT-AV1 含 v4.2.0 调参调研报告 / NVENC / QSV / VCE）
+
+olddocs/                 历史档案存档（各阶段代码快照 / 被取代的旧脚本），详见 olddocs/README.md
 ```
 
 ## 关键决策记录
@@ -182,7 +195,8 @@ docs/
   （VLC/mpv）；分发请出 4:2:0 副本；
 - **AV1**：统一 4:2:0 输出（所有 AV1 后端）；Sony 源保留元数据但不打
   XAVC tag（brand av01）；SVT-AV1 无场景关键帧（scd 只管码率分配）、
-  mbr 为软上限（非 VBV 硬钳）；4K60 UHQ 档（preset 2）编码耗时极高，
+  mbr 为软上限（非 VBV 硬钳）；4K60 UHQ 档（preset 1，≈1fps 对齐
+  x265 UHQ）编码耗时极高，
   属基准档非生产实用；
 - 非 Sony 非 DJI 素材按策略丢弃元数据（仅视频+音频）；
 - VFR 素材自动 `--avsync forcecfr` 规范化（WARNING 记录）；

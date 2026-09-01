@@ -1,6 +1,7 @@
 """ffprobe probing (metadata-only) and the SourceInfo adapter.
 
-probe_source() is preserved from the original x265_archive.py with one
+probe_source() is preserved from the original x265_archive.py (now
+archived at olddocs/x265_archive.py) with one
 additive extension (stream side_data_list for HDR mastering/CLL): ONE
 metadata pass per file, no -show_frames, no -show_packets, no GOP
 analysis. The CSV layer depends on its exact (summary, streams)
