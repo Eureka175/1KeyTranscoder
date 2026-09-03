@@ -39,9 +39,9 @@
 4:2:2 10bit 自动选型 Main 4:2:2 10；官方文档逐参数核查 71 参数全部合法。
 已知改进项（P0）：
 
-1. FAST 档 `rd=2` 使 psy-rd 静默失效（官方要求 rd≥3）
+1. FAST 档 `rd=2` 使 psy-rd 静默失效（官方要求 rd≥3；按用户决定保持 rd=2）
 2. `info` 1→0（构建信息 SEI 破坏归档可复现性）
-3. 删除 `no-strong-intra-smoothing`（防条带平滑回退）
+3. `no-strong-intra-smoothing`：先删后恢复 —— 2026-09-01 用户决定**全档开启**（触发帧内强力平滑的条件苛刻、对画面影响低；带上后编码器改用其他平滑手段，细纹理/颗粒保留更好）
 4. level/CPB 修正（动态 VBV 的 bufsize 超 Level 6.1 High tier CPB 上限）
 5. 端到端验证留档：`run_selfcheck --encoder x265 --check full`
 
