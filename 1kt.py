@@ -349,13 +349,17 @@ def encode_one(
     check_level: str = "basic",
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
+    channel_sync: bool = False,
+    channel_sync_opts: dict[str, Any] | None = None,
+    gpac: Any = None,
     work_dir: Path | None = None,
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
 ) -> str:
     """Classic single-pass (x265/svtav1 software backends). At
-    check_level='full' the PSNR/SSIM sample gates delivery."""
+    check_level='full' the PSNR/SSIM sample gates delivery; with
+    channel_sync the fixed audio replaces the copied audio post-encode."""
     from core.paths import safe_unlink
 
     safe_unlink(part_dst)
@@ -418,6 +422,44 @@ def encode_one(
             safe_unlink(part_dst)
             return "failed"
 
+    # 自动延时补偿 (经典路径): 修正后的音频轨替换拷贝音频
+    if channel_sync:
+        from core.channel_sync import run_channel_sync
+        from preservation.audio_sync import remux_replace_audio
+
+        try:
+            res = run_channel_sync(
+                source=src,
+                ffmpeg=ffmpeg,
+                work_dir=(work_dir or part_dst.parent) / "channel_sync",
+                streams=prepared.streams,
+                opts=channel_sync_opts,
+                log=lambda msg: logger.info("[SYNC] %s | %s", src.name, msg),
+            )
+            file_logger.info(
+                "CHANNEL_SYNC | %s | %s",
+                res["status"],
+                json.dumps(res.get("channels", []), ensure_ascii=False),
+            )
+            if res["status"] == "applied":
+                synced = part_dst.with_name(part_dst.stem + ".synced.mov")
+                remux_replace_audio(
+                    gpac=gpac, video_src=part_dst,
+                    fixed_files=[Path(p) for p in res["fixed_files"]],
+                    dst=synced,
+                    log=lambda msg: logger.info("[SYNC] %s", msg),
+                )
+                safe_unlink(part_dst)
+                os.replace(synced, part_dst)
+            elif res["status"] in ("measure_failed", "verify_failed"):
+                logger.warning(
+                    "[SYNC-SKIP] %s | %s — 原音频照旧",
+                    src.name, res["detail"],
+                )
+        except Exception as exc:
+            logger.warning("[SYNC-FAIL] %s | %s — 原音频照旧", src, exc)
+            file_logger.exception("CHANNEL SYNC FAILED")
+
     try:
         os.replace(part_dst, dst)
     except OSError as exc:
@@ -456,6 +498,8 @@ def encode_one_sony(
     codec: str = "hevc",
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
+    channel_sync: bool = False,
+    channel_sync_opts: dict[str, Any] | None = None,
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
@@ -533,6 +577,37 @@ def encode_one_sony(
                 "POLICY | AV1 Sony preserve: rtmd/nrtm/uuid kept, "
                 "XAVC brand NOT restored (AV1 not in XAVC spec)"
             )
+
+        # 自动延时补偿 (Sony): 修正后的音频轨在重建时替代源音轨
+        audio_sources = None
+        if channel_sync and source_summary["audio_streams"] > 0:
+            from core.channel_sync import run_channel_sync
+
+            try:
+                res = run_channel_sync(
+                    source=src,
+                    ffmpeg=ffmpeg,
+                    work_dir=work_dir / "channel_sync",
+                    streams=prepared.streams,
+                    opts=channel_sync_opts,
+                    log=lambda msg: logger.info("[SYNC] %s | %s", src.name, msg),
+                )
+                file_logger.info(
+                    "CHANNEL_SYNC | %s | %s",
+                    res["status"],
+                    json.dumps(res.get("channels", []), ensure_ascii=False),
+                )
+                if res["status"] == "applied":
+                    audio_sources = [Path(p) for p in res["fixed_files"]]
+                elif res["status"] in ("measure_failed", "verify_failed"):
+                    logger.warning(
+                        "[SYNC-SKIP] %s | %s — 原音频照旧",
+                        src.name, res["detail"],
+                    )
+            except Exception as exc:
+                logger.warning("[SYNC-FAIL] %s | %s — 原音频照旧", src, exc)
+                file_logger.exception("CHANNEL SYNC FAILED")
+
         report = run_sony_pipeline(
             source=src,
             work_dir=work_dir,
@@ -548,6 +623,7 @@ def encode_one_sony(
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,
             quality_csv=quality_csv,
+            audio_sources=audio_sources,
             log=pipe_log,
         )
     except Exception as exc:
@@ -635,6 +711,8 @@ def encode_one_dji_x265(
     video_entry: str = "hvc1",
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
+    channel_sync: bool = False,
+    channel_sync_opts: dict[str, Any] | None = None,
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
@@ -705,6 +783,36 @@ def encode_one_dji_x265(
             )
         pipe_log(f"video ready: {encoded_mov}")
 
+        # 自动延时补偿 (DJI): 修正后的音频轨在重建时替代源音轨
+        audio_sources = None
+        if channel_sync and source_summary["audio_streams"] > 0:
+            from core.channel_sync import run_channel_sync
+
+            try:
+                res = run_channel_sync(
+                    source=src,
+                    ffmpeg=ffmpeg,
+                    work_dir=work_dir / "channel_sync",
+                    streams=prepared.streams,
+                    opts=channel_sync_opts,
+                    log=lambda msg: logger.info("[SYNC] %s | %s", src.name, msg),
+                )
+                file_logger.info(
+                    "CHANNEL_SYNC | %s | %s",
+                    res["status"],
+                    json.dumps(res.get("channels", []), ensure_ascii=False),
+                )
+                if res["status"] == "applied":
+                    audio_sources = [Path(p) for p in res["fixed_files"]]
+                elif res["status"] in ("measure_failed", "verify_failed"):
+                    logger.warning(
+                        "[SYNC-SKIP] %s | %s — 原音频照旧",
+                        src.name, res["detail"],
+                    )
+            except Exception as exc:
+                logger.warning("[SYNC-FAIL] %s | %s — 原音频照旧", src, exc)
+                file_logger.exception("CHANNEL SYNC FAILED")
+
         report = dji.dji_rebuild(
             original=src,
             encoded_mov=encoded_mov,
@@ -719,6 +827,7 @@ def encode_one_dji_x265(
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,
             quality_csv=quality_csv,
+            audio_sources=audio_sources,
             log=pipe_log,
         )
     except Exception as exc:
@@ -835,6 +944,17 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--gyroflow", default=None,
                         help="Explicit Gyroflow.exe path.")
+    parser.add_argument(
+        "--channel-sync",
+        action="store_true",
+        help=(
+            "自动延时补偿: 对多流单声道 PCM 布局 (无线麦 CH1/CH2 + 有线 "
+            "CH3/CH4) 逐文件 GCC-PHAT 测量无线通道相对 CH3 的固定微延迟 "
+            "并逐样本修正 (尾部补零保全长, 参考通道/阈值见 "
+            "core/channel_sync.py DEFAULTS)。测量质量门不过或复检超差时 "
+            "原音频照旧 + 警告。依赖 numpy/scipy (可选)。"
+        ),
+    )
     parser.add_argument(
         "--check",
         choices=["basic", "advanced", "full"],
@@ -1029,6 +1149,10 @@ def main() -> int:
     quality_opts = (
         config.get("quality_check") if isinstance(config, dict) else None
     )
+    channel_sync_opts = (
+        config.get("channel_sync") if isinstance(config, dict) else None
+    )
+    channel_sync_enabled = bool(getattr(args, "channel_sync", False))
 
     work_root = output_root / ".1ktwork"
     logger = setup_logger(total_log)
@@ -1239,6 +1363,8 @@ def main() -> int:
                         check_level=args.check, codec=codec,
                         quality_opts=quality_opts,
                         quality_csv=quality_csv,
+                        channel_sync=channel_sync_enabled,
+                        channel_sync_opts=channel_sync_opts,
                         logger=logger, file_logger=file_logger,
                         dry_run=args.dry_run,
                     )
@@ -1253,6 +1379,8 @@ def main() -> int:
                         check_level=args.check, video_entry=video_entry,
                         quality_opts=quality_opts,
                         quality_csv=quality_csv,
+                        channel_sync=channel_sync_enabled,
+                        channel_sync_opts=channel_sync_opts,
                         logger=logger, file_logger=file_logger,
                         dry_run=args.dry_run,
                     )
@@ -1266,6 +1394,9 @@ def main() -> int:
                         engine=engine, check_level=args.check,
                         quality_opts=quality_opts,
                         quality_csv=quality_csv,
+                        channel_sync=channel_sync_enabled,
+                        channel_sync_opts=channel_sync_opts,
+                        gpac=gpac,
                         work_dir=work_root / job_id_for(src),
                         logger=logger,
                         file_logger=file_logger, dry_run=args.dry_run,
@@ -1305,6 +1436,8 @@ def main() -> int:
             check_level=args.check,
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,
+            channel_sync=channel_sync_enabled,
+            channel_sync_opts=channel_sync_opts,
             dry_run=args.dry_run,
             failed_path=failed_path,
             status=status,

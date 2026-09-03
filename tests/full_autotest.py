@@ -516,6 +516,137 @@ def l1_quality() -> None:
            f"json={vj.name} csv={vc.name}")
 
 
+def l1_channel_sync() -> None:
+    section("L1 延时补偿 (channel-sync)")
+    try:
+        import numpy as np
+        from scipy import signal
+    except ImportError as exc:
+        record("channel_sync.numpy/scipy 可用", False,
+               f"{exc} — 本组跳过 (--channel-sync 需 numpy/scipy)")
+        return
+    record("channel_sync.numpy/scipy 可用", True)
+
+    from core.channel_sync import effective_opts, eligible_audio
+    from core.mp4_channel_sync import (
+        fix_channels,
+        measure_channels,
+        measure_delay,
+        verify_channels,
+    )
+
+    # --- 布局判定: 2ch/1ch 默认不做对齐 ---
+    ok, why = eligible_audio(
+        [{"codec_type": "audio", "codec_name": "pcm_s16le",
+          "channels": 2, "sample_rate": "48000"}]
+    )
+    record("channel_sync.2ch 默认不对齐", not ok and "2ch" in why, why)
+    ok, why = eligible_audio(
+        [{"codec_type": "audio", "codec_name": "pcm_s16le",
+          "channels": 1, "sample_rate": "48000"}]
+    )
+    record("channel_sync.1ch 默认不对齐", not ok and "1ch" in why, why)
+    ok, why = eligible_audio(
+        [{"codec_type": "audio", "codec_name": "aac", "channels": 1,
+          "sample_rate": "48000"}] * 4
+    )
+    record("channel_sync.非 PCM 不对齐", not ok, why)
+    ok, _ = eligible_audio(
+        [{"codec_type": "audio", "codec_name": "pcm_s24be",
+          "channels": 1, "sample_rate": "48000"}] * 4
+    )
+    record("channel_sync.4xmono PCM 对齐", ok)
+    record("channel_sync.opts 默认值",
+           effective_opts(None)["reference_stream"] == 2)
+
+    # --- 算法包核心断言 (与手交付包 selftest 同源, 合成信号) ---
+    SR = 48_000
+
+    def speech_like(n: int, seed: int = 0) -> np.ndarray:
+        rng = np.random.default_rng(seed)
+        sos = signal.butter(4, [100.0, 4000.0], btype="band", fs=SR,
+                            output="sos")
+        carrier = signal.sosfilt(sos, rng.standard_normal(n))
+        carrier /= np.max(np.abs(carrier)) + 1e-12
+        envelope = np.zeros(n)
+        t = 0.0
+        while t < n / SR:
+            start = int(t * SR)
+            dur = rng.uniform(0.08, 0.4)
+            m = int(dur * SR)
+            if start < n and m > 0:
+                k = np.arange(min(m, n - start))
+                env = rng.uniform(0.4, 1.0) * np.exp(-k / (dur * SR / 3.0))
+                envelope[start: start + len(k)] += env
+            t += rng.uniform(0.15, 0.6) + dur
+        out = carrier * np.minimum(envelope, 1.0)
+        return (out / (np.max(np.abs(out)) + 1e-12)).astype(np.float32)
+
+    def delay_int(x: np.ndarray, n: int) -> np.ndarray:
+        y = np.zeros_like(x)
+        if n >= 0:
+            if n < x.size:
+                y[n:] = x[: x.size - n]
+        else:
+            m = -n
+            if m < x.size:
+                y[: x.size - m] = x[m:]
+        return y
+
+    def delay_frac(x: np.ndarray, delay: float, taps: int = 97) -> np.ndarray:
+        i0 = int(np.floor(delay))
+        frac = delay - i0
+        m = np.arange(-(taps // 2), taps // 2 + 1)
+        h = np.sinc(m - frac) * np.hanning(taps)
+        h /= h.sum()
+        return delay_int(np.convolve(x, h, mode="same"), i0)
+
+    base = speech_like(15 * SR, seed=1)
+    channels = [delay_int(base, 1223), delay_int(base, 1350), base, base]
+    results = measure_channels(channels, reference_index=2)
+    d = {r.channel: r.delay_samples for r in results}
+    record("channel_sync.整数延迟 1223 样本", abs(d[0] - 1223.0) < 0.5,
+           f"measured {d[0]:.2f}")
+    record("channel_sync.整数延迟 1350 样本", abs(d[1] - 1350.0) < 0.5,
+           f"measured {d[1]:.2f}")
+    record("channel_sync.参考通道=0", d[2] == 0.0)
+    record("channel_sync.有线通道≈0", abs(d[3]) < 0.5, f"{d[3]:.2f}")
+    record("channel_sync.恒定判定", results[0].constant)
+    record("channel_sync.置信度>0.5", results[0].confidence > 0.5)
+
+    base2 = speech_like(10 * SR, seed=2)
+    rf = measure_channels(
+        [delay_frac(base2, 1223.4), base2], reference_index=1
+    )[0]
+    record("channel_sync.分数延迟 ±0.15",
+           abs(rf.delay_samples - 1223.4) < 0.15,
+           f"measured {rf.delay_samples:.3f}")
+
+    base3 = speech_like(15 * SR, seed=3)
+    ch3 = [delay_int(base3, 1223), delay_int(base3, 1350), base3, base3]
+    res3 = measure_channels(ch3, reference_index=2)
+    fixed = fix_channels(ch3, [r.delay_samples for r in res3])
+    resid = verify_channels(fixed, reference_index=2)
+    record("channel_sync.修正+复检 残差<0.05ms",
+           all(abs(v) < 0.05 for v in resid),
+           f"residuals={[f'{v:.4f}' for v in resid]}")
+
+    base4 = speech_like(10 * SR, seed=4)
+    rp = measure_delay(base4, -delay_int(base4, 500))
+    record("channel_sync.反相检测+延迟正确",
+           rp.polarity == -1 and abs(rp.delay_samples - 500.0) < 0.5,
+           f"polarity={rp.polarity} delay={rp.delay_samples:.2f}")
+
+    base5 = speech_like(8 * SR, seed=5)
+    silence = np.zeros_like(base5)
+    rs5 = measure_channels([silence, base5], reference_index=1)
+    fixed5 = fix_channels([silence, base5], [rs5[0].delay_samples, 0.0])
+    import math
+    record("channel_sync.静音 nan + 原样保留",
+           math.isnan(rs5[0].delay_samples)
+           and np.array_equal(fixed5[0], silence[: fixed5.shape[1]]))
+
+
 def l1_x265() -> None:
     section("L1 x265 P0 修复断言")
     import json
@@ -1159,6 +1290,64 @@ def l3_pipeline() -> None:
     else:
         expect("C23_quality_sample_FAIL_捕获", False, "classic 输入未生成")
 
+    # C24 延时补偿端到端: 合成 4xmono PCM (注入 CH1 +1223 样本 /
+    # CH2 +900 样本) -> --channel-sync -> 输出复测对齐 (残差<0.1ms)
+    sync_dir = IN_DIR / "sync"
+    sync_dir.mkdir(exist_ok=True)
+    sync_src = sync_dir / "sync_test.MP4"
+    r = sh(ffmpeg, "-v", "error", "-y",
+           "-f", "lavfi",
+           "-i", "anoisesrc=color=pink:duration=8:seed=42:sample_rate=48000",
+           "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30:duration=8",
+           "-filter_complex",
+           "[0:a]asplit=4[x1][x2][x3][x4];"
+           "[x1]adelay=1223S[ch1];[x2]adelay=900S[ch2];"
+           "[x3]anull[ch3];[x4]anull[ch4]",
+           "-map", "[ch1]", "-map", "[ch2]", "-map", "[ch3]",
+           "-map", "[ch4]", "-map", "1:v:0",
+           "-c:a", "pcm_s24be", "-ar", "48000", "-ac", "1",
+           "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+           "-pix_fmt", "yuv420p", "-shortest", sync_src, timeout=900)
+    if r.returncode == 0 and sync_src.is_file():
+        out = OUT_DIR / "c24_channel_sync"
+        rc, tail = _run_1kt(sync_dir, out,
+                            "--encoder", "nvenc", "--preset", "fast",
+                            "--check", "basic", "--channel-sync",
+                            "--jobs", "1", timeout=1200)
+        final = out / "sync_test.MP4"
+        aligned = False
+        if rc == 0 and final.is_file():
+            try:
+                from core.channel_sync import run_channel_sync
+                v = ffprobe_json(final)
+                res = run_channel_sync(
+                    source=final, ffmpeg=ffmpeg,
+                    work_dir=WORK / "c24_recheck",
+                    streams=v.get("streams", []), log=lambda m: None,
+                )
+                delays = [
+                    c["delay_ms"] for c in res.get("channels", [])
+                    if c["stream"] != 2
+                ]
+                aligned = res["status"] in (
+                    "applied", "already_aligned"
+                ) and all(
+                    d is None or abs(d) < 0.1 for d in delays
+                )
+                expect("C24_channel_sync_端到端对齐",
+                       aligned,
+                       f"rc={rc} status={res['status']} "
+                       f"delays={delays} tail={tail[-120:].strip()}")
+            except Exception as exc:
+                expect("C24_channel_sync_端到端对齐", False,
+                       f"{type(exc).__name__}: {exc}")
+        else:
+            expect("C24_channel_sync_端到端对齐", False,
+                   f"rc={rc} tail={tail[-160:].strip()}")
+    else:
+        expect("C24_channel_sync_端到端对齐", False,
+               f"合成文件生成失败 rc={r.returncode}")
+
 
 # ===========================================================================
 # runner
@@ -1174,6 +1363,7 @@ SUITES: dict[str, list[tuple[str, Callable[[], None]]]] = {
         ("gpac/dji", l1_gpac_dji),
         ("x265 P0", l1_x265),
         ("quality/versions", l1_quality),
+        ("channel-sync", l1_channel_sync),
         ("av1", l1_av1),
     ],
     "toolchain": [("toolchain", l2_toolchain)],
