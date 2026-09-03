@@ -189,9 +189,11 @@ olddocs/                 历史档案存档（各阶段代码快照 / 被取代�
    色彩元数据端到端 + 质量对齐）；4:2:2 输出为 Rext，硬解仅 Blackwell，
    归档定位为"压缩归档副本"（母版标准是 FFV1/ProRes）。
 4. **x265 定位**：手动高压缩档。P0 修复已落地并回归（info=false
-   可复现、删除 no-strong-intra-smoothing、level 6.2 + CPB 钳位
-   240Mbit；FAST rd 保持 2 不动）；DJI 素材走同构保留管线（djmd 原生
-   保留）；缩放规则仍 PROVISIONAL。详见
+   可复现、level 6.2 + CPB 钳位 240Mbit；FAST rd 保持 2 不动）；
+   `no-strong-intra-smoothing` **全档开启**（用户决定 2026-09-01：
+   触发帧内强力平滑的条件苛刻、对画面影响低，带上后编码器改用
+   其他平滑手段，细纹理/颗粒保留更好）；DJI 素材走同构保留管线
+   （djmd 原生保留）；缩放规则仍 PROVISIONAL。详见
    `work/x265_test/x265_test_report.md`。
 5. **档位数值权威性**：JSON 数值为作者实测标定，调参须回归测试集。
 

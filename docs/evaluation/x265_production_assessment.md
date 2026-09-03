@@ -18,7 +18,7 @@
 |---|---|---|
 | 命令/管线正确性 | ✅ **可进生产** | 本机实证：4 档完整解析 + x265 4.3 真实素材编码零告警零错误；4:2:2 10bit 自动选型正确 |
 | 参数合法性 | ✅（1 处实质问题） | 官方文档逐项核对 71 参数全部合法；FAST 档 `rd=2` 使 psy-rd 失效；`threaded-me` JSON 中为关闭（=0），与官方结论一致、无需改动 |
-| 归档语义 | ⚠️ 有张力 | `info=1` 破坏可复现性；`no-strong-intra-smoothing=1` 增加 banding 风险；level/CPB 声明超出规格 |
+| 归档语义 | ⚠️ 有张力 | `info=1` 破坏可复现性；`no-strong-intra-smoothing=1` 按用户决定开启（影响低、细纹理更优，2026-09-01）；level/CPB 声明超出规格 |
 | 数值标定 | ⚠️ 缩放规则自标 PROVISIONAL | x265_scaling.json 缩放比率自标 PROVISIONAL；**档位速度注记（285H@10/2/0.8fps）为作者实测标定值，为权威数据**（本机复测因前台负载偏低，见 §6） |
 | 验证证据 | ⚠️ 不足 | 当前日志无 x265 端到端验证记录（溯源见 §7）；机制存在、留档缺失 |
 | 吞吐现实 | ⚠️ **决定性** | 4K60：FAST 15x / HQ 57x / UHQ 180x 实时（受压下限）；无并行调度 |
@@ -54,7 +54,7 @@ hist-scenecut≥3.3、aq-mode 4≥3.2 均满足）。但核查发现实质性问
 | 1 | **FAST 档 `rd=2`**：官方要求 psy-rd/tskip/ssim-rd/cu-lossless 需 `rd≥3` | FAST 的 `psy-rd=1.5` 是**死参数**（静默失效），档位真实行为与配置意图不符 | FAST 升 `rd=3`（激活 psy-rd），或删除死参数 |
 | 2 | `threaded-me`（4.2+ 实验参数）：官方注明**启用时**与 VBV 互斥且降低压缩效率 | **JSON 中从未启用**（四档 `"threaded_me": false`，序列化为 0），与官方"VBV 下禁用"结论一致，属显式默认关闭、无行为差异 | **无需改动**（保留即可） |
 | 3 | `info=1`：写入构建信息 SEI | 同一参数在不同 x265 构建间**输出不可复现**，与归档目标相悖 | 改 `info=0` |
-| 4 | `no-strong-intra-smoothing=1`：移除防条带平滑 | 天空/渐变类素材 banding 风险上升（对 10bit 影响小但非零） | 删除该键（恢复默认平滑） |
+| 4 | `no-strong-intra-smoothing=1`：移除防条带平滑 | 天空/渐变类素材 banding 风险上升（对 10bit 影响小但非零） | **2026-09-01 用户决定全档开启**：触发帧内强力平滑的条件苛刻、对画面影响低；带上后编码器改用其他平滑手段，细纹理/颗粒保留更好（Doom9 实测对比亦支持细纹理方向） |
 | 5 | **level 6.1 过声明 + CPB 超限**：4K60@89-125Mbps 最低合规是 5.1+high-tier；实测动态 VBV 产出 bufsize HQ 268Mbit/UHQ 376Mbit，**超过 Level 6.1 High tier MaxCPB 240Mbit**（x265 不告警，hrd=1 下仍写入） | 严格 level 合规不成立（消费端多数容忍） | level 改 6.2，或 vbv 规则加 CPB 上限钳位，或 bufsize_factor 3.0→2.0 |
 | 6 | `limit-sao`（SAO 早退）：画质有轻微代价 | 可接受权衡 | 保留，档位说明中注明 |
 
@@ -99,7 +99,9 @@ CRF 需 maxrate+bufsize 同时非零才激活 VBV 封顶（本配置满足）；
 - **deblock [-1,-1]**（UHQ/HQ）：去块滤波向细节保留倾斜，噪点素材观感好、
   平坦区风险略增——属风格选择，保留。
 - **SAO：UHQ/FAST 关、HQ/SMALL 开**：档位间逻辑合理（高压缩档开 SAO）。
-- **no-strong-intra-smoothing=1 全档开**：见 §3 问题 4，建议回退。
+- **no-strong-intra-smoothing=1 全档开**：见 §3 问题 4 —— 2026-09-01
+  用户决定保留开启（触发条件苛刻、影响低；细纹理/颗粒方向更优），
+  不再是回退项。
 
 ---
 
@@ -182,9 +184,10 @@ CRF 需 maxrate+bufsize 同时非零才激活 VBV 封顶（本配置满足）；
 ## 9. 进入生产的条件清单
 
 **P0（必须，否则不发布）：**
-1. FAST 档 `rd` 2→3（激活 psy-rd；FAST 定位"快但有效"）
+1. FAST 档 `rd`：用户决定保持 2 不动（psy-rd 静默失效为已知取舍）
 2. `info` true→false（归档可复现性）
-3. 删除 `no_strong_intra_smoothing`（恢复默认防条带平滑）
+3. `no_strong_intra_smoothing`：2026-09-01 用户决定**全档开启**（触发
+   帧内强力平滑条件苛刻、影响低；让编码器改用其他平滑手段）
 4. level/CPB 修正：level-idc 改 6.2，或 vbv 规则加 CPB 上限钳位（≤240Mbit），
    或 bufsize_factor 3.0→2.0（三选一，建议钳位+6.2）
 5. **一轮档位标定回归**：testsets 全谱（4K60/4K30/4:2:2/高噪点）× 4 档跑批，

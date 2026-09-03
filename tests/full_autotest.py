@@ -525,8 +525,11 @@ def l1_x265() -> None:
         # (psy-rd 在 rd<3 时静默失效, 属已知取舍, 不改)
         record(f"x265.{tier}.rd 值域合法", 2 <= int(p["rd"]) <= 6)
         record(f"x265.{tier}.info=false (可复现)", p["info"] is False)
-        record(f"x265.{tier}.无 no-strong-intra-smoothing",
-               "no_strong_intra_smoothing" not in p)
+        # no-strong-intra-smoothing 全档开启 (用户决定 2026-09-01):
+        # 触发帧内强力平滑的条件苛刻, 对画面影响低; 带上后编码器改用
+        # 其他手段平滑 (细纹理/颗粒素材保留更好)
+        record(f"x265.{tier}.no-strong-intra-smoothing 开启",
+               p.get("no_strong_intra_smoothing") is True)
         record(f"x265.{tier}.level 6.2", p["level_idc"] == 6.2)
     # CPB 钳位: 高码率源动态 VBV 产出超限 bufsize -> 应钳到 240000
     from core.models import SourceInfo
