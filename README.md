@@ -50,6 +50,9 @@ python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset all
 # x265 手动高压缩档（软件，慢）
 python 1kt.py --input D:\素材 --output D:\归档 --encoder x265 --preset hq
 
+# 自动延时补偿（无线麦 CH1/CH2 相对有线 CH3 的固定微延迟, 逐文件自动测量+修正）
+python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset hq --channel-sync
+
 # 无人值守 (不弹看板窗口, 全部落日志)
 python 1kt.py ... --headless
 ```
@@ -68,6 +71,23 @@ python 1kt.py ... --headless
 | NVEncC / QSVEncC | `tools/NVEncC_9.31_x64/`、`tools/QSVEncC_8.26_x64/`（或 `--tool-*`） |
 | ffmpeg / ffprobe | 9.0.1 gyan full（tools/ 自带，内置 libx265/libsvtav1/libvmaf） |
 | Gyroflow（可选） | 消费端校验（`--check advanced/full`；未安装则提示并跳过） |
+| numpy / scipy（可选） | 仅 `--channel-sync` 延时补偿需要（缺失时该功能跳过并 WARNING，转码不受影响） |
+
+## 自动延时补偿：`--channel-sync`
+
+无线麦克风（CH1/CH2）经数字无线链路相比有线通道（CH3/CH4）存在逐文件
+变化的固定微延迟（实测 19.7–29.5 ms）。开启后对每条音轨自动执行
+**GCC-PHAT 测量 → 质量门 → 窗 sinc 逐样本修正 → 复检**，全程无人工
+常数（参考通道 = CH3，即第 3 条音轨）：
+
+- **适用布局**：≥3 条独立单声道 PCM 流（多流无线麦录制）；
+  **2ch（立体声）/1ch（单声道）布局默认不做对齐**（用户决定）
+- 质量门不过（置信度 <0.3 / 非恒定 / 复检残差 ≥0.05ms）→ 原音频
+  照旧 + 显著 WARNING，绝不静音或乱移
+- 修正尾部补零保全长（轨道时长与源一致，Sony/DJI 结构校验不受影响）
+- 三条路径（Sony 保留 / DJI 保留 / 经典）均接入；测量报告
+  `channel_sync_<名>.json` 落盘
+- 算法来自 ChronoSync 交付包（`core/mp4_channel_sync.py`，MIT）
 
 ## 编码后验证：`--check basic|advanced|full`
 

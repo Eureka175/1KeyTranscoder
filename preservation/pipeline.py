@@ -90,8 +90,11 @@ def run_sony_pipeline(
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
+    audio_sources: list[Path] | None = None,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
+    """audio_sources: 延时补偿后的音频中间文件 (与 bundle.audio_tracks
+    一一对应); 提供时重建改用其音轨替代源音轨原生复制。"""
     work_dir.mkdir(parents=True, exist_ok=True)
 
     def step(msg: str) -> None:
@@ -207,8 +210,19 @@ def run_sony_pipeline(
     stage.parent.mkdir(parents=True, exist_ok=True)
     adds = [f"{encoded_mov}#video"]
     if has_audio:
-        for at in bundle.audio_tracks:
-            adds.append(f"{source}#{at.track_id}")
+        if audio_sources:
+            # 延时补偿: 修正后的音频中间文件替代源音轨 (尾补零保全长,
+            # 时长/时基与源一致, 结构校验不受影响)
+            if len(audio_sources) != len(bundle.audio_tracks):
+                raise RuntimeError(
+                    f"audio_sources count {len(audio_sources)} != "
+                    f"source audio tracks {len(bundle.audio_tracks)}"
+                )
+            for af in audio_sources:
+                adds.append(f"{af}#audio")
+        else:
+            for at in bundle.audio_tracks:
+                adds.append(f"{source}#{at.track_id}")
     for track in bundle.tracks:
         adds.append(f"{source}#{track.track_id}")
     step("muxing video+audio+metadata tracks with MP4Box (native copy)...")

@@ -246,6 +246,7 @@ def dji_rebuild(
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
+    audio_sources: list[Path] | None = None,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """Shared DJI rebuild tail (encoder-agnostic).
@@ -254,6 +255,9 @@ def dji_rebuild(
     djmd/dbgi/tmcd native copies) -> optional stts duration repair
     (hardware rigaya intermediates only; ffmpeg/x265 intermediates
     pass fix_hw_timing=False) -> run_dji_check -> report.json.
+
+    audio_sources: 延时补偿后的音频中间文件 (与源音轨一一对应);
+    提供时替代源音轨的原生复制。
 
     Used by the hardware DJI path (core/batch_hw) and the x265 DJI
     path (1kt.py) so both keep identical container fidelity.
@@ -275,8 +279,17 @@ def dji_rebuild(
 
     gpac.movie_timescale = movie_ts
     adds = [f"{encoded_mov}#video"]
-    for aid in specs["audio_ids"]:
-        adds.append(f"{original}#{aid}")
+    if audio_sources:
+        if len(audio_sources) != len(specs["audio_ids"]):
+            raise RuntimeError(
+                f"audio_sources count {len(audio_sources)} != "
+                f"source audio tracks {len(specs['audio_ids'])}"
+            )
+        for af in audio_sources:
+            adds.append(f"{af}#audio")
+    else:
+        for aid in specs["audio_ids"]:
+            adds.append(f"{original}#{aid}")
     for did, _ in specs["data_ids"]:
         adds.append(f"{original}#{did}")
     final.parent.mkdir(parents=True, exist_ok=True)
