@@ -1964,6 +1964,255 @@ def l3_channel_sync_p1() -> None:
         expect("C26_复检门_仅回退该轨", False, "合成失败")
 
 
+def l3_channel_sync_p1_algo() -> None:
+    """L3 延时补偿 P1 算法级专项 (纯音频算法, 进程内 run_channel_sync,
+    不经过任何视频转码管线 — 可在不跑编码流程时单独执行)。"""
+    section("L3 延时补偿 P1 算法级 (音频专用, 无转码)")
+    import hashlib
+
+    try:
+        import numpy as np
+    except ImportError:
+        record("l3.p1_algo_numpy_可用", False, "numpy 缺失 — 本组跳过")
+        return
+    record("l3.p1_algo_numpy_可用", True)
+    p1d = IN_DIR / "sync_p1" / "d"
+    p1d.mkdir(parents=True, exist_ok=True)
+
+    def expect(case: str, cond: bool, detail: str) -> None:
+        record(f"l3.{case}", cond, detail)
+
+    def shb(*args: str, timeout: int = 3600) -> tuple[int, bytes]:
+        r = subprocess.run(
+            [str(a) for a in args], stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            check=False, timeout=timeout,
+        )
+        return r.returncode, (r.stdout or b"")
+
+    def make_audio4(name: str, specs: list[str], codec: str = "pcm_s24le",
+                    ar: int = 48000, dur: int = 8) -> Path | None:
+        """4×mono 音频专用文件: specs[i] = "lavfi输入[|滤镜链]"。"""
+        p = p1d / name
+        cmd = [FFMPEG, "-v", "error", "-y"]
+        for i, s in enumerate(specs):
+            src, _, _filt = s.partition("|")
+            cmd += ["-f", "lavfi", "-i", src]
+        fc, maps = [], []
+        for i, s in enumerate(specs):
+            _src, has_f, filt = s.partition("|")
+            if has_f:
+                fc.append(f"[{i}:a]{filt}[c{i}]")
+                maps += ["-map", f"[c{i}]"]
+            else:
+                maps += ["-map", f"{i}:a:0"]
+        if fc:
+            cmd += ["-filter_complex", ";".join(fc)]
+        cmd += maps
+        cmd += ["-c:a", codec, "-ar", str(ar), "-ac", "1", "-f", "mov", p]
+        r = sh(*cmd, timeout=900)
+        return p if (p.is_file() and r.returncode == 0) else None
+
+    def sync_of(p: Path, opts: dict | None = None, name: str = "algo") -> dict:
+        from core.channel_sync import run_channel_sync
+
+        v = ffprobe_json(p)
+        return run_channel_sync(
+            source=p, ffmpeg=FFMPEG, work_dir=WORK / f"{name}_sync",
+            streams=v.get("streams", []), opts=opts, log=lambda m: None,
+        )
+
+    def mux4(dst: Path, parts: list[Path]) -> bool:
+        if not (len(parts) == 4 and all(p.is_file() for p in parts)):
+            return False
+        r = sh(FFMPEG, "-v", "error", "-y",
+               "-i", parts[0], "-i", parts[1], "-i", parts[2],
+               "-i", parts[3],
+               "-map", "0:a:0", "-map", "1:a:0", "-map", "2:a:0",
+               "-map", "3:a:0",
+               "-c", "copy", "-shortest", dst, timeout=600)
+        return dst.is_file() and r.returncode == 0
+
+    def decode_f32(p: Path, idx: int) -> np.ndarray | None:
+        rc, out = shb(FFMPEG, "-v", "error", "-i", p,
+                      "-map", f"0:a:{idx}", "-f", "f32le", "-")
+        return np.frombuffer(out, dtype="<f4") if rc == 0 else None
+
+    def np_delay_raw(name: str, delay_samples: float, frac: float = 0.0,
+                     seed: int = 20) -> Path:
+        """numpy 构造带延迟轨的 raw (支持负延迟与分数延迟)。"""
+        r = sh(FFMPEG, "-v", "error", "-y", "-f", "lavfi",
+               "-i", f"anoisesrc=color=pink:duration=8:seed={seed}:"
+                     "sample_rate=48000",
+               "-f", "f32le", p1d / f"{name}_src.f32", timeout=600)
+        noise = np.fromfile(p1d / f"{name}_src.f32", dtype="<f4")
+        noise = noise.astype(np.float64)
+        if frac:
+            taps = 97
+            mm = np.arange(-(taps // 2), taps // 2 + 1)
+            hh = np.sinc(mm - frac) * np.hanning(taps)
+            hh /= hh.sum()
+            noise = np.convolve(noise, hh, mode="same")
+        total = noise.shape[0]
+        if delay_samples >= 0:
+            # 晚到 delay: 内容后移, 尾部延长 (adelay 约定)
+            total += int(delay_samples)
+            out = np.zeros(total, dtype=np.float32)
+            out[int(delay_samples):] = noise.astype(np.float32)
+        else:
+            # 早到 |delay|: 内容前移, 保全长 (尾部补零)
+            out = np.zeros(total, dtype=np.float32)
+            out[: total - int(-delay_samples)] = noise[
+                int(-delay_samples):
+            ].astype(np.float32)
+        raw = p1d / f"{name}.raw"
+        raw.write_bytes(out.tobytes())
+        return raw
+
+    def raw_to_mov(name: str, codec: str = "pcm_s24le") -> Path:
+        r = sh(FFMPEG, "-v", "error", "-y",
+               "-f", "f32le", "-ar", "48000", "-ac", "1",
+               "-i", p1d / f"{name}.raw", "-c:a", codec, "-f", "mov",
+               p1d / f"{name}.mov", timeout=600)
+        return p1d / f"{name}.mov"
+
+    # C27: 负延迟端到端 (CH1 早到 900 样本 -> shift -900 后移 + 头补零)
+    src27 = p1d / "sync_p1_k.mov"
+    r1 = np_delay_raw("k_neg", -900, seed=20)
+    r2 = sh(FFMPEG, "-v", "error", "-y", "-f", "lavfi",
+            "-i", "anoisesrc=color=pink:duration=8:seed=20:sample_rate=48000",
+            "-filter_complex", "[0:a]adelay=900S[o]",
+            "-map", "[o]", "-c:a", "pcm_s24le", "-ar", "48000", "-ac", "1",
+            "-f", "mov", p1d / "k_pos.mov", timeout=600)
+    r3 = sh(FFMPEG, "-v", "error", "-y", "-f", "lavfi",
+            "-i", "anoisesrc=color=pink:duration=8:seed=20:sample_rate=48000",
+            "-c:a", "pcm_s24le", "-ar", "48000", "-ac", "1",
+            "-f", "mov", p1d / "k_ref.mov", timeout=600)
+    r4 = sh(FFMPEG, "-v", "error", "-y", "-f", "lavfi",
+            "-i", "anoisesrc=color=pink:duration=8:seed=20:sample_rate=48000",
+            "-filter_complex", "[0:a]adelay=1223S[o]",
+            "-map", "[o]", "-c:a", "pcm_s24le", "-ar", "48000", "-ac", "1",
+            "-f", "mov", p1d / "k_ch4.mov", timeout=600)
+    if mux4(src27, [raw_to_mov("k_neg"), p1d / "k_pos.mov",
+                    p1d / "k_ref.mov", p1d / "k_ch4.mov"]):
+        res27 = sync_of(src27, name="c27")
+        r27 = {c["stream"]: c for c in res27.get("channels", [])}
+        expect("C27_负延迟_shift负数",
+               res27["status"] == "applied"
+               and r27.get(0, {}).get("decision") == "fixed"
+               and r27.get(0, {}).get("shift_samples") == -900
+               and r27.get(1, {}).get("decision") == "fixed"
+               and r27.get(1, {}).get("shift_samples") == 900
+               and r27.get(3, {}).get("decision") == "fixed",
+               f"status={res27['status']} "
+               f"rows={json.dumps(r27, ensure_ascii=False)}")
+        # 修正后的 CH1 音频文件 vs 参考轨: 直接用算法复测残差
+        af0 = WORK / "c27_sync" / "audio_0.mov"
+        ref3 = decode_f32(p1d / "k_ref.mov", 0)
+        fx0 = decode_f32(af0, 0) if af0.is_file() else None
+        if ref3 is not None and fx0 is not None:
+            from core import sync_estimate
+
+            ee = sync_estimate.estimate_pair(
+                ref3, fx0, sample_rate=48000, search_window_ms=80.0,
+                frame_ms=200.0, hop_ms=100.0,
+                anchor_segment_seconds=3.0, min_confidence=0.3,
+            )
+            expect("C27_负延迟_修正轨已对齐",
+                   abs(ee.delay_samples) <= 2.0 and ee.confidence > 0.5,
+                   f"residual={ee.delay_samples:.2f} samples "
+                   f"conf={ee.confidence:.2f}")
+        else:
+            expect("C27_负延迟_修正轨已对齐", False, "audio_0.mov 缺失")
+    else:
+        expect("C27_负延迟_shift负数", False, "合成失败")
+        expect("C27_负延迟_修正轨已对齐", False, "合成失败")
+
+    # C28: 96kHz 端到端
+    src28 = make_audio4(
+        "sync_p1_l.mov", [
+            "anoisesrc=color=pink:duration=8:seed=21:sample_rate=96000|adelay=300S",
+            "anoisesrc=color=pink:duration=8:seed=21:sample_rate=96000|adelay=2446S",
+            "anoisesrc=color=pink:duration=8:seed=21:sample_rate=96000",
+            "anoisesrc=color=pink:duration=8:seed=21:sample_rate=96000|adelay=1223S",
+        ], ar=96000,
+    )
+    if src28:
+        res28 = sync_of(src28, name="c28")
+        r28 = {c["stream"]: c for c in res28.get("channels", [])}
+        expect("C28_96kHz_整数延迟",
+               res28["status"] == "applied"
+               and r28.get(0, {}).get("shift_samples") == 300
+               and r28.get(1, {}).get("shift_samples") == 2446
+               and r28.get(3, {}).get("shift_samples") == 1223,
+               f"status={res28['status']} "
+               f"rows={json.dumps(r28, ensure_ascii=False)}")
+    else:
+        expect("C28_96kHz_整数延迟", False, "96k 合成失败")
+
+    # C29: s32le 源 -> f64 存储管线端到端
+    src29 = make_audio4(
+        "sync_p1_m.mov", [
+            "anoisesrc=color=pink:duration=8:seed=22:sample_rate=48000|adelay=300S",
+            "anoisesrc=color=pink:duration=8:seed=22:sample_rate=48000|adelay=900S",
+            "anoisesrc=color=pink:duration=8:seed=22:sample_rate=48000",
+            "anoisesrc=color=pink:duration=8:seed=22:sample_rate=48000|adelay=1223S",
+        ], codec="pcm_s32le",
+    )
+    if src29:
+        res29 = sync_of(src29, name="c29")
+        r29 = {c["stream"]: c for c in res29.get("channels", [])}
+        expect("C29_s32le_f64管线",
+               res29["status"] == "applied"
+               and r29.get(1, {}).get("decision") == "fixed"
+               and r29.get(1, {}).get("storage_dtype") == "f64"
+               and r29.get(1, {}).get("shift_samples") == 900
+               and r29.get(3, {}).get("decision") == "fixed",
+               f"status={res29['status']} "
+               f"rows={json.dumps(r29, ensure_ascii=False)}")
+    else:
+        expect("C29_s32le_f64管线", False, "s32le 合成失败")
+
+    # C30: f32le 源 + >0dBFS 内容 — 不钳位、样本值不变 (整数移位)
+    src30 = make_audio4(
+        "sync_p1_n.mov", [
+            "anoisesrc=color=pink:duration=8:seed=23:sample_rate=48000|volume=6dB,adelay=300S",
+            "anoisesrc=color=pink:duration=8:seed=23:sample_rate=48000|adelay=900S",
+            "anoisesrc=color=pink:duration=8:seed=23:sample_rate=48000",
+            "anoisesrc=color=pink:duration=8:seed=23:sample_rate=48000",
+        ], codec="pcm_f32le",
+    )
+    if src30:
+        src0 = decode_f32(src30, 0)
+        peak_src = float(np.max(np.abs(src0))) if src0 is not None else 0.0
+        res30 = sync_of(src30, name="c30")
+        r30 = {c["stream"]: c for c in res30.get("channels", [])}
+        fixed30 = WORK / "c30_sync" / "audio_0.mov"
+        ok_vals = False
+        if fixed30.is_file() and src0 is not None:
+            fx = decode_f32(fixed30, 0)
+            if fx is not None and fx.shape[0] == src0.shape[0]:
+                expect_shift = np.zeros_like(src0)
+                expect_shift[: src0.shape[0] - 300] = src0[300:]
+                ok_vals = bool(np.array_equal(fx, expect_shift))
+        expect("C30_f32le超0dBFS_不钳位样本不变",
+               res30["status"] == "applied"
+               and r30.get(0, {}).get("decision") == "fixed"
+               and r30.get(0, {}).get("shift_samples") == 300
+               and peak_src > 1.0 and ok_vals,
+               f"status={res30['status']} peak_src={peak_src:.2f} "
+               f"values_exact={ok_vals}")
+    else:
+        expect("C30_f32le超0dBFS_不钳位样本不变", False, "f32le 合成失败")
+
+    # 清理本组中间文件 (留在输入目录会被当作源文件)
+    for tmp in p1d.glob("k_*"):
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+
+
 # ===========================================================================
 # runner
 # ===========================================================================
@@ -1983,7 +2232,8 @@ SUITES: dict[str, list[tuple[str, Callable[[], None]]]] = {
     ],
     "toolchain": [("toolchain", l2_toolchain)],
     "full": [("pipeline", l3_pipeline),
-             ("channel-sync P1 E2E", l3_channel_sync_p1)],
+             ("channel-sync P1 E2E", l3_channel_sync_p1),
+             ("channel-sync P1 算法级", l3_channel_sync_p1_algo)],
 }
 
 
