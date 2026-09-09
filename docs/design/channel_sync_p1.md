@@ -36,7 +36,8 @@ P1 只做"文件内时间对齐"。"设备固有 latency 标定"、"麦克风空
 - 方向: `delay > 0` = 目标轨比锚点**晚到** → 修正 = 整体前移 delay
   （估计/修正/复检/JSON/日志全链路一致）。
 - 估计数学全程 float64; 中间 raw 存储:
-  `pcm_s16le/s24le → f32le`, `pcm_s32le → f64le`, `pcm_f32le → f32le`。
+  `pcm_s16/s24 (le/be) → f32le`, `pcm_s32 (le/be) → f64le`,
+  `pcm_f32 (le/be) → f32le`。
 - float PCM 不 clamp 到 [-1,1]（允许 |x|>1.0 的合法过 0dBFS 录音）;
   仅检测 NaN/Inf; 整数移位不改变样本值。
 - 输入读取全部 `np.memmap` + 分块（**禁 `np.fromfile()` 全量加载**）;
@@ -53,7 +54,7 @@ P1 只做"文件内时间对齐"。"设备固有 latency 标定"、"麦克风空
 |---|---|
 | 音频流 ≥ 3 | 否则 `not_eligible`（1ch/2ch 布局默认不做对齐 — 用户决定） |
 | 每流 `channels == 1` | 否则 `not_eligible`（立体声内部相位关系不可破坏） |
-| codec ∈ {pcm_s16le, s24le, s32le, f32le} | 否则 `not_eligible`（大端/alaw 等一律拒） |
+| codec ∈ 线性 PCM 八类 {s16/s24/s32/f32 × le/be} | 否则 `not_eligible`（压缩/非线性如 aac/alaw 一律拒）。**用户决定: 大小端无所谓都支持**（实测 A7M5 XAVC-S 为大端 s24be）；任务书 v3 原列小端四类，经真实素材标定放宽 |
 | 全部采样率相同 | 否则 `not_eligible` |
 | 采样率 ∈ {48000, 96000} | 否则 `not_eligible`（**44.1k 显式拒绝**, 不 silently 跑旧算法） |
 | 每轨时长 ≥ `min_audio_seconds` | 轨道级不可测（`insufficient_frames`）; 不影响其它轨 |
@@ -175,7 +176,9 @@ DEFAULTS = {
     "channel_sync_transparent": False,
     "min_audio_streams": 3,
     "supported_sample_rates": [48000, 96000],
-    "supported_codecs": ["pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le"],
+    "supported_codecs": ["pcm_s16le", "pcm_s16be", "pcm_s24le",
+                         "pcm_s24be", "pcm_s32le", "pcm_s32be",
+                         "pcm_f32le", "pcm_f32be"],
     "min_audio_seconds": 2.0,
     "silent_rms_dbfs": -60.0,
     "search_window_ms": 80.0,
@@ -210,7 +213,7 @@ traj_mad_ms / traj_spread_samples / usable_frames`。
 ## 13. 测试矩阵（tests/full_autotest.py）
 
 - **L1 `channel-sync P1`（26 断言, 纯逻辑无外部工具）**: DEFAULTS v3 /
-  eligible 边界（44.1k/96k/混合采样率/大端/非 PCM） / shift_stream
+  eligible 边界（44.1k/96k/混合采样率/大小端 PCM 接受/非 PCM 拒绝） / shift_stream
   正负整数与分数 rint、样本值不变、memmap / 48k+96k 整数与分数精估 /
   复检（整数残差 <0.05ms、0.4 样本残余检出）/ 中途 50ms 跳变与 10ppm
   漂移 → non_constant / 100ms 超窗（窄窗不可测+宽窗测出）/ 反相 /

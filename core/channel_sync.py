@@ -2,8 +2,8 @@
 
 流程 (transcode 模式; transparent 模式跳过视频编码, 见下):
   1. effective_opts 归一 (DEFAULTS + 用户覆盖, 旧键 max_lag_seconds 兼容);
-  2. eligible_audio(): 文件级边界 — 音频流 >= 3 / 每流单声道 / 小端 PCM
-     (s16le/s24le/s32le/f32le) / 采样率一致且 ∈ {48000, 96000};
+  2. eligible_audio(): 文件级边界 — 音频流 >= 3 / 每流单声道 / 线性 PCM
+     (s16/s24/s32/f32 × le/be) / 采样率一致且 ∈ {48000, 96000};
      **2ch/1ch 布局默认不做对齐** (用户决定); 44.1kHz 显式拒绝;
   3. ffmpeg 逐流解码 raw (存储精度按 §6.2 表: s32 源走 f64, 其余 f32),
      逐轨健康检查 (NaN/Inf / 静音 RMS / 最短时长) — 轨道级状态;
@@ -70,7 +70,11 @@ DEFAULTS: dict[str, Any] = {
     "min_audio_streams": 3,              # 至少 3 条独立单声道 PCM 流才启用
     "supported_sample_rates": [48000, 96000],  # 仅 48k/96k (44.1k 显式拒绝)
     "supported_codecs": [
-        "pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le",
+        # 用户决定: 大小端无所谓, 都支持; 需要排除的是 44.1kHz 采样率
+        "pcm_s16le", "pcm_s16be",
+        "pcm_s24le", "pcm_s24be",
+        "pcm_s32le", "pcm_s32be",
+        "pcm_f32le", "pcm_f32be",
     ],
     "min_audio_seconds": 2.0,            # 初值, 待真实素材标定 (过短轨=轨道级不可测)
     "silent_rms_dbfs": -60.0,            # 初值, 待真实素材标定 (整轨静音判定)
@@ -169,9 +173,10 @@ def eligible_audio(streams: list[dict[str, Any]]) -> tuple[bool, str]:
     (单声道) 布局默认不做对齐** — 立体声流内部相位关系不应被通道间
     重排破坏, 单流无从对齐。
 
-    P1 起采样率限定 48k/96k (44.1k 等一律显式拒绝并 WARNING — 有意的
-    范围收窄, 不再 silently 跑旧算法), codec 限定小端 PCM 四类
-    (s16le/s24le/s32le/f32le, 大端/alaw 等一律拒), 各流采样率须一致。
+    P1 起采样率限定 48k/96k (**44.1k 等一律显式拒绝**并 WARNING — 有意的
+    范围收窄, 不再 silently 跑旧算法), codec 支持线性 PCM 八类
+    (s16/s24/s32/f32 × 小端/大端 — 用户决定: 大小端无所谓, 都支持),
+    压缩/非线性格式 (aac/alaw 等) 一律拒, 各流采样率须一致。
     """
     audio = [s for s in streams if s.get("codec_type") == "audio"]
     if len(audio) < DEFAULTS["min_audio_streams"]:
@@ -435,7 +440,10 @@ def run_channel_sync(
     audio = [s for s in streams if s.get("codec_type") == "audio"]
     sample_rate = int(audio[0].get("sample_rate", 0) or 0)
     codecs = [str(st.get("codec_name", "")) for st in audio]
-    storage = ["f64" if c == "pcm_s32le" else "f32" for c in codecs]
+    storage = [
+        "f64" if c in ("pcm_s32le", "pcm_s32be") else "f32"
+        for c in codecs
+    ]
     n_tracks = len(audio)
     min_samples = max(1, int(round(eff["min_audio_seconds"] * sample_rate)))
 
@@ -461,8 +469,9 @@ def run_channel_sync(
             "traj_mad_ms": None,
             "traj_spread_samples": None,
             "usable_frames": None,
+            "rms_dbfs": None,
         }
-        if codecs[i] == "pcm_s32le":
+        if codecs[i] in ("pcm_s32le", "pcm_s32be"):
             row["precision_note"] = "s32 source processed via f64 pipeline"
         return row
 
@@ -511,7 +520,7 @@ def run_channel_sync(
             "traj_spread_samples": j(stats.spread_samples, 3),
             "usable_frames": e.usable_frames,
         }
-        if codecs[i] == "pcm_s32le":
+        if codecs[i] in ("pcm_s32le", "pcm_s32be"):
             row["precision_note"] = "s32 source processed via f64 pipeline"
         return row
 
@@ -539,14 +548,20 @@ def run_channel_sync(
 
         # 2. 逐轨健康检查 (轨道级状态; 不健康轨 -> untouched, 不阻止其它轨)
         health: list[tuple[bool, str | None, float]] = []
+        rms_of: dict[int, float | None] = {}
         rows: list[dict] = [plain_row(i, "untouched", None)
                             for i in range(n_tracks)]
         for i, a in enumerate(arrs):
             if a.shape[0] < min_samples:
                 health.append((False, "insufficient_frames", float("nan")))
                 rows[i]["reason"] = "insufficient_frames"
+                rms_of[i] = None
                 continue
             finite, rms_db = _track_health(a, np)
+            rms_of[i] = rms_db if rms_db == rms_db else None
+            rows[i]["rms_dbfs"] = (
+                round(rms_db, 1) if rms_db == rms_db else None
+            )
             if not finite:
                 health.append((False, "non_finite", rms_db))
                 rows[i]["reason"] = "non_finite"
@@ -634,6 +649,10 @@ def run_channel_sync(
         anchor_row.update({
             "delay_ms": 0.0, "delay_samples": 0.0, "confidence": 1.0,
             "constant": True, "fine_delay_ms": 0.0,
+            "rms_dbfs": (
+                round(rms_of[anchor], 1)
+                if rms_of.get(anchor) is not None else None
+            ),
         })
         rows[anchor] = anchor_row
         to_fix: list[int] = []
@@ -729,6 +748,9 @@ def run_channel_sync(
                     reason_ = "out_of_range"
             if reason_ is not None:
                 rows[i] = est_row(i, e, stats, "untouched", reason_)
+                rows[i]["rms_dbfs"] = (
+                    round(rms_of[i], 1) if rms_of.get(i) is not None else None
+                )
                 log(
                     f"channel-sync: CH{i + 1} {reason_} (conf "
                     f"{e.confidence:.2f}, usable {e.usable_frames}, "
@@ -741,6 +763,9 @@ def run_channel_sync(
             else:
                 rows[i] = est_row(i, e, stats, "fixed", None)
                 to_fix.append(i)
+            rows[i]["rms_dbfs"] = (
+                round(rms_of[i], 1) if rms_of.get(i) is not None else None
+            )
 
         log(
             f"channel-sync: anchor=CH{anchor + 1}, measured "

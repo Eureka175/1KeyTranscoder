@@ -688,8 +688,12 @@ def l1_channel_sync_p1() -> None:
         [mono(48000), mono(96000), mono(48000), mono(48000)]
     )
     record("p1.混合采样率拒绝", not ok and "mixed" in why, why)
+    ok, why = eligible_audio([mono(48000, "pcm_s16be")] * 4)
+    record("p1.s16be 大端接受", ok, why)
     ok, why = eligible_audio([mono(48000, "pcm_s24be")] * 4)
-    record("p1.大端 PCM 拒绝", not ok, why)
+    record("p1.s24be 大端接受 (A7M5 XAVC-S)", ok, why)
+    ok, why = eligible_audio([mono(48000, "pcm_f32be")] * 4)
+    record("p1.f32be 大端接受", ok, why)
     ok, why = eligible_audio([mono(48000, "aac")] * 4)
     record("p1.非 PCM 拒绝", not ok, why)
 
