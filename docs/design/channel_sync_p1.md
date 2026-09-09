@@ -229,6 +229,11 @@ traj_mad_ms / traj_spread_samples / usable_frames`。
   轨）untouched 且其它轨同步; C25 全不相关 → measure_failed /
   no_valid_anchor; C26 复检门（verify_max_ms=0.005 + CH4 分数延迟
   1223.4 样本）→ 仅 CH4 回退 recheck_residual, CH2 照常 fixed。
+- **L3 `channel-sync P1 算法级`（6 断言, 纯音频算法、不经过任何视频转码
+  管线, 可单独执行）**: C27 负延迟端到端（CH1 早到 900 样本 → shift
+  -900, 修正轨复测残差 0.00）; C28 96kHz 整数延迟; C29 s32le 源 →
+  f64 存储管线; C30 f32le 源 + >0dBFS 内容（峰值 1.65）不钳位、整数
+  移位后样本逐位不变。
 - 既有 L1 `channel-sync`（vendored 算法包断言）与 L3 C14（转码端到端）
   保持并适配 P1 输入边界（C14 生成器改用 `pcm_s24le`）。
 - 零回归: `--channel-sync` 关闭时输出与主线行为一致（C1–C13 不变）。
