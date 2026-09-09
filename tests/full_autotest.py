@@ -2205,6 +2205,91 @@ def l3_channel_sync_p1_algo() -> None:
     else:
         expect("C30_f32le超0dBFS_不钳位样本不变", False, "f32le 合成失败")
 
+    # C31: 近窗缘延迟 (68.75ms, 窄窗边缘置信不足) -> 宽窗采纳后照常修正
+    src31 = make_audio4(
+        "sync_p1_o.mov", [
+            "anoisesrc=color=pink:duration=8:seed=24:sample_rate=48000|adelay=300S",
+            "anoisesrc=color=pink:duration=8:seed=24:sample_rate=48000|adelay=3300S",
+            "anoisesrc=color=pink:duration=8:seed=24:sample_rate=48000",
+            "anoisesrc=color=pink:duration=8:seed=24:sample_rate=48000|adelay=1223S",
+        ],
+    )
+    if src31:
+        res31 = sync_of(src31, name="c31")
+        r31 = {c["stream"]: c for c in res31.get("channels", [])}
+        expect("C31_近窗缘_宽窗采纳修正",
+               res31["status"] == "applied"
+               and r31.get(1, {}).get("decision") == "fixed"
+               and r31.get(1, {}).get("shift_samples") == 3300,
+               f"status={res31['status']} "
+               f"rows={json.dumps(r31, ensure_ascii=False)}")
+    else:
+        expect("C31_近窗缘_宽窗采纳修正", False, "合成失败")
+
+    # C32: 覆盖率门确定性触发宽窗采纳 (稀疏语音内容, 天然覆盖率 ~65%) —
+    # 修正阶段必须用采纳后的估计 (回归: 曾误用窄窗 NaN delay 导致崩溃/误标)
+    def speech_like(n: int, seed: int, fs: int) -> np.ndarray:
+        from scipy import signal as _sig
+
+        rng = np.random.default_rng(seed)
+        sos = _sig.butter(4, [100.0, 4000.0], btype="band", fs=fs,
+                          output="sos")
+        carrier = _sig.sosfilt(sos, rng.standard_normal(n))
+        carrier /= np.max(np.abs(carrier)) + 1e-12
+        envelope = np.zeros(n)
+        t = 0.0
+        while t < n / fs:
+            start = int(t * fs)
+            dur = rng.uniform(0.08, 0.4)
+            m = int(dur * fs)
+            if start < n and m > 0:
+                k = np.arange(min(m, n - start))
+                envelope[start: start + len(k)] += (
+                    rng.uniform(0.4, 1.0) * np.exp(-k / (dur * fs / 3.0))
+                )
+            t += rng.uniform(0.15, 0.6) + dur
+        out = carrier * np.minimum(envelope, 1.0)
+        return (out / (np.max(np.abs(out)) + 1e-12)).astype(np.float32)
+
+    def write_speech_mov(name: str, delay: int, seed: int = 25) -> Path:
+        SR = 48000
+        base = speech_like(8 * SR, seed=seed, fs=SR)
+        out = np.zeros(base.shape[0] + max(0, delay), dtype=np.float32)
+        if delay >= 0:
+            out[delay:] = base
+        else:
+            out[: base.shape[0] + delay] = base[-delay:]
+        raw = p1d / f"{name}.raw"
+        raw.write_bytes(out.tobytes())
+        r = sh(FFMPEG, "-v", "error", "-y",
+               "-f", "f32le", "-ar", "48000", "-ac", "1",
+               "-i", raw, "-c:a", "pcm_s24le", "-f", "mov",
+               p1d / f"{name}.mov", timeout=600)
+        try:
+            raw.unlink()
+        except OSError:
+            pass
+        return p1d / f"{name}.mov"
+
+    src32 = p1d / "sync_p1_p.mov"
+    if mux4(src32, [write_speech_mov("p1", 300),
+                    write_speech_mov("p2", 3300),
+                    write_speech_mov("p3", 0),
+                    write_speech_mov("p4", 1223)]):
+        res32 = sync_of(
+            src32, opts={"min_usable_fraction": 0.95}, name="c32"
+        )
+        r32 = {c["stream"]: c for c in res32.get("channels", [])}
+        expect("C32_宽窗采纳_修正阶段用采纳估计",
+               res32["status"] == "applied"
+               and r32.get(1, {}).get("decision") == "fixed"
+               and r32.get(1, {}).get("shift_samples") == 3300
+               and r32.get(1, {}).get("reason") is None,
+               f"status={res32['status']} "
+               f"rows={json.dumps(r32, ensure_ascii=False)}")
+    else:
+        expect("C32_宽窗采纳_修正阶段用采纳估计", False, "合成失败")
+
     # 清理本组中间文件 (留在输入目录会被当作源文件)
     for tmp in p1d.glob("k_*"):
         try:
