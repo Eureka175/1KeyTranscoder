@@ -488,10 +488,13 @@ def run_channel_sync(
             "confidence": round(e.confidence, 3),
             "polarity": e.polarity,
             "drift_ppm": round(stats.drift_ppm, 2),
+            # 与决策门一致: MAD + 极差 + 漂移 ppm 三门 (classify_constant)
             "constant": bool(
-                stats.mad_ms == stats.mad_ms
-                and stats.mad_ms <= eff["mad_max_ms"]
-                and abs(stats.drift_ppm) <= eff["constant_max_ppm"]
+                sync_estimate.classify_constant(
+                    stats, mad_max_ms=eff["mad_max_ms"],
+                    max_ppm=eff["constant_max_ppm"],
+                    sample_rate=sample_rate,
+                )
             ),
             "warnings": warnings,
             "decision": decision,
@@ -634,6 +637,7 @@ def run_channel_sync(
         })
         rows[anchor] = anchor_row
         to_fix: list[int] = []
+        used_est: dict[int, Any] = {}   # 每轨最终采用的估计 (窄窗或宽窗)
         for i in healthy:
             if i == anchor:
                 continue
@@ -663,6 +667,7 @@ def run_channel_sync(
                         e, stats = ew, sync_estimate.summarize_trajectory(
                             ew.frames, sample_rate
                         )
+                        used_est[i] = ew
                         log(
                             f"channel-sync: CH{i + 1} 窄窗无可测帧, "
                             f"宽窗窗内测出 {ew.delay_ms:+.3f}ms — 采用宽窗估计"
@@ -682,6 +687,7 @@ def run_channel_sync(
                         e, stats = ew, sync_estimate.summarize_trajectory(
                             ew.frames, sample_rate
                         )
+                        used_est[i] = ew
                         log(
                             f"channel-sync: CH{i + 1} 窄窗证据覆盖率 "
                             f"{coverage:.0%} 不足, 采用宽窗估计 "
@@ -741,9 +747,10 @@ def run_channel_sync(
             + ", ".join(
                 f"CH{i + 1}="
                 + (
-                    f"{ests[i].delay_samples * 1000.0 / sample_rate:+.3f}ms"
-                    f"(conf {ests[i].confidence:.2f})"
-                    if ests[i].delay_samples == ests[i].delay_samples
+                    f"{used_est.get(i, ests[i]).delay_samples * 1000.0 / sample_rate:+.3f}ms"
+                    f"(conf {used_est.get(i, ests[i]).confidence:.2f})"
+                    if used_est.get(i, ests[i]).delay_samples
+                    == used_est.get(i, ests[i]).delay_samples
                     else "nan"
                 )
                 for i in healthy if i != anchor
@@ -753,7 +760,7 @@ def run_channel_sync(
         # 5. 逐轨修正 (纯整数移位) + 独立复检 (失败只回退该轨)
         fixed_ok: list[int] = []
         for i in to_fix:
-            e = ests[i]
+            e = used_est.get(i, ests[i])   # 宽窗采纳轨用采纳估计 (窄窗 delay 可能为 NaN)
             shift = int(np.rint(e.delay_samples))
             try:
                 sync_fix.shift_stream(
