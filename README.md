@@ -58,8 +58,11 @@ python 1kt.py --input D:\素材 --output D:\归档 --encoder svtav1 --preset hq
 # AV1 硬件档（Sony/DJI 均走保留管线, 不打 XAVC tag）
 python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc-av1 --preset hq
 
-# 自动延时补偿（无线麦 CH1/CH2 相对有线 CH3 的固定微延迟, 逐文件自动测量+修正）
+# 自动延时补偿（无线麦 CH1/CH2 相对有线参考的逐文件观测时差, 自动测量+整数样本修正）
 python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset hq --channel-sync
+
+# 透明模式（剪辑前预处理: 跳过视频编码, 视频/非音频流 stream copy, 仅修音频轨）
+python 1kt.py --input D:\素材 --output D:\归档 --channel-sync-transparent
 
 # 无人值守 (不弹看板窗口, 全部落日志)
 python 1kt.py ... --headless
@@ -83,21 +86,54 @@ DJI（djmd）→ DJI
 | Gyroflow（可选） | 消费端校验（`--check advanced/full`；未安装则提示并跳过） |
 | numpy / scipy（可选） | 仅 `--channel-sync` 延时补偿需要（缺失时该功能跳过并 WARNING，转码不受影响） |
 
-## 自动延时补偿：`--channel-sync`
+## 自动延时补偿：`--channel-sync`（P1）
 
 无线麦克风（CH1/CH2）经数字无线链路相比有线通道（CH3/CH4）存在逐文件
-变化的固定微延迟（实测 19.7–29.5 ms）。开启后对每条音轨自动执行
-**GCC-PHAT 测量 → 质量门 → 窗 sinc 逐样本修正 → 复检**，全程无人工
-常数（参考通道 = CH3，即第 3 条音轨）：
+变化的固定微延迟（实测 19.7–29.5 ms）。P1（`algo 2.3.0-p1`）开启后对
+每条音轨自动执行 **GCC-PHAT 两阶段测量（8kHz 粗扫 + 全速率精测）→
+相位斜率精估 → 轨道级质量门 → 纯整数样本移位 → 复检**，全程无人工
+常数；锚点按候选顺序 **CH3 > CH4 > CH1 > CH2 自动回退**（CH3 只是
+默认优先级最高，不是"真值基准"）：
 
-- **适用布局**：≥3 条独立单声道 PCM 流（多流无线麦录制）；
-  **2ch（立体声）/1ch（单声道）布局默认不做对齐**（用户决定）
-- 质量门不过（置信度 <0.3 / 非恒定 / 复检残差 ≥0.05ms）→ 原音频
-  照旧 + 显著 WARNING，绝不静音或乱移
-- 修正尾部补零保全长（轨道时长与源一致，Sony/DJI 结构校验不受影响）
+- **支持 48kHz / 96kHz；44.1kHz 显式拒绝**（有意的范围收窄，不会
+  silently 跑旧算法）；codec 限小端 PCM（s16le/s24le/s32le/f32le）
+- **适用布局**：≥3 条独立单声道 PCM 流；**2ch（立体声）/1ch（单声道）
+  布局默认不做对齐**（用户决定）
+- **默认修正 = 纯整数样本移位**（48k 下最大量化残差 0.5 sample ≈
+  10.4 µs），无滤波、无插值、样本值不变；尾部补零保全长（轨道时长
+  与源一致，Sony/DJI 结构校验不受影响）
+- **轨道级部分成功**：空轨/静音轨（`silent_track`）、NaN/Inf
+  （`non_finite`）、低置信（`low_confidence`）、非恒定
+  （`non_constant`）、超搜索窗（`out_of_range`）、复检超差
+  （`recheck_residual`）的轨一律 `untouched` 原样保留，**不阻止其它
+  健康轨同步**；文件级失败（无有效锚点/全部健康轨均不可靠）才整文件
+  原音频不动
+- **恒定性**只做 constant/non_constant 二分（MAD + 极差 + 漂移 ppm），
+  不做漂移 `resample`；P1 不提供 fractional sinc 生产模式
+- 质量门不过或复检超差 → 该轨原样 + 显著 WARNING，绝不静音或乱移
 - 三条路径（Sony 保留 / DJI 保留 / 经典）均接入；测量报告
-  `channel_sync_<名>.json` 落盘
-- 算法来自 ChronoSync 交付包（`core/mp4_channel_sync.py`，MIT）
+  `channel_sync_<名>.json` 落盘（含 `decision/reason/shift_samples/
+  fine_delay_ms` 等逐轨字段，`result_scope = file|partial`）
+- **语义约定**：报告中的 delay 是**当前文件内的观测轨间时差**（可含
+  电子/无线链路延迟、录音链路差与麦克风物理位置的声学传播差），
+  不自动等价于设备 latency；不同物理位置的麦克风不禁止同步，但相关
+  性不足时安全放弃该轨
+- 阈值集中在 `core/channel_sync.py::DEFAULTS`（注释"初值, 待真实素材
+  标定"），可经档位 JSON 的 `channel_sync` 节覆盖
+
+### 透明模式：`--channel-sync-transparent`（剪辑前预处理）
+
+隐含启用 `--channel-sync`；跳过视频编码：视频与所有非音频流
+**stream copy**，仅对需要修正的音频轨重新生成，`untouched` 轨保持
+原始内容；全部已对齐时输出与源文件**字节级一致**（SHA256 相同）；
+文件级失败时输出为源文件原样拷贝（音频原样）。不依赖编码器配置，
+输出命名与常规转码一致。
+
+算法由 `core/sync_estimate.py`（两阶段估计 + 相位斜率精估）与
+`core/sync_fix.py`（整数流式移位）实现；vendored
+`core/mp4_channel_sync.py`（ChronoSync 1.x，MIT）保留作回滚与对照，
+不再被 P1 主路径引用。设计细节与 P1 vs vendored 差异对照见
+`docs/design/channel_sync_p1.md`。
 
 ## 编码后验证：`--check basic|advanced|full`
 

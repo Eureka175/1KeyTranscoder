@@ -20,6 +20,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -445,9 +446,17 @@ def encode_one(
                 synced = part_dst.with_name(part_dst.stem + ".synced.mov")
                 remux_replace_audio(
                     gpac=gpac, video_src=part_dst,
-                    fixed_files=[Path(p) for p in res["fixed_files"]],
+                    fixed_files=[Path(p) for p in (res.get("audio_files")
+                                                   or res["fixed_files"])],
                     dst=synced,
                     log=lambda msg: logger.info("[SYNC] %s", msg),
+                )
+                # GPAC 输出 mvhd timescale 与源不同: 按实际 timescale 修复
+                # tkhd/elst 时长 (否则音频被 elst 截断为 1/3)
+                from core.channel_sync import repair_remux_timescale
+
+                repair_remux_timescale(
+                    synced, log=lambda msg: logger.info("[SYNC] %s", msg)
                 )
                 safe_unlink(part_dst)
                 os.replace(synced, part_dst)
@@ -598,7 +607,9 @@ def encode_one_sony(
                     json.dumps(res.get("channels", []), ensure_ascii=False),
                 )
                 if res["status"] == "applied":
-                    audio_sources = [Path(p) for p in res["fixed_files"]]
+                    audio_sources = [Path(p) for p in (
+                        res.get("audio_files") or res["fixed_files"]
+                    )]
                 elif res["status"] in ("measure_failed", "verify_failed"):
                     logger.warning(
                         "[SYNC-SKIP] %s | %s — 原音频照旧",
@@ -803,7 +814,9 @@ def encode_one_dji_x265(
                     json.dumps(res.get("channels", []), ensure_ascii=False),
                 )
                 if res["status"] == "applied":
-                    audio_sources = [Path(p) for p in res["fixed_files"]]
+                    audio_sources = [Path(p) for p in (
+                        res.get("audio_files") or res["fixed_files"]
+                    )]
                 elif res["status"] in ("measure_failed", "verify_failed"):
                     logger.warning(
                         "[SYNC-SKIP] %s | %s — 原音频照旧",
@@ -948,11 +961,23 @@ def parse_args() -> argparse.Namespace:
         "--channel-sync",
         action="store_true",
         help=(
-            "自动延时补偿: 对多流单声道 PCM 布局 (无线麦 CH1/CH2 + 有线 "
-            "CH3/CH4) 逐文件 GCC-PHAT 测量无线通道相对 CH3 的固定微延迟 "
-            "并逐样本修正 (尾部补零保全长, 参考通道/阈值见 "
-            "core/channel_sync.py DEFAULTS)。测量质量门不过或复检超差时 "
-            "原音频照旧 + 警告。依赖 numpy/scipy (可选)。"
+            "自动延时补偿 (P1): 对多流单声道 PCM 布局 (无线麦 CH1/CH2 + 有线 "
+            "CH3/CH4, 48k/96k, 44.1k 显式拒绝) 逐文件 GCC-PHAT 测量各通道相对"
+            "锚点 (候选回退 CH3>CH4>CH1>CH2) 的固定观测时差并做纯整数样本"
+            "移位 (尾部补零保全长); 空轨/低置信/非恒定/超窗轨 untouched, "
+            "不阻止其它健康轨同步 (轨道级部分成功); 质量门不过或复检超差"
+            "时该轨原样 + 警告。2ch/1ch 布局默认不做对齐; 不做漂移 resample"
+            "与分数 sinc。依赖 numpy/scipy (可选)。"
+        ),
+    )
+    parser.add_argument(
+        "--channel-sync-transparent",
+        action="store_true",
+        help=(
+            "延时补偿透明模式 (隐含 --channel-sync, 剪辑前预处理): 跳过视频"
+            "编码, 视频与所有非音频流 stream copy, 仅对需要修正的音频轨重新"
+            "生成, untouched 轨保持原始内容; 全部已对齐时输出与源文件字节级"
+            "一致 (SHA256 相同); 文件级失败时输出为源文件原样拷贝。"
         ),
     )
     parser.add_argument(
@@ -1028,6 +1053,195 @@ def spawn_dashboard(json_path: Path, script_dir: Path):
 
 
 # ---------------------------------------------------------------------------
+# transparent 模式 (--channel-sync-transparent, 剪辑前预处理)
+# ---------------------------------------------------------------------------
+
+def transparent_main(
+    *,
+    args: argparse.Namespace,
+    script_dir: Path,
+    input_root: Path,
+    output_root: Path,
+    ffmpeg: Path,
+    ffprobe: Path,
+    gpac: GpacContainerBackend,
+) -> int:
+    """视频/非音频流 stream copy + 轨道级音频同步, 不依赖编码器配置。
+
+    输出命名沿用 output_path_for (原 basename, .MP4 后缀); 全部已对齐时
+    输出与源文件字节级一致; 文件级失败时输出为源文件原样拷贝。
+    """
+    from core.channel_sync import run_channel_sync
+
+    output_root.mkdir(parents=True, exist_ok=True)
+    logs_root = input_root.parent / "logs"
+    logs_root.mkdir(parents=True, exist_ok=True)
+    total_log = logs_root / "total.log"
+    work_root = output_root / ".1ktwork"
+    logger = setup_logger(total_log)
+
+    # channel_sync 阈值: 优先 --config 里的 channel_sync 块, 加载失败用 DEFAULTS
+    channel_sync_opts = None
+    try:
+        config_path = resolve_config_file(
+            script_dir, args.config, "x265.json"
+        )
+        cfg = load_json_file(config_path)
+        channel_sync_opts = (
+            cfg.get("channel_sync") if isinstance(cfg, dict) else None
+        )
+    except Exception as exc:
+        logger.warning(
+            "TRANSPARENT CONFIG LOAD FAILED | %s (channel_sync DEFAULTS 生效)",
+            exc,
+        )
+
+    if args.retry_list:
+        retry_sources = load_retry_list(Path(args.retry_list))
+        if not retry_sources:
+            print(
+                f"[FATAL] retry list empty or unreadable: {args.retry_list}",
+                file=sys.stderr,
+            )
+            return 2
+        sources = retry_sources
+        logger.info(
+            "RETRY LIST | %d file(s) from %s", len(sources), args.retry_list
+        )
+    else:
+        sources = discover_sources(input_root)
+
+    dashboard_json = logs_root / "dashboard.json"
+    status = DashboardStatus(dashboard_json)
+    if not args.headless:
+        spawn_dashboard(dashboard_json, script_dir)
+    status.set_meta(
+        {
+            "encoders": "channel-sync-transparent",
+            "preset": "SYNC",
+            "check": "basic",
+            "total": len(sources),
+            "gpu": "",
+            "jobs": "1",
+            "headless": args.headless,
+        }
+    )
+
+    logger.info("============================================================")
+    logger.info("1KeyTranscoder transparent channel-sync batch start")
+    logger.info("Input : %s", input_root)
+    logger.info("Output: %s", output_root)
+    logger.info("Logs  : %s", logs_root)
+    logger.info("Files: %d", len(sources))
+    logger.info("============================================================")
+
+    counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0}
+    for src in sources:
+        dst = output_path_for(src, input_root, output_root, "SYNC", False)
+        file_log = per_file_log_path(src, input_root, logs_root, "SYNC")
+        file_logger = build_file_logger(file_log)
+        if status is not None:
+            status.start(src, "SYNC", "channel-sync-transparent")
+        if dst.is_file() and dst.stat().st_size > 0:
+            logger.info("[SKIP] %s | %s", src, dst)
+            file_logger.info(
+                "SKIP | output already exists | output=%s", dst
+            )
+            counters["skipped"] += 1
+            if status is not None:
+                status.finish(src, "skipped")
+            continue
+        if args.dry_run:
+            logger.info("[DRY-RUN] %s -> %s", src, dst)
+            file_logger.info("DRY-RUN | no sync performed.")
+            counters["dry-run"] += 1
+            if status is not None:
+                status.finish(src, "dry-run")
+            continue
+        try:
+            try:
+                _fmt, streams = probe_source(ffprobe, src)
+            except Exception as exc:
+                # 探测失败 (如无视频流的纯音频文件): 输出 = 源文件原样拷贝
+                logger.warning(
+                    "[SYNC-SKIP] %s | probe failed (%s) — 输出为源文件原样拷贝",
+                    src.name, exc,
+                )
+                file_logger.exception(
+                    "TRANSPARENT PROBE FAILED — output is source copy"
+                )
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+                counters["done"] += 1
+                if status is not None:
+                    status.finish(src, "done")
+                continue
+            res = run_channel_sync(
+                source=src,
+                ffmpeg=ffmpeg,
+                work_dir=work_root / job_id_for(src) / "channel_sync",
+                streams=streams,
+                opts=channel_sync_opts,
+                transparent=True,
+                dst=dst,
+                gpac=gpac,
+                log=lambda msg: logger.info("[SYNC] %s | %s", src.name, msg),
+            )
+            file_logger.info(
+                "CHANNEL_SYNC | %s | %s",
+                res["status"],
+                json.dumps(res.get("channels", []), ensure_ascii=False),
+            )
+            if res["status"] in ("applied", "already_aligned"):
+                if res["status"] == "applied":
+                    logger.info(
+                        "[SYNC-OK] %s | transparent remux "
+                        "(scope=%s, fixed=%d, %s) | %s",
+                        src.name, res.get("result_scope"),
+                        len(res.get("fixed_files", [])),
+                        "byte copy" if res.get("file_copied") else "remux",
+                        dst,
+                    )
+                else:
+                    logger.info(
+                        "[SYNC-OK] %s | already aligned — byte-identical "
+                        "copy | %s",
+                        src.name, dst,
+                    )
+                counters["done"] += 1
+            elif res["status"] in ("not_eligible", "tool_missing"):
+                logger.warning(
+                    "[SYNC-SKIP] %s | %s — 输出为源文件原样拷贝 | %s",
+                    src.name, res["detail"], dst,
+                )
+                counters["done"] += 1
+            else:
+                logger.warning(
+                    "[SYNC-FAIL] %s | %s — 输出为源文件原样拷贝 | %s",
+                    src.name, res["detail"], dst,
+                )
+                counters["done"] += 1
+        except Exception as exc:
+            logger.error("[SYNC-FAIL] %s | %s", src, exc)
+            file_logger.exception("CHANNEL SYNC TRANSPARENT FAILED")
+            counters["failed"] += 1
+        if status is not None:
+            status.finish(src, "done")
+
+    status.mark_finished()
+    logger.info("============================================================")
+    logger.info(
+        "Transparent finished | done=%d skipped=%d failed=%d dry-run=%d",
+        counters["done"], counters["skipped"], counters["failed"],
+        counters["dry-run"],
+    )
+    logger.info("Total log: %s", total_log)
+    logger.info("Dashboard data: %s", dashboard_json)
+    logger.info("============================================================")
+    return 1 if counters["failed"] else 0
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -1048,6 +1262,35 @@ def main() -> int:
         print("[FATAL] output directory must not be inside input directory.",
               file=sys.stderr)
         return 2
+
+    # 通用工具链解析 (transparent 模式只需要 ffmpeg/ffprobe/GPAC)
+    try:
+        ffmpeg = find_executable("ffmpeg", script_dir, args.ffmpeg)
+        ffprobe = find_executable("ffprobe", script_dir, args.ffprobe)
+        verify_executable(ffmpeg, "ffmpeg")
+        verify_executable(ffprobe, "ffprobe")
+        gpac = GpacContainerBackend(
+            Path(args.gpac_dir) if args.gpac_dir else None
+        )
+        gyroflow = find_gyroflow(
+            Path(args.gyroflow) if args.gyroflow else None
+        )
+    except Exception as exc:
+        print(f"[FATAL] {exc}", file=sys.stderr)
+        return 2
+
+    # --channel-sync-transparent: 剪辑前预处理独立流程 (跳过视频编码,
+    # 不依赖编码器配置)
+    if args.channel_sync_transparent:
+        return transparent_main(
+            args=args,
+            script_dir=script_dir,
+            input_root=input_root,
+            output_root=output_root,
+            ffmpeg=ffmpeg,
+            ffprobe=ffprobe,
+            gpac=gpac,
+        )
 
     try:
         default_config_name = {
@@ -1096,18 +1339,6 @@ def main() -> int:
                 "backend (nvenc/qsv); it manages both backends itself."
             )
 
-        ffmpeg = find_executable("ffmpeg", script_dir, args.ffmpeg)
-        ffprobe = find_executable("ffprobe", script_dir, args.ffprobe)
-        verify_executable(ffmpeg, "ffmpeg")
-        verify_executable(ffprobe, "ffprobe")
-
-        gpac = GpacContainerBackend(
-            Path(args.gpac_dir) if args.gpac_dir else None
-        )
-        gyroflow = find_gyroflow(
-            Path(args.gyroflow) if args.gyroflow else None
-        )
-
         classifier = engine = scaling_config = scaling_path = None
         backend = None
 
@@ -1152,7 +1383,10 @@ def main() -> int:
     channel_sync_opts = (
         config.get("channel_sync") if isinstance(config, dict) else None
     )
-    channel_sync_enabled = bool(getattr(args, "channel_sync", False))
+    channel_sync_enabled = bool(
+        getattr(args, "channel_sync", False)
+        or getattr(args, "channel_sync_transparent", False)
+    )
 
     work_root = output_root / ".1ktwork"
     logger = setup_logger(total_log)

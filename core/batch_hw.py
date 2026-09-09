@@ -741,7 +741,9 @@ def encode_one_sony_hw(
                     json.dumps(res.get("channels", []), ensure_ascii=False),
                 )
                 if res["status"] == "applied":
-                    audio_sources = [Path(p) for p in res["fixed_files"]]
+                    audio_sources = [Path(p) for p in (
+                        res.get("audio_files") or res["fixed_files"]
+                    )]
                 elif res["status"] in ("measure_failed", "verify_failed"):
                     logger.warning(
                         "[SYNC-SKIP] %s | %s — 原音频照旧",
@@ -993,9 +995,17 @@ def encode_one_hw_classic(
                 synced = part_dst.with_name(part_dst.stem + ".synced.mov")
                 remux_replace_audio(
                     gpac=gpac, video_src=part_dst,
-                    fixed_files=[Path(p) for p in res["fixed_files"]],
+                    fixed_files=[Path(p) for p in (res.get("audio_files")
+                                                   or res["fixed_files"])],
                     dst=synced,
                     log=lambda msg: logger.info("[SYNC] %s", msg),
+                )
+                # GPAC 输出 mvhd timescale 与源不同: 按实际 timescale 修复
+                # tkhd/elst 时长 (否则音频被 elst 截断为 1/3)
+                from core.channel_sync import repair_remux_timescale
+
+                repair_remux_timescale(
+                    synced, log=lambda msg: logger.info("[SYNC] %s", msg)
                 )
                 safe_unlink(part_dst)
                 os.replace(synced, part_dst)
@@ -1202,7 +1212,8 @@ def encode_one_dji_hw(
                     )
                     if res["status"] == "applied":
                         audio_sources = [
-                            Path(p) for p in res["fixed_files"]
+                            Path(p) for p in (res.get("audio_files")
+                                              or res["fixed_files"])
                         ]
                     elif res["status"] in ("measure_failed", "verify_failed"):
                         logger.warning(
