@@ -107,6 +107,7 @@ class TrajectoryStats:
     spread_samples: float     # 合格帧延迟极差 (样本)
     step_max_ms: float        # 相邻合格帧延迟差最大值 (ms, 仅诊断警告)
     drift_ppm: float          # 合格帧延迟对帧中心的线性拟合斜率 x1e6
+    drift_total_ms: float = float("nan")   # 拟合在轨迹跨度上的预测漂移总量 (ms)
 
 
 # ---------------------------------------------------------------- 输入读取
@@ -467,12 +468,17 @@ def estimate_pair(
 def summarize_trajectory(
     frames: list[FrameDelay], sample_rate: int
 ) -> TrajectoryStats:
-    """合格帧轨迹统计: MAD / 极差 / 相邻步长 / 线性漂移 (nan-aware)."""
+    """合格帧轨迹统计: MAD / 极差 / 相邻步长 / 线性漂移 (nan-aware)。
+
+    drift_total_ms = 线性拟合在轨迹跨度上的预测漂移总量 (ms) — 用于区分
+    "真实慢漂移"与"整数量化噪声导致的偶然斜率"(见 classify_constant)。
+    """
     good = [f for f in frames if f.delay_samples == f.delay_samples]
     usable = len(good)
     if usable == 0:
         return TrajectoryStats(
-            usable, float("nan"), float("nan"), float("nan"), 0.0
+            usable, float("nan"), float("nan"), float("nan"), 0.0,
+            float("nan"),
         )
     d = np.array([f.delay_samples for f in good], dtype=np.float64)
     med = float(np.median(d))
@@ -481,29 +487,51 @@ def summarize_trajectory(
     step = float(np.max(np.abs(np.diff(d)))) if usable >= 2 else 0.0
     step_ms = step * 1000.0 / sample_rate
     drift_ppm = 0.0
+    drift_total_ms = float("nan")
     if usable >= 2:
         c = np.array([f.center_sample for f in good], dtype=np.float64)
-        drift_ppm = float(np.polyfit(c, d, 1)[0]) * 1e6
-    return TrajectoryStats(usable, mad_ms, spread, step_ms, drift_ppm)
+        slope = float(np.polyfit(c, d, 1)[0])
+        drift_ppm = slope * 1e6
+        span = float(c[-1] - c[0])
+        drift_total_ms = slope * span * 1000.0 / sample_rate
+    return TrajectoryStats(
+        usable, mad_ms, spread, step_ms, drift_ppm, drift_total_ms
+    )
 
 
 def classify_constant(
     stats: TrajectoryStats, *, mad_max_ms: float, max_ppm: float,
-    sample_rate: int,
+    sample_rate: int, drift_min_ms: float = 0.0,
 ) -> bool:
-    """P1 恒定性二分: MAD / 极差 / 线性漂移 ppm 三门 (constant/non_constant)。
+    """P1 恒定性二分: MAD / 极差 / 线性漂移 三门 (constant/non_constant)。
 
-    极差门用 mad_max_ms 同值: 中途跳变时中位数可能恰好落在跳变前值上
-    (MAD 退化), 此时极差 (50ms 级) 仍能可靠拦下。step_max_ms 只作诊断
-    警告, 不参与判定 — 跳变/漂移细分属二期。
+    - 极差门用 mad_max_ms 同值: 中途跳变时中位数可能恰好落在跳变前值上
+      (MAD 退化), 此时极差 (50ms 级) 仍能可靠拦下;
+    - 漂移门 = ppm 门 + **材料性门**: ppm 超门**且**全片预测漂移
+      |drift_total_ms| > drift_min_ms 才判非恒定。真实素材标定依据
+      (testsets A7M5): 整数样本量化噪声会让"已对齐"轨的偶然斜率落在
+      5–30 ppm (spread 仅 2–3 样本 = 0.05ms), 单看 ppm 会误判为非恒定;
+      而真实慢漂移轨 (C1154 CH1 ≈39ppm/0.42ms, C1159 CH2 ≈49ppm/1.9ms)
+      的预测漂移远超 0.1ms, 仍被正确拦下。
+    - step_max_ms 只作诊断警告, 不参与判定 — 跳变/漂移细分属二期。
     """
     spread_ms = stats.spread_samples * 1000.0 / sample_rate
+    drift_bad = (
+        abs(stats.drift_ppm) > max_ppm
+        and (
+            drift_min_ms <= 0.0
+            or (
+                stats.drift_total_ms == stats.drift_total_ms
+                and abs(stats.drift_total_ms) > drift_min_ms
+            )
+        )
+    )
     return (
         stats.mad_ms == stats.mad_ms
         and stats.mad_ms <= mad_max_ms
         and stats.spread_samples == stats.spread_samples
         and spread_ms <= mad_max_ms
-        and abs(stats.drift_ppm) <= max_ppm
+        and not drift_bad
     )
 
 

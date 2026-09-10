@@ -847,6 +847,9 @@ def l1_channel_sync_p1() -> None:
            f"spread={st7.spread_samples:.0f}smp mad={st7.mad_ms:.2f}ms "
            f"ppm={st7.drift_ppm:.1f}")
 
+    # --- 恒定性漂移门 (真实素材标定: ppm 门 + 漂移材料性门) ---
+    # 10ppm 漂移在 6s 上仅 0.06ms: 低于材料性门 (0.1ms) -> 视为恒定
+    # (A7M5 实测: 已对齐轨的量化噪声斜率可达 5~30ppm, 漂移量仅 ~0.03ms)
     n_d = base.shape[0]
     idx = np.arange(n_d, dtype=np.float64)
     pos = idx - idx * 10e-6           # 10 ppm 线性漂移 (每 1e6 样本 10 样本)
@@ -854,11 +857,30 @@ def l1_channel_sync_p1() -> None:
     e8 = est(base, drift_sig, SR)
     st8 = sync_estimate.summarize_trajectory(e8.frames, SR)
     c8 = sync_estimate.classify_constant(
-        st8, mad_max_ms=1.0, max_ppm=5.0, sample_rate=SR
+        st8, mad_max_ms=1.0, max_ppm=5.0, sample_rate=SR, drift_min_ms=0.1
     )
-    record("p1.10ppm 线性漂移 -> non_constant (ppm 门)",
-           not c8 and abs(st8.drift_ppm) > 5.0,
-           f"ppm={st8.drift_ppm:.1f} mad={st8.mad_ms:.2f}ms")
+    record("p1.6s 上 10ppm (0.06ms) -> constant (材料性门)",
+           c8 and abs(st8.drift_ppm) > 5.0
+           and abs(st8.drift_total_ms) < 0.1,
+           f"ppm={st8.drift_ppm:.1f} drift_total={st8.drift_total_ms:.3f}ms")
+
+    # 同一 10ppm 漂移在 30s 上累计 0.3ms -> 超材料性门 -> non_constant
+    base30 = speech_like(30 * SR, seed=3, fs=SR)
+    n30 = base30.shape[0]
+    idx30 = np.arange(n30, dtype=np.float64)
+    pos30 = idx30 - idx30 * 10e-6
+    drift30 = np.interp(
+        pos30, idx30, base30.astype(np.float64)
+    ).astype(np.float32)
+    e8b = est(base30, drift30, SR)
+    st8b = sync_estimate.summarize_trajectory(e8b.frames, SR)
+    c8b = sync_estimate.classify_constant(
+        st8b, mad_max_ms=1.0, max_ppm=5.0, sample_rate=SR, drift_min_ms=0.1
+    )
+    record("p1.30s 上 10ppm (0.3ms) -> non_constant",
+           not c8b and abs(st8b.drift_ppm) > 5.0
+           and abs(st8b.drift_total_ms) > 0.1,
+           f"ppm={st8b.drift_ppm:.1f} drift_total={st8b.drift_total_ms:.3f}ms")
 
     # --- 超窗: 窄窗不可测 + 宽窗复测可测 (out_of_range 依据) ---
     e9 = est(base, delay_int(base, 4800), SR)   # +100ms > 80ms 搜索窗
@@ -1859,9 +1881,7 @@ def l3_channel_sync_p1() -> None:
         expect("C24_低SNR轨_untouched",
                res24["status"] == "applied"
                and r24.get(1, {}).get("decision") == "untouched"
-               and r24.get(1, {}).get("reason") in (
-                   "insufficient_frames", "low_confidence"
-               )
+               and r24.get(1, {}).get("reason") == "low_confidence"
                and r24.get(0, {}).get("decision") == "fixed"
                and r24.get(3, {}).get("decision") == "fixed",
                f"status={res24['status']} "
