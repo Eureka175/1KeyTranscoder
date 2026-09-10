@@ -81,7 +81,8 @@ def tool_version(tool: Path) -> str:
 
 def _parse_nvenc(text: str) -> dict[str, CodecCaps]:
     """NVEncC --check-features: per-codec input-format list lines like
-    'H.265/HEVC: nv12, yv12, yv12(10bit), yuv444(10bit), yuv422(10bit), ...'"""
+    'H.265/HEVC: nv12, yv12, yv12(10bit), yuv444(10bit), yuv422(10bit), ...'
+    AV1: 'AV1: nv12, yv12, yv12(10bit)' (4:2:0 only, no 4:2:2/4:4:4)."""
     caps: dict[str, CodecCaps] = {}
     for m in re.finditer(
         r"H\.(264/AVC|265/HEVC)\s*:\s*([^\r\n]+)", text
@@ -94,6 +95,10 @@ def _parse_nvenc(text: str) -> dict[str, CodecCaps]:
         c.csp_444 = "yuv444" in fmt
         c.bit10_422 = "yuv422(10bit)" in fmt
         caps[codec] = c
+    m = re.search(r"\bAV1\s*:\s*([^\r\n]+)", text)
+    if m:
+        fmt = m.group(1)
+        caps["av1"] = CodecCaps(bit10="10bit" in fmt)
     return caps
 
 
@@ -101,15 +106,18 @@ def _parse_qsv(text: str) -> dict[str, CodecCaps]:
     """QSVEncC --check-features: per-codec '10bit depth' row (o/x per
     RC mode). 4:2:2/4:4:4 columns are not parsed — the QSV backend
     policy always plans 4:2:0 for 4:2:2 sources (direct 4:2:2 encode on
-    Arc is a slow path, ~1.0x vs 2.0x for the 4:2:0 conversion)."""
+    Arc is a slow path, ~1.0x vs 2.0x for the 4:2:0 conversion).
+    AV1 block is 'Codec: AV1 FF' (LP/FF fixed-function path only)."""
     caps: dict[str, CodecCaps] = {}
     for m in re.finditer(
-        r"Codec:\s*H\.(264/AVC|265/HEVC)\s*\w*\s*\n(.*?)(?=Codec:|$)",
+        r"Codec:\s*(H\.(264/AVC|265/HEVC)|AV1)\s*\w*\s*\n(.*?)(?=Codec:|$)",
         text,
         re.S,
     ):
-        codec = "hevc" if "265" in m.group(1) else "h264"
-        section = m.group(2)
+        codec = "av1" if m.group(1) == "AV1" else (
+            "hevc" if m.group(2) == "265/HEVC" else "h264"
+        )
+        section = m.group(3)
         row = re.search(r"10bit depth\s+([ox ]+)", section)
         caps[codec] = CodecCaps(
             bit10=bool(row and "o" in row.group(1)),
@@ -167,23 +175,30 @@ def probe_backend(tool: Path, kind: str) -> BackendCaps | None:
         # HEVC is the only production codec; missing section means the
         # parse failed for the codec we care about.
         caps.codecs["hevc"] = CodecCaps()
+    if "av1" not in codecs:
+        caps.codecs["av1"] = CodecCaps()
     return caps
 
 
-def supports(caps: BackendCaps | None, chroma: str, depth: int) -> bool:
-    """Can the backend encode (chroma, depth) HEVC?"""
+def supports(
+    caps: BackendCaps | None,
+    chroma: str,
+    depth: int,
+    codec: str = "hevc",
+) -> bool:
+    """Can the backend encode (chroma, depth) in `codec`?"""
     if caps is None:
         return False
-    hevc = caps.codecs.get("hevc")
-    if hevc is None:
+    cc = caps.codecs.get(codec)
+    if cc is None:
         return False
     if chroma == "4:2:2":
-        return hevc.bit10_422 if depth > 8 else hevc.csp_422
+        return cc.bit10_422 if depth > 8 else cc.csp_422
     if chroma == "4:4:4":
-        return hevc.csp_444
+        return cc.csp_444
     # 4:2:0 / unknown
     if depth > 8:
-        return hevc.bit10
+        return cc.bit10
     return True
 
 

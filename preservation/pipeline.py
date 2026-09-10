@@ -87,14 +87,23 @@ def run_sony_pipeline(
     gyroflow: Path | None = None,
     fix_hw_timing: bool = False,
     check_level: str = "advanced",
+    codec: str = "hevc",
+    encoded_path: Path | None = None,
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
     audio_sources: list[Path] | None = None,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
-    """audio_sources: 延时补偿后的音频中间文件 (与 bundle.audio_tracks
+    """codec: "hevc" (XAVC 合规路径, 恢复 XAVC brand) 或 "av1"
+    (元数据保留但按策略不打 XAVC tag — AV1 不在 XAVC 规范内)。
+    encoded_path: 视频中间文件位置; 默认 video/encoded.mov (HEVC),
+    AV1 后端传入 .mp4 (ffmpeg 9 的 MOV muxer 不接受 AV1, MP4 可以;
+    GPAC 对两者一视同仁)。
+    audio_sources: 延时补偿后的音频中间文件 (与 bundle.audio_tracks
     一一对应); 提供时重建改用其音轨替代源音轨原生复制。"""
+    if codec not in ("hevc", "av1"):
+        raise ValueError(f"run_sony_pipeline: unsupported codec {codec!r}")
     work_dir.mkdir(parents=True, exist_ok=True)
 
     def step(msg: str) -> None:
@@ -161,7 +170,7 @@ def run_sony_pipeline(
     # 2. video encode (injected; production = scaled libx265 -> MOV).
     # MOV, not MKV: GPAC's MKV reader quantizes timestamps to
     # milliseconds and would break exact rtmd alignment.
-    encoded_mov = work_dir / "video" / "encoded.mov"
+    encoded_mov = encoded_path or (work_dir / "video" / "encoded.mov")
 
     def _encoded_ok() -> bool:
         """A reusable intermediate must be a real file with >=1 video
@@ -238,7 +247,23 @@ def run_sony_pipeline(
     # apply the threaded -timescale either. moov must sit after mdat
     # before byte-level uuid insertion.
     gpac.flatten(stage)
-    if bundle.major_brand:
+    if codec == "av1":
+        # AV1 不在 XAVC 规范内 (XAVC 仅定义 H.264/HEVC): 保留管线照常
+        # 携带 rtmd/nrtm/uuid 元数据, 但按策略不打 XAVC tag — 否则会
+        # 产出伪标准文件。仍需一次 -brand 通行以恢复 movie timescale
+        # (GPAC -flat 会把它重置为首轨媒体时基, -brand 通行携带
+        # 线程化 -timescale 恢复它); 用 AV1 品牌 av01 替代 XAVC。
+        step(
+            "codec=av1: XAVC brand NOT restored (AV1 not in XAVC spec); "
+            "branding av01 instead (rtmd/nrtm/uuid metadata preserved)"
+        )
+        gpac.set_brand(
+            stage,
+            "av01",
+            ["isom", "iso2", "mp41"],
+            remove=["qt  "],
+        )
+    elif bundle.major_brand:
         compat = [
             b for b in bundle.compatible_brands
             if b and b != bundle.major_brand
@@ -337,6 +362,7 @@ def run_sony_pipeline(
         gyroflow=gyroflow,
         work_dir=work_dir,
         known_facts=known_facts,
+        codec=codec,
         ffmpeg=ffmpeg,
         quality_opts=quality_opts,
         quality_csv=quality_csv,

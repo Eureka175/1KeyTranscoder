@@ -192,8 +192,12 @@ def hw_backend_for(
     work_root: Path,
     logger: logging.Logger,
 ):
-    """Build a hardware backend + probe/save capabilities at run start."""
-    kind = "nvencc" if encoder_name == "nvenc" else "qsvencc"
+    """Build a hardware backend + probe/save capabilities at run start.
+
+    encoder_name: "nvenc"/"qsv" (HEVC) or "nvenc-av1"/"qsv-av1" (AV1)."""
+    base = encoder_name.split("-", 1)[0]
+    kind = "nvencc" if base == "nvenc" else "qsvencc"
+    codec = "av1" if encoder_name.endswith("-av1") else "hevc"
     exe_name = "NVEncC64.exe" if kind == "nvencc" else "QSVEncC64.exe"
     explicit = args.tool_nvencc if kind == "nvencc" else args.tool_qsvencc
     tool = find_hw_tool(script_dir, exe_name, explicit)
@@ -205,21 +209,25 @@ def hw_backend_for(
             "(8bit 4:2:0) assumed",
             exe_name,
         )
-        caps = BackendCaps(tool=exe_name, codecs={"hevc": CodecCaps()})
+        caps = BackendCaps(
+            tool=exe_name, codecs={"hevc": CodecCaps(), "av1": CodecCaps()}
+        )
     json_path, raw_path = caps.save(caps_dir)
     logger.info(
-        "Caps %s: device=%s driver=%s hevc(10bit=%s,422=%s,422-10bit=%s)",
+        "Caps %s: device=%s driver=%s hevc(10bit=%s,422=%s,422-10bit=%s) "
+        "av1(10bit=%s)",
         exe_name,
         caps.device,
         caps.driver,
         caps.codecs.get("hevc", CodecCaps()).bit10,
         caps.codecs.get("hevc", CodecCaps()).csp_422,
         caps.codecs.get("hevc", CodecCaps()).bit10_422,
+        caps.codecs.get("av1", CodecCaps()).bit10,
     )
     logger.info("Caps files: %s | %s", json_path, raw_path)
-    if encoder_name == "nvenc":
-        return NvencBackend(tool, caps)
-    return QsvBackend(tool, caps)
+    if kind == "nvencc":
+        return NvencBackend(tool, caps, codec=codec)
+    return QsvBackend(tool, caps, codec=codec)
 
 
 def _last_encode_fps(raw_log: Path) -> float:
@@ -267,7 +275,7 @@ def hw_encode_with_fallback(
     depth = src_info.bit_depth
 
     planned, needs_downgrade = plan_initial_format(
-        caps, backend.kind, chroma, depth
+        caps, backend.kind, chroma, depth, backend.codec
     )
     if needs_downgrade:
         if no_downgrade:
@@ -645,7 +653,7 @@ def encode_one_sony_hw(
     encoded_mov = work_dir / "video" / "encoded.mov"
 
     planned, needs_downgrade = plan_initial_format(
-        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth
+        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth, backend.codec
     )
 
     def build_cmd(chroma: str, depth: int) -> list[str]:
@@ -702,6 +710,16 @@ def encode_one_sony_hw(
         file_logger.info("PIPELINE | %s", msg)
 
     try:
+        if backend.codec == "av1":
+            logger.info(
+                "[POLICY] %s | AV1 保留管线: rtmd/nrtm/uuid 元数据保留, "
+                "不打 XAVC tag (AV1 不在 XAVC 规范内)",
+                src.name,
+            )
+            file_logger.info(
+                "POLICY | AV1 Sony preserve: rtmd/nrtm/uuid kept, "
+                "XAVC brand NOT restored (AV1 not in XAVC spec)"
+            )
         # 自动延时补偿 (Sony): 修正后的音频轨在重建时替代源音轨
         audio_sources = None
         if channel_sync and source_summary["audio_streams"] > 0 \
@@ -745,6 +763,7 @@ def encode_one_sony_hw(
             gyroflow=gyroflow,
             fix_hw_timing=True,
             check_level=check_level,
+            codec=backend.codec,
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,
             quality_csv=quality_csv,
@@ -866,12 +885,13 @@ def encode_one_hw_classic(
 ) -> str:
     """Non-Sony material: video + audio only, single-tool single pass.
     At check_level='full' the PSNR/SSIM sample gates delivery (FAIL
-    deletes the part file and fails the batch entry)."""
+    deletes the part file and fails the batch entry); with channel_sync
+    the fixed audio replaces the copied audio post-encode."""
     part_dst = dst.with_name(dst.stem + ".part.mov")
     safe_unlink(part_dst)
 
     planned, needs_downgrade = plan_initial_format(
-        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth
+        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth, backend.codec
     )
     log_hw_header(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
@@ -1069,7 +1089,7 @@ def encode_one_dji_hw(
     report_path = work_dir / "report.json"
 
     planned, needs_downgrade = plan_initial_format(
-        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth
+        backend.caps, backend.kind, src_info.chroma, src_info.bit_depth, backend.codec
     )
     log_hw_header(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
@@ -1216,6 +1236,9 @@ def encode_one_dji_hw(
                 vfr=vfr,
                 level=check_level,
                 fix_hw_timing=True,
+                video_entry=(
+                    "av01" if backend.codec == "av1" else "hvc1"
+                ),
                 ffmpeg=ffmpeg,
                 quality_opts=quality_opts,
                 quality_csv=quality_csv,

@@ -121,10 +121,16 @@ def compare(
     scratch: Path,
     known_facts: dict[str, Any] | None = None,
     level: str = "advanced",
+    codec: str = "hevc",
 ) -> dict[str, Any]:
     """level: 'basic' = essential core metadata only (timeline, tracks,
     rtmd payload/timing, tref, timecode — skips nrtm lens/xml details
-    and the uuid inventory); 'advanced' = everything."""
+    and the uuid inventory); 'advanced' = everything.
+
+    codec: expected re-encoded video codec. 'hevc' keeps the XAVC
+    compliance expectations (brand preserved); 'av1' expects metadata
+    preservation without the XAVC brand (AV1 is not in the XAVC spec —
+    the brand difference is policy, not a preservation failure)."""
     src = FileFacts(
         original, gpac, ffprobe, scratch / "original", known_facts, level
     )
@@ -154,7 +160,19 @@ def compare(
         return "", 0, []
 
     sb, ob = brands(src.parsed), brands(out.parsed)
-    if sb == ob:
+    if codec == "av1":
+        # AV1 不打 XAVC tag (policy): brand 差异是预期行为, 不是失败。
+        # 额外断言最终文件确实没有声称 XAVC — 防止伪标准产物。
+        av1_compat_ok = "XAVC" not in ob[0] and not any(
+            b.startswith("XAVC") for b in ob[2]
+        )
+        items.append(_item(
+            "ftyp.brands",
+            PRESERVED if av1_compat_ok else MODIFIED,
+            f"av1 policy: XAVC brand not kept "
+            f"(original={sb[0]}, final={ob[0]}/{ob[2]})",
+        ))
+    elif sb == ob:
         items.append(_item("ftyp.brands", PRESERVED, f"{sb[0]} {sb[1]}"))
     else:
         items.append(_item("ftyp.brands", MODIFIED,
@@ -236,11 +254,15 @@ def compare(
                 "video.elst", MODIFIED,
                 f"original={src_v['elst']} final={out_v['elst']}",
             ))
+        expected = "hevc" if codec == "hevc" else "av1"
+        codec_ok = ov.get("codec_name") == expected
         items.append(_item(
-            "video.codec", PRESERVED,
+            "video.codec",
+            PRESERVED if codec_ok else MODIFIED,
             f"original={sv.get('codec_name')} final={ov.get('codec_name')}"
-            if ov.get("codec_name") == "hevc"
-            else f"UNEXPECTED codec {ov.get('codec_name')}",
+            f" ({expected} expected)" if codec_ok
+            else f"UNEXPECTED codec {ov.get('codec_name')} "
+                 f"({expected} expected)",
         ))
         items.append(_item(
             "video.encode", PRESERVED,
@@ -437,6 +459,7 @@ def compare(
             "video.track_duration",
             "video.stts",
             "video.elst",
+            "video.codec",
             "video.color_primaries",
             "video.color_transfer",
             "video.color_space",

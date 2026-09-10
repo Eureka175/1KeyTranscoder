@@ -20,20 +20,27 @@ x265 为手动高压缩选项。**主入口：`1kt.py`。**
 | QSVEncC（Intel QSV HEVC） | ✅ 生产 | `qsv.json` / **`qsv_aligned.json`** | 第二后端。`qsv_aligned.json` 为按 NVENC 同档质量标定的对齐版（见下） |
 | x265（软件 HEVC） | ✅ 手动高压缩档（P0 修复完成） | `x265.json` + `x265_scaling.json` | 质量优先冷归档 / 4:2:2 保真唯一软件路径（吞吐受限，缩放规则仍 PROVISIONAL，见 `work/x265_test/`） |
 | VCEEncC（AMD VCE HEVC） | 预留（JSON 已备未接） | `vce.json` | AMD 机器扩展 |
-| AV1（NVENC/QSV/SVT） | 📋 评估完成；**实现在 `av1` 分支**（发布包 v0.5.1，见下载节） | `av1` 分支：`svtav1.json`/`nvenc_av1.json`/`qsv_av1.json` | 免版税备选线；Sony/DJI 元数据保留管线（不打 XAVC tag，brand av01） |
+| **SVT-AV1（软件 AV1）** | ✅ 已实施（四档标定完成，见评估） | `svtav1.json` + `svtav1_scaling.json` | `--encoder svtav1`；ffmpeg 9.0.1 内置 SVT-AV1 v4.2.0；Sony/DJI 元数据保留管线；软件 AV1 体积/细节优势（档位对标 x265 判定见 `docs/evaluation/av1_calibration.md`） |
+| **AV1**（NVENC/QSV 硬件） | ✅ 已实施 | `nvenc_av1.json` / `qsv_av1.json` | 免版税备选；`--encoder nvenc-av1\|qsv-av1`；Sony 源同样走保留管线（不打 XAVC tag） |
 
 > ⚠️ 档位 JSON 内的数值为作者实测标定值，请勿改动；调参须以测试集回归
 > 与 `tests/full_autotest.py` 为依据。
 
 ## 下载（自包含发布包）
 
-无需自行搭建工具链：发布包内置 **ffmpeg/ffprobe 9.0.1 + NVEncC 9.31 +
-QSVEncC 8.26 + GPAC 26.02**，解压即用（另需 Python 3.11+ 与对应 GPU
-驱动；Gyroflow 为可选消费端工具，请从 gyroflow.xyz 单独安装）。
+无需自行搭建工具链：发布包内置 **ffmpeg/ffprobe 9.0.1（libsvtav1
+v4.2.0/libx265/libvmaf）+ NVEncC 9.31 + QSVEncC 8.26 + GPAC 26.02**，
+解压即用（另需 Python 3.11+ 与对应 GPU 驱动；Gyroflow 为可选消费端
+工具，请从 gyroflow.xyz 单独安装）。
 
-- **v0.4.2**（本 `main` 分支 · HEVC/265 线）：
+- **v0.5.1**（AV1 线 · 软件 + 硬件 AV1；tag 现已在 `main` 历史中）：
+  [1KeyTranscoder-v0.5.1-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.5.1/1KeyTranscoder-v0.5.1-win64-selfcontained.zip)
+- **v0.4.2**（HEVC/265 线）：
   [1KeyTranscoder-v0.4.2-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.4.2/1KeyTranscoder-v0.4.2-win64-selfcontained.zip)
-- AV1 线（软件 SVT-AV1 + 硬件 AV1）发布包见 **`av1` 分支**：v0.5.1
+
+> 当前 `main` 已合并 AV1 能力（HEVC 与 AV1 同处一条主线），但**尚未为
+> 合并后的状态发布新版本包**（未打新 tag）；上列两包分别对应各线最后
+> 一次发布。自建请直接使用 `main` 工作区。
 
 ## 快速开始
 
@@ -50,6 +57,12 @@ python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset all
 # x265 手动高压缩档（软件，慢）
 python 1kt.py --input D:\素材 --output D:\归档 --encoder x265 --preset hq
 
+# 软件 AV1（SVT-AV1，元数据保留管线，不打 XAVC tag）
+python 1kt.py --input D:\素材 --output D:\归档 --encoder svtav1 --preset hq
+
+# AV1 硬件档（Sony/DJI 均走保留管线, 不打 XAVC tag）
+python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc-av1 --preset hq
+
 # 自动延时补偿（无线麦 CH1/CH2 相对有线参考的逐文件观测时差, 自动测量+整数样本修正）
 python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset hq --channel-sync
 
@@ -60,7 +73,9 @@ python 1kt.py --input D:\素材 --output D:\归档 --channel-sync-transparent
 python 1kt.py ... --headless
 ```
 
-**三条自动路径**：Sony XAVC（rtmd）→ 元数据保留管线；DJI（djmd）→ DJI
+**三条自动路径**：Sony XAVC（rtmd）→ 元数据保留管线（AV1 后端同样
+保留 rtmd/nrtm/uuid，但按策略不打 XAVC tag — AV1 不在 XAVC 规范内）；
+DJI（djmd）→ DJI
 保留管线（视频重编码 + djmd/dbgi/tmcd 原生复制 + 载荷 sha256 + Gyroflow
 四元数校验；mjpeg 封面与 udta 因 GPAC 26.02 不可寻址而丢弃并显式记录）；
 其余素材 → 经典单趟（按策略仅视频+音频，日志显式声明）。输出为同名
@@ -72,7 +87,7 @@ python 1kt.py ... --headless
 |---|---|
 | GPAC / MP4Box | `C:\Program Files\GPAC`（或 `--gpac-dir`）——容器重建与元数据保留核心（**行为绑定 26.02**，升级须回归） |
 | NVEncC / QSVEncC | `tools/NVEncC_9.31_x64/`、`tools/QSVEncC_8.26_x64/`（或 `--tool-*`） |
-| ffmpeg / ffprobe | 9.0.1 gyan full（tools/ 自带，内置 libx265/libsvtav1/libvmaf） |
+| ffmpeg / ffprobe | 9.0.1 gyan full（tools/ 自带，内置 libx265/libsvtav1 v4.2.0/libvmaf；**必须用项目自带版本**，PATH 老版本不支持 AV1 新特性） |
 | Gyroflow（可选） | 消费端校验（`--check advanced/full`；未安装则提示并跳过） |
 | numpy / scipy（可选） | 仅 `--channel-sync` 延时补偿需要（缺失时该功能跳过并 WARNING，转码不受影响） |
 
@@ -145,7 +160,7 @@ python 1kt.py ... --headless
 结果落盘 `quality_<名>.json` + 批次汇总 `logs/quality_samples.csv`。
 
 **环境版本记录**：每批次启动时收集软件/驱动版本
-（ffmpeg/NVEncC/QSVEncC/GPAC/Gyroflow + GPU 驱动）→
+（ffmpeg/SVT-AV1 库/NVEncC/QSVEncC/GPAC/Gyroflow + GPU 驱动）→
 `logs/env_versions.json` + `env_versions.csv`，供编码行为复现。
 
 ## 质量对齐（NVENC ↔ QSV）
@@ -217,16 +232,19 @@ docs/
 ├── README.md            分类索引
 ├── FINAL_REPORT.md      ★ 四份评估汇总结论与路线图
 ├── design/              设计文档：硬件后端设计 / 实施报告(含 DJI §15) / 集成报告 / HEVC 4:2:2 Rext 播放兼容性
-├── evaluation/          评估：HEVC 生产就绪度(重写版) / x265 生产就绪 / AV1 可行性 / AV1 调参 / SVT-AV1 归档
-└── reference/           第三方一手资料存档（x265 / SVT-AV1 / NVENC / QSV / VCE）
+├── evaluation/          评估：HEVC 生产就绪度(重写版) / x265 生产就绪 / AV1 可行性 / AV1 调参 / SVT-AV1 归档 / AV1 档位标定
+└── reference/           第三方一手资料存档（x265 / SVT-AV1 含 v4.2.0 调参调研报告 / NVENC / QSV / VCE）
 
 olddocs/                 历史档案存档（各阶段代码快照 / 被取代的旧脚本），详见 olddocs/README.md
 ```
 
 ## 关键决策记录
 
-1. **AV1 与 XAVC 边界**：XAVC 标准只定义 H.264/HEVC，保留 XAVC brand 的
-   AV1 文件是伪标准产物 → AV1 不默认集成保留管线，XAVC 素材恒用 HEVC。
+1. **AV1 与 XAVC 边界**：XAVC 标准只定义 H.264/HEVC。AV1 后端（svtav1 /
+   nvenc-av1 / qsv-av1）对 Sony 源保留 rtmd/nrtm/uuid 元数据管线，但
+   **不打 XAVC tag**（brand 改 av01）——保留 XAVC brand 的 AV1 文件是
+   伪标准产物；XAVC 合规归档请用 HEVC 后端。AV1 统一 4:2:0 输出
+   （4:2:2 源 WARNING 后降采样，不用 AOM）。
 2. **DJI 专线**：djmd 即运动数据载体（Gyroflow 官方支持 Action 4/5/6、
    Avata、Neo）；`MP4Box -diso` XML 对 DJI 文件解析失败 → 轨道枚举全部
    走 `-info` 文本解析；mjpeg 封面/udta GPAC 不可寻址，按策略丢弃。
@@ -251,6 +269,11 @@ olddocs/                 历史档案存档（各阶段代码快照 / 被取代�
   特性不生效）；驱动/QSVEncC 版本对需钉住（6557/6559 曾有批量编码回归史）；
 - Sony 4:2:2 成品 = HEVC Rext，播放硬解仅 NVIDIA 50 系，其余需软解播放器
   （VLC/mpv）；分发请出 4:2:0 副本；
+- **AV1**：统一 4:2:0 输出（所有 AV1 后端）；Sony 源保留元数据但不打
+  XAVC tag（brand av01）；SVT-AV1 无场景关键帧（scd 只管码率分配）、
+  mbr 为软上限（非 VBV 硬钳）；4K60 UHQ 档（preset 1，≈1fps 对齐
+  x265 UHQ）编码耗时极高，
+  属基准档非生产实用；
 - 非 Sony 非 DJI 素材按策略丢弃元数据（仅视频+音频）；
 - VFR 素材自动 `--avsync forcecfr` 规范化（WARNING 记录）；
 - 经典路径无 1:1 帧闸门（不误杀 VFR）；Sony/DJI 路径有。
@@ -271,8 +294,11 @@ git tag -l                         # pre_S1S5 / post_S1S5 / pre_ui / post_1kt_ui
                                    # post_adaptive / post_hw_fulltest / post_color_meta
                                    # post_dji / post_dji_checklevels / post_quality_align
                                    # post_autotest / post_x265 / v0.4.0 / v0.4.1 / v0.4.2
+                                   # post_av1 / post_av1_calib / v0.5.0 / v0.5.1
+git checkout backup/pre-av1-main-merge   # AV1 合并进 main 之前的状态 (回滚点)
 ```
 
-> 分支约定: `main` 仅保留 HEVC/265 实现 (发布包 v0.4.2); **AV1
-> (svtav1/nvenc-av1/qsv-av1) 实现在 `av1` 分支** (`git checkout av1`,
-> 发布包 v0.5.1, 含 post_av1 / post_av1_calib / v0.5.0 / v0.5.1 tag)。
+> 分支约定: `main` = **HEVC/265 + AV1 合并主线**（两条线能力同处一分支，
+> 各线最后一次发布包见上节）；`av1` 分支保留为 AV1 独立线历史
+> （含 post_av1 / post_av1_calib / v0.5.0 / v0.5.1 tag）；
+> `backup/pre-av1-main-merge` = AV1 合并前的 `main` 快照。

@@ -961,6 +961,118 @@ def l1_x265() -> None:
            f"audit={eff.audit.get('vbv-bufsize', {}).get('mode')}")
 
 
+def l1_av1() -> None:
+    section("L1 AV1")
+    from encoders.caps import _parse_nvenc, _parse_qsv
+    from encoders.hw import plan_initial_format
+    from encoders.caps import BackendCaps, CodecCaps
+    caps = _parse_nvenc(
+        "H.265/HEVC: nv12, yv12(10bit), yuv422(10bit)\n"
+        "AV1: nv12, yv12, yv12(10bit)\n"
+    )
+    record("av1.caps nvenc 解析", caps.get("av1") is not None
+           and caps["av1"].bit10 and not caps["av1"].csp_422,
+           f"av1={caps.get('av1')}")
+    qcaps = _parse_qsv(
+        "Codec: AV1 FF\n10bit depth       o o o\n"
+        "Codec: H.265/HEVC FF\n10bit depth       o o o o\n"
+    )
+    record("av1.caps qsv FF 解析", qcaps.get("av1") is not None
+           and qcaps["av1"].bit10, f"av1={qcaps.get('av1')}")
+    b = BackendCaps(codecs={"av1": CodecCaps(bit10=True)})
+    record("av1.plan 422/10 恒转 420",
+           plan_initial_format(b, "nvencc", "4:2:2", 10, "av1")
+           == (("4:2:0", 10), True))
+    record("av1.plan 420/10 无降级",
+           plan_initial_format(b, "nvencc", "4:2:0", 10, "av1")
+           == (("4:2:0", 10), False))
+    import json
+    for name, path in (("nvenc_av1.json", ROOT / "nvenc_av1.json"),
+                       ("qsv_av1.json", ROOT / "qsv_av1.json")):
+        cfg = json.loads(path.read_text(encoding="utf-8"))
+        tiers = set(cfg["profile"])
+        record(f"av1.{name} 四档完整", tiers == {"UHQ", "HQ", "SMALL", "FAST"},
+               f"tiers={sorted(tiers)}")
+        for t, p in cfg["profile"].items():
+            if name.startswith("nvenc"):
+                record(f"av1.{name}.{t} qvbr+profile=high",
+                       p.get("profile") == "high"
+                       and 0 <= int(p.get("qvbr", -1)) <= 63
+                       and p.get("bframes", 0) <= 7)
+            else:
+                record(f"av1.{name}.{t} FF+icq",
+                       p.get("function_mode") == "FF"
+                       and isinstance(p.get("icq"), int))
+
+    # --- svtav1 后端 (纯逻辑) ---
+    from core.config import load_svtav1_config
+    from encoders.svtav1 import (
+        PARAM_MAP,
+        SvtAv1Backend,
+        av1_pix_fmt,
+        format_svt_value,
+    )
+    from core.models import SourceInfo
+    svt_cfg = load_svtav1_config(ROOT / "svtav1.json")
+    record("av1.svtav1.json 加载+四档", set(svt_cfg["profile"])
+           == {"UHQ", "HQ", "SMALL", "FAST"}, f"cfg=ok")
+    for t, p in svt_cfg["profile"].items():
+        record(f"av1.svtav1.{t} tune0+crf+preset",
+               p.get("tune") == 0 and isinstance(p.get("crf"), int)
+               and isinstance(p.get("preset"), int))
+    want_map = {"keyint": "keyint", "vbv_maxrate": "mbr",
+                "enable_qm": "enable-qm", "ac_bias": "ac-bias"}
+    record("av1.svtav1 param map 关键键",
+           want_map.items() <= PARAM_MAP.items(),
+           f"map={sorted(PARAM_MAP)[:5]}...")
+    record("av1.svtav1 bool 格式", format_svt_value("enable_tf", True, 30.0)
+           == "1" and format_svt_value("enable_tf", False, 30.0) == "0")
+    record("av1.svtav1 FR* 格式", format_svt_value("keyint", "FR*10", 59.94)
+           == "600")
+    si422 = SourceInfo(path=ROOT / "x", size_bytes=1, duration_sec=1.0,
+                       width=3840, height=2160, fps=30.0,
+                       r_frame_rate="30/1", avg_frame_rate="30/1",
+                       codec="h264", profile="", pix_fmt="yuv422p10le",
+                       bit_depth=10, chroma="4:2:2", ob_kbps=100000.0,
+                       video_bitrate_kbps=100000.0, video_stream_count=1,
+                       stream_info=())
+    si420_8 = SourceInfo(path=ROOT / "x", size_bytes=1, duration_sec=1.0,
+                         width=3840, height=2160, fps=30.0,
+                         r_frame_rate="30/1", avg_frame_rate="30/1",
+                         codec="h264", profile="", pix_fmt="yuv420p",
+                         bit_depth=8, chroma="4:2:0", ob_kbps=100000.0,
+                         video_bitrate_kbps=100000.0, video_stream_count=1,
+                         stream_info=())
+    record("av1.svtav1 pix_fmt 420 策略",
+           av1_pix_fmt(si422) == "yuv420p10le"
+           and av1_pix_fmt(si420_8) == "yuv420p",
+           f"422->{av1_pix_fmt(si422)} 8bit420->{av1_pix_fmt(si420_8)}")
+    from core.scaling import ScalingEngine
+    from core.source_classifier import SourceClassifier
+    from core.config import load_scaling_config
+    sc = load_scaling_config(ROOT / "svtav1_scaling.json")
+    eng = ScalingEngine(sc)
+    cls_ = SourceClassifier(sc).classify(si422)
+    eff = eng.build(
+        svt_cfg["profile"]["HQ"], "HQ", si422, cls_,
+        SvtAv1Backend.param_order, SvtAv1Backend.format_fixed,
+    )
+    cmd, effd = SvtAv1Backend().build_video_command(
+        ROOT / "tools" / "ffmpeg.exe", ROOT / "src.mp4", ROOT / "out.mov",
+        svt_cfg["profile"]["HQ"], eff, si422,
+    )
+    joined = " ".join(str(c) for c in cmd)
+    record("av1.svtav1 build_video_command",
+           "libsvtav1" in joined and "-tag:v" in joined
+           and "av01" in joined and "yuv420p10le" in joined
+           and "-svtav1-params" in joined
+           and int(effd.get("mbr", 0)) > 0
+           and effd.get("keyint") == "300"
+           and effd.get("lookahead") == "60",
+           f"mbr={effd.get('mbr')} keyint={effd.get('keyint')} "
+           f"lookahead={effd.get('lookahead')}")
+
+
 # ===========================================================================
 # L2 — 工具链
 # ===========================================================================
@@ -980,6 +1092,16 @@ def l2_toolchain() -> None:
     r = sh(ffmpeg, "-version")
     record("tool.ffmpeg 可用", r.returncode == 0
            and "ffmpeg version" in (r.stdout or "").lower())
+    # 必须使用项目自带 tools/ffmpeg.exe (PATH 老版本不支持 AV1 新特性)
+    record("tool.ffmpeg 项目自带 (tools/)",
+           ROOT.resolve() in Path(ffmpeg).resolve().parents,
+           f"ffmpeg={ffmpeg}")
+    r = sh(ffmpeg, "-hide_banner", "-encoders")
+    enc_text = (r.stdout or "") + (r.stderr or "")
+    record("tool.ffmpeg libsvtav1 编码器", "libsvtav1" in enc_text)
+    record("tool.ffmpeg libvmaf 滤波器", "libvmaf" in
+           ((sh(ffmpeg, "-hide_banner", "-filters").stdout or "")
+            + (sh(ffmpeg, "-hide_banner", "-filters").stderr or "")))
     nvenc = find_hw_tool(ROOT, "NVEncC64.exe")
     qsv = find_hw_tool(ROOT, "QSVEncC64.exe")
     r = sh(nvenc, "--version")
@@ -1263,11 +1385,132 @@ def l3_pipeline() -> None:
            and {"djmd", "dbgi", "tmcd"} <= tags,
            f"rc={rc} tags={sorted(tags - {None})}")
 
-    # C12 质量抽样 PASS (真实管线产物: C10 x265 Sony 输出 vs 源)
+    # C33 nvenc-av1 DJI basic (AV1 保留管线: av01 + 数据轨)
+    out = OUT_DIR / "c33_nvenc_av1_dji"
+    rc, _ = _run_1kt(cases["dji"], out,
+                     "--encoder", "nvenc-av1", "--preset", "hq",
+                     "--check", "basic", "--jobs", "1")
+    final = out / "DJI_20260830095031_0009_D.MP4"
+    v = ffprobe_json(final) if final.is_file() else {}
+    vs = next((s for s in v.get("streams", [])
+               if s.get("codec_type") == "video"), {})
+    tags = {s.get("codec_tag_string") for s in v.get("streams", [])}
+    expect("C33_nvenc_av1_dji_av01+元数据", rc == 0 and final.is_file()
+           and vs.get("codec_name") == "av1"
+           and vs.get("pix_fmt") == "yuv420p10le"
+           and {"djmd", "dbgi", "tmcd"} <= tags,
+           f"rc={rc} codec={vs.get('codec_name')} "
+           f"pix_fmt={vs.get('pix_fmt')}")
+
+    # C34 nvenc-av1 Sony -> 保留管线 (rtmd/nrtm/uuid 保留, 不打 XAVC tag)
+    out = OUT_DIR / "c34_nvenc_av1_sony"
+    rc, tail = _run_1kt(cases["sony"], out,
+                        "--encoder", "nvenc-av1", "--preset", "hq",
+                        "--check", "basic", "--jobs", "1", timeout=2400)
+    final = out / "C9037.MP4"
+    v = ffprobe_json(final) if final.is_file() else {}
+    vs = next((s for s in v.get("streams", [])
+               if s.get("codec_type") == "video"), {})
+    rtmd = any(s.get("codec_tag_string") == "rtmd"
+               for s in v.get("streams", []))
+    major_brand = (v.get("format") or {}).get("tags", {}).get(
+        "major_brand", "")
+    expect("C34_nvenc_av1_sony_保留管线",
+           rc == 0 and final.is_file()
+           and vs.get("codec_name") == "av1" and rtmd
+           and "XAVC" not in major_brand and "AV1" in tail,
+           f"rc={rc} codec={vs.get('codec_name')} rtmd={rtmd} "
+           f"brand={major_brand} policy_warn={'AV1' in tail}")
+
+    # C35 qsv-av1 DJI basic
+    out = OUT_DIR / "c35_qsv_av1_dji"
+    rc, _ = _run_1kt(cases["dji"], out,
+                     "--encoder", "qsv-av1", "--preset", "hq",
+                     "--check", "basic", "--jobs", "1")
+    final = out / "DJI_20260830095031_0009_D.MP4"
+    v = ffprobe_json(final) if final.is_file() else {}
+    vs = next((s for s in v.get("streams", [])
+               if s.get("codec_type") == "video"), {})
+    expect("C35_qsv_av1_dji", rc == 0 and final.is_file()
+           and vs.get("codec_name") == "av1",
+           f"rc={rc} codec={vs.get('codec_name')}")
+
+    # C36 svtav1 DJI basic (软件 AV1 保留管线: av01 + 数据轨)
+    out = OUT_DIR / "c36_svtav1_dji"
+    rc, tail = _run_1kt(cases["dji"], out,
+                        "--encoder", "svtav1", "--preset", "fast",
+                        "--check", "basic", timeout=3600)
+    final = out / "DJI_20260830095031_0009_D.MP4"
+    v = ffprobe_json(final) if final.is_file() else {}
+    vs = next((s for s in v.get("streams", [])
+               if s.get("codec_type") == "video"), {})
+    tags = {s.get("codec_tag_string") for s in v.get("streams", [])}
+    expect("C36_svtav1_dji_av01+元数据", rc == 0 and final.is_file()
+           and vs.get("codec_name") == "av1"
+           and vs.get("pix_fmt") == "yuv420p10le"
+           and {"djmd", "dbgi", "tmcd"} <= tags,
+           f"rc={rc} codec={vs.get('codec_name')} "
+           f"pix_fmt={vs.get('pix_fmt')} tail={tail[-120:].strip()}")
+
+    # C37 svtav1 Sony basic (保留管线: rtmd 保留 + 422->420 降级 + 无 XAVC)
+    out = OUT_DIR / "c37_svtav1_sony"
+    rc, tail = _run_1kt(cases["sony"], out,
+                        "--encoder", "svtav1", "--preset", "fast",
+                        "--check", "basic", timeout=3600)
+    final = out / "C9037.MP4"
+    v = ffprobe_json(final) if final.is_file() else {}
+    vs = next((s for s in v.get("streams", [])
+               if s.get("codec_type") == "video"), {})
+    rtmd = any(s.get("codec_tag_string") == "rtmd"
+               for s in v.get("streams", []))
+    major_brand = (v.get("format") or {}).get("tags", {}).get(
+        "major_brand", "")
+    expect("C37_svtav1_sony_保留+420+无XAVC",
+           rc == 0 and final.is_file()
+           and vs.get("codec_name") == "av1"
+           and vs.get("pix_fmt") == "yuv420p10le"
+           and rtmd and "XAVC" not in major_brand
+           and "4:2:2" in tail,
+           f"rc={rc} codec={vs.get('codec_name')} "
+           f"pix_fmt={vs.get('pix_fmt')} rtmd={rtmd} "
+           f"brand={major_brand} downgrade_warn={'4:2:2' in tail} "
+           f"tail={tail[-120:].strip()}")
+
+    # C38 svtav1 经典路径 (剥离后的 DJI 文件: video+audio only)
+    if "classic" in cases:
+        out = OUT_DIR / "c38_svtav1_classic"
+        rc, tail = _run_1kt(cases["classic"], out,
+                            "--encoder", "svtav1", "--preset", "fast",
+                            "--check", "basic", timeout=3600)
+        final = out / "classic_test.MP4"
+        v = ffprobe_json(final) if final.is_file() else {}
+        types = sorted({s.get("codec_type") for s in v.get("streams", [])})
+        vs = next((s for s in v.get("streams", [])
+                   if s.get("codec_type") == "video"), {})
+        expect("C38_svtav1_classic", rc == 0 and final.is_file()
+               and types == ["audio", "video"]
+               and vs.get("codec_name") == "av1",
+               f"rc={rc} types={types} codec={vs.get('codec_name')} "
+               f"tail={tail[-120:].strip()}")
+    else:
+        expect("C38_svtav1_classic", False, "classic 输入未生成")
+
+    # C39 svtav1 DJI full (Gyroflow 逐帧四元数消费端 on av01)
+    out = OUT_DIR / "c39_svtav1_dji_full"
+    rc, tail = _run_1kt(cases["dji"], out,
+                        "--encoder", "svtav1", "--preset", "fast",
+                        "--check", "full", timeout=3600)
+    final = out / "DJI_20260830095031_0009_D.MP4"
+    expect("C39_svtav1_dji_full_gyroflow",
+           rc == 0 and final.is_file() and "dji gyroflow" in tail,
+           f"rc={rc} tail={tail[-160:].strip()}")
+
     from core.config import find_executable
     from preservation.quality import run_quality_sample
     ffmpeg = find_executable("ffmpeg", ROOT)
     ffprobe = find_executable("ffprobe", ROOT)
+
+    # C12 质量抽样 PASS (真实管线产物: C10 x265 Sony 输出 vs 源)
     c10_final = OUT_DIR / "c10_x265_sony" / "C9037.MP4"
     if c10_final.is_file():
         q = run_quality_sample(
@@ -1288,9 +1531,30 @@ def l3_pipeline() -> None:
     else:
         expect("C12_quality_sample_PASS", False, "C10 输出缺失")
 
+    # C40 质量抽样 PASS — AV1 后端产物 (C37 svtav1 Sony 输出 vs 源)
+    c37_final = OUT_DIR / "c37_svtav1_sony" / "C9037.MP4"
+    if c37_final.is_file():
+        q = run_quality_sample(
+            original=cases["sony"] / "C9037.MP4",
+            final=c37_final,
+            ffmpeg=ffmpeg,
+            ffprobe=ffprobe,
+            scratch=WORK / "quality_c40",
+            opts={"sample_rate": 1, "max_duration_sec": 600},
+            log=lambda m: None,
+        )
+        expect("C40_svtav1_quality_sample_PASS",
+               q["status"] == "PASS"
+               and q["psnr_avg_db"] and q["psnr_avg_db"] > 25
+               and q["ssim_all"] and q["ssim_all"] > 0.8,
+               f"status={q['status']} psnr={q['psnr_avg_db']} "
+               f"ssim={q['ssim_all']} detail={q['detail']}")
+    else:
+        expect("C40_svtav1_quality_sample_PASS", False, "C19 输出缺失")
+
     # C13 质量抽样 FAIL (灰屏垃圾文件: 同分辨率同帧数, PSNR 必然崩溃)
     if "classic" in cases:
-        garbage = WORK / "quality_c13_garbage.mp4"
+        garbage = WORK / "quality_c23_garbage.mp4"
         r = sh(ffmpeg, "-hide_banner", "-nostdin", "-y",
                "-i", cases["classic"] / "classic_test.MP4",
                "-map", "0:v:0", "-an",
@@ -1342,6 +1606,7 @@ def l3_pipeline() -> None:
                             "--check", "basic", "--channel-sync",
                             "--jobs", "1", timeout=1200)
         final = out / "sync_test.MP4"
+        aligned = False
         if rc == 0 and final.is_file():
             try:
                 from core.channel_sync import run_channel_sync
@@ -2338,6 +2603,7 @@ SUITES: dict[str, list[tuple[str, Callable[[], None]]]] = {
         ("quality/versions", l1_quality),
         ("channel-sync", l1_channel_sync),
         ("channel-sync P1", l1_channel_sync_p1),
+        ("av1", l1_av1),
     ],
     "toolchain": [("toolchain", l2_toolchain)],
     "full": [("pipeline", l3_pipeline),

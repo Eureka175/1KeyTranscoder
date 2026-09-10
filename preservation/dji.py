@@ -243,6 +243,7 @@ def dji_rebuild(
     vfr: bool,
     level: str,
     fix_hw_timing: bool,
+    video_entry: str = "hvc1",
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
@@ -256,6 +257,8 @@ def dji_rebuild(
     (hardware rigaya intermediates only; ffmpeg/x265 intermediates
     pass fix_hw_timing=False) -> run_dji_check -> report.json.
 
+    video_entry: expected sample entry of the re-encoded video track
+    ("hvc1" for HEVC backends, "av01" for AV1 backends).
     audio_sources: 延时补偿后的音频中间文件 (与源音轨一一对应);
     提供时替代源音轨的原生复制。
 
@@ -321,6 +324,7 @@ def dji_rebuild(
         scratch=work_dir / "validate",
         vfr=vfr,
         level=level,
+        video_entry=video_entry,
         ffmpeg=ffmpeg,
         quality_opts=quality_opts,
         quality_csv=quality_csv,
@@ -350,6 +354,7 @@ def run_dji_check(
     scratch: Path,
     vfr: bool = False,
     level: str = "basic",
+    video_entry: str = "hvc1",
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
@@ -365,6 +370,9 @@ def run_dji_check(
       full     : advanced + deep items (per-track timescale/media
                  duration, payload head/tail bytes, ffprobe stream
                  facts incl. data-track tags) + PSNR/SSIM quality sample
+
+    video_entry: expected sample entry of the re-encoded video track
+    ("hvc1" HEVC / "av01" AV1).
 
     Critical items: data-track payloads (djmd/dbgi/tmcd) byte-identical,
     track inventory, audio streams, video frame count/fps (CFR only),
@@ -410,19 +418,20 @@ def run_dji_check(
     )
     eq("dji.track_inventory", s_inv, o_inv)
 
-    # video: re-encoded HEVC expected
+    # video: re-encoded (HEVC hvc1 / AV1 av01 expected)
     o_video = next(
         (t for t in out_tracks if t["handler"] == "vide"), None
     )
     if o_video is None:
         note("dji.video.track", MISSING, "no video track in final")
-    elif o_video["entry"] != "hvc1":
+    elif o_video["entry"] != video_entry:
         note(
             "dji.video.track", MODIFIED,
-            f"final video entry {o_video['entry']!r} (hvc1 expected)",
+            f"final video entry {o_video['entry']!r} "
+            f"({video_entry} expected)",
         )
     else:
-        note("dji.video.track", PRESERVED, "vide:hvc1")
+        note("dji.video.track", PRESERVED, f"vide:{video_entry}")
 
     # --- data-track payloads (byte-identical) ---
     for track_id, entry in s_specs["data_ids"]:
@@ -559,11 +568,16 @@ def run_dji_check(
                 (st for st in streams if st.get("codec_type") == "video"),
                 {},
             )
+            # main (HEVC) 路径保持原有校验强度: profile 参与比对
+            # (源 DJI HEVC Main 10 -> x265/NVENC Main 10)。
+            # AV1 重编码必然改变 profile (HEVC Main 10 -> AV1 Main),
+            # 故 AV1 路径只比对几何/像素格式; 目标 sample entry 由
+            # dji.video.track 断言, 此处不再重复。
+            video_fields = ["width", "height", "pix_fmt"]
+            if video_entry == "hvc1":
+                video_fields.append("profile")
             return {
-                "video": (
-                    video.get("width"), video.get("height"),
-                    video.get("pix_fmt"), video.get("profile"),
-                ),
+                "video": tuple(video.get(k) for k in video_fields),
                 "audio": sorted(
                     (
                         st.get("codec_name"), st.get("sample_fmt"),

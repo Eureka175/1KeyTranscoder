@@ -29,6 +29,7 @@ PARAM_MAP = {
     "tier": ("--tier", "value"),
     "level": ("--level", "value"),
     "qvbr": ("--qvbr", "value"),
+    "cqp": ("--cqp", "list"),
     "max_bitrate": ("--max-bitrate", "value"),
     "vbv_bufsize": ("--vbv-bufsize", "value"),
     "aq": ("--aq", "flag"),
@@ -39,6 +40,8 @@ PARAM_MAP = {
     "bframes": ("-b --bframes", "value"),
     "bref_mode": ("--bref-mode", "value"),
     "ref": ("--ref", "value"),
+    "refs_forward": ("--refs-forward", "value"),
+    "refs_backward": ("--refs-backward", "value"),
     "tf_level": ("--tf-level", "value"),
     "nonrefp": ("--nonrefp", "flag"),
     "mv_precision": ("--mv-precision", "value"),
@@ -50,6 +53,11 @@ PARAM_MAP = {
     "aud": ("--aud", "flag"),
     "repeat_headers": ("--repeat-headers", "flag"),
     "pic_struct": ("--pic-struct", "flag"),
+    "tile_columns": ("--tile-columns", "value"),
+    "tile_rows": ("--tile-rows", "value"),
+    "part_size_min": ("--part-size-min", "value"),
+    "part_size_max": ("--part-size-max", "value"),
+    "bitstream_padding": ("--bitstream-padding", "flag"),
 }
 
 # nvenc.json keys intentionally not mapped: split_enc/parallel/
@@ -69,10 +77,18 @@ class NvencBackend:
     name = "nvenc"
     kind = "nvencc"
 
-    def __init__(self, tool: Path, caps: BackendCaps | None = None) -> None:
+    def __init__(
+        self,
+        tool: Path,
+        caps: BackendCaps | None = None,
+        codec: str = "hevc",
+    ) -> None:
         self.tool = tool
         self.caps = caps or CONSERVATIVE_CAPS
         self.known = known_flags(tool)
+        self.codec = codec
+        if codec != "hevc":
+            self.name = f"{self.name}-{codec}"
 
     def build_args(
         self,
@@ -88,13 +104,18 @@ class NvencBackend:
         args, skipped = build_flag_args(profile, PARAM_MAP, self.known)
         cargs, cnotes = color_flag_args(color, self.known)
         args = [
-            "--avsw", "--video-track", "1", "-c", "hevc",
+            "--avsw", "--video-track", "1", "-c", self.codec,
             "--output-depth", str(depth),
             *args,
         ]
         # atc_sei ("auto") is a legit rigaya CLI value and would be
-        # swallowed by the AUTO token check in build_flag_args.
-        if profile.get("atc_sei") and "atc-sei" in self.known:
+        # swallowed by the AUTO token check in build_flag_args. HEVC
+        # only (alternative transfer characteristics SEI, HLG).
+        if (
+            self.codec == "hevc"
+            and profile.get("atc_sei")
+            and "atc-sei" in self.known
+        ):
             args += ["--atc-sei", str(profile["atc_sei"])]
         args += cargs
         if chroma == "4:2:2":

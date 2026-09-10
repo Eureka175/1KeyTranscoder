@@ -145,8 +145,13 @@ def detailed_compare(
     ffprobe: Path,
     log_dir: Path,
     gyroflow: Path | None = None,
+    codec: str = "hevc",
 ) -> dict[str, Any]:
     """Extensive ORIGINAL vs FINAL Sony metadata comparison.
+
+    codec: expected re-encoded codec ("hevc" | "av1"). For av1 the
+    XAVC brand is deliberately not restored (AV1 not in XAVC spec) —
+    the ftyp item is policy-aware and never fails on that difference.
 
     Returns the full result dict (also written to log_dir as
     selfcheck_<stem>.json + .txt)."""
@@ -166,7 +171,28 @@ def detailed_compare(
     out_streams = _ffprobe_streams(ffprobe, final)
 
     # --- container / brands ---
-    note("ftyp", _ftyp(src), _ftyp(out))
+    s_ftyp = _ftyp(src)
+    o_ftyp = _ftyp(out)
+    if codec == "av1":
+        av1_brand_ok = (
+            "XAVC" not in (o_ftyp.get("major") or "")
+            and not any(
+                b.startswith("XAVC") for b in o_ftyp.get("compat", [])
+            )
+        )
+        results.append(
+            {
+                "item": "ftyp",
+                "status": PASS if av1_brand_ok else FAIL,
+                "detail": (
+                    f"av1 policy: XAVC brand not kept "
+                    f"(original={s_ftyp.get('major')}, "
+                    f"final={o_ftyp.get('major')}/{o_ftyp.get('compat')})"
+                ),
+            }
+        )
+    else:
+        note("ftyp", s_ftyp, o_ftyp)
 
     # --- movie ---
     def mvhd(p: ParsedFile) -> dict[str, str]:
@@ -222,14 +248,16 @@ def detailed_compare(
         for key in ("timescale", "stts"):
             note(f"video.{key}", sv[key], ov[key])
         # codec change is the EXPECTED result of re-encoding: verify the
-        # final is HEVC rather than requiring codec equality.
+        # final sample entry matches the target codec rather than
+        # requiring codec equality.
+        expected_entries = ("hvc1", "hev1") if codec == "hevc" else ("av01",)
         results.append(
             {
                 "item": "video.stsd",
-                "status": PASS if ov["stsd"] in ("hvc1", "hev1") else FAIL,
+                "status": PASS if ov["stsd"] in expected_entries else FAIL,
                 "detail": (
                     f"original={sv['stsd']} final={ov['stsd']} "
-                    "(re-encode, HEVC expected)"
+                    f"(re-encode, {codec} expected)"
                 ),
             }
         )
@@ -261,14 +289,18 @@ def detailed_compare(
             "color_range",
         ):
             note(f"video.{key}", s_v.get(key), o_v.get(key))
+        expected_codec = "hevc" if codec == "hevc" else "av1"
         results.append(
             {
                 "item": "video.ffprobe.codec",
-                "status": PASS if o_v.get("codec_name") == "hevc" else FAIL,
+                "status": (
+                    PASS if o_v.get("codec_name") == expected_codec
+                    else FAIL
+                ),
                 "detail": (
                     f"original={s_v.get('codec_name')} "
                     f"final={o_v.get('codec_name')} "
-                    "(re-encode, HEVC expected)"
+                    f"(re-encode, {expected_codec} expected)"
                 ),
             }
         )

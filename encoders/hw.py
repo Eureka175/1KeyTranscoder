@@ -370,20 +370,26 @@ def plan_initial_format(
     backend_kind: str,
     chroma: str,
     depth: int,
+    codec: str = "hevc",
 ) -> tuple[tuple[str, int], bool]:
     """Capability-driven initial format.
 
-    Returns ((chroma, depth), needs_downgrade). QSV policy: 4:2:2
-    sources always plan 4:2:0 conversion (direct 4:2:2 encode on Arc
-    is the slow path ~1.0x vs 2.0x); NVENC keeps 4:2:2 when capable."""
+    Returns ((chroma, depth), needs_downgrade). Policies:
+    - AV1: hardware AV1 is 4:2:0 only on all vendors — any non-4:2:0
+      source always plans 4:2:0 conversion (lossy, warned).
+    - QSV: 4:2:2 sources always plan 4:2:0 conversion (direct 4:2:2
+      encode on Arc is the slow path ~1.0x vs 2.0x).
+    - NVENC: keeps 4:2:2 when capable."""
+    if codec == "av1":
+        return ("4:2:0", max(depth, 10)), chroma != "4:2:0"
     if chroma == "4:2:2":
         if backend_kind == "qsvencc":
             return ("4:2:0", max(depth, 10)), True
-        if supports(caps, "4:2:2", depth):
+        if supports(caps, "4:2:2", depth, codec):
             return (chroma, depth), False
         return ("4:2:0", max(depth, 10)), True
     if depth > 8:
-        if supports(caps, chroma, depth):
+        if supports(caps, chroma, depth, codec):
             return (chroma, depth), False
         return ("4:2:0", 10), True
     return (chroma, depth), False
