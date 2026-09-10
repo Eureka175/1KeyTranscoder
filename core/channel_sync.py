@@ -248,11 +248,28 @@ def _decode_stream(
     return ok, (proc.stderr or "")[-300:]
 
 
+# ffmpeg 的 MOV muxer 写 QuickTime PCM 条目 (in24/sowt/twos/in32/fl32),
+# MP4 muxer 写 ISO 条目 (ipcm/fpcm)。Sony XAVC-S 的 LPCM 实际是 **ipcm**
+# — 若音频中间文件用 MOV 承载, 源音轨被替换后容器里的 sample entry 会
+# 变成 in24, preservation 的 `audio.tracks` 关键项随即判 MODIFIED 并使
+# 整个文件 `--check basic` 失败 (真实 A7M5 素材实测: applied 的文件
+# rc=1 且不产出)。因此按**源轨自己的 sample entry** 选择能复现同一条目
+# 的 muxer, 使替换对容器透明。
+_MP4_SAMPLE_ENTRIES = ("ipcm", "fpcm")
+
+
+def _muxer_for_entry(sample_entry: str) -> str:
+    """返回能复现源轨 sample entry 的 ffmpeg muxer 名 (默认 mov)。"""
+    entry = str(sample_entry or "").strip().lower()
+    return "mp4" if entry in _MP4_SAMPLE_ENTRIES else "mov"
+
+
 def _copy_stream(
     ffmpeg: Path,
     source: Path,
     stream_index: int,
     out_file: Path,
+    muxer: str = "mov",
 ) -> tuple[bool, str]:
     """源音轨 stream copy 到独立容器 (untouched 轨 bit-exact 保留)。"""
     proc = subprocess.run(
@@ -261,7 +278,7 @@ def _copy_stream(
             "-i", str(source),
             "-map", f"0:a:{stream_index}",
             "-vn", "-sn", "-dn",
-            "-c:a", "copy", "-f", "mov", str(out_file),
+            "-c:a", "copy", "-f", muxer, str(out_file),
         ],
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE, text=True, encoding="utf-8",
@@ -445,6 +462,8 @@ def run_channel_sync(
     audio = [s for s in streams if s.get("codec_type") == "audio"]
     sample_rate = int(audio[0].get("sample_rate", 0) or 0)
     codecs = [str(st.get("codec_name", "")) for st in audio]
+    # 源轨 sample entry (ipcm / in24 / sowt / ...), 决定中间文件 muxer
+    entries = [str(st.get("codec_tag_string", "") or "") for st in audio]
     storage = [
         "f64" if c in ("pcm_s32le", "pcm_s32be") else "f32"
         for c in codecs
@@ -894,7 +913,8 @@ def run_channel_sync(
                         str(ffmpeg), "-v", "error", "-nostdin", "-y",
                         "-f", fmt, "-ar", str(sample_rate), "-ac", "1",
                         "-i", str(src_raw),
-                        "-c:a", codecs[i], "-f", "mov", str(out),
+                        "-c:a", codecs[i],
+                        "-f", _muxer_for_entry(entries[i]), str(out),
                     ],
                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                     stderr=subprocess.PIPE, text=True, encoding="utf-8",
@@ -908,7 +928,9 @@ def run_channel_sync(
                         channels=rows,
                     )
             else:
-                ok_c, err_c = _copy_stream(ffmpeg, source, i, out)
+                ok_c, err_c = _copy_stream(
+                    ffmpeg, source, i, out, _muxer_for_entry(entries[i])
+                )
                 if not ok_c:
                     return finish(
                         "verify_failed",

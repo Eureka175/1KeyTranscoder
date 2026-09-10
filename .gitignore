@@ -3,6 +3,9 @@ logs/
 *.log
 *.csv
 
+# 例外: 通道同步 P1 真实素材冻结基线 (纯文本 fixture, 需入库; 不含媒体)
+!tests/fixtures/channel_sync/*.csv
+
 # Temporary / partial outputs
 *.part
 *.part.mov

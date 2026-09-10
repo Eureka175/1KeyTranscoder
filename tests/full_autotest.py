@@ -658,7 +658,9 @@ def l1_channel_sync_p1() -> None:
     record("p1.numpy/scipy 可用", True)
 
     from core import sync_estimate, sync_fix
-    from core.channel_sync import DEFAULTS, effective_opts, eligible_audio
+    from core.channel_sync import (
+        DEFAULTS, effective_opts, eligible_audio, _muxer_for_entry,
+    )
 
     # --- DEFAULTS (v3) ---
     record("p1.algo_version 2.3.0-p1", DEFAULTS["algo_version"] == "2.3.0-p1")
@@ -696,6 +698,20 @@ def l1_channel_sync_p1() -> None:
     record("p1.f32be 大端接受", ok, why)
     ok, why = eligible_audio([mono(48000, "aac")] * 4)
     record("p1.非 PCM 拒绝", not ok, why)
+
+    # --- 音频中间文件的 sample entry 必须可复现源轨 (真实素材回归) ---
+    # Sony XAVC-S LPCM 的 sample entry 是 ipcm; ffmpeg 的 MOV muxer 会写成
+    # in24, 源音轨被替换后 preservation 的 audio.tracks 关键项即判 MODIFIED
+    # 并使整个文件 --check basic 失败 (真实 A7M5 applied 素材 rc=1 实测)。
+    # MP4 muxer 写 ipcm/fpcm, 因此按源 entry 选 muxer。
+    _mux = _muxer_for_entry
+    record("p1.ipcm 源 -> MP4 muxer (保持 ipcm)",
+           _mux("ipcm") == "mp4" and _mux("IPCM") == "mp4")
+    record("p1.fpcm 源 -> MP4 muxer",
+           _mux("fpcm") == "mp4")
+    record("p1.QuickTime PCM entry 保持 MOV muxer",
+           all(_mux(e) == "mov"
+               for e in ("in24", "in32", "sowt", "twos", "fl32", "")))
 
     # --- 合成信号 ---
     def speech_like(n: int, seed: int, fs: int) -> np.ndarray:

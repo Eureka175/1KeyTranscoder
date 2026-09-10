@@ -169,6 +169,38 @@ timescale 实为 3000（不采纳 `-timescale 1000`）→ tkhd/elst 被写成 1/
 自身**读取真实 mvhd timescale 后重跑同一修复（stts 始终精确，是可靠
 事实来源），接入全部 classic 重封装调用点与 transparent 重封装。
 
+### 9.1 音频中间文件 sample entry 失配（真实素材短集成实测发现）
+
+真实 A7M5 素材（XAVC-S LPCM）音轨的 sample entry 是 **`ipcm`**
+（`ffprobe codec_tag_string`）。P1 的音频中间文件原先以 `-f mov` 写出，
+而 ffmpeg 的 MOV muxer 对 PCM 一律写 QuickTime 条目（`in24` / `sowt` /
+`twos` / `in32` / `fl32`）→ 源音轨被替换后容器里变成 `in24`，触
+`preservation/validate.py` 中 `critical_modified` 的 `audio.tracks` 关键项
+→ 整个文件 `--check basic` 失败、rc=1、**不产出文件**。
+
+实测影响面：**只要 channel-sync 真正修正了某条轨就会触发**（137 段中
+11 段 `applied` 全部命中）；未修正的文件因不替换音轨而正常，所以此前
+137 段**算法级**扫描（不经过转码管线）看不到它。既有合成用例用的是
+`pcm_s24le`（MOV 下本也是 `in24`），因此 L1/L3 断言也覆盖不到 —
+这是只有"真实素材 + 完整封装管线"才能暴露的集成缺陷。
+
+修复（满足 P1 约束：**不修改 `preservation/`**）：在 `core/channel_sync.py`
+新增 `_muxer_for_entry()`，**按源轨自身的 sample entry 选择能复现同一条目
+的 muxer**：
+
+| 源 sample entry | muxer | 产物条目 |
+|---|---|---|
+| `ipcm` / `fpcm`（ISO/Sony XAVC-S） | `-f mp4` | `ipcm` / `fpcm` |
+| `in24` / `in32` / `sowt` / `twos` / `fl32` / 未知 | `-f mov`（原行为） | 同源 |
+
+两处写盘点（fixed 轨回编码、untouched 轨 stream copy）均已接入；文件名与
+调用方签名未改动。
+
+验证（真实素材）：`20260904_C1183` / `20260904_C1209` 修复前 rc=1 且无
+产出，修复后 rc=0；输出音轨 sample entry 与源逐轨一致（`ipcm`×4）；输出
+复测显示被修正轨残差 0.0 ms 且 `untouched` 轨逐值不变。回归钉：
+`l1_channel_sync_p1` 增加 3 条 `_muxer_for_entry` 断言。
+
 ## 10. P1 新算法 vs vendored 1.x 对照
 
 | 维度 | vendored 1.x (`core/mp4_channel_sync.py`) | P1 (`sync_estimate` + `sync_fix`) |
@@ -310,7 +342,77 @@ CH3/CH4 高相关、已对齐、不同固定 delay、低相关等 10 类场景�
    太少 → `insufficient_frames`（见 §5）。
 4. **报告新增诊断字段** `rms_dbfs` / `traj_drift_ms`。
 
-## 15. 明确未实现（P1 边界, 勿顺手实现）
+## 15. Real-world calibration baseline（真实素材冻结基线）
+
+Dataset: **137 real Sony A7M5 4CH clips**（`testsets/20260903` +
+`testsets/20260904`，4K60 XAVC-S MP4/MOV；音频 4×mono **pcm_s24be**
+48kHz）。冻结基线工件：`tests/fixtures/channel_sync/a7m5_real_137_baseline.csv`
+（逐轨 548 行，纯文本，不含媒体）+ 同目录 `.md`（字段映射与空值约定）
++ `a7m5_real_137_analysis.md`（分析报告）。
+
+| 项 | 值 |
+|---|---|
+| 素材 | 137 段 A7M5 4CH（枚举 164 个候选；正确排除 27 段非 A7M5：17 段无音频 DJI Air3S、9 段 2ch AAC、1 段无音频 MP4） |
+| PCM | **8 linear PCM variants**: s16 / s24 / s32 / f32 × little-endian + **big-endian** |
+| Sample rate | **48 / 96 kHz**；**44.1 reject** |
+| 逐轨行数 | 548（137 × 4），全部 `pcm_s24be` / 48000 / 4 streams / entry **`ipcm`** |
+| `drift_min_ms` | **0.1 ms**（材料性门，见 §6.2） |
+| 固定延迟修正 | **11/11 successful，residual 0.00 sample** |
+| 修正量 | 9 段 905–1222 samples = **18.9–25.5 ms @ 48 kHz**；另 2 段 −37/−39 samples = −0.77/−0.81 ms。**完整范围 37–1222 samples = 0.77–25.46 ms** |
+| real drift（正确拒修） | **39–76 ppm**，总漂移 **0.4–2 ms** |
+| 文件级结果 | already_aligned 111 / applied 11 / measure_failed 15 |
+| 锚点分布 | CH3 500 轨 / CH1 8 轨 / 无锚点 40 轨（**无 CH4 锚点样本**） |
+
+**边界声明**：
+
+```text
+P1 handles fixed / approximately constant delay.
+P1 does not resample drift.
+```
+
+上表 39–76 ppm / 0.4–2 ms 的真实持续漂移属 **P2 范围**：P1 不处理并原样
+保留该轨音频（宁可保持原音频，也不做错误修正）。
+
+**可复现性**：基线由 `work/sweep_real_sync.py` + `analyze_real_sync.py`
+重跑一遍并与首轮逐字段比对后冻结 — 548 行全部字段 **0 差异**、
+`analysis.md` 逐行一致（仅 `summary.csv` 的 `dur_s` 墙钟列不同），
+11/11 修正轨复测残差仍为 0.00 样本。注意 `reason` 是**诊断口径**（一个
+文件可同时出现多种 reason），`already_aligned / applied / measure_failed`
+才是互斥的最终状态层级，两者不可混在一起求和。
+
+### 15.1 短素材端到端集成验收（production pipeline）
+
+用同一批真实素材做完整封装管线的短素材集成验收
+（`work/p1_short_integration.py`；7 个 `--channel-sync` 用例 + 5 个
+`--channel-sync-transparent` 用例，**173 断言全绿**）：
+
+| 用例 | 素材 | 覆盖点 |
+|---|---|---|
+| already_aligned (低置信) | C1157 | CH1/CH2 low_confidence → untouched |
+| already_aligned (静音 CH1/CH2) | C1088 | 静音轨不参与估计、不制造虚假 delay；健康轨仍被评估 |
+| applied + **锚点回退** | C1183 | CH3/CH4 均 low_confidence → **回退到 CH1** 成功修正 CH2 |
+| applied (anchor=CH3) | C1209 | 观测轨间时差 +19.917 ms 被修正；同文件 CH2 真实漂移（24.844 ms、203 ppm）正确拒修 |
+| non_constant | C1154 | 真实慢漂移（41.5 ppm）→ untouched |
+| insufficient_frames | C1215 | 有信号但可用帧不足 → untouched |
+| 文件级失败 (全静音) | C1083 | 无有效锚点 → 全部音轨原样 |
+| transparent ×5 | 同上 | 全对齐→**SHA256 与源字节级一致**；applied→视频/非音频 **stream copy**（逐流 MD5 相同）且仅 fixed 轨改变；文件级失败→源文件原样拷贝 |
+
+逐项断言：容器结构（音轨数/顺序/采样率/codec/时长/几何与帧率）、
+Sony 元数据保留（rtmd/nrtm、`--check basic` 无 FAIL）、管线日志中的
+`anchor` / `status` / 每轨实测 delay 与算法级参考报告一致、`fixed` 行的
+shift 符号与量级同 delay 一致且复检残差 ≤ `verify_max_ms`，以及
+**对最终输出独立复测**：`fixed` 轨 → 0.0 ms、`anchor`/`already_aligned`
+轨 → 0.0 ms、`untouched` 轨逐值不变（未被静默改动）。
+
+本次集成验收暴露并修复了 1 个真实缺陷（see **§9.1**：`ipcm` sample
+entry 失配导致 applied 文件 rc=1、无产出），并新增 3 条 L1 回归钉。
+
+> 真实素材的覆盖缺口（据实记录，未伪造通过）：137 段中
+> **不存在**"某轨静音 + 同文件另一轨被修正"的组合（11 段 applied 全部
+> 无静音轨），也**不存在** anchor=CH4 的样本。这两种组合由合成用例
+> `l3_channel_sync_p1`（C15–C26）覆盖，见 §13。
+
+## 16. 明确未实现（P1 边界, 勿顺手实现）
 
 锚点完整评分 / 轨迹三分类（step/ramp）/ 漂移 `resample` / 全两两估计 /
 设备 latency 数据库 / 声学传播差建模 / LUFS·包络·分频带降级 / 44.1kHz /
