@@ -97,7 +97,11 @@ DEFAULTS: dict[str, Any] = {
     # —— 恒定性 (P1 二分 constant/non_constant; step/ramp 细分属二期) ——
     "mad_max_ms": 1.0,                   # 初值, 待真实素材标定
     "step_min_ms": 3.0,                  # 初值, 待真实素材标定 (仅诊断警告, 不参与判定)
-    "constant_max_ppm": 5.0,             # 初值, 待真实素材标定 (10ppm 漂移 -> non_constant)
+    "constant_max_ppm": 5.0,             # 初值, 待真实素材标定
+    # 漂移材料性门 (真实素材标定): ppm 超门**且**全片预测漂移 > 此值才判非恒定 —
+    # A7M5 实测: 已对齐轨的量化噪声斜率可达 5~30ppm 但漂移量仅 ~0.03ms;
+    # 真实慢漂移轨 39~49ppm 对应 0.42~1.9ms, 远超此门仍被正确拦下
+    "drift_min_ms": 0.1,                 # 初值, 待真实素材标定
 
     # —— 修正 / 复检 ——
     "verify_max_ms": 0.05,               # 复检残差阈值 (整数修正量化残差理论上 <= 0.5 sample)
@@ -117,7 +121,8 @@ _FLOAT_KEYS = ("min_audio_seconds", "silent_rms_dbfs", "search_window_ms",
                "wide_search_ms", "frame_ms", "hop_ms",
                "anchor_segment_seconds",
                "min_confidence", "min_usable_fraction", "mad_max_ms",
-               "step_min_ms", "constant_max_ppm", "verify_max_ms",
+               "step_min_ms", "constant_max_ppm", "drift_min_ms",
+               "verify_max_ms",
                "aligned_max_ms", "fix_chunk_seconds", "frame_min_rms_dbfs")
 _LIST_INT_KEYS = ("supported_sample_rates", "anchor_candidates")
 _LIST_FLOAT_KEYS = ("fine_phase_band_hz",)
@@ -468,6 +473,7 @@ def run_channel_sync(
             "storage_dtype": storage[i],
             "traj_mad_ms": None,
             "traj_spread_samples": None,
+            "traj_drift_ms": None,
             "usable_frames": None,
             "rms_dbfs": None,
         }
@@ -497,12 +503,13 @@ def run_channel_sync(
             "confidence": round(e.confidence, 3),
             "polarity": e.polarity,
             "drift_ppm": round(stats.drift_ppm, 2),
-            # 与决策门一致: MAD + 极差 + 漂移 ppm 三门 (classify_constant)
+            # 与决策门一致: MAD + 极差 + 漂移(ppm×材料性) 三门
             "constant": bool(
                 sync_estimate.classify_constant(
                     stats, mad_max_ms=eff["mad_max_ms"],
                     max_ppm=eff["constant_max_ppm"],
                     sample_rate=sample_rate,
+                    drift_min_ms=eff["drift_min_ms"],
                 )
             ),
             "warnings": warnings,
@@ -518,6 +525,7 @@ def run_channel_sync(
             "storage_dtype": storage[i],
             "traj_mad_ms": j(stats.mad_ms, 4),
             "traj_spread_samples": j(stats.spread_samples, 3),
+            "traj_drift_ms": j(getattr(stats, "drift_total_ms", float("nan")), 4),
             "usable_frames": e.usable_frames,
         }
         if codecs[i] in ("pcm_s32le", "pcm_s32be"):
@@ -692,7 +700,20 @@ def run_channel_sync(
                             f"宽窗窗内测出 {ew.delay_ms:+.3f}ms — 采用宽窗估计"
                         )
                 else:
-                    reason_ = "insufficient_frames"
+                    # 窄窗宽窗均无足够可测帧: 用"有信号的帧数"区分原因 —
+                    # 有信号但相关性不足 -> low_confidence;
+                    # 有信号的帧本身就太少 (稀疏内容/极短素材) -> insufficient_frames
+                    attempted = sum(
+                        1 for f in e.frames if f.confidence > 0.0
+                    )
+                    if attempted >= eff["min_usable_frames"]:
+                        reason_ = "low_confidence"
+                        log(
+                            f"channel-sync: CH{i + 1} 有信号帧 {attempted} 个但"
+                            f"均可测性不足 (相关峰值未过门) — low_confidence"
+                        )
+                    else:
+                        reason_ = "insufficient_frames"
             elif coverage < eff["min_usable_fraction"]:
                 # 轨迹证据覆盖率不足 (存在大洞): 恒定性判断不可靠 -> 宽窗复测
                 ew = wide_estimate(i)
@@ -740,6 +761,7 @@ def run_channel_sync(
                     stats, mad_max_ms=eff["mad_max_ms"],
                     max_ppm=eff["constant_max_ppm"],
                     sample_rate=sample_rate,
+                    drift_min_ms=eff["drift_min_ms"],
                 ):
                     reason_ = "non_constant"
                 elif e.delay_samples != e.delay_samples:

@@ -65,3 +65,25 @@
   （不入库亦可, 或按需提交结论摘要）。
 - 阈值标定结论回流到 `core/channel_sync.py::DEFAULTS`（所有阈值标注
   "初值, 待真实素材标定"，不得把初值描述成充分标定的最终值）。
+
+## 实测结论（20260903 + 20260904，137 段 A7M5 真实素材）
+
+扫描工具: `work/sweep_real_sync.py`（进程内 `run_channel_sync`，纯音频
+算法，源文件只读）→ `work/real_data_sync/summary.csv`；分析:
+`work/analyze_real_sync.py` → `analysis.md`。
+
+| 状态 | 段数 | 说明 |
+|---|---|---|
+| already_aligned | 111 | 无轨需要修正（含空轨/弱相关轨 untouched） |
+| applied | 11 | 修正量 905–1222 样本 = 18.9–25.5 ms（与实测无线麦延迟量级一致） |
+| measure_failed | 15 | 四轨全静音 5 + 无有效锚点 3 + 目标轨全部不可靠 7 |
+
+- **修正正确性**: 11/11 修正轨算法复测 vs 锚轨，残差 **0.00 样本**。
+- **不误修**: 已对齐轨未被误改；真实慢漂移轨（spread 0.6–2.2 ms、
+  34–76 ppm，轨迹单调）与弱相关轨（全窗最大归一化相关 0.09–0.46）
+  均安全拒修（`non_constant` / `low_confidence`）。
+- 因真实素材产生的标定: codec 白名单大小端全支持（A7M5 实为大端
+  s24be）、漂移材料性门 `drift_min_ms`、reason 区分
+  （`low_confidence` vs `insufficient_frames`）。
+- 待办（P2 范围）: 素材内部 0.4–2 ms 量级的慢漂移需 resample 处理；
+  P1 明确不做，漂移轨保持原音频。

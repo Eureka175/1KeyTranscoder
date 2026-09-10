@@ -67,8 +67,8 @@ P1 只做"文件内时间对齐"。"设备固有 latency 标定"、"麦克风空
 |---|---|---|
 | `silent_track` | 整轨 RMS < `silent_rms_dbfs`(-60) | untouched, 不阻止其它轨 |
 | `non_finite` | 解码后 NaN/Inf | untouched |
-| `insufficient_frames` | 窄窗+宽窗均无足够可测帧 | untouched |
-| `low_confidence` | 置信度 < `min_confidence`(0.3) / 证据覆盖率不足且宽窗不可靠 / 相位精估退化 | untouched |
+| `insufficient_frames` | 有信号的帧本身就太少（稀疏内容/素材过短; 窄窗+宽窗均不足） | untouched |
+| `low_confidence` | 有信号帧但相关性/置信度不足（含窄窗+宽窗均不可测; 相位精估退化） | untouched |
 | `non_constant` | MAD / 极差 / 漂移 ppm 三门任一不过 | untouched |
 | `out_of_range` | 真实时差超搜索窗（宽窗复测确认） | untouched |
 | `recheck_residual` | 修正后复检残差 ≥ `verify_max_ms`(0.05ms) | **仅该轨回退** untouched |
@@ -95,8 +95,23 @@ P1 只做"文件内时间对齐"。"设备固有 latency 标定"、"麦克风空
 
 ### 6.2 恒定性（P1 二分）
 `constant` ⇔ MAD ≤ `mad_max_ms`(1.0) **且** 极差 ≤ 同值 **且**
-|线性漂移 ppm| ≤ `constant_max_ppm`(5.0)。极差门覆盖"跳变后中位数退化"
-情形；`step_min_ms`(3.0) 仅作诊断警告（跳变/漂移细分属二期）。
+漂移门不过。极差门覆盖"跳变后中位数退化"情形；`step_min_ms`(3.0) 仅作
+诊断警告（跳变/漂移细分属二期）。
+
+**漂移门 = ppm 门 + 材料性门（真实素材标定）**:
+`|drift_ppm| > constant_max_ppm`(5.0) **且** 全片预测漂移
+`|drift_total_ms| > drift_min_ms`(0.1) 才判 non_constant。
+
+标定依据（testsets 20260903+04, 137 段 A7M5 实测）:
+- 整数样本量化噪声会让**已对齐轨**的偶然拟合斜率落在 5–30 ppm，而极差
+  仅 2–11 样本（0.04–0.23 ms）— 单看 ppm 会误判为"非恒定"，掩盖"该轨
+  本来已对齐/本可修正"的事实;
+- 真实慢漂移轨的斜率同样在 39–49 ppm，但预测漂移达 0.42–1.9 ms
+  （C1154 CH1 轨迹 1202→1235 样本单调；C1159 CH2 968→1058 / 42 s
+  ≈ 49 ppm）— 远超 0.1 ms 门，仍被正确拦下（P1 不做 resample，
+  漂移轨保持原音频 + 明确 reason）。
+- 该门使"恒定但含量化噪声"的轨可正常进入修正，同时不放松对真实漂移
+  的拦截；`traj_drift_ms` 写入报告供后续标定。
 
 ### 6.3 超窗判定（out_of_range）
 窄窗无可测帧（或轨迹证据覆盖率 < `min_usable_fraction`(0.6)，大洞时
@@ -190,6 +205,7 @@ DEFAULTS = {
     "fine_phase_band_hz": [200.0, 8000.0],
     "frame_min_rms_dbfs": -50.0,
     "mad_max_ms": 1.0, "step_min_ms": 3.0, "constant_max_ppm": 5.0,
+    "drift_min_ms": 0.1,       # 漂移材料性门 (真实素材标定)
     "verify_max_ms": 0.05, "aligned_max_ms": 0.05,
     "fix_chunk_seconds": 60.0,
     "anchor_candidates": [2, 3, 0, 1],
@@ -208,7 +224,8 @@ log_dir`（`reference_stream` 为兼容旧键 = anchor）。
 逐轨: `stream / delay_ms / delay_samples / confidence / polarity /
 drift_ppm / constant / warnings / decision / reason / fine_delay_ms /
 shift_samples / fractional_part_samples / storage_dtype /
-traj_mad_ms / traj_spread_samples / usable_frames`。
+traj_mad_ms / traj_spread_samples / traj_drift_ms / usable_frames /
+rms_dbfs`（`rms_dbfs` / `traj_drift_ms` 为真实素材标定新增的诊断字段）。
 
 ## 13. 测试矩阵（tests/full_autotest.py）
 
@@ -243,11 +260,55 @@ traj_mad_ms / traj_spread_samples / usable_frames`。
   保持并适配 P1 输入边界（C14 生成器改用 `pcm_s24le`）。
 - 零回归: `--channel-sync` 关闭时输出与主线行为一致（C1–C13 不变）。
 
-## 14. A7M5 真实素材 fixture
+## 14. A7M5 真实素材 fixture 与真实数据标定
 
 固定清单与测试说明见 `docs/fixtures/a7m5_channel_sync_fixtures.md`
 （原始大文件不提交仓库, 仅路径引用; 覆盖空 CH1/CH2、不同物理位置、
 CH3/CH4 高相关、已对齐、不同固定 delay、低相关等 10 类场景）。
+
+### 14.1 真实素材扫描（testsets 20260903 + 20260904）
+
+工具: `work/sweep_real_sync.py`（进程内 `run_channel_sync`，纯音频算法，
+不经转码管线；源文件只读）→ `work/real_data_sync/summary.csv` +
+每文件完整 JSON；分析: `work/analyze_real_sync.py` → `analysis.md`。
+
+全部 4ch 素材 **137 段**（Sony A7M5，音频为 **pcm_s24be** 大端四轨单声道
+48kHz）。标定后结果:
+
+| 项 | 标定前 | 标定后 |
+|---|---|---|
+| 已对齐 (already_aligned) | 94 | 111 |
+| 测量失败 (measure_failed) | 33 | 15 |
+| 实际修正 (applied) | 10 | 11 |
+| non_constant 轨数 | 71 | 52 |
+| low_confidence / insufficient_frames 轨数 | 0 / 52 | 43 / 9 |
+
+- **修正正确性复验**: 11/11 修正轨用算法复测 vs 锚轨，残差 **0.00 样本**；
+  修正量分布 905–1222 样本 = **18.9–25.5 ms**（与用户实测无线麦延迟
+  量级 19.7–29.5 ms 一致）。
+- **剩余 non_constant 均为真实慢漂移**（spread 29–104 样本 = 0.6–2.2 ms，
+  ppm 34–76，轨迹单调；如 C1154 CH1 1202→1235、C1159 CH2 968→1058/42s
+  ≈49 ppm）→ P1 不做 resample，正确保持原音频。
+- **被拒修的"有内容"轨确为弱相关/不相关**（C1157 CH1 vs CH3 全窗最大
+  归一化相关仅 0.13–0.46 且峰值 lag 不一致 −51…−65 ms；C1173 ≈0.09–0.14）
+  → reason 记为 `low_confidence`（有信号帧但相关性不足），与
+  `insufficient_frames`（有信号的帧本身就太少）区分。
+- **measure_failed 细分**: 四轨全静音 5 段（正确拒修）+ 有内容但无有效
+  锚点 3 段 + 目标轨全部不可靠 7 段。
+- 结论: 真实素材上"已对齐轨不被误修、真实延迟轨被正确修正、漂移轨与
+  弱相关轨安全拒修"三条均成立；相对素材内部延迟量级 0.4–2 ms 的二阶
+  漂移（P2 范围）不处理。
+
+### 14.2 由真实素材驱动的标定改动
+
+1. **codec 白名单**: 用户决定大小端都支持（线性 PCM 八类），唯一排除
+   采样率 44.1kHz — A7M5 XAVC-S LPCM 实为大端 s24be，原小端四类会导致
+   全部真实素材 `not_eligible`。
+2. **漂移材料性门 `drift_min_ms`(0.1)**: 见 §6.2 — 量化噪声斜率（5–30 ppm）
+   不再误判已对齐轨为 non_constant。
+3. **reason 区分**: 有信号帧但相关性不足 → `low_confidence`；有信号的帧
+   太少 → `insufficient_frames`（见 §5）。
+4. **报告新增诊断字段** `rms_dbfs` / `traj_drift_ms`。
 
 ## 15. 明确未实现（P1 边界, 勿顺手实现）
 
