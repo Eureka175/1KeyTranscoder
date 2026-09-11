@@ -50,6 +50,7 @@ the whole corpus rather than on one clip.
 | [`nvdec.md`](nvdec.md) | NVDEC results |
 | [`divergence.md`](divergence.md) | per-frame fingerprinting and first-divergence analysis |
 | [`root-cause.md`](root-cause.md) | Observation/Evidence/Hypothesis/Experiment/Result/Conclusion |
+| [`rigaya-avhw-analysis.md`](rigaya-avhw-analysis.md) | **Phase 2** — the exact rigaya source line that discards Sony's leading pictures, why Sony triggers and x265 does not, and a PoC patch |
 | [`design.md`](design.md) | target decoder architecture |
 | [`implementation-plan.md`](implementation-plan.md) | Phase 2 plan, acceptance criteria, risks |
 | [`test-results/`](test-results/) | machine-readable results |

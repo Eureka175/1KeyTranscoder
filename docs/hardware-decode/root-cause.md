@@ -1,5 +1,32 @@
 # 8. Root Cause Analysis
 
+> ## ⚠ Phase 2 correction — see [`rigaya-avhw-analysis.md`](rigaya-avhw-analysis.md)
+>
+> Phase 2 pinned rigaya `NVEnc` tag **9.31** and located the defect. Two
+> statements below are **superseded**; everything else stands as written.
+>
+> 1. **RC-1 / RC-2 label the layer imprecisely.** The loss is *not* in the
+>    reader/demuxer (`RGYInputAvcodec`, `rgy_input_avcodec.cpp`). That code
+>    drops nothing: its own debug log reports `found first key frame:
+>    timestamp 3003, offset 0` on every fixture, identically for `--avsw`
+>    and `--avhw`. The loss is in the **hardware-decode pipeline task**,
+>    `PipelineTaskNVDecode::getOutputFrame()` at
+>    **`NVEncCore/NVEncPipeline.h:1665-1667`** — one layer *below* the
+>    reader and *below* the decoder.
+> 2. **RC-9's `Unconfirmed` for "the exact line of rigaya code" is now
+>    `Confirmed`.** The hardware decoder is proven exact by its own callback
+>    log (`DecPictureDisplay` fires 30/30, 195/195, 360/360, 105/105), while
+>    the stage immediately downstream (`PipelineTaskCheckPTS`) sees its first
+>    frame at `orig_pts 3003` — the IRAP. The frames are decoded and then
+>    discarded by the pipeline.
+>
+> **Method note.** The Phase 1 working hypothesis — "skip until the first
+> keyframe" in the reader — is refuted by measurement. `m_hwDecFirstPts` is
+> the PTS of the first *packet* fed to the decoder, and the loop treats it as
+> the PTS of the first frame to *present*. It is set (`NVEncPipeline.h:1550`)
+> from the IRAP, so every display-order picture preceding the IRAP is dropped
+> — which is exactly `pictures_before_first_keyframe`.
+
 > Each entry follows **Observation → Evidence → Hypothesis → Experiment →
 > Result → Conclusion**, and carries an explicit confidence label:
 > `Confirmed` / `Likely` / `Unconfirmed` / `Rejected`.
