@@ -50,7 +50,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from . import checker, isobmf
+from . import checker, colour, isobmf
 from .gpac import GpacContainerBackend
 from .models import PreservationBundle
 from .poc_video import CopyAudioBackend
@@ -341,6 +341,24 @@ def run_sony_pipeline(
                     step("  meta item_type already exact")
             except RuntimeError as exc:
                 step(f"WARNING: meta item_type patch skipped: {exc}")
+
+    # 5d. AV1 colour-description fidelity. MP4Box stamps its SDR default
+    # nclc 1/1/1 (bt709) on an imported AV1 track whose sequence header
+    # has no color_description_present_flag — i.e. exactly the sources
+    # that declare no colour at all — and would then fail validation as
+    # video.color_primaries/transfer/space MODIFIED. The encoded
+    # bitstream is already correct (unspecified), so only the container
+    # claim is reconciled, in place, and only for such sources.
+    if codec == "av1":
+        try:
+            desc = colour.reconcile_av1_colour(final, source, ffprobe)
+        except (OSError, RuntimeError) as exc:
+            step(f"WARNING: AV1 colr reconciliation skipped: {exc}")
+        else:
+            if desc:
+                step(f"  {desc}")
+            else:
+                step("  AV1 colr already faithful to the source")
 
     # 6. post-encode checks (independent checker module, applies to
     # every backend's Sony output). Timing regression guards live in

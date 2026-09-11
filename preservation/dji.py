@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .gpac import GpacContainerBackend
-from . import isobmf
+from . import colour, isobmf
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -313,6 +313,17 @@ def dji_rebuild(
         mv_desc = isobmf.patch_movie_duration(final)
         if mv_desc:
             log(mv_desc)
+
+    # AV1 colour-description fidelity (same defect as the Sony path:
+    # MP4Box stamps nclc 1/1/1 on an imported AV1 track whose sequence
+    # header carries no colour description — see preservation/colour.py).
+    if video_entry == "av01":
+        try:
+            desc = colour.reconcile_av1_colour(final, original, ffprobe)
+        except (OSError, RuntimeError) as exc:
+            log(f"WARNING: AV1 colr reconciliation skipped: {exc}")
+        else:
+            log(desc or "AV1 colr already faithful to the source")
 
     log(f"validating original vs final (dji check={level})...")
     report = run_dji_check(

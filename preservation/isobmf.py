@@ -198,6 +198,15 @@ def _patch_u64(f, offset: int, old: int, new: int) -> None:
     f.write(struct.pack(">Q", new))
 
 
+def _patch_u16(f, offset: int, old: int, new: int) -> None:
+    f.seek(offset)
+    cur = struct.unpack(">H", f.read(2))[0]
+    if cur != old:
+        raise RuntimeError(f"patch_u16 @{offset}: expected {old}, found {cur}")
+    f.seek(offset)
+    f.write(struct.pack(">H", new))
+
+
 def _stts_sum(f, trak: Box) -> int | None:
     """Sum of sample durations (stts) for a track, in track units.
 
@@ -515,6 +524,115 @@ def patch_meta_item_type(
                     if res is not None:
                         return res
     raise RuntimeError(f"no v2 infe with item_id {item_id} in {path}")
+
+
+# ISO/IEC 23001-8 code points meaning "no colour description declared"
+# (2 = unspecified for primaries, transfer characteristics and matrix).
+COLOUR_UNSPECIFIED = (2, 2, 2)
+
+# VisualSampleEntry body after the 8-byte box header; the sample entry's
+# child boxes start after it.
+_VISUAL_SAMPLE_ENTRY = 78
+
+# colr box colour types carrying an explicit nclc/nclx triple. `prof`
+# and `rICC` carry an ICC profile instead and are left untouched.
+_NCLC = b"nclc"
+_NCLX = b"nclx"
+
+
+def _video_sample_entry_colr(f, stsd: Box) -> Box | None:
+    """First `colr` child of the first sample entry in this stsd."""
+    f.seek(stsd.data_offset + 4)
+    head = f.read(4)
+    if len(head) < 4:
+        return None
+    count = struct.unpack(">I", head)[0]
+    off = stsd.data_offset + 8
+    for _ in range(count):
+        entry = _read_header(f, off, stsd.end)
+        if entry is None:
+            return None
+        off = entry.end
+        child_off = entry.data_offset + _VISUAL_SAMPLE_ENTRY
+        while child_off < entry.end:
+            child = _read_header(f, child_off, entry.end)
+            if child is None:
+                break
+            child_off = child.end
+            if child.type == "colr":
+                return child
+    return None
+
+
+def patch_video_colr(
+    path: Path,
+    target: tuple[int, int, int] = COLOUR_UNSPECIFIED,
+) -> str | None:
+    """Rewrite the video track's `colr` nclc/nclx triple in place.
+
+    GPAC derives an imported AV1 track's `colr` atom from the
+    bitstream's color_config() **only** when the sequence header sets
+    color_description_present_flag. When the description is absent from
+    the bitstream (FFmpeg/libsvtav1 and NVEncC output for a source that
+    declares no colour), MP4Box does not fall back to "unspecified" —
+    it stamps its SDR default nclc 1/1/1 (bt709) on the track, so the
+    container claims a colour description the source never had. The
+    encoded bitstream itself stays correct.
+
+    Only the 6 payload bytes of an EXISTING nclc/nclx `colr` in the
+    video sample entry are rewritten: the box size never changes, so no
+    ancestor size, chunk offset (stco/co64) or moov/mdat order can be
+    invalidated. `prof`/`rICC` (ICC) boxes are left alone, and a
+    missing `colr` is not created (the encoded bitstream already
+    carries the correct signalling).
+
+    Idempotent: returns None when nothing needed changing. Returns a
+    human-readable description of the change otherwise.
+    """
+    if len(target) != 3 or any(not 0 <= v <= 0xFFFF for v in target):
+        raise ValueError(f"bad target colour triple {target!r}")
+
+    roots = root_boxes(path)
+    with path.open("r+b") as f:
+        for root in roots:
+            if root.type != "moov":
+                continue
+            for trak in _children(f, root):
+                if trak.type != "trak" or _trak_handler(f, trak) != "vide":
+                    continue
+                for mdia in _children(f, trak):
+                    if mdia.type != "mdia":
+                        continue
+                    for minf in _children(f, mdia):
+                        if minf.type != "minf":
+                            continue
+                        for stbl in _children(f, minf):
+                            if stbl.type != "stbl":
+                                continue
+                            for stsd in _children(f, stbl):
+                                if stsd.type != "stsd":
+                                    continue
+                                colr = _video_sample_entry_colr(f, stsd)
+                                if colr is None:
+                                    return None
+                                f.seek(colr.data_offset)
+                                kind = f.read(4)
+                                if kind not in (_NCLC, _NCLX):
+                                    return None
+                                cur = struct.unpack(">HHH", f.read(6))
+                                if cur == target:
+                                    return None
+                                for i, value in enumerate(target):
+                                    _patch_u16(
+                                        f, colr.data_offset + 4 + i * 2,
+                                        cur[i], value,
+                                    )
+                                return (
+                                    f"video colr {kind.decode('latin-1')} "
+                                    f"{cur[0]}/{cur[1]}/{cur[2]} -> "
+                                    f"{target[0]}/{target[1]}/{target[2]}"
+                                )
+    return None
 
 
 def insert_uuid_boxes(
