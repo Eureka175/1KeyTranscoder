@@ -69,6 +69,48 @@ def section(title: str) -> None:
     print(f"\n== {title} ==")
 
 
+def _work_set_mb() -> float | None:
+    """本进程工作集 (MB); 非 Windows 或调用失败返回 None。
+
+    内存回归断言用: np.memmap 会把被触碰的整条文件计入 WorkingSet,
+    有界窗口读取器则不会 —— 这条断言把该性质钉进回归 (Stage 1.2)。
+    """
+    if not sys.platform.startswith("win"):
+        return None
+    try:
+        import ctypes
+        import ctypes.wintypes as wt
+
+        class _PMC(ctypes.Structure):
+            _fields_ = [
+                ("cb", wt.DWORD), ("PageFaultCount", wt.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        k32 = ctypes.WinDLL("kernel32")
+        k32.GetCurrentProcess.restype = wt.HANDLE
+        psapi = ctypes.WinDLL("psapi")
+        psapi.GetProcessMemoryInfo.restype = wt.BOOL
+        psapi.GetProcessMemoryInfo.argtypes = [
+            wt.HANDLE, ctypes.POINTER(_PMC), wt.DWORD,
+        ]
+        c = _PMC()
+        c.cb = ctypes.sizeof(c)
+        if not psapi.GetProcessMemoryInfo(
+                k32.GetCurrentProcess(), ctypes.byref(c), c.cb):
+            return None
+        return c.WorkingSetSize / 1024 ** 2
+    except Exception:
+        return None
+
+
 def sh(*args: str, timeout: int = 1800) -> subprocess.CompletedProcess:
     return subprocess.run(
         [str(a) for a in args], stdin=subprocess.DEVNULL,
@@ -796,12 +838,48 @@ def l1_channel_sync_p1() -> None:
         record("p1.shift 分数 -0.4 -> rint=0 (样本值不变)",
                bool(np.array_equal(y4, x)))
         m = sync_estimate.open_source(src, "f32")
-        record("p1.路径输入 memmap (禁 np.fromfile 全量加载)",
-               isinstance(m, np.memmap))
+        record("p1.路径输入为有界窗口流 (非整文件映射)",
+               bool(isinstance(m, sync_estimate.RawStream)
+                    and not isinstance(m, np.memmap)))
+        record("p1.窗口读取与 ndarray 切片一致",
+               bool(np.array_equal(np.asarray(m[100:600]), x[100:600])
+                    and m.shape[0] == x.shape[0]))
+        record("p1.越界窗口自动裁剪 (不报错/不补零)",
+               bool(m[m.shape[0] - 4: m.shape[0] + 999].shape[0] == 4
+                    and m[5: 5].shape[0] == 0))
+        # 内存回归: 对 8 MB 流做整轨扫描 + 逐帧读取, 进程工作集增量必须有界
+        # (旧 np.memmap 实现会把整条文件计入 WorkingSet; Stage 1.2 实测
+        #  4x110 MB 轨 -> RSS +440 MB, 见 work/channel_sync_memory_audit.md)
+        if _work_set_mb() is None:
+            record("p1.整轨扫描后工作集增量有界", True,
+                   "非 Windows: 跳过工作集测量")
+        else:
+            big_n = 16_000_000                      # 64 MB f32
+            big = td / "big.f32"
+            big.write_bytes(np.zeros(big_n, dtype="<f4").tobytes())
+            stream = sync_estimate.open_source(big, "f32")
+            before_mb = _work_set_mb()
+            ssq = 0.0
+            for a0 in range(0, big_n, 1 << 19):     # 整轨分块扫描
+                blk = np.asarray(stream[a0: a0 + (1 << 19)], dtype=np.float64)
+                ssq += float(np.sum(blk * blk))
+            # 逐帧窗口读取 (与 estimate_pair 的访问模式相同)
+            for a0 in range(0, big_n - 48000, 4800):
+                window = stream[a0: a0 + 9600]
+                if window.shape[0]:
+                    ssq += float(window[0])
+            stream.close()
+            growth = _work_set_mb() - before_mb
+            # 64 MB 整轨: 旧 np.memmap 实现会 +64 MB; 有界窗口读取器只保留
+            # 窗口 + 4x1 MiB 读缓存 + f64 副本, 实测 < 20 MB
+            record("p1.64MB 整轨扫描后工作集增量有界 (<= 32 MB, 实测 %.1f MB)"
+                   % growth, bool(growth <= 32.0))
         try:
             mm = getattr(m, "_mmap", None)
             if mm is not None:
                 mm.close()
+            else:
+                m.close()
         except OSError:
             pass
 
