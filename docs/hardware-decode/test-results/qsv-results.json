@@ -1,0 +1,148 @@
+{
+  "level": "FFmpeg QSV hardware decode",
+  "modes": {
+    "qsv_native": {
+      "files_tested": 151,
+      "classification": {
+        "DECODER_ERROR": 5,
+        "PASS": 146
+      },
+      "failures": [
+        {
+          "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9037.MP4",
+          "classification": "DECODER_ERROR",
+          "detail": "decode failed rc=69",
+          "software_frames": 195,
+          "hw_frames": 0,
+          "frame_delta": null,
+          "first_divergence": null,
+          "pts_divergence": null,
+          "sequence_identical": null,
+          "multiset": null
+        },
+        {
+          "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9073.MP4",
+          "classification": "DECODER_ERROR",
+          "detail": "decode failed rc=69",
+          "software_frames": 150,
+          "hw_frames": 0,
+          "frame_delta": null,
+          "first_divergence": null,
+          "pts_divergence": null,
+          "sequence_identical": null,
+          "multiset": null
+        },
+        {
+          "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9088.MP4",
+          "classification": "DECODER_ERROR",
+          "detail": "decode failed rc=69",
+          "software_frames": 165,
+          "hw_frames": 0,
+          "frame_delta": null,
+          "first_divergence": null,
+          "pts_divergence": null,
+          "sequence_identical": null,
+          "multiset": null
+        },
+        {
+          "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9110.MP4",
+          "classification": "DECODER_ERROR",
+          "detail": "decode failed rc=69",
+          "software_frames": 630,
+          "hw_frames": 0,
+          "frame_delta": null,
+          "first_divergence": null,
+          "pts_divergence": null,
+          "sequence_identical": null,
+          "multiset": null
+        },
+        {
+          "file": "testsets\\a7m5_4k30p_264_hi422p_xavcs\\20260823_C0887.MP4",
+          "classification": "DECODER_ERROR",
+          "detail": "decode failed rc=69",
+          "software_frames": 195,
+          "hw_frames": 0,
+          "frame_delta": null,
+          "first_divergence": null,
+          "pts_divergence": null,
+          "sequence_identical": null,
+          "multiset": null
+        }
+      ],
+      "pass_rate": 0.966887,
+      "all_sequences_bit_identical": true
+    }
+  },
+  "primary_mode": "qsv_native",
+  "summary": {
+    "files_tested": 151,
+    "classification": {
+      "DECODER_ERROR": 5,
+      "PASS": 146
+    },
+    "failures": [
+      {
+        "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9037.MP4",
+        "classification": "DECODER_ERROR",
+        "detail": "decode failed rc=69",
+        "software_frames": 195,
+        "hw_frames": 0,
+        "frame_delta": null,
+        "first_divergence": null,
+        "pts_divergence": null,
+        "sequence_identical": null,
+        "multiset": null
+      },
+      {
+        "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9073.MP4",
+        "classification": "DECODER_ERROR",
+        "detail": "decode failed rc=69",
+        "software_frames": 150,
+        "hw_frames": 0,
+        "frame_delta": null,
+        "first_divergence": null,
+        "pts_divergence": null,
+        "sequence_identical": null,
+        "multiset": null
+      },
+      {
+        "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9088.MP4",
+        "classification": "DECODER_ERROR",
+        "detail": "decode failed rc=69",
+        "software_frames": 165,
+        "hw_frames": 0,
+        "frame_delta": null,
+        "first_divergence": null,
+        "pts_divergence": null,
+        "sequence_identical": null,
+        "multiset": null
+      },
+      {
+        "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9110.MP4",
+        "classification": "DECODER_ERROR",
+        "detail": "decode failed rc=69",
+        "software_frames": 630,
+        "hw_frames": 0,
+        "frame_delta": null,
+        "first_divergence": null,
+        "pts_divergence": null,
+        "sequence_identical": null,
+        "multiset": null
+      },
+      {
+        "file": "testsets\\a7m5_4k30p_264_hi422p_xavcs\\20260823_C0887.MP4",
+        "classification": "DECODER_ERROR",
+        "detail": "decode failed rc=69",
+        "software_frames": 195,
+        "hw_frames": 0,
+        "frame_delta": null,
+        "first_divergence": null,
+        "pts_divergence": null,
+        "sequence_identical": null,
+        "multiset": null
+      }
+    ],
+    "pass_rate": 0.966887,
+    "all_sequences_bit_identical": true
+  }
+}

@@ -1,0 +1,261 @@
+{
+  "environment": {
+    "ffmpeg": "ffmpeg version 9.0.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+    "ffprobe": "ffprobe version 9.0.1-full_build-www.gyan.dev Copyright (c) 2007-2026 the FFmpeg developers",
+    "nvencC": "NVEncC (x64) 9.31 (r4047) by rigaya, Aug  8 2026 12:55:12 (VC 1944/Win)",
+    "qsvencC": "QSVEncC (x64) 8.26 (r4504) by rigaya, Aug  8 2026 12:17:31 (VC 1944/Win)",
+    "windows": "Microsoft Windows 11 ��ͥ�� ���İ� | build 26200",
+    "cpu": "{\"Name\":\"Intel(R) Core(TM) Ultra 9 285H\",\"NumberOfCores\":16,\"NumberOfLogicalProcessors\":16,\"MaxClockSpeed\":2900}",
+    "nvidia": "name, driver_version, vbios_version, memory.total [MiB], compute_cap\r\nNVIDIA GeForce RTX 5070 Laptop GPU, 616.56, 98.06.2a.40.c6, 8151 MiB, 12.0",
+    "adapters": "[{\"Name\":\"Parsec Virtual Display Adapter\",\"DriverVersion\":\"0.45.0.0\",\"DriverDate\":\"\\/Date(1706140800000)\\/\",\"AdapterRAM\":null},{\"Name\":\"IddDesk Device\",\"DriverVersion\":\"15.27.40.592\",\"DriverDate\":\"\\/Date(1748217600000)\\/\",\"AdapterRAM\":null},{\"Name\":\"Intel(R) Arc(TM) 140T GPU (16GB)\",\"DriverVersion\":\"32.0.101.8974\",\"DriverDate\":\"\\/Date(1786406400000)\\/\",\"AdapterRAM\":4293918720},{\"Name\":\"NVIDIA GeForce RTX 5070 Laptop GPU\",\"DriverVersion\":\"32.0.16.1656\",\"DriverDate\":\"\\/Date(1787184000000)\\/\",\"AdapterRAM\":4293918720},{\"Name\":\"Honor Virtual Display Device\",\"DriverVersion\":\"1.0.23.3\",\"DriverDate\":\"\\/Date(1720051200000)\\/\",\"AdapterRAM\":null}]",
+    "git_head": "f721b1fc442129342875b79cacf4d5aa562cdde6",
+    "git_branch": "research/hardware-decode-adaptation"
+  },
+  "corpus": {
+    "sony_files": 151,
+    "non_sony_files": 30,
+    "total_bytes": 69649716522,
+    "total_container_frames": 188475,
+    "distribution": {
+      "codec": {
+        "hevc": 146,
+        "h264": 5
+      },
+      "profile": {
+        "Main 10": 146,
+        "High 4:2:2": 5
+      },
+      "level": {
+        "153": 146,
+        "51": 5
+      },
+      "pixel_format": {
+        "yuv420p10le": 146,
+        "yuv422p10le": 5
+      },
+      "chroma": {
+        "4:2:0": 146,
+        "4:2:2": 5
+      },
+      "width": {
+        "3840": 151
+      },
+      "height": {
+        "2160": 151
+      },
+      "fps": {
+        "59.94006": 146,
+        "29.97003": 5
+      },
+      "camera_model": {
+        "ILCE-7M5": 137,
+        "None": 14
+      },
+      "recording_mode": {
+        "normal": 137,
+        "None": 14
+      },
+      "xavc_video_codec_string": {
+        "HEVC_3840_2160_M10P@L51HT": 137,
+        "None": 14
+      },
+      "xavc_capture_fps": {
+        "59.94p": 137,
+        "None": 14
+      },
+      "max_gop": {
+        "60": 145,
+        "30": 5,
+        "None": 1
+      },
+      "all_intra": {
+        "False": 151
+      },
+      "has_b_frames": {
+        "2": 146,
+        "1": 5
+      },
+      "elst_media_time_frames": {
+        "2.0": 146,
+        "1.0": 5
+      },
+      "ctts_reorder_depth_frames": {
+        "5": 146,
+        "3": 5
+      },
+      "pictures_before_first_keyframe": {
+        "3": 146,
+        "2": 5
+      },
+      "capture_gamma": {
+        "rec709": 130,
+        "None": 14,
+        "s-log3-cine": 7
+      }
+    }
+  },
+  "software_ground_truth": {
+    "files": 151,
+    "frames": 188475,
+    "decoded_equals_container_for_all": true
+  },
+  "qsv": {
+    "primary_mode": "qsv_native",
+    "summary": {
+      "files_tested": 151,
+      "classification": {
+        "DECODER_ERROR": 5,
+        "PASS": 146
+      },
+      "failures": [
+        {
+          "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9037.MP4",
+          "classification": "DECODER_ERROR",
+          "detail": "decode failed rc=69",
+          "software_frames": 195,
+          "hw_frames": 0,
+          "frame_delta": null,
+          "first_divergence": null,
+          "pts_divergence": null,
+          "sequence_identical": null,
+          "multiset": null
+        },
+        {
+          "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9073.MP4",
+          "classification": "DECODER_ERROR",
+          "detail": "decode failed rc=69",
+          "software_frames": 150,
+          "hw_frames": 0,
+          "frame_delta": null,
+          "first_divergence": null,
+          "pts_divergence": null,
+          "sequence_identical": null,
+          "multiset": null
+        },
+        {
+          "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9088.MP4",
+          "classification": "DECODER_ERROR",
+          "detail": "decode failed rc=69",
+          "software_frames": 165,
+          "hw_frames": 0,
+          "frame_delta": null,
+          "first_divergence": null,
+          "pts_divergence": null,
+          "sequence_identical": null,
+          "multiset": null
+        },
+        {
+          "file": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9110.MP4",
+          "classification": "DECODER_ERROR",
+          "detail": "decode failed rc=69",
+          "software_frames": 630,
+          "hw_frames": 0,
+          "frame_delta": null,
+          "first_divergence": null,
+          "pts_divergence": null,
+          "sequence_identical": null,
+          "multiset": null
+        },
+        {
+          "file": "testsets\\a7m5_4k30p_264_hi422p_xavcs\\20260823_C0887.MP4",
+          "classification": "DECODER_ERROR",
+          "detail": "decode failed rc=69",
+          "software_frames": 195,
+          "hw_frames": 0,
+          "frame_delta": null,
+          "first_divergence": null,
+          "pts_divergence": null,
+          "sequence_identical": null,
+          "multiset": null
+        }
+      ],
+      "pass_rate": 0.966887,
+      "all_sequences_bit_identical": true
+    }
+  },
+  "nvdec": {
+    "primary_mode": "nvdec_cuvid",
+    "summary": {
+      "files_tested": 151,
+      "classification": {
+        "PASS": 151
+      },
+      "failures": [],
+      "pass_rate": 1.0,
+      "all_sequences_bit_identical": true
+    }
+  },
+  "rigaya": {
+    "predictor_validation": {
+      "files": 151,
+      "measured": {
+        "nvenc": 151,
+        "qsv": 146
+      },
+      "refused": {
+        "nvenc": 0,
+        "qsv": 5
+      },
+      "errors": {
+        "nvenc": 0,
+        "qsv": 0
+      },
+      "predictor_checked": {
+        "nvenc": 151,
+        "qsv": 146
+      },
+      "predictor_correct": {
+        "nvenc": 151,
+        "qsv": 146
+      },
+      "predictor_wrong": {
+        "nvenc": 0,
+        "qsv": 0
+      },
+      "loss_distribution_nvenc": {
+        "3": 146,
+        "2": 5
+      },
+      "loss_distribution_qsv": {
+        "3": 146
+      },
+      "reader_report_distribution": {
+        "avcuvid": 151,
+        "avqsv": 146,
+        "null": 5
+      }
+    }
+  },
+  "production_artifacts": {
+    "sources": {
+      "20260903_C1154.MP4": {
+        "video_samples": 720
+      },
+      "20260904_C1197.MP4": {
+        "video_samples": 570
+      }
+    },
+    "deliverables": {
+      "20260904_C1197.MP4": {
+        "input_copy_COLD-03": null,
+        "input_copy_COLD-04": null,
+        "input_copy_COLD-05": null,
+        "input_copy_COLD-06": null,
+        "input_copy_COLD-07": null,
+        "input_copy_COLD-08": null,
+        "input_copy_COLD-10": null,
+        "COLD-03": 570,
+        "COLD-04": 570,
+        "COLD-05": 570,
+        "COLD-06": 570,
+        "COLD-07": 570,
+        "COLD-08": 570,
+        "COLD-10": 570
+      },
+      "20260903_C1154.MP4": {
+        "input_copy_COLD-09": null,
+        "COLD-09": 720
+      }
+    }
+  }
+}

@@ -1,0 +1,4393 @@
+{
+  "definition": "Software (libavcodec native HEVC/H.264) decode of every Sony corpus file, packets fully consumed, decoder drained to EOF by the FFmpeg CLI. This is the investigation's ground truth.",
+  "important_caveat": "The FFmpeg mov demuxer reports 'edit list: N Missing key frame while searching for timestamp' on these clips; the edit list start does not coincide with a keyframe. Software decode still emits every coded picture.",
+  "file_count": 151,
+  "software_frame_total": 188475,
+  "decoded_equals_container_for_all": true,
+  "files": [
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1083.MP4",
+      "container_sample_count": 330,
+      "software_frame_count": 330,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 329329,
+      "pts_span_ticks": 329329,
+      "duration_sec": 5.488817,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 324,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000021de51b2040] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 49.34,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1083-4e217246f3/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1084.MP4",
+      "container_sample_count": 450,
+      "software_frame_count": 450,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 449449,
+      "pts_span_ticks": 449449,
+      "duration_sec": 7.490817,
+      "keyframe_count": 8,
+      "pict_type_histogram": {
+        "B": 442,
+        "I": 8
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001c1d8971800] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 63.71,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1084-a6bec96f61/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1085.MP4",
+      "container_sample_count": 450,
+      "software_frame_count": 450,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 449449,
+      "pts_span_ticks": 449449,
+      "duration_sec": 7.490817,
+      "keyframe_count": 8,
+      "pict_type_histogram": {
+        "B": 442,
+        "I": 8
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000208b1021f40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 46.23,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1085-62305efe06/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1086.MP4",
+      "container_sample_count": 300,
+      "software_frame_count": 300,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 299299,
+      "pts_span_ticks": 299299,
+      "duration_sec": 4.988317,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 295,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000025395391f40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 77.72,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1086-be703f5afd/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1087.MP4",
+      "container_sample_count": 240,
+      "software_frame_count": 240,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 239239,
+      "pts_span_ticks": 239239,
+      "duration_sec": 3.987317,
+      "keyframe_count": 4,
+      "pict_type_histogram": {
+        "B": 236,
+        "I": 4
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000267e43b18c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 65.38,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1087-4bbe664af8/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1088.MP4",
+      "container_sample_count": 330,
+      "software_frame_count": 330,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 329329,
+      "pts_span_ticks": 329329,
+      "duration_sec": 5.488817,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 324,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002b0ea781c80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 57.54,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1088-1bed139bce/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1089.MP4",
+      "container_sample_count": 330,
+      "software_frame_count": 330,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 329329,
+      "pts_span_ticks": 329329,
+      "duration_sec": 5.488817,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 324,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002dcee3f1c80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 54.57,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1089-96e7276138/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1090.MP4",
+      "container_sample_count": 660,
+      "software_frame_count": 660,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 659659,
+      "pts_span_ticks": 659659,
+      "duration_sec": 10.994317,
+      "keyframe_count": 11,
+      "pict_type_histogram": {
+        "B": 649,
+        "I": 11
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000186c9edde40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 44.89,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1090-a3c82f6d76/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1091.MP4",
+      "container_sample_count": 720,
+      "software_frame_count": 720,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 719719,
+      "pts_span_ticks": 719719,
+      "duration_sec": 11.995317,
+      "keyframe_count": 12,
+      "pict_type_histogram": {
+        "B": 708,
+        "I": 12
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000026cdcd91e80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 43.27,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1091-effca08a53/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1092.MP4",
+      "container_sample_count": 330,
+      "software_frame_count": 330,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 329329,
+      "pts_span_ticks": 329329,
+      "duration_sec": 5.488817,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 324,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001a825ae1fc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 56.93,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1092-a7737fd9a0/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1093.MP4",
+      "container_sample_count": 180,
+      "software_frame_count": 180,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 179179,
+      "pts_span_ticks": 179179,
+      "duration_sec": 2.986317,
+      "keyframe_count": 3,
+      "pict_type_histogram": {
+        "B": 177,
+        "I": 3
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002c183ac24c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 50.31,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1093-fe96cdc845/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1094.MP4",
+      "container_sample_count": 600,
+      "software_frame_count": 600,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 599599,
+      "pts_span_ticks": 599599,
+      "duration_sec": 9.993317,
+      "keyframe_count": 10,
+      "pict_type_histogram": {
+        "B": 590,
+        "I": 10
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000176137a1d80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 89.3,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1094-6d930a9143/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1095.MP4",
+      "container_sample_count": 540,
+      "software_frame_count": 540,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 539539,
+      "pts_span_ticks": 539539,
+      "duration_sec": 8.992317,
+      "keyframe_count": 9,
+      "pict_type_histogram": {
+        "B": 531,
+        "I": 9
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000026eed832080] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 49.44,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1095-daded322c2/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1096.MP4",
+      "container_sample_count": 510,
+      "software_frame_count": 510,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 509509,
+      "pts_span_ticks": 509509,
+      "duration_sec": 8.491817,
+      "keyframe_count": 9,
+      "pict_type_histogram": {
+        "B": 501,
+        "I": 9
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000230b02b2100] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 38.95,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1096-f3449092ef/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1097.MP4",
+      "container_sample_count": 420,
+      "software_frame_count": 420,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 419419,
+      "pts_span_ticks": 419419,
+      "duration_sec": 6.990317,
+      "keyframe_count": 7,
+      "pict_type_histogram": {
+        "B": 413,
+        "I": 7
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000213cfc01a40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 45.87,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1097-bff85a8858/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1098.MP4",
+      "container_sample_count": 330,
+      "software_frame_count": 330,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 329329,
+      "pts_span_ticks": 329329,
+      "duration_sec": 5.488817,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 324,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000239dd021cc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 63.81,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1098-16b3e0535f/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1099.MP4",
+      "container_sample_count": 420,
+      "software_frame_count": 420,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 419419,
+      "pts_span_ticks": 419419,
+      "duration_sec": 6.990317,
+      "keyframe_count": 7,
+      "pict_type_histogram": {
+        "B": 413,
+        "I": 7
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001f09b601780] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 45.79,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1099-f503e2fbec/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1100.MP4",
+      "container_sample_count": 240,
+      "software_frame_count": 240,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 239239,
+      "pts_span_ticks": 239239,
+      "duration_sec": 3.987317,
+      "keyframe_count": 4,
+      "pict_type_histogram": {
+        "B": 236,
+        "I": 4
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000022f69cc1800] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 67.36,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1100-61b4f8be27/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1101.MP4",
+      "container_sample_count": 600,
+      "software_frame_count": 600,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 599599,
+      "pts_span_ticks": 599599,
+      "duration_sec": 9.993317,
+      "keyframe_count": 10,
+      "pict_type_histogram": {
+        "B": 590,
+        "I": 10
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001fc8c9d1c00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 100.27,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1101-ce2f49dd53/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1102.MP4",
+      "container_sample_count": 420,
+      "software_frame_count": 420,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 419419,
+      "pts_span_ticks": 419419,
+      "duration_sec": 6.990317,
+      "keyframe_count": 7,
+      "pict_type_histogram": {
+        "B": 413,
+        "I": 7
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000020616613840] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 56.0,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1102-3e3a5fa445/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1103.MP4",
+      "container_sample_count": 600,
+      "software_frame_count": 600,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 599599,
+      "pts_span_ticks": 599599,
+      "duration_sec": 9.993317,
+      "keyframe_count": 10,
+      "pict_type_histogram": {
+        "B": 590,
+        "I": 10
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000011ccb4f17c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 42.15,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1103-5238aca38c/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1104.MP4",
+      "container_sample_count": 720,
+      "software_frame_count": 720,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 719719,
+      "pts_span_ticks": 719719,
+      "duration_sec": 11.995317,
+      "keyframe_count": 12,
+      "pict_type_histogram": {
+        "B": 708,
+        "I": 12
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001f2cb0b1a80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 42.39,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1104-efbc3ee7a0/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1105.MP4",
+      "container_sample_count": 420,
+      "software_frame_count": 420,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 419419,
+      "pts_span_ticks": 419419,
+      "duration_sec": 6.990317,
+      "keyframe_count": 7,
+      "pict_type_histogram": {
+        "B": 413,
+        "I": 7
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002952cd81c40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 50.53,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1105-415a291f7d/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1106.MP4",
+      "container_sample_count": 750,
+      "software_frame_count": 750,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 749749,
+      "pts_span_ticks": 749749,
+      "duration_sec": 12.495817,
+      "keyframe_count": 13,
+      "pict_type_histogram": {
+        "B": 737,
+        "I": 13
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002ca0ece2180] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 52.34,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1106-9a89b69860/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1107.MP4",
+      "container_sample_count": 540,
+      "software_frame_count": 540,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 539539,
+      "pts_span_ticks": 539539,
+      "duration_sec": 8.992317,
+      "keyframe_count": 9,
+      "pict_type_histogram": {
+        "B": 531,
+        "I": 9
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001d80ce31d00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 47.86,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1107-237ebb067d/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1108.MP4",
+      "container_sample_count": 450,
+      "software_frame_count": 450,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 449449,
+      "pts_span_ticks": 449449,
+      "duration_sec": 7.490817,
+      "keyframe_count": 8,
+      "pict_type_histogram": {
+        "B": 442,
+        "I": 8
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001bd1adb2440] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 46.98,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1108-92bb32cdbb/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1109.MP4",
+      "container_sample_count": 300,
+      "software_frame_count": 300,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 299299,
+      "pts_span_ticks": 299299,
+      "duration_sec": 4.988317,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 295,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000021a99051c00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 69.06,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1109-5529beba22/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1110.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001488e8f1d80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 48.1,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1110-2604f885f6/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1111.MP4",
+      "container_sample_count": 300,
+      "software_frame_count": 300,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 299299,
+      "pts_span_ticks": 299299,
+      "duration_sec": 4.988317,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 295,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000187e1701c40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 128.04,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1111-c6be50f2c4/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1112.MP4",
+      "container_sample_count": 300,
+      "software_frame_count": 300,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 299299,
+      "pts_span_ticks": 299299,
+      "duration_sec": 4.988317,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 295,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001a47ac118c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 80.0,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1112-ee58350b96/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1113.MP4",
+      "container_sample_count": 420,
+      "software_frame_count": 420,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 419419,
+      "pts_span_ticks": 419419,
+      "duration_sec": 6.990317,
+      "keyframe_count": 7,
+      "pict_type_histogram": {
+        "B": 413,
+        "I": 7
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000206ef9bebc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 50.34,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1113-96a4eeba08/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1114.MP4",
+      "container_sample_count": 330,
+      "software_frame_count": 330,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 329329,
+      "pts_span_ticks": 329329,
+      "duration_sec": 5.488817,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 324,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000177a3fd1d80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 51.39,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1114-eaeeb6990d/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1115.MP4",
+      "container_sample_count": 630,
+      "software_frame_count": 630,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 629629,
+      "pts_span_ticks": 629629,
+      "duration_sec": 10.493817,
+      "keyframe_count": 11,
+      "pict_type_histogram": {
+        "B": 619,
+        "I": 11
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000019a7aa72b40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 43.22,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1115-76e60ddbb2/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1116.MP4",
+      "container_sample_count": 210,
+      "software_frame_count": 210,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 209209,
+      "pts_span_ticks": 209209,
+      "duration_sec": 3.486817,
+      "keyframe_count": 4,
+      "pict_type_histogram": {
+        "B": 206,
+        "I": 4
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001f23a491940] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 56.22,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1116-38e19fc01c/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1117.MP4",
+      "container_sample_count": 480,
+      "software_frame_count": 480,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 479479,
+      "pts_span_ticks": 479479,
+      "duration_sec": 7.991317,
+      "keyframe_count": 8,
+      "pict_type_histogram": {
+        "B": 472,
+        "I": 8
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002b360281380] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 43.27,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1117-1f0c26b110/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1118.MP4",
+      "container_sample_count": 300,
+      "software_frame_count": 300,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 299299,
+      "pts_span_ticks": 299299,
+      "duration_sec": 4.988317,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 295,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001a1608c2280] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 63.99,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1118-2fb77282cc/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1119.MP4",
+      "container_sample_count": 630,
+      "software_frame_count": 630,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 629629,
+      "pts_span_ticks": 629629,
+      "duration_sec": 10.493817,
+      "keyframe_count": 11,
+      "pict_type_histogram": {
+        "B": 619,
+        "I": 11
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000156ada71e80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 43.12,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1119-bffa3a1690/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1120.MP4",
+      "container_sample_count": 330,
+      "software_frame_count": 330,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 329329,
+      "pts_span_ticks": 329329,
+      "duration_sec": 5.488817,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 324,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001bc224f1c00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 64.59,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1120-0e3b99a62b/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1121.MP4",
+      "container_sample_count": 510,
+      "software_frame_count": 510,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 509509,
+      "pts_span_ticks": 509509,
+      "duration_sec": 8.491817,
+      "keyframe_count": 9,
+      "pict_type_histogram": {
+        "B": 501,
+        "I": 9
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000245fdb62100] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 47.03,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1121-269cc19fda/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1122.MP4",
+      "container_sample_count": 480,
+      "software_frame_count": 480,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 479479,
+      "pts_span_ticks": 479479,
+      "duration_sec": 7.991317,
+      "keyframe_count": 8,
+      "pict_type_histogram": {
+        "B": 472,
+        "I": 8
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000272ec824cc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 45.05,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1122-6140cdff10/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1123.MP4",
+      "container_sample_count": 450,
+      "software_frame_count": 450,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 449449,
+      "pts_span_ticks": 449449,
+      "duration_sec": 7.490817,
+      "keyframe_count": 8,
+      "pict_type_histogram": {
+        "B": 442,
+        "I": 8
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002237cff26c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 48.16,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1123-b4e8cf4aac/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1124.MP4",
+      "container_sample_count": 270,
+      "software_frame_count": 270,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 269269,
+      "pts_span_ticks": 269269,
+      "duration_sec": 4.487817,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 265,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001fbbbf91d80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 82.7,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1124-b61716ce18/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1125.MP4",
+      "container_sample_count": 1020,
+      "software_frame_count": 1020,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 1020019,
+      "pts_span_ticks": 1020019,
+      "duration_sec": 17.000317,
+      "keyframe_count": 17,
+      "pict_type_histogram": {
+        "B": 1003,
+        "I": 17
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001d13b9c20c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 64.82,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1125-55d3ce3133/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1126.MP4",
+      "container_sample_count": 270,
+      "software_frame_count": 270,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 269269,
+      "pts_span_ticks": 269269,
+      "duration_sec": 4.487817,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 265,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001d9f1502900] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 48.4,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1126-6b1d4360db/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1127.MP4",
+      "container_sample_count": 420,
+      "software_frame_count": 420,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 419419,
+      "pts_span_ticks": 419419,
+      "duration_sec": 6.990317,
+      "keyframe_count": 7,
+      "pict_type_histogram": {
+        "B": 413,
+        "I": 7
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001651f4236c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 66.53,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1127-81706e2fd9/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1128.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000028c059e1c40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 48.4,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1128-1817fa713a/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1129.MP4",
+      "container_sample_count": 450,
+      "software_frame_count": 450,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 449449,
+      "pts_span_ticks": 449449,
+      "duration_sec": 7.490817,
+      "keyframe_count": 8,
+      "pict_type_histogram": {
+        "B": 442,
+        "I": 8
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000021f1a931d00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 46.98,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1129-ce72e00003/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1130.MP4",
+      "container_sample_count": 300,
+      "software_frame_count": 300,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 299299,
+      "pts_span_ticks": 299299,
+      "duration_sec": 4.988317,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 295,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000025773aa2400] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 66.45,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1130-b3cdede883/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1131.MP4",
+      "container_sample_count": 540,
+      "software_frame_count": 540,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 539539,
+      "pts_span_ticks": 539539,
+      "duration_sec": 8.992317,
+      "keyframe_count": 9,
+      "pict_type_histogram": {
+        "B": 531,
+        "I": 9
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001fe538f1380] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 48.0,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1131-e579dbec92/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1132.MP4",
+      "container_sample_count": 450,
+      "software_frame_count": 450,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 449449,
+      "pts_span_ticks": 449449,
+      "duration_sec": 7.490817,
+      "keyframe_count": 8,
+      "pict_type_histogram": {
+        "B": 442,
+        "I": 8
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000028813ca1b80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 44.51,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1132-78587eacef/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1133.MP4",
+      "container_sample_count": 480,
+      "software_frame_count": 480,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 479479,
+      "pts_span_ticks": 479479,
+      "duration_sec": 7.991317,
+      "keyframe_count": 8,
+      "pict_type_histogram": {
+        "B": 472,
+        "I": 8
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000027bcf0d1900] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 45.65,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1133-87209b29db/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1134.MP4",
+      "container_sample_count": 570,
+      "software_frame_count": 570,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 569569,
+      "pts_span_ticks": 569569,
+      "duration_sec": 9.492817,
+      "keyframe_count": 10,
+      "pict_type_histogram": {
+        "B": 560,
+        "I": 10
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000023481a21d80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 41.98,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1134-7cfd13d580/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1135.MP4",
+      "container_sample_count": 330,
+      "software_frame_count": 330,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 329329,
+      "pts_span_ticks": 329329,
+      "duration_sec": 5.488817,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 324,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000015885322000] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 55.15,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1135-515b0bbc72/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1136.MP4",
+      "container_sample_count": 210,
+      "software_frame_count": 210,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 209209,
+      "pts_span_ticks": 209209,
+      "duration_sec": 3.486817,
+      "keyframe_count": 4,
+      "pict_type_histogram": {
+        "B": 206,
+        "I": 4
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000022987502100] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 54.86,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1136-4aa3bab752/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1137.MP4",
+      "container_sample_count": 180,
+      "software_frame_count": 180,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 179179,
+      "pts_span_ticks": 179179,
+      "duration_sec": 2.986317,
+      "keyframe_count": 3,
+      "pict_type_histogram": {
+        "B": 177,
+        "I": 3
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000022a42321d00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 74.81,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1137-425120f472/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1138.MP4",
+      "container_sample_count": 420,
+      "software_frame_count": 420,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 419419,
+      "pts_span_ticks": 419419,
+      "duration_sec": 6.990317,
+      "keyframe_count": 7,
+      "pict_type_histogram": {
+        "B": 413,
+        "I": 7
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000196504332c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 59.2,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1138-4252d43f2b/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1139.MP4",
+      "container_sample_count": 390,
+      "software_frame_count": 390,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 389389,
+      "pts_span_ticks": 389389,
+      "duration_sec": 6.489817,
+      "keyframe_count": 7,
+      "pict_type_histogram": {
+        "B": 383,
+        "I": 7
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000021553f92100] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 49.73,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1139-454e341300/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1140.MP4",
+      "container_sample_count": 210,
+      "software_frame_count": 210,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 209209,
+      "pts_span_ticks": 209209,
+      "duration_sec": 3.486817,
+      "keyframe_count": 4,
+      "pict_type_histogram": {
+        "B": 206,
+        "I": 4
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000021cd6865fc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 82.45,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1140-5aee19add2/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1141.MP4",
+      "container_sample_count": 270,
+      "software_frame_count": 270,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 269269,
+      "pts_span_ticks": 269269,
+      "duration_sec": 4.487817,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 265,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000025a944f1c00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 76.79,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1141-1a378be3d4/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1142.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000156a9f71c00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 49.55,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1142-080de36165/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1143.MP4",
+      "container_sample_count": 300,
+      "software_frame_count": 300,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 299299,
+      "pts_span_ticks": 299299,
+      "duration_sec": 4.988317,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 295,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002cb93f2eb40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 100.0,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1143-dcc222f544/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1144.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001d84609f0c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 48.0,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1144-5c0e495f61/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1145.MP4",
+      "container_sample_count": 210,
+      "software_frame_count": 210,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 209209,
+      "pts_span_ticks": 209209,
+      "duration_sec": 3.486817,
+      "keyframe_count": 4,
+      "pict_type_histogram": {
+        "B": 206,
+        "I": 4
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001c3a87e1f40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 68.23,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1145-0f74ccdcca/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1146.MP4",
+      "container_sample_count": 330,
+      "software_frame_count": 330,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 329329,
+      "pts_span_ticks": 329329,
+      "duration_sec": 5.488817,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 324,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001b5b2f61640] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 64.78,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1146-f5b78e646f/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1147.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000013f133b3280] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 49.02,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1147-f716589b43/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1148.MP4",
+      "container_sample_count": 240,
+      "software_frame_count": 240,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 239239,
+      "pts_span_ticks": 239239,
+      "duration_sec": 3.987317,
+      "keyframe_count": 4,
+      "pict_type_histogram": {
+        "B": 236,
+        "I": 4
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001e24b551cc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 91.95,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1148-7985aed610/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1149.MP4",
+      "container_sample_count": 330,
+      "software_frame_count": 330,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 329329,
+      "pts_span_ticks": 329329,
+      "duration_sec": 5.488817,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 324,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000273622a2f80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 49.69,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1149-1a2b01fa43/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1150.MP4",
+      "container_sample_count": 660,
+      "software_frame_count": 660,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 659659,
+      "pts_span_ticks": 659659,
+      "duration_sec": 10.994317,
+      "keyframe_count": 11,
+      "pict_type_histogram": {
+        "B": 649,
+        "I": 11
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001d3413f2000] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 49.52,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1150-bb07668593/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1151.MP4",
+      "container_sample_count": 390,
+      "software_frame_count": 390,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 389389,
+      "pts_span_ticks": 389389,
+      "duration_sec": 6.489817,
+      "keyframe_count": 7,
+      "pict_type_histogram": {
+        "B": 383,
+        "I": 7
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000187fe6a1c80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 49.24,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1151-a4f855b059/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1152.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001f94e421e40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 55.11,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1152-6d59b8d076/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1153.MP4",
+      "container_sample_count": 390,
+      "software_frame_count": 390,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 389389,
+      "pts_span_ticks": 389389,
+      "duration_sec": 6.489817,
+      "keyframe_count": 7,
+      "pict_type_histogram": {
+        "B": 383,
+        "I": 7
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000025dbc8e22c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 49.72,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1153-93239d91cc/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1154.MP4",
+      "container_sample_count": 720,
+      "software_frame_count": 720,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 719719,
+      "pts_span_ticks": 719719,
+      "duration_sec": 11.995317,
+      "keyframe_count": 12,
+      "pict_type_histogram": {
+        "B": 708,
+        "I": 12
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001b242c51c80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 42.67,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1154-c18173c7c3/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1155.MP4",
+      "container_sample_count": 600,
+      "software_frame_count": 600,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 599599,
+      "pts_span_ticks": 599599,
+      "duration_sec": 9.993317,
+      "keyframe_count": 10,
+      "pict_type_histogram": {
+        "B": 590,
+        "I": 10
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000132cd541f40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 42.76,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1155-9edea90a08/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1156.MP4",
+      "container_sample_count": 270,
+      "software_frame_count": 270,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 269269,
+      "pts_span_ticks": 269269,
+      "duration_sec": 4.487817,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 265,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000027a8f044d40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 49.94,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1156-02736b9bc0/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1157.MP4",
+      "container_sample_count": 270,
+      "software_frame_count": 270,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 269269,
+      "pts_span_ticks": 269269,
+      "duration_sec": 4.487817,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 265,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000017d941512c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 85.55,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1157-6af5874ccc/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1158.MP4",
+      "container_sample_count": 150,
+      "software_frame_count": 150,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 149149,
+      "pts_span_ticks": 149149,
+      "duration_sec": 2.485817,
+      "keyframe_count": 3,
+      "pict_type_histogram": {
+        "B": 147,
+        "I": 3
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001664f941bc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 91.46,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1158-099abf5aa9/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1159.MP4",
+      "container_sample_count": 3720,
+      "software_frame_count": 3720,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 3722719,
+      "pts_span_ticks": 3722719,
+      "duration_sec": 62.045317,
+      "keyframe_count": 62,
+      "pict_type_histogram": {
+        "B": 3658,
+        "I": 62
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001fc8227e080] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 82.95,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1159-ac49b6f633/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1160.MP4",
+      "container_sample_count": 2340,
+      "software_frame_count": 2340,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 2341339,
+      "pts_span_ticks": 2341339,
+      "duration_sec": 39.022317,
+      "keyframe_count": 39,
+      "pict_type_histogram": {
+        "B": 2301,
+        "I": 39
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000172b0ad1380] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 89.73,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1160-4bde4c5964/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1161.MP4",
+      "container_sample_count": 2940,
+      "software_frame_count": 2940,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 2941939,
+      "pts_span_ticks": 2941939,
+      "duration_sec": 49.032317,
+      "keyframe_count": 49,
+      "pict_type_histogram": {
+        "B": 2891,
+        "I": 49
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002164e021d00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 77.46,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1161-8490d78062/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1162.MP4",
+      "container_sample_count": 720,
+      "software_frame_count": 720,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 719719,
+      "pts_span_ticks": 719719,
+      "duration_sec": 11.995317,
+      "keyframe_count": 12,
+      "pict_type_histogram": {
+        "B": 708,
+        "I": 12
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000022db8ab2580] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 50.47,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1162-cf00f00dc9/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1163.MP4",
+      "container_sample_count": 7830,
+      "software_frame_count": 7830,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 7836829,
+      "pts_span_ticks": 7836829,
+      "duration_sec": 130.613817,
+      "keyframe_count": 131,
+      "pict_type_histogram": {
+        "B": 7699,
+        "I": 131
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001b5fcf61c00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 86.73,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1163-9a9287cd53/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1164.MP4",
+      "container_sample_count": 8310,
+      "software_frame_count": 8310,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 8317309,
+      "pts_span_ticks": 8317309,
+      "duration_sec": 138.621817,
+      "keyframe_count": 139,
+      "pict_type_histogram": {
+        "B": 8171,
+        "I": 139
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000227565e1c80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 29.27,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1164-c17c279326/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1165.MP4",
+      "container_sample_count": 660,
+      "software_frame_count": 660,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 659659,
+      "pts_span_ticks": 659659,
+      "duration_sec": 10.994317,
+      "keyframe_count": 11,
+      "pict_type_histogram": {
+        "B": 649,
+        "I": 11
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000028d748d1fc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 44.41,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1165-247f6d0a45/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1166.MP4",
+      "container_sample_count": 3000,
+      "software_frame_count": 3000,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 3001999,
+      "pts_span_ticks": 3001999,
+      "duration_sec": 50.033317,
+      "keyframe_count": 50,
+      "pict_type_histogram": {
+        "B": 2950,
+        "I": 50
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001bf47cc7a80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 76.46,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1166-dba998a7d0/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1167.MP4",
+      "container_sample_count": 600,
+      "software_frame_count": 600,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 599599,
+      "pts_span_ticks": 599599,
+      "duration_sec": 9.993317,
+      "keyframe_count": 10,
+      "pict_type_histogram": {
+        "B": 590,
+        "I": 10
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000207915021c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 68.82,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1167-49a50ad582/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1168.MP4",
+      "container_sample_count": 8820,
+      "software_frame_count": 8820,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 8827819,
+      "pts_span_ticks": 8827819,
+      "duration_sec": 147.130317,
+      "keyframe_count": 147,
+      "pict_type_histogram": {
+        "B": 8673,
+        "I": 147
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000029c56e71c80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 29.72,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1168-d77d658fbb/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1169.MP4",
+      "container_sample_count": 10170,
+      "software_frame_count": 10170,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 10179169,
+      "pts_span_ticks": 10179169,
+      "duration_sec": 169.652817,
+      "keyframe_count": 170,
+      "pict_type_histogram": {
+        "B": 10000,
+        "I": 170
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000155b5c83600] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 32.2,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1169-e99587afe0/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1170.MP4",
+      "container_sample_count": 30,
+      "software_frame_count": 30,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 29029,
+      "pts_span_ticks": 29029,
+      "duration_sec": 0.483817,
+      "keyframe_count": 1,
+      "pict_type_histogram": {
+        "B": 29,
+        "I": 1
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000021aebb61d40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 24.31,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1170-001c277c60/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1171.MP4",
+      "container_sample_count": 4680,
+      "software_frame_count": 4680,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 4683679,
+      "pts_span_ticks": 4683679,
+      "duration_sec": 78.061317,
+      "keyframe_count": 78,
+      "pict_type_histogram": {
+        "B": 4602,
+        "I": 78
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001a64be71d40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 111.47,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1171-df487bf931/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1172.MP4",
+      "container_sample_count": 4560,
+      "software_frame_count": 4560,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 4563559,
+      "pts_span_ticks": 4563559,
+      "duration_sec": 76.059317,
+      "keyframe_count": 76,
+      "pict_type_histogram": {
+        "B": 4484,
+        "I": 76
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000017e78e724c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 92.12,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1172-b8c7509f13/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1173.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000021d4f971c00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 57.6,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1173-1e7f47b598/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1174.MP4",
+      "container_sample_count": 540,
+      "software_frame_count": 540,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 539539,
+      "pts_span_ticks": 539539,
+      "duration_sec": 8.992317,
+      "keyframe_count": 9,
+      "pict_type_histogram": {
+        "B": 531,
+        "I": 9
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002d0c9091b40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 51.28,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1174-cc922a2a12/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1175.MP4",
+      "container_sample_count": 3120,
+      "software_frame_count": 3120,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 3122119,
+      "pts_span_ticks": 3122119,
+      "duration_sec": 52.035317,
+      "keyframe_count": 52,
+      "pict_type_histogram": {
+        "B": 3068,
+        "I": 52
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000137aa0e1d00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 93.92,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1175-cfbec5c246/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1176.MP4",
+      "container_sample_count": 3780,
+      "software_frame_count": 3780,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 3782779,
+      "pts_span_ticks": 3782779,
+      "duration_sec": 63.046317,
+      "keyframe_count": 63,
+      "pict_type_histogram": {
+        "B": 3717,
+        "I": 63
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001ec77c21b80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 93.23,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1176-e578de9f46/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260903\\A7M5\\20260903_C1177.MP4",
+      "container_sample_count": 150,
+      "software_frame_count": 150,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 149149,
+      "pts_span_ticks": 149149,
+      "duration_sec": 2.485817,
+      "keyframe_count": 3,
+      "pict_type_histogram": {
+        "B": 147,
+        "I": 3
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001eba5bb21c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 88.92,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260903_C1177-a756dd6fee/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1178.MP4",
+      "container_sample_count": 3540,
+      "software_frame_count": 3540,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 3542539,
+      "pts_span_ticks": 3542539,
+      "duration_sec": 59.042317,
+      "keyframe_count": 59,
+      "pict_type_histogram": {
+        "B": 3481,
+        "I": 59
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001bf7ba65400] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 72.73,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1178-1af8cc65ba/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1179.MP4",
+      "container_sample_count": 4650,
+      "software_frame_count": 4650,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 4653649,
+      "pts_span_ticks": 4653649,
+      "duration_sec": 77.560817,
+      "keyframe_count": 78,
+      "pict_type_histogram": {
+        "B": 4572,
+        "I": 78
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000021e64be0ac0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 100.0,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1179-16d88f2e4f/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1180.MP4",
+      "container_sample_count": 450,
+      "software_frame_count": 450,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 449449,
+      "pts_span_ticks": 449449,
+      "duration_sec": 7.490817,
+      "keyframe_count": 8,
+      "pict_type_histogram": {
+        "B": 442,
+        "I": 8
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002671ec71ac0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 47.21,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1180-28b359689d/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1181.MP4",
+      "container_sample_count": 1680,
+      "software_frame_count": 1680,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 1680679,
+      "pts_span_ticks": 1680679,
+      "duration_sec": 28.011317,
+      "keyframe_count": 28,
+      "pict_type_histogram": {
+        "B": 1652,
+        "I": 28
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002377e1b20c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 66.17,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1181-beebd6c5af/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1182.MP4",
+      "container_sample_count": 1080,
+      "software_frame_count": 1080,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 1080079,
+      "pts_span_ticks": 1080079,
+      "duration_sec": 18.001317,
+      "keyframe_count": 18,
+      "pict_type_histogram": {
+        "B": 1062,
+        "I": 18
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000024e62d11a40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 59.89,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1182-bcae78b30b/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1183.MP4",
+      "container_sample_count": 390,
+      "software_frame_count": 390,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 389389,
+      "pts_span_ticks": 389389,
+      "duration_sec": 6.489817,
+      "keyframe_count": 7,
+      "pict_type_histogram": {
+        "B": 383,
+        "I": 7
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001b36e9824c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 42.59,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1183-e64f2c46bb/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1184.MP4",
+      "container_sample_count": 1410,
+      "software_frame_count": 1410,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 1410409,
+      "pts_span_ticks": 1410409,
+      "duration_sec": 23.506817,
+      "keyframe_count": 24,
+      "pict_type_histogram": {
+        "B": 1386,
+        "I": 24
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000027927841880] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 93.32,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1184-33685d704f/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1185.MP4",
+      "container_sample_count": 570,
+      "software_frame_count": 570,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 569569,
+      "pts_span_ticks": 569569,
+      "duration_sec": 9.492817,
+      "keyframe_count": 10,
+      "pict_type_histogram": {
+        "B": 560,
+        "I": 10
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001f11a1b1900] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 42.57,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1185-da48590f8a/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1186.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000028a34dc20c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 54.85,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1186-d0741cd4b5/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1187.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001bd1fb91c80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 44.48,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1187-bed33cfd05/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1188.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000014dcda020c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 44.31,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1188-f09050d74d/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1189.MP4",
+      "container_sample_count": 450,
+      "software_frame_count": 450,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 449449,
+      "pts_span_ticks": 449449,
+      "duration_sec": 7.490817,
+      "keyframe_count": 8,
+      "pict_type_histogram": {
+        "B": 442,
+        "I": 8
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000025092ca3580] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 44.44,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1189-c6db7c736b/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1190.MP4",
+      "container_sample_count": 690,
+      "software_frame_count": 690,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 689689,
+      "pts_span_ticks": 689689,
+      "duration_sec": 11.494817,
+      "keyframe_count": 12,
+      "pict_type_histogram": {
+        "B": 678,
+        "I": 12
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001da05fb2d00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 47.84,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1190-e943e728c1/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1191.MP4",
+      "container_sample_count": 750,
+      "software_frame_count": 750,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 749749,
+      "pts_span_ticks": 749749,
+      "duration_sec": 12.495817,
+      "keyframe_count": 13,
+      "pict_type_histogram": {
+        "B": 737,
+        "I": 13
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001a5cb3d20c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 53.16,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1191-c590bc9763/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1192.MP4",
+      "container_sample_count": 870,
+      "software_frame_count": 870,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 869869,
+      "pts_span_ticks": 869869,
+      "duration_sec": 14.497817,
+      "keyframe_count": 15,
+      "pict_type_histogram": {
+        "B": 855,
+        "I": 15
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002925592eac0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 50.48,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1192-eb275c2753/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1193.MP4",
+      "container_sample_count": 90,
+      "software_frame_count": 90,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 89089,
+      "pts_span_ticks": 89089,
+      "duration_sec": 1.484817,
+      "keyframe_count": 2,
+      "pict_type_histogram": {
+        "B": 88,
+        "I": 2
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000020cdac01bc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 53.35,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1193-098485541e/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1194.MP4",
+      "container_sample_count": 930,
+      "software_frame_count": 930,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 929929,
+      "pts_span_ticks": 929929,
+      "duration_sec": 15.498817,
+      "keyframe_count": 16,
+      "pict_type_histogram": {
+        "B": 914,
+        "I": 16
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001ebb4fc2100] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 50.74,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1194-50277324db/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1195.MP4",
+      "container_sample_count": 180,
+      "software_frame_count": 180,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 179179,
+      "pts_span_ticks": 179179,
+      "duration_sec": 2.986317,
+      "keyframe_count": 3,
+      "pict_type_histogram": {
+        "B": 177,
+        "I": 3
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002ab1bc31340] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 50.96,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1195-d7b7a58c70/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1196.MP4",
+      "container_sample_count": 120,
+      "software_frame_count": 120,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 119119,
+      "pts_span_ticks": 119119,
+      "duration_sec": 1.985317,
+      "keyframe_count": 2,
+      "pict_type_histogram": {
+        "B": 118,
+        "I": 2
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000024570c12400] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 64.55,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1196-1d31f29d12/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1197.MP4",
+      "container_sample_count": 570,
+      "software_frame_count": 570,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 569569,
+      "pts_span_ticks": 569569,
+      "duration_sec": 9.492817,
+      "keyframe_count": 10,
+      "pict_type_histogram": {
+        "B": 560,
+        "I": 10
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000013decdc5500] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 54.86,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1197-b70aed6342/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1198.MP4",
+      "container_sample_count": 210,
+      "software_frame_count": 210,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 209209,
+      "pts_span_ticks": 209209,
+      "duration_sec": 3.486817,
+      "keyframe_count": 4,
+      "pict_type_histogram": {
+        "B": 206,
+        "I": 4
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001ded519ec80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 53.54,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1198-1267015e1d/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1199.MP4",
+      "container_sample_count": 270,
+      "software_frame_count": 270,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 269269,
+      "pts_span_ticks": 269269,
+      "duration_sec": 4.487817,
+      "keyframe_count": 5,
+      "pict_type_histogram": {
+        "B": 265,
+        "I": 5
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001fc2c032080] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 65.69,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1199-22dc0c7e06/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1200.MP4",
+      "container_sample_count": 330,
+      "software_frame_count": 330,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 329329,
+      "pts_span_ticks": 329329,
+      "duration_sec": 5.488817,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 324,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002b4bb002180] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 54.02,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1200-cb891f5df8/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1201.MP4",
+      "container_sample_count": 240,
+      "software_frame_count": 240,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 239239,
+      "pts_span_ticks": 239239,
+      "duration_sec": 3.987317,
+      "keyframe_count": 4,
+      "pict_type_histogram": {
+        "B": 236,
+        "I": 4
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002593e282a80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 81.69,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1201-967428ec46/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1202.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000017f87701f00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 50.31,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1202-c6b997c5a2/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1203.MP4",
+      "container_sample_count": 5370,
+      "software_frame_count": 5370,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 5374369,
+      "pts_span_ticks": 5374369,
+      "duration_sec": 89.572817,
+      "keyframe_count": 90,
+      "pict_type_histogram": {
+        "B": 5280,
+        "I": 90
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001efbda31c80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 111.19,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1203-7488c8c70a/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1204.MP4",
+      "container_sample_count": 3060,
+      "software_frame_count": 3060,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 3062059,
+      "pts_span_ticks": 3062059,
+      "duration_sec": 51.034317,
+      "keyframe_count": 51,
+      "pict_type_histogram": {
+        "B": 3009,
+        "I": 51
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002021e6cd780] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 70.45,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1204-ae14142a05/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1205.MP4",
+      "container_sample_count": 2820,
+      "software_frame_count": 2820,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 2821819,
+      "pts_span_ticks": 2821819,
+      "duration_sec": 47.030317,
+      "keyframe_count": 47,
+      "pict_type_histogram": {
+        "B": 2773,
+        "I": 47
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000013be54de380] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 89.35,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1205-11734e2775/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1206.MP4",
+      "container_sample_count": 3420,
+      "software_frame_count": 3420,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 3422419,
+      "pts_span_ticks": 3422419,
+      "duration_sec": 57.040317,
+      "keyframe_count": 57,
+      "pict_type_histogram": {
+        "B": 3363,
+        "I": 57
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001f4b1ce2000] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 68.23,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1206-05ccd8c3d9/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1207.MP4",
+      "container_sample_count": 4230,
+      "software_frame_count": 4230,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 4233229,
+      "pts_span_ticks": 4233229,
+      "duration_sec": 70.553817,
+      "keyframe_count": 71,
+      "pict_type_histogram": {
+        "B": 4159,
+        "I": 71
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000022925d81b40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 91.49,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1207-c885f6ac95/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1208.MP4",
+      "container_sample_count": 5850,
+      "software_frame_count": 5850,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 5854849,
+      "pts_span_ticks": 5854849,
+      "duration_sec": 97.580817,
+      "keyframe_count": 98,
+      "pict_type_histogram": {
+        "B": 5752,
+        "I": 98
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000137c2931840] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 86.91,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1208-d984b1ba9d/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1209.MP4",
+      "container_sample_count": 1620,
+      "software_frame_count": 1620,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 1620619,
+      "pts_span_ticks": 1620619,
+      "duration_sec": 27.010317,
+      "keyframe_count": 27,
+      "pict_type_histogram": {
+        "B": 1593,
+        "I": 27
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000025aae2e1f00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 68.12,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1209-26234ec9bf/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1210.MP4",
+      "container_sample_count": 2520,
+      "software_frame_count": 2520,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 2521519,
+      "pts_span_ticks": 2521519,
+      "duration_sec": 42.025317,
+      "keyframe_count": 42,
+      "pict_type_histogram": {
+        "B": 2478,
+        "I": 42
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000019228342000] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 84.26,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1210-5e2dd3f27d/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1211.MP4",
+      "container_sample_count": 1530,
+      "software_frame_count": 1530,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 1530529,
+      "pts_span_ticks": 1530529,
+      "duration_sec": 25.508817,
+      "keyframe_count": 26,
+      "pict_type_histogram": {
+        "B": 1504,
+        "I": 26
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002836c7720c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 83.62,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1211-71d02d7398/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1212.MP4",
+      "container_sample_count": 1740,
+      "software_frame_count": 1740,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 1740739,
+      "pts_span_ticks": 1740739,
+      "duration_sec": 29.012317,
+      "keyframe_count": 29,
+      "pict_type_histogram": {
+        "B": 1711,
+        "I": 29
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000024369ed1c80] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 79.89,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1212-13962aa966/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1213.MP4",
+      "container_sample_count": 3120,
+      "software_frame_count": 3120,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 3122119,
+      "pts_span_ticks": 3122119,
+      "duration_sec": 52.035317,
+      "keyframe_count": 52,
+      "pict_type_histogram": {
+        "B": 3068,
+        "I": 52
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000018f3e271d40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 73.95,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1213-eba70fa55c/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1214.MP4",
+      "container_sample_count": 4380,
+      "software_frame_count": 4380,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 4383379,
+      "pts_span_ticks": 4383379,
+      "duration_sec": 73.056317,
+      "keyframe_count": 73,
+      "pict_type_histogram": {
+        "B": 4307,
+        "I": 73
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001a8d7131c00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 85.75,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1214-a6745bac35/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1215.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000018f55d41c00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 42.75,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1215-9a55b236ad/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1216.MP4",
+      "container_sample_count": 1560,
+      "software_frame_count": 1560,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 1560559,
+      "pts_span_ticks": 1560559,
+      "duration_sec": 26.009317,
+      "keyframe_count": 26,
+      "pict_type_histogram": {
+        "B": 1534,
+        "I": 26
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001994ce21c00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 85.7,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1216-253e0c7cf2/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1217.MP4",
+      "container_sample_count": 3540,
+      "software_frame_count": 3540,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 3542539,
+      "pts_span_ticks": 3542539,
+      "duration_sec": 59.042317,
+      "keyframe_count": 59,
+      "pict_type_histogram": {
+        "B": 3481,
+        "I": 59
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001ec69771cc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 78.67,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1217-38723dbe5f/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1218.MP4",
+      "container_sample_count": 150,
+      "software_frame_count": 150,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 149149,
+      "pts_span_ticks": 149149,
+      "duration_sec": 2.485817,
+      "keyframe_count": 3,
+      "pict_type_histogram": {
+        "B": 147,
+        "I": 3
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000028921771ac0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 52.47,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1218-b3e06c86b0/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\20260904\\20260904_C1220.MP4",
+      "container_sample_count": 1380,
+      "software_frame_count": 1380,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 1380379,
+      "pts_span_ticks": 1380379,
+      "duration_sec": 23.006317,
+      "keyframe_count": 23,
+      "pict_type_histogram": {
+        "B": 1357,
+        "I": 23
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001af322a1d40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 89.12,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260904_C1220-096c6ef8b7/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9037.MP4",
+      "container_sample_count": 195,
+      "software_frame_count": 195,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 194194,
+      "pts_span_ticks": 194194,
+      "duration_sec": 6.473133,
+      "keyframe_count": 13,
+      "pict_type_histogram": {
+        "B": 130,
+        "I": 13,
+        "P": 52
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001acd1611b40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 1001"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 60.58,
+      "return_code": 0,
+      "elst_media_time": 1001,
+      "elst_media_time_frames": 1.0,
+      "pictures_before_first_keyframe": 2,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/C9037-f1594bc425/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9073.MP4",
+      "container_sample_count": 150,
+      "software_frame_count": 150,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 149149,
+      "pts_span_ticks": 149149,
+      "duration_sec": 4.971633,
+      "keyframe_count": 10,
+      "pict_type_histogram": {
+        "B": 100,
+        "I": 10,
+        "P": 40
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000020c6ed918c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 1001"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 39.18,
+      "return_code": 0,
+      "elst_media_time": 1001,
+      "elst_media_time_frames": 1.0,
+      "pictures_before_first_keyframe": 2,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/C9073-091368a75a/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9088.MP4",
+      "container_sample_count": 165,
+      "software_frame_count": 165,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 164164,
+      "pts_span_ticks": 164164,
+      "duration_sec": 5.472133,
+      "keyframe_count": 11,
+      "pict_type_histogram": {
+        "B": 110,
+        "I": 11,
+        "P": 44
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000166f8843cc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 1001"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 44.37,
+      "return_code": 0,
+      "elst_media_time": 1001,
+      "elst_media_time_frames": 1.0,
+      "pictures_before_first_keyframe": 2,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/C9088-68c261b030/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\a7m4_4k30p_264_hi422p_xavcs\\C9110.MP4",
+      "container_sample_count": 630,
+      "software_frame_count": 630,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 629629,
+      "pts_span_ticks": 629629,
+      "duration_sec": 20.987633,
+      "keyframe_count": 42,
+      "pict_type_histogram": {
+        "B": 420,
+        "I": 42,
+        "P": 168
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002a8ff042200] st: 0 edit list: 1 Missing key frame while searching for timestamp: 1001"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 45.61,
+      "return_code": 0,
+      "elst_media_time": 1001,
+      "elst_media_time_frames": 1.0,
+      "pictures_before_first_keyframe": 2,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/C9110-3a3b2fdbf6/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\a7m5_4k30p_264_hi422p_xavcs\\20260823_C0887.MP4",
+      "container_sample_count": 195,
+      "software_frame_count": 195,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 194194,
+      "pts_span_ticks": 194194,
+      "duration_sec": 6.473133,
+      "keyframe_count": 13,
+      "pict_type_histogram": {
+        "B": 130,
+        "I": 13,
+        "P": 52
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002aa9a7b1c40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 1001"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 52.89,
+      "return_code": 0,
+      "elst_media_time": 1001,
+      "elst_media_time_frames": 1.0,
+      "pictures_before_first_keyframe": 2,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260823_C0887-4c31f19947/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\a7m5_4k60p_265_10bit420_150m_xavchs_4ch\\20260823_C0886.MP4",
+      "container_sample_count": 360,
+      "software_frame_count": 360,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 359359,
+      "pts_span_ticks": 359359,
+      "duration_sec": 5.989317,
+      "keyframe_count": 6,
+      "pict_type_histogram": {
+        "B": 354,
+        "I": 6
+      },
+      "decode_warnings": [
+        "[in#0 @ 00000202fdf14780] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 54.21,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/20260823_C0886-d0a48873b5/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\adjust\\夜间手持高噪点.MP4",
+      "container_sample_count": 2010,
+      "software_frame_count": 2010,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 2011009,
+      "pts_span_ticks": 2011009,
+      "duration_sec": 33.516817,
+      "keyframe_count": 34,
+      "pict_type_histogram": {
+        "B": 1976,
+        "I": 34
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002424d3e2000] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 74.88,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/_-0383f118e3/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\adjust\\昼间手持几乎无噪点-稳定.MP4",
+      "container_sample_count": 1020,
+      "software_frame_count": 1020,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 1020019,
+      "pts_span_ticks": 1020019,
+      "duration_sec": 17.000317,
+      "keyframe_count": 17,
+      "pict_type_histogram": {
+        "B": 1003,
+        "I": 17
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001c82c271d00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 89.06,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/_-_-c2b4591f9f/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\adjust\\车内高晃动适中噪点.MP4",
+      "container_sample_count": 1740,
+      "software_frame_count": 1740,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 1740739,
+      "pts_span_ticks": 1740739,
+      "duration_sec": 29.012317,
+      "keyframe_count": 29,
+      "pict_type_histogram": {
+        "B": 1711,
+        "I": 29
+      },
+      "decode_warnings": [
+        "[in#0 @ 000001b95cfd2b40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 74.94,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/_-3ba5ab7c1d/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\adjust\\阴天手持高晃动低噪点.MP4",
+      "container_sample_count": 720,
+      "software_frame_count": 720,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 719719,
+      "pts_span_ticks": 719719,
+      "duration_sec": 11.995317,
+      "keyframe_count": 12,
+      "pict_type_histogram": {
+        "B": 708,
+        "I": 12
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000024613a06fc0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 60.79,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/_-3c1724f93c/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\stress\\晴天室外手持跟拍几乎无噪点-高晃动-长-多场景亮暗切换.MP4",
+      "container_sample_count": 11280,
+      "software_frame_count": 11280,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 11290279,
+      "pts_span_ticks": 11290279,
+      "duration_sec": 188.171317,
+      "keyframe_count": 188,
+      "pict_type_histogram": {
+        "B": 11092,
+        "I": 188
+      },
+      "decode_warnings": [
+        "[in#0 @ 000002a187b738c0] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 35.28,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/_-_-_-_-703adf28a6/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\stress\\晴天室外手持跟拍几乎无噪点-高晃动-长-多场景亮暗切换2.MP4",
+      "container_sample_count": 3390,
+      "software_frame_count": 3390,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 3392389,
+      "pts_span_ticks": 3392389,
+      "duration_sec": 56.539817,
+      "keyframe_count": 57,
+      "pict_type_histogram": {
+        "B": 3333,
+        "I": 57
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000024169c81d00] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 72.06,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/_-_-_-_2-0c1ca6bdd2/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\validate\\夜间室内适中偏高噪点-手持变焦.MP4",
+      "container_sample_count": 720,
+      "software_frame_count": 720,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 719719,
+      "pts_span_ticks": 719719,
+      "duration_sec": 11.995317,
+      "keyframe_count": 12,
+      "pict_type_histogram": {
+        "B": 708,
+        "I": 12
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000021df89e2280] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 76.8,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/_-_-3ce9b8a5cf/sw.json"
+      }
+    },
+    {
+      "path": "testsets\\validate\\昼间车内手持低噪点-主体聚焦.MP4",
+      "container_sample_count": 660,
+      "software_frame_count": 660,
+      "decoded_equals_container": true,
+      "first_pts": 0,
+      "last_pts": 659659,
+      "pts_span_ticks": 659659,
+      "duration_sec": 10.994317,
+      "keyframe_count": 11,
+      "pict_type_histogram": {
+        "B": 649,
+        "I": 11
+      },
+      "decode_warnings": [
+        "[in#0 @ 0000028266932a40] st: 0 edit list: 1 Missing key frame while searching for timestamp: 2002"
+      ],
+      "decode_warning_count": 1,
+      "sw_decode_fps": 53.54,
+      "return_code": 0,
+      "elst_media_time": 2002,
+      "elst_media_time_frames": 2.0,
+      "pictures_before_first_keyframe": 3,
+      "method": "ffmpeg -i SRC -map 0:v:0 -an -sn -dn -fps_mode passthrough -vf scale=64:64:flags=bilinear,format=gray,showinfo -f rawvideo - | sha1 per 4096-byte frame; DEFAULT demuxer edit-list handling; decoder drained to EOF by the CLI.",
+      "per_frame": {
+        "pts": null,
+        "note": "full per-frame table stored at work/hwdecode/raw/fp/_-_-a23649ec3b/sw.json"
+      }
+    }
+  ]
+}

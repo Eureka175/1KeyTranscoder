@@ -1,0 +1,33 @@
+{
+  "level": "FFmpeg NVDEC hardware decode",
+  "modes": {
+    "nvdec_cuvid": {
+      "files_tested": 151,
+      "classification": {
+        "PASS": 151
+      },
+      "failures": [],
+      "pass_rate": 1.0,
+      "all_sequences_bit_identical": true
+    },
+    "nvdec_auto": {
+      "files_tested": 151,
+      "classification": {
+        "PASS": 151
+      },
+      "failures": [],
+      "pass_rate": 1.0,
+      "all_sequences_bit_identical": true
+    }
+  },
+  "primary_mode": "nvdec_cuvid",
+  "summary": {
+    "files_tested": 151,
+    "classification": {
+      "PASS": 151
+    },
+    "failures": [],
+    "pass_rate": 1.0,
+    "all_sequences_bit_identical": true
+  }
+}

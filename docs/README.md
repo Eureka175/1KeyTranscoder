@@ -9,6 +9,56 @@
 >
 > ★ **`FINAL_REPORT.md`** — 最终报告：四份评估的汇总结论、决策记录与路线图。
 
+## 项目文件夹结构（整体架构）
+
+```
+F:\1KeyTranscoder\
+├── 1kt.py                  主入口（CLI + 三条管线：Sony 保留 / DJI 保留 / 经典）
+├── watchfolder.py          轮询批处理入口（转调 1kt.py）
+├── start.bat               双击启动
+├── VERSION                 版本号唯一来源（0.6.2）
+├── LICENSE                 LGPL-3.0-or-later
+│
+├── core/                   ★ 运行时核心（54 文件）：config / probe / paths /
+│                             scaling / source_classifier / hw / batch_hw /
+│                             channel_sync / sync_estimate / sync_fix /
+│                             logging_utils / dashboard / versions / color …
+├── encoders/               ★ 编码后端（24 文件）：nvencc / qsvencc / x265 /
+│                             svtav1 / caps / hw(plan_initial_format) / base
+├── preservation/           ★ 元数据保留（46 文件）：sony / dji / gpac / isobmf /
+│                             validate / colour / selfcheck / gyroflow
+├── tests/                  自动化测试（三级深度）+ fixtures（137 段冻结基线 CSV）
+├── release/                发布工具：build_release.py / verify_package.py
+│
+├── *.json                  档位配置（nvenc / nvenc_av1 / qsv / qsv_aligned /
+│                             qsv_av1 / x265 + scaling / svtav1 + scaling /
+│                             vce[预留未接]）—— 运行时配置，非文档
+│
+├── docs/                   📚 文档（见下）
+├── tools/                  自带工具链（ffmpeg/ffprobe 9.0.1、NVEncC 9.31、
+│                             QSVEncC 8.26、GPAC 26.02）—— 1.37 GB，gitignored
+├── testsets/               测试素材（1063 文件 / 97.5 GB）—— gitignored
+├── work/                   实验产物与阶段证据（详见 work/docs/v1.0.0_requirements.md）
+├── dist/                   发布产物：v0.6.1 zip + sha256 + manifest（3.5 GB）
+├── olddocs/                历史代码快照与废弃脚本（详见 olddocs/README.md）
+├── metadata_forensics/     取证数据（8 文件 / 0.5 MB，被 design 文档引用）
+└── logs/                   运行时日志输出（gitignored）
+```
+
+### 是否进入正式发布包（`release/build_release.py` allowlist）
+
+| 目录 / 文件 | 入包 | 说明 |
+|---|---|---|
+| `1kt.py` `watchfolder.py` `start.bat` `README.md` `LICENSE` `VERSION` | ✅ | 必需条目（缺失即拒绝构建） |
+| `core/` `encoders/` `preservation/` `tests/` | ✅ | 全部 `.py`（排除 `__pycache__`/.pyc） |
+| `*.json`（档位配置） | ✅ | `TOP_GLOBS = ("*.json",)` |
+| `tools/`（ffmpeg / NVEncC / QSVEncC / GPAC） | ✅ | 仅 `TOOL_FILES` + `TOOL_DIRS` 白名单；**`tools/VCEEncC_9.12_x64` 不入包** |
+| `docs/` `olddocs/` `logs/` `work/` `testsets/` `dist/` `release/` `metadata_forensics/` | ❌ | **明确排除**，见 manifest `excluded_by_design` |
+
+> 即：**文档、实验产物、测试素材、发布工具本身都不进包**，
+> 包内只含运行时必需内容 + 自带工具链。改动的具体清单见
+> `dist/release-manifest.json` 的 `files`（455 条记录）。
+
 ## 📁 design/ — 设计文档（分类：项目设计）
 
 | 文件 | 说明 |
@@ -25,9 +75,30 @@
 |---|---|
 | `release_notes_v0.6.1.md` | **v0.6.1 发布说明**：Channel Sync P1 / AV1 mainline / AV1 色彩保真 / 流式内存修复；含验证矩阵、实测性能与已知限制 |
 
-> 另有两份阶段验证报告保存在 `work/`（按项目约定不入文档目录，不入发布包）：
-> `work/stage12_memory_validation.md`（Stage 1.2 内存修复验证，含 600 s 长程表）
-> 与 `work/channel_sync_memory_audit.md`（逐阶段内存归因审计）。
+> 阶段验证报告的正式副本已归档在 `work/docs/` 与 `work/releases/`
+> （`work/` 按项目约定不入文档目录、不入发布包）：
+> `work/docs/channel_sync/stage12_memory_validation.md`（Stage 1.2 内存修复验证，
+> 含 600 s 长程表）、`work/docs/channel_sync/memory_audit.md`（逐阶段内存归因）、
+> `work/releases/v0.6.1_release_validation.md`（正式发布验证记录）。
+
+## 📁 hardware-decode/ — 硬件解码调查（分类：项目专项调查）
+
+| 文件 | 说明 |
+|---|---|
+| `README.md` | **调查总纲与可行性判定**：QSV/NVDEC/rigaya `--avhw` 三方结论、headline findings、结论表 |
+| `investigation.md` | 完整结构化报告（12 节），含 §10 现有缺陷清单（P1–P8） |
+| `corpus.md` | Sony 语料构成与识别特征（151 文件 / 188,475 帧 / 64.87 GiB） |
+| `ground-truth.md` | 软解基准如何建立与验证 |
+| `qsv.md` / `nvdec.md` | QSV / NVDEC 逐项结果与吞吐 |
+| `divergence.md` | 逐帧指纹与首次分歧分析 |
+| `root-cause.md` | 根因分析（Observation/Evidence/Hypothesis/Experiment/Result/Conclusion） |
+| `design.md` | 目标解码器架构设计 |
+| `implementation-plan.md` | **Phase 2 计划**：§17.1 架构问题 P1–P8、§17.3 解码器 API、§17.4 完整性三层、§17.5 回退契约、§17.9 步骤 S1–S10 |
+| `test-results/` | 机器可读结果（comparison / corpus / nvdec / qsv / software-ground-truth / summary） |
+
+> ⚠️ **本目录是 Phase 1 调查产物，Phase 2 未执行**：生产 decode/encode/mux/
+> preservation/channel-sync 代码一行未改。当前开发方向与优先级见
+> `work/docs/v1.0.0_requirements.md`（P0-A = 硬件解码方向探索）。
 
 ## 📁 evaluation/ — 评估报告（分类：评估与调研）
 
@@ -40,6 +111,12 @@
 | `hevc_implementation_assessment.md` | **HEVC 实现生产就绪度评估（重写版）**：全量代码重读 + 官方文档/社区实测调研 + 本机复测，判定"有条件生产就绪"与上线条件 |
 | `x265_production_assessment.md` | **x265 实现生产就绪评估（重写版）**：官方文档逐参数核查 + 本机实证 + 生产判定与条件清单 |
 | `svt_av1_archival_assessment.md` | **SVT-AV1（含 PSY fork）归档可行性评估**：主线/PSY 关系、归档调参、质量与吞吐、集成定位 |
+
+## 📁 fixtures/ — 测试素材清单（分类：项目自身文档）
+
+| 文件 | 说明 |
+|---|---|
+| `a7m5_channel_sync_fixtures.md` | **A7M5 真实素材 channel-sync fixture 清单**：10 类场景（空 CH1/CH2、不同物理位置、已对齐、不同固定 delay、低相关等）；原始大文件不提交仓库，仅路径引用；冻结基线与标定依据见 §15 与 `tests/fixtures/channel_sync/` |
 
 ## 📁 reference/ — 参考资料（分类：第三方一手资料存档）
 
