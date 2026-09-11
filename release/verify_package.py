@@ -1,7 +1,7 @@
 """Release package integrity verifier (task book §6/§7/§8).
 
-    python release/verify_package.py dist/1KeyTranscoder-v0.6.0-win64-selfcontained.zip \
-        --extract-dir "%TEMP%\\1KT-v0.6.0-clean"
+    python release/verify_package.py dist/1KeyTranscoder-v<version>-win64-selfcontained.zip \
+        --extract-dir "%TEMP%\\1KT-v<version>-clean"
 
 Steps:
   1. archive exists, size > 0, sidecar SHA256 present and matching
@@ -171,8 +171,16 @@ def main(argv: list[str] | None = None) -> int:
     rep.check("manifest archive.size matches file",
               blk.get("size") == size,
               f"manifest={blk.get('size')} actual={size}")
+    # The expected version is whatever this checkout's VERSION file says —
+    # the verifier must never be pinned to one release (a hard-coded 0.6.0
+    # here would false-FAIL every later package).
+    expected_version = (Path(__file__).resolve().parent.parent / "VERSION")
+    want_version = (expected_version.read_text(encoding="utf-8").strip()
+                    if expected_version.is_file() else "")
     version = outer.get("version", "")
-    rep.check("manifest version", version == "0.6.0", version)
+    rep.check("manifest version == VERSION file",
+              bool(want_version) and version == want_version,
+              f"manifest={version!r} VERSION={want_version!r}")
     commit = outer.get("git_commit", "")
     rep.check("manifest git_commit present", bool(commit), commit[:12])
     rep.check("manifest dirty flag false", outer.get("dirty") is False,
