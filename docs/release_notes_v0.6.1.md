@@ -94,18 +94,42 @@ header 的 `color_description_present_flag == 1` 时才从位流推导 `colr`，
 规格:      600 s / 4 audio tracks / 48 kHz / --channel-sync / 单线程 (--jobs 1)
 输入:      LONG-CS-AUDIO.mp4 (600.02 s, 4× pcm_s24be 单声道, 由真实 A7M5
            素材流拷贝拼接而成, 无重编码)
-
-Peak RSS:  205.6 MB / 214.5 MB      (目标 ≤ 512 MB)   PASS
-Runtime:   46.9 s  / 52.7 s         (目标 < 60 s)     PASS
+采样:      进程树 Peak WorkingSet, work/rss_sampler.ps1, 500 ms 间隔
 ```
 
-同步结果正确性：`status = applied`，CH1 `shift_samples = 1051`
-（= 该 fixture 冻结标定值 +21.8958 ms @48 kHz），复检残差 **+0.0180 ms**
-（≤ 0.05 ms 门限），低置信轨 CH2 仍 `untouched`（未误修），4 条音轨完整保留，
-输出可解析、完整解码 stderr 为空。
+| 运行 | Runtime | Peak RSS | 结果 |
+|---|---:|---:|---|
+| algo-r1（发布判定运行） | **46.4 s** | **288.3 MB** | PASS |
+| algo-r2（确定性复跑） | **45.3 s** | **153.0 MB** | PASS |
+| 端到端 `--channel-sync-transparent` | 92.6 s | 237.8 MB | PASS |
+| 单独复测 A（空闲窗口） | 46.9 s | 205.6 MB | PASS |
+| 单独复测 B（带采样器） | 52.7 s | 214.5 MB | PASS |
+| 后台服务繁忙窗口（对照，非判定） | 59.2 s | 205.6 MB | PASS |
 
-> 说明：runtime 余量受机器后台负载影响（同一构建在后台服务繁忙时段实测
-> 可达 59 s 量级）；内存指标不受此影响且余量充足。
+```
+Peak RSS:  153–288 MB      (目标 ≤ 512 MB)   PASS
+Runtime:   45.3–52.7 s     (目标 < 60 s)     PASS
+```
+
+内存指标离散度小且余量充足；runtime 离散度主要来自机器后台负载（同一构建
+在后台服务繁忙时段可测得 59 s 量级，仍未越线）。
+
+同步结果正确性（发布判定运行）：`status = applied`、`result_scope = partial`、
+锚点 CH3；CH1 `shift_samples = 1051`（= 该 fixture 冻结标定值
++21.8958 ms @48 kHz），复检残差 **+0.0180 ms**（≤ 0.05 ms 门限）；
+低置信/复检超差的 CH2 仍 `untouched`（残差 −2.0602 ms 超门 → 安全放弃，
+未误修）；CH4 `already_aligned`。4 条音轨完整保留，输出可解析、完整解码
+stderr 为空。复跑（r2）决策与 shift 完全一致。
+
+### 4.1 与 v0.6.0 的长程内存对照
+
+```
+60 s : 151.6 MB  ->  208.1 MB
+150 s: 356.7 MB  ->  228.8 MB
+300 s: 468.3 MB  ->  208.5 MB
+450 s: 579.7 MB  ->  264.6 MB
+600 s: 605.4 MB  ->  209.3 MB      (v0.6.0 随时长线性增长, v0.6.1 与时长无关)
+```
 
 ## 5. Backward Compatibility
 
