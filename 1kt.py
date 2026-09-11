@@ -65,6 +65,7 @@ from core.postprobe import postprobe_and_log
 from core.probe import build_source_info, count_frames, probe_source
 from core.scaling import ScalingEngine
 from core.source_classifier import SourceClassifier
+from core.version import version_string
 from encoders.svtav1 import SvtAv1Backend
 from encoders.x265 import X265Backend
 from preservation.gpac import GpacContainerBackend
@@ -917,6 +918,12 @@ def parse_args() -> argparse.Namespace:
             "Sony camera-metadata preservation (NVEncC/QSVEncC hardware "
             "backends; x265 as explicit manual option)."
         ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=version_string(),
+        help="Print the version and exit.",
     )
     parser.add_argument("--input", required=True, help="Input root directory.")
     parser.add_argument("--output", required=True, help="Output root directory.")

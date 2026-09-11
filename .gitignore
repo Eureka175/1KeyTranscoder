@@ -35,3 +35,6 @@ metadata_forensics/
 
 # Preservation POC intermediates
 work/
+
+# Release build output (staging tree + archive + manifest)
+dist/
