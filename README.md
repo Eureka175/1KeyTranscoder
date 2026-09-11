@@ -47,9 +47,12 @@ v4.2.0/libx265/libvmaf）+ NVEncC 9.31 + QSVEncC 8.26 + GPAC 26.02**，
   RSS ≤ 512 MB 已实测达标），并含 AV1 色彩元数据保真修复；发布说明见
   [docs/release_notes_v0.6.1.md](docs/release_notes_v0.6.1.md)
 - **v0.6.0**（`main` 主线 · HEVC/265 + AV1 合并后首个版本 + AV1 色彩
-  元数据保真修复）：tag 已打在合并后状态上，`git checkout v0.6.0` 即可复现；
-  该版本**长程 channel-sync 内存问题未修复**（10 min/4CH 峰值 RSS 达
-  605–713 MB），**不建议用于长素材的 `--channel-sync`**，请用 v0.6.1
+  元数据保真修复）：该版本**长程 channel-sync 内存问题未修复**（10 min/4CH
+  峰值 RSS 达 605–713 MB），**不建议用于长素材的 `--channel-sync`**，请用
+  v0.6.1。**注意：历史上未发布 v0.6.0 的独立发布包；仓库里 `v0.6.0` 这个
+  tag 指向的是发布基建（`VERSION` / `release/` / `--version`）落地之前的
+  mainline commit**，与本节描述的能力不完全对应——需要复现合并后能力请用
+  `v0.6.1`（或 `main` 上的 `f721b1f` 及其后提交）
 - **v0.5.1**（AV1 线 · 软件 + 硬件 AV1；tag 现已在 `main` 历史中）：
   [1KeyTranscoder-v0.5.1-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.5.1/1KeyTranscoder-v0.5.1-win64-selfcontained.zip)
 - **v0.4.2**（HEVC/265 线）：
@@ -58,6 +61,7 @@ v4.2.0/libx265/libvmaf）+ NVEncC 9.31 + QSVEncC 8.26 + GPAC 26.02**，
 > 版本线：`v0.4.x` = HEVC/265 线，`v0.5.x` = AV1 独立线，**`v0.6.x` =
 > 两条线合并进 `main` 后的主线**（AV1 与 HEVC 同处一分支，共用一个入口与
 > 一套保留管线）。`v0.6.1` 是 `v0.6.0` 的缺陷修复版本，无功能新增。
+> `v0.6.1` 是 v0.6 线上**唯一带独立发布包**的版本。
 
 ## 快速开始
 
