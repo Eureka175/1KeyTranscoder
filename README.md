@@ -8,7 +8,8 @@
 
 编码后端：**NVEncC / QSVEncC 硬件编码**（HEVC 与 AV1；解码恒软解，硬件
 路径永不回退软件）、**SVT-AV1 软件 AV1**、**x265 手动高压缩档**；
-默认后端为 NVENC HEVC。**当前版本 `v0.6.0`**（HEVC/265 与 AV1 合并主线）。
+默认后端为 NVENC HEVC。**当前版本 `v0.6.1`**（HEVC/265 与 AV1 合并主线，
+bugfix release：`--channel-sync` 流式内存修复 + AV1 色彩元数据保真）。
 **主入口：`1kt.py`。**
 
 > 📚 文档索引见 [docs/README.md](docs/README.md)；评估汇总与决策见
@@ -31,7 +32,7 @@
 > AV1 三后端（SVT-AV1 / NVENC-AV1 / QSV-AV1）已通过合并后阶段验收：
 > 真实 Sony 素材上的 Sony 元数据保留、4:2:2→4:2:0 策略、AV1 MP4 容器、
 > 色彩元数据保真、以及 `--channel-sync` 组合回归（27 case / 348 断言全绿，
-> 全量短回归 225 PASS / 0 FAIL）。
+> 全量短回归 228 PASS / 0 FAIL）。
 
 ## 下载（自包含发布包）
 
@@ -40,18 +41,23 @@ v4.2.0/libx265/libvmaf）+ NVEncC 9.31 + QSVEncC 8.26 + GPAC 26.02**，
 解压即用（另需 Python 3.11+ 与对应 GPU 驱动；Gyroflow 为可选消费端
 工具，请从 gyroflow.xyz 单独安装）。
 
-- **v0.6.0**（`main` 主线 · HEVC/265 + AV1 **合并后首个版本** + AV1 色彩
+- **v0.6.1**（`main` 主线 · **当前正式发布** · bugfix release）：
+  [1KeyTranscoder-v0.6.1-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/1KeyTranscoder-v0.6.1-win64-selfcontained.zip)
+  —— 修复 `--channel-sync` 长素材内存无上限增长（10 min/4CH/48 kHz 峰值
+  RSS ≤ 512 MB 已实测达标），并含 AV1 色彩元数据保真修复；发布说明见
+  [docs/release_notes_v0.6.1.md](docs/release_notes_v0.6.1.md)
+- **v0.6.0**（`main` 主线 · HEVC/265 + AV1 合并后首个版本 + AV1 色彩
   元数据保真修复）：tag 已打在合并后状态上，`git checkout v0.6.0` 即可复现；
-  **自包含发布包尚未构建上传**（需要现成包请用下方两包，需要合并后能力请
-  用 `main` / `v0.6.0` 工作区）
+  该版本**长程 channel-sync 内存问题未修复**（10 min/4CH 峰值 RSS 达
+  605–713 MB），**不建议用于长素材的 `--channel-sync`**，请用 v0.6.1
 - **v0.5.1**（AV1 线 · 软件 + 硬件 AV1；tag 现已在 `main` 历史中）：
   [1KeyTranscoder-v0.5.1-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.5.1/1KeyTranscoder-v0.5.1-win64-selfcontained.zip)
 - **v0.4.2**（HEVC/265 线）：
   [1KeyTranscoder-v0.4.2-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.4.2/1KeyTranscoder-v0.4.2-win64-selfcontained.zip)
 
-> 版本线：`v0.4.x` = HEVC/265 线，`v0.5.x` = AV1 独立线，**`v0.6.0` =
+> 版本线：`v0.4.x` = HEVC/265 线，`v0.5.x` = AV1 独立线，**`v0.6.x` =
 > 两条线合并进 `main` 后的主线**（AV1 与 HEVC 同处一分支，共用一个入口与
-> 一套保留管线）。上列两包分别对应各线最后一次发布。
+> 一套保留管线）。`v0.6.1` 是 `v0.6.0` 的缺陷修复版本，无功能新增。
 
 ## 快速开始
 
@@ -145,11 +151,14 @@ DJI（djmd）→ DJI
   被安全拒修。冻结基线：`tests/fixtures/channel_sync/a7m5_real_137_baseline.csv`
   （逐轨 548 行，仅文本，不含媒体）。注意 `detail`/`reason` 是诊断口径，
   不构成互斥的顶层状态，不可直接相加
-- **长程性能不属本功能的正常使用声明**：10 分钟 / 4 轨 / 48 kHz 长程
-  benchmark（RSS ≤ 512 MB、目标 < 60 s）**尚未按该规格完成实测确认**，
-  状态为 **PENDING** —— 代码路径已设计为 memmap + 分块流式处理，但
-  未完成长程实测确认；**不把"未使用 np.fromfile"等价为"性能已通过"**。
-  因此本功能不声明任何长程性能指标（短素材端到端集成验证已完成）
+- **长程性能（v0.6.1 实测达标）**：10 分钟 / 4 轨 / 48 kHz / 单线程
+  benchmark 实测 **Peak RSS 205–215 MB**、**Runtime 46.9–52.7 s**
+  （进程树 500 ms 采样；达标线 **RSS ≤ 512 MB / Runtime < 60 s**，
+  余量主要受机器后台负载影响）。峰值 RSS **不随时长增长**
+  （60 / 150 / 300 / 450 / 600 s 扫描：208.1 / 228.8 / 208.5 / 264.6 /
+  209.3 MB）；v0.6.0 同场景为 605–713 MB（随时长线性增长，v0.6.1 已修复）。
+  详见 [docs/release_notes_v0.6.1.md](docs/release_notes_v0.6.1.md) 与
+  `work/stage12_memory_validation.md`
 
 ### 透明模式：`--channel-sync-transparent`（剪辑前预处理）
 
@@ -230,18 +239,19 @@ DJI（djmd）→ DJI
 ## 自动化测试（三级深度）
 
 ```powershell
-python tests\full_autotest.py --level unit        # L1 纯逻辑 (155 项, 秒级, 零外部依赖)
+python tests\full_autotest.py --level unit        # L1 纯逻辑 (158 项, 秒级, 零外部依赖)
 python tests\full_autotest.py --level toolchain   # L2 + 工具版本/实机能力/旗标白名单 (~16s)
-python tests\full_autotest.py --level full        # L3 + 真实管线集成 + 故障注入 (225 项, ~9 分钟)
+python tests\full_autotest.py --level full        # L3 + 真实管线集成 + 故障注入 (228 项, ~9.5 分钟)
 python tests\full_autotest.py --level all         # 等同 full
 ```
 
-> 当前基线：**`--level full` = 225 PASS / 0 FAIL（531 s）**。任何改动后
+> 当前基线：**`--level full` = 228 PASS / 0 FAIL（573 s）**。任何改动后
 > 必须复核该数字不出现新增 FAIL。
 
-- **L1 unit**（155 项）：color token 表、caps 解析、格式规划、失败分类、
+- **L1 unit**（158 项）：color token 表、caps 解析、格式规划、失败分类、
   flag 构造、probe/paths、源分类、缩放引擎、gpac parse_info、dji facts、
-  channel-sync 纯逻辑、AV1 档位与参数映射；
+  channel-sync 纯逻辑、**channel-sync 内存回归（有界窗口流 / 窗口切片一致 /
+  64 MB 整轨扫描后工作集增量 ≤32 MB）**、AV1 档位与参数映射；
 - **L2 toolchain**（+16 项）：真实工具版本、`--check-features` 实机能力、
   known_flags 白名单、Gyroflow/GPAC 探测；
 - **L3 full**（+54 项）：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
@@ -323,7 +333,19 @@ olddocs/                 历史档案存档（各阶段代码快照 / 被取代�
     非生产实用。
 - 非 Sony 非 DJI 素材按策略丢弃元数据（仅视频+音频）；
 - VFR 素材自动 `--avsync forcecfr` 规范化（WARNING 记录）；
-- 经典路径无 1:1 帧闸门（不误杀 VFR）；Sony/DJI 路径有。
+- 经典路径无 1:1 帧闸门（不误杀 VFR）；Sony/DJI 路径有；
+- **`--channel-sync`（P1）能力边界**：
+  - 只做**整数样本移位**（无重采样、无 fractional sinc、无 time-warp）。
+    真实慢漂移（39–76 ppm）会被判 `non_constant` 并**拒绝修正**，本轮
+    **不做漂移补偿**（P2 drift/resample 为后续工作，未实施）；
+  - 仅 **48 / 96 kHz 线性 PCM**（44.1 kHz 与压缩/非线性格式显式拒绝）；
+  - 只处理 **≥3 条独立单声道 PCM 轨**（2ch/1ch 布局默认不对齐）；
+  - 长程验证只覆盖 **4 轨 / 48 kHz / 单线程**这一规格（含 `--jobs 1`）。
+    `--jobs auto` 长程、Sony/DJI 10 分钟素材长程、`--experimental-multihw`
+    长程**均未验证**，不得据此声明性能；
+  - `--channel-sync-transparent` 成功路径会在 `.1ktwork/` 保留 4 个
+    `audio_*.mov` 与通道报告 JSON（10 分钟输入约 330 MB），属既有行为，
+    需自行判废。
 
 ## 许可证
 
@@ -343,11 +365,12 @@ git tag -l                         # pre_S1S5 / post_S1S5 / pre_ui / post_1kt_ui
                                    # post_autotest / post_x265 / v0.4.0 / v0.4.1 / v0.4.2
                                    # post_av1 / post_av1_calib / v0.5.0 / v0.5.1
                                    # v0.6.0 (HEVC+AV1 合并主线, 含 AV1 色彩保真修复)
+                                   # v0.6.1 (channel-sync 流式内存修复, 当前发布)
 git checkout backup/pre-av1-main-merge   # AV1 合并进 main 之前的状态 (回滚点)
 ```
 
 > 分支约定: `main` = **HEVC/265 + AV1 合并主线**（两条线能力同处一分支，
-> 各线最后一次发布包见上节；合并后状态打 tag **`v0.6.0`**）；
+> 各线最后一次发布包见上节；合并后主线的当前发布为 **`v0.6.1`**）；
 > `av1` 分支保留为 AV1 独立线历史
 > （含 post_av1 / post_av1_calib / v0.5.0 / v0.5.1 tag）；
 > `backup/pre-av1-main-merge` = AV1 合并前的 `main` 快照。

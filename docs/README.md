@@ -17,6 +17,17 @@
 | `implementation_report.md` | 实施报告：降级链与回退路径的完整故障演练记录（§15 DJI 专线） |
 | `INTEGRATION_REPORT.md` | 集成报告（早期版本整合记录） |
 | `hevc_422_rext_compatibility.md` | HEVC 4:2:2 Rext 输出形态、播放兼容矩阵与归档建议 |
+| `channel_sync_p1.md` | **`--channel-sync` P1 设计文档**（algo 2.3.0-p1）：算法、阈值、轨道级降级、fixture 标定、测试矩阵 |
+
+## 📄 发布说明（分类：项目自身文档）
+
+| 文件 | 说明 |
+|---|---|
+| `release_notes_v0.6.1.md` | **v0.6.1 发布说明**：Channel Sync P1 / AV1 mainline / AV1 色彩保真 / 流式内存修复；含验证矩阵、实测性能与已知限制 |
+
+> 另有两份阶段验证报告保存在 `work/`（按项目约定不入文档目录，不入发布包）：
+> `work/stage12_memory_validation.md`（Stage 1.2 内存修复验证，含 600 s 长程表）
+> 与 `work/channel_sync_memory_audit.md`（逐阶段内存归因审计）。
 
 ## 📁 evaluation/ — 评估报告（分类：评估与调研）
 

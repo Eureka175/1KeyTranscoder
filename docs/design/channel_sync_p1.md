@@ -21,7 +21,7 @@ P1 只做"文件内时间对齐"。"设备固有 latency 标定"、"麦克风空
 | 文件 | 职责 |
 |---|---|
 | `core/sync_estimate.py` | 两阶段 GCC-PHAT（8kHz 粗扫 + 全速率精测）+ 相位斜率加权 LS 精估 + 帧轨迹统计 + 恒定性二分 + 边缘堆积判定 |
-| `core/sync_fix.py` | 纯整数样本流式移位（分块 memmap，尾补零，样本值不变）+ 修后复检（局部 GCC + 相位斜率） |
+| `core/sync_fix.py` | 纯整数样本流式移位（有界窗口读取 + 普通文件句柄分块写，尾补零，样本值不变）+ 修后复检（局部 GCC + 相位斜率） |
 | `core/channel_sync.py` | 集成层：`DEFAULTS` / `effective_opts` / `eligible_audio` / `run_channel_sync` / `repair_remux_timescale` |
 | `core/mp4_channel_sync.py` | **vendored（ChronoSync 1.x, MIT），P1 未修改**；保留作回滚/对照/历史算法参考，P1 主路径不再引用 |
 
@@ -40,7 +40,10 @@ P1 只做"文件内时间对齐"。"设备固有 latency 标定"、"麦克风空
   `pcm_f32 (le/be) → f32le`。
 - float PCM 不 clamp 到 [-1,1]（允许 |x|>1.0 的合法过 0dBFS 录音）;
   仅检测 NaN/Inf; 整数移位不改变样本值。
-- 输入读取全部 `np.memmap` + 分块（**禁 `np.fromfile()` 全量加载**）;
+- 输入读取为**有界窗口流**（`RawStream`：`seek`+`read`，1 MiB 块 + LRU
+  读缓存，每流固定约 4 MiB；**禁 `np.fromfile()` 全量加载，也不使用
+  `np.memmap` 整文件映射** —— v0.6.0 的整轨 memmap 会让每条轨的每个被触碰
+  页常驻工作集，10 min/4ch/48k 下每轨 +110 MB，见 §10.1）;
   FFT 尺寸固定（`next_fast_len`）、整数帧位、无 RNG → 同输入两次运行
   JSON 逐字节一致（L3 C19 验证）。
 - **语义**: 报告的 delay 是"当前文件内 target 相对 reference 的观测到达
@@ -213,8 +216,40 @@ timescale 实为 3000（不采纳 `-timescale 1000`）→ tkhd/elst 被写成 1/
 | 轨道语义 | 整文件全有或全无 | **轨道级部分成功**（silent/non_finite/低置信/非恒定/超窗/复检差 → untouched） |
 | 超窗 | 无概念 | 宽窗复测 → `out_of_range` |
 | 输入边界 | 宽松 | 48k/96k 限定、44.1k 显式拒绝、小端 PCM 四类、逐轨最短时长 |
-| 内存 | `np.fromfile` 全量加载 | memmap + 分块（10min/4ch/48k RSS 增量实测 ~37MB） |
-| 性能 | — | 10min/4ch/48k 全流程（解码+估计+修正+回编码）实测 ~31s |
+| 内存 | `np.fromfile` 全量加载 | **有界窗口流**（`RawStream`，每流约 4 MiB 读缓存）——v0.6.0 曾用整轨 memmap，实测**随时长线性增长**（10 min/4ch/48k 每轨 +110 MB），v0.6.1 修复为与时长无关（§10.1） |
+| 性能 | — | 10min/4ch/48k 全流程（解码+估计+修正+回编码）实测 ~31s；算法 benchmark（无重编码）Peak RSS 205–215 MB / 46.9–52.7 s（v0.6.1 实测） |
+
+### 10.1 内存（v0.6.1 流式修复）
+
+P1 最初用 `np.memmap` 做"分块流式"读取，并把它当作低内存实现——**这是错的**。
+映射本身不占内存（实测增量 +0.0 MB），但每个被触碰的 file-backed 页都计入
+进程 WorkingSet 并长期保留，而实现确实顺序走完了每一条轨的每一个字节：
+
+| 代码路径 | v0.6.0 实测内存后果 |
+|---|---|
+| `channel_sync._track_health()` 分块扫描整轨算 RMS/有限性 | **每轨 +110 MB**（单轨 raw = 28,800,760 样本 × 4 B = 109.9 MB；4 轨 +440 MB） |
+| `estimate_pair()` 5999 帧逐帧读完两轨 | 确立整轨常驻 |
+| `shift_stream()` `np.memmap(mode="w+")` 写整轨 | 输出整条文件脏页常驻（峰值 +36 MB） |
+| `recheck_residual()` 读 30 s 锚段（读取范围本身正确） | 叠加锚段 FFT ~+45 MB（有界） |
+
+阶段探针实测峰值 **719.0 MB**，其中约 **440 MB（61%）来自整轨映射页驻留**，
+与 60→600 s 的线性增长完全吻合（151.6 → 605.4 MB）。
+
+v0.6.1 以 `RawStream`（`seek`+`read`，1 MiB 对齐块 + 4 槽 LRU，每流约 4 MiB）
+替换整文件映射，`shift_stream()` 输出改普通文件句柄，并把
+`estimate_pair`/`recheck_residual` 拆为「所有权包装 + 纯计算」。
+
+**逐位一致**：块寻址落在与 memmap 相同的文件偏移、dtype 映射未变、
+`_track_health` 的分块单位（`range(0, n, 1<<20)`，单位=样本）与 f32→f64
+转换点未变，故 RMS 平方和归约顺序一致。新旧差分 49 用例 46 项完全相同
+（余 3 项为同类型异常文案与绝对临时路径），137 段真实素材逐文件报告 JSON
+**137/137 字节相同**。
+
+**结果**：600 s/4ch/48k 峰值 RSS 719.0 → **205–215 MB**，
+`_track_health` 每轨 **+110 MB → +3.9 MB**，且 RSS 不再随时长增长
+（60/150/300/450/600 s = 208.1/228.8/208.5/264.6/209.3 MB）。
+详细审计与验证见 `work/channel_sync_memory_audit.md`、
+`work/stage12_memory_validation.md`。
 
 ## 11. DEFAULTS（全部为初值, 待真实素材标定）
 
@@ -263,10 +298,13 @@ rms_dbfs`（`rms_dbfs` / `traj_drift_ms` 为真实素材标定新增的诊断字
 
 - **L1 `channel-sync P1`（26 断言, 纯逻辑无外部工具）**: DEFAULTS v3 /
   eligible 边界（44.1k/96k/混合采样率/大小端 PCM 接受/非 PCM 拒绝） / shift_stream
-  正负整数与分数 rint、样本值不变、memmap / 48k+96k 整数与分数精估 /
+  正负整数与分数 rint、样本值不变、有界窗口流读取 / 48k+96k 整数与分数精估 /
   复检（整数残差 <0.05ms、0.4 样本残余检出）/ 中途 50ms 跳变与 10ppm
   漂移 → non_constant / 100ms 超窗（窄窗不可测+宽窗测出）/ 反相 /
   bit 级确定性。
+  **v0.6.1 新增内存回归 3 条**：`p1.路径输入为有界窗口流 (非整文件映射)`、
+  `p1.窗口读取与 ndarray 切片一致`、`p1.越界窗口自动裁剪`、
+  `p1.64MB 整轨扫描后工作集增量有界 (<= 32 MB)`（旧整轨 memmap 实现会 +64 MB）。
 - **L3 `channel-sync P1 E2E`（20 断言）**:
   C15 转码轨道级部分成功（CH1 silent untouched + CH2/CH4 fixed,
   scope=partial, 输出复测 aligned）; C16 对抗中途 50ms 跳变（CH2
