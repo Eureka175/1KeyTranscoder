@@ -8,8 +8,10 @@
 
 编码后端：**NVEncC / QSVEncC 硬件编码**（HEVC 与 AV1；解码恒软解，硬件
 路径永不回退软件）、**SVT-AV1 软件 AV1**、**x265 手动高压缩档**；
-默认后端为 NVENC HEVC。**当前版本 `v0.6.1`**（HEVC/265 与 AV1 合并主线，
-bugfix release：`--channel-sync` 流式内存修复 + AV1 色彩元数据保真）。
+**未指定 `--encoder` 时按能力优先自动选择：NVENC → QSV → x265**
+（v0.6.2 起；加 `--no-hw-autoselect` 可固定为 x265，即 v0.6.1 及更早的行为）。
+注意 `--config` 里的 `encoder` 字段优先级最高，会覆盖自动选择。
+**当前版本 `v0.6.2`**（HEVC/265 与 AV1 合并主线）。
 **主入口：`1kt.py`。**
 
 > 📚 文档索引见 [docs/README.md](docs/README.md)；评估汇总与决策见
@@ -231,8 +233,31 @@ DJI（djmd）→ DJI
 - `--jobs 1`（默认）/ `--jobs N` 固定并发 / `--jobs auto` 自适应
   （波次实测聚合吞吐动态调整，无写死预算表）；
 - `--experimental-multihw` 实验性双后端并行（NVENC+QSV，**质量一致性
-  不保证**——见质量对齐节）；
+  不保证**——见质量对齐节）。**v0.6.2 起无需再指定 `--encoder`**：开关
+  自身探测 NVENC/QSV；两个都可用则双后端调度，只有一个可用则**退化为
+  单后端池并告警**（此时跨后端质量差问题不存在），都不可用则直接报错。
+  与 `--encoder x265|svtav1|*-av1` 同时给出会报错（multihw 只调度 HEVC）；
 - x265 路径顺序执行。
+
+## 日志与可观测性
+
+三个层级各落一个文件（`logs/` 下），互不干扰：
+
+| 文件 | 内容 | 何时写入 |
+|---|---|---|
+| `error.log` | 仅 ERROR | **始终写入**（跨批次追加，排查先看这个） |
+| `warn.log` | WARNING 及以上 | **始终写入**（跨批次追加） |
+| `total.log` | 按 `--log-level` | 默认 INFO 及以上；**追加**，可用 `--fresh-log` 清空 |
+| `debug.log` | DEBUG（完整命令行/阶段耗时） | 仅 `--log-level debug` 时创建 |
+
+```powershell
+--log-level error|warn|info|debug   # 文件详细度（大小写不敏感），默认 info
+--verbose                            # 控制台输出 DEBUG（文件级别不受影响）
+--fresh-log                          # 启动时清空 total.log / debug.log
+```
+
+`error.log` / `warn.log` 与级别无关地始终追加：失败报告不会因为下一次
+正常运行而被截断。
 
 ## 双窗口 UI / watchfolder
 
@@ -244,14 +269,16 @@ DJI（djmd）→ DJI
 ## 自动化测试（三级深度）
 
 ```powershell
-python tests\full_autotest.py --level unit        # L1 纯逻辑 (158 项, 秒级, 零外部依赖)
+python tests\full_autotest.py --level unit        # L1 纯逻辑 (178 项, 秒级, 零外部依赖)
 python tests\full_autotest.py --level toolchain   # L2 + 工具版本/实机能力/旗标白名单 (~16s)
-python tests\full_autotest.py --level full        # L3 + 真实管线集成 + 故障注入 (228 项, ~9.5 分钟)
+python tests\full_autotest.py --level full        # L3 + 真实管线集成 + 故障注入 (~9.5 分钟)
 python tests\full_autotest.py --level all         # 等同 full
 ```
 
-> 当前基线：**`--level full` = 228 PASS / 0 FAIL（573 s）**。任何改动后
-> 必须复核该数字不出现新增 FAIL。
+> 当前基线：**L1 = 178 PASS / 0 FAIL**（v0.6.2 新增 20 条：CLI 大小写 /
+> 默认后端自动选择 / 分层日志）。`--level full` 在 v0.6.1 为 228 PASS /
+> 0 FAIL，v0.6.2 因上述新增断言应为 248 PASS。任何改动后必须复核不出现
+> 新增 FAIL。
 
 - **L1 unit**（158 项）：color token 表、caps 解析、格式规划、失败分类、
   flag 构造、probe/paths、源分类、缩放引擎、gpac parse_info、dji facts、

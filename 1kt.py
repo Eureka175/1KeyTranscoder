@@ -51,6 +51,7 @@ from core.logging_utils import (
     append_csv,
     build_file_logger,
     make_scaling_csv_row,
+    resolve_log_level,
     setup_logger,
 )
 from core.models import PRESETS, EffectiveParams
@@ -929,12 +930,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", required=True, help="Output root directory.")
     parser.add_argument(
         "--preset",
+        type=str.lower,                      # accept UHQ / Hq / hQ / uhq alike
         choices=[p.lower() for p in PRESETS] + ["all"],
         default="hq",
-        help="UHQ/HQ/SMALL/FAST/all. Default: HQ.",
+        help="UHQ/HQ/SMALL/FAST/all (case-insensitive). Default: HQ.",
     )
     parser.add_argument(
         "--encoder",
+        type=str.lower,                      # case-insensitive (nvenc/NVENC)
         choices=["x265", "svtav1", "nvenc", "qsv", "nvenc-av1", "qsv-av1"],
         default=None,
         help=(
@@ -989,6 +992,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--check",
+        type=str.lower,                      # case-insensitive (Basic/FULL)
         choices=["basic", "advanced", "full"],
         default="basic",
         help=(
@@ -1012,8 +1016,43 @@ def parse_args() -> argparse.Namespace:
         "--experimental-multihw",
         action="store_true",
         help=(
-            "实验性功能: NVENC+QSV 多硬件后端并行. 启用即声明: "
-            "无法保证视频编码质量一致性."
+            "实验性功能: NVENC+QSV 多硬件后端并行 (无需再指定 --encoder; "
+            "两个后端自动探测, 只有一个可用时退化为单后端并告警). "
+            "启用即声明: 无法保证视频编码质量一致性."
+        ),
+    )
+    parser.add_argument(
+        "--log-level",
+        type=str.lower,
+        choices=["error", "warn", "info", "debug"],
+        default="info",
+        help=(
+            "日志文件详细度 (大小写不敏感). error=只写 error.log; "
+            "warn=+warn.log; info(默认)=+total.log; debug=+debug.log "
+            "(含完整命令行/阶段耗时/逐阶段内存). "
+            "error.log 与 warn.log 始终写入, 与级别无关."
+        ),
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="控制台输出 DEBUG 级日志 (文件级别仍由 --log-level 决定).",
+    )
+    parser.add_argument(
+        "--fresh-log",
+        action="store_true",
+        help=(
+            "启动时清空 total.log / debug.log (默认追加, 便于跨批次排查). "
+            "error.log 与 warn.log 始终追加, 不受影响."
+        ),
+    )
+    parser.add_argument(
+        "--no-hw-autoselect",
+        action="store_true",
+        help=(
+            "禁用默认后端的硬件自动选择. 未指定 --encoder 时按 "
+            "NVENC -> QSV -> x265 探测可用后端; 加此旗标则固定 x265 "
+            "(即 v0.6.1 及更早的默认行为)."
         ),
     )
     parser.add_argument(
@@ -1060,6 +1099,80 @@ def spawn_dashboard(json_path: Path, script_dir: Path):
 
 
 # ---------------------------------------------------------------------------
+# 默认后端选择 (v0.6.2): 未指定 --encoder 时按能力优先 NVENC -> QSV -> x265
+# ---------------------------------------------------------------------------
+
+# Priority order for the automatic default backend. AV1 entries are
+# deliberately absent: auto-selection must not silently change the codec.
+AUTOSELECT_ORDER = ("nvenc", "qsv")
+HW_AUTOSELECT_FALLBACK = "x265"
+
+
+def _hw_encoders_available(script_dir: Path, log) -> list[str]:
+    """Which HEVC hardware encoders are actually usable on this machine?
+
+    A backend counts as available only when its rigaya tool exists *and*
+    `--check-features` probes successfully and reports an HEVC section —
+    the same probe the run itself uses, so auto-selection and execution
+    cannot disagree.
+    """
+    from core.config import find_hw_tool
+    from encoders.caps import probe_backend
+
+    available: list[str] = []
+    for name in AUTOSELECT_ORDER:
+        exe_name = "NVEncC64.exe" if name == "nvenc" else "QSVEncC64.exe"
+        kind = "nvencc" if name == "nvenc" else "qsvencc"
+        try:
+            tool = find_hw_tool(script_dir, exe_name)
+        except Exception as exc:              # noqa: BLE001 - probe only
+            log(f"  autoselect: {name} unavailable (tool not found: {exc})")
+            continue
+        try:
+            caps = probe_backend(tool, kind)
+        except Exception as exc:              # noqa: BLE001 - probe only
+            log(f"  autoselect: {name} unavailable (probe error: {exc})")
+            continue
+        if caps is None:
+            log(f"  autoselect: {name} unavailable (--check-features failed)")
+            continue
+        hevc = caps.codecs.get("hevc")
+        if hevc is None or not (
+            hevc.bit10 or hevc.csp_422 or hevc.csp_444 or hevc.bit10_422
+        ):
+            log(f"  autoselect: {name} unavailable (no HEVC encode support)")
+            continue
+        available.append(name)
+        log(f"  autoselect: {name} available "
+            f"(device={caps.device or '?'})")
+    return available
+
+
+def resolve_default_backend(
+    args: argparse.Namespace, script_dir: Path, log=print
+) -> str:
+    """Pick the backend when the user did not name one.
+
+    Priority: NVENC -> QSV -> x265, each gated on a real capability probe.
+    ``--no-hw-autoselect`` restores the pre-v0.6.2 default (x265) without
+    probing anything.
+
+    NOTE (behaviour boundary, deliberately kept): this only chooses the
+    *initial* backend. The existing promise "hardware paths never fall back
+    to software encoding" is untouched — a hardware run that fails still
+    fails rather than silently re-encoding with x265.
+    """
+    if args.no_hw_autoselect:
+        log("  autoselect: disabled by --no-hw-autoselect -> x265")
+        return HW_AUTOSELECT_FALLBACK
+    available = _hw_encoders_available(script_dir, log)
+    if available:
+        return available[0]
+    log("  autoselect: no hardware encoder available -> x265 (software)")
+    return HW_AUTOSELECT_FALLBACK
+
+
+# ---------------------------------------------------------------------------
 # transparent 模式 (--channel-sync-transparent, 剪辑前预处理)
 # ---------------------------------------------------------------------------
 
@@ -1085,7 +1198,12 @@ def transparent_main(
     logs_root.mkdir(parents=True, exist_ok=True)
     total_log = logs_root / "total.log"
     work_root = output_root / ".1ktwork"
-    logger = setup_logger(total_log)
+    logger = setup_logger(
+        total_log,
+        log_level=resolve_log_level(args.log_level),
+        verbose=bool(args.verbose),
+        fresh=bool(args.fresh_log),
+    )
 
     # channel_sync 阈值: 优先 --config 里的 channel_sync 块, 加载失败用 DEFAULTS
     channel_sync_opts = None
@@ -1321,7 +1439,19 @@ def main() -> int:
                 )
             encoder_name = declared
         else:
-            encoder_name = args.encoder or "x265"
+            if args.encoder:
+                encoder_name = args.encoder
+            elif args.experimental_multihw:
+                # multihw does its own probe of both backends a few lines
+                # below; skip the default autoselect so --check-features
+                # is not run twice (each probe costs seconds).
+                encoder_name = "nvenc"
+            else:
+                # v0.6.2: default backend is capability-first
+                # NVENC -> QSV -> x265 instead of the old fixed x265.
+                print("Default backend autoselect (no --encoder given):")
+                encoder_name = resolve_default_backend(args, script_dir)
+                print(f"  -> {encoder_name}")
             config_path = resolve_config_file(
                 script_dir, None, default_config_name[encoder_name]
             )
@@ -1338,13 +1468,36 @@ def main() -> int:
         is_hardware = encoder_name in (
             "nvenc", "qsv", "nvenc-av1", "qsv-av1"
         )
-        if args.experimental_multihw and encoder_name not in (
-            "nvenc", "qsv"
-        ):
-            raise ValueError(
-                "--experimental-multihw requires a HEVC hardware "
-                "backend (nvenc/qsv); it manages both backends itself."
-            )
+        # v0.6.2: --experimental-multihw no longer demands an explicit
+        # --encoder; it probes the hardware backends itself. An explicitly
+        # requested AV1 or software backend still conflicts (multihw only
+        # schedules HEVC NVENC+QSV).
+        multihw_backends: list[str] = []
+        if args.experimental_multihw:
+            if args.encoder and args.encoder not in ("nvenc", "qsv"):
+                raise ValueError(
+                    f"--experimental-multihw manages HEVC NVENC+QSV itself; "
+                    f"--encoder {args.encoder} conflicts with it "
+                    f"(drop --encoder to let it probe the backends)."
+                )
+            print("--experimental-multihw: probing hardware backends "
+                  "(no --encoder required):")
+            multihw_backends = _hw_encoders_available(script_dir, print)
+            if not multihw_backends:
+                raise ValueError(
+                    "--experimental-multihw requires at least one usable "
+                    "HEVC hardware backend (NVENC or QSV); none was found. "
+                    "Run `1kt.py --check-features` to inspect this machine."
+                )
+            if len(multihw_backends) == 1:
+                print(f"  [WARN] only {multihw_backends[0]} is available — "
+                      f"multihw degrades to a single-backend pool "
+                      f"(quality-consistency caveat no longer applies)")
+            # An explicit --encoder among the probed backends still pins
+            # the primary backend (secondary queue keeps the other one).
+            if not (args.encoder and args.encoder in multihw_backends):
+                encoder_name = multihw_backends[0]
+            is_hardware = True
 
         classifier = engine = scaling_config = scaling_path = None
         backend = None
@@ -1396,15 +1549,30 @@ def main() -> int:
     )
 
     work_root = output_root / ".1ktwork"
-    logger = setup_logger(total_log)
+    logger = setup_logger(
+        total_log,
+        log_level=resolve_log_level(args.log_level),
+        verbose=bool(args.verbose),
+        fresh=bool(args.fresh_log),
+    )
 
     if is_hardware:
         if args.experimental_multihw:
             print(EXPERIMENTAL_BANNER)
-            logger.warning(
-                "[EXPERIMENTAL] multihw enabled: quality consistency "
-                "NOT guaranteed"
-            )
+            if len(multihw_backends) >= 2:
+                logger.warning(
+                    "[EXPERIMENTAL] multihw enabled: quality consistency "
+                    "NOT guaranteed"
+                )
+            else:
+                # Degraded on purpose: only one hardware backend exists,
+                # so cross-backend quality spread cannot occur.
+                logger.warning(
+                    "[WARNING] multihw requested but only %s is usable; "
+                    "running a single-backend pool (experimental quality "
+                    "caveat does not apply)",
+                    multihw_backends[0] if multihw_backends else "none",
+                )
             backend = hw_backend_for("nvenc", script_dir, args, work_root, logger)
             backend_qsv = hw_backend_for("qsv", script_dir, args, work_root, logger)
         else:
@@ -1685,9 +1853,17 @@ def main() -> int:
         )
 
         if args.experimental_multihw:
-            round_counters = run_multihw_pool(
-                ctx, backend, backend_qsv, sources, logger
-            )
+            if len(multihw_backends) >= 2:
+                round_counters = run_multihw_pool(
+                    ctx, backend, backend_qsv, sources, logger
+                )
+            else:
+                # Only one backend is usable: a single-backend pool with
+                # --jobs semantics is strictly better than a dual pool
+                # where one queue is always empty.
+                round_counters = run_hw_pool(
+                    ctx, backend, sources, logger, jobs_value
+                )
         else:
             round_counters = run_hw_pool(
                 ctx, backend, sources, logger, jobs_value

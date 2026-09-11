@@ -25,41 +25,116 @@ _CSV_LOCK = threading.Lock()
 # Loggers
 # ---------------------------------------------------------------------------
 
-def setup_logger(log_file: Path) -> logging.Logger:
-    logger = logging.getLogger("x265_archive")
-    logger.setLevel(logging.INFO)
-    logger.handlers.clear()
-    logger.propagate = False
+# Task book (v0.6.2 §7): one log file per severity tier, next to the
+# existing total.log. Names are fixed so operators can always find them.
+ERROR_LOG_NAME = "error.log"
+WARN_LOG_NAME = "warn.log"
+DEBUG_LOG_NAME = "debug.log"
 
-    formatter = logging.Formatter(
+LOG_LEVELS = ("error", "warn", "info", "debug")
+
+_LEVEL_NAMES = {
+    "error": logging.ERROR,
+    "warn": logging.WARNING,
+    "warning": logging.WARNING,
+    "info": logging.INFO,
+    "debug": logging.DEBUG,
+}
+
+
+def resolve_log_level(name: str | None) -> int:
+    """Map a CLI log level to a logging level (default INFO)."""
+    if not name:
+        return logging.INFO
+    return _LEVEL_NAMES.get(str(name).strip().lower(), logging.INFO)
+
+
+def _make_formatter() -> logging.Formatter:
+    return logging.Formatter(
         "%(asctime)s | %(levelname)s | %(message)s",
         "%Y-%m-%d %H:%M:%S",
     )
 
-    fh = logging.FileHandler(log_file, encoding="utf-8")
+
+def setup_logger(
+    log_file: Path,
+    log_level: int = logging.INFO,
+    verbose: bool = False,
+    fresh: bool = False,
+) -> logging.Logger:
+    """Batch logger: console + total.log + tiered files.
+
+    Handlers:
+      * console            — level INFO, or DEBUG when ``verbose``
+      * ``total.log``      — ``log_level`` (every message at the default)
+      * ``debug.log``      — only created when ``log_level`` is DEBUG
+      * ``warn.log``       — WARNING and above only
+      * ``error.log``      — ERROR and above only
+
+    ``fresh`` truncates total.log / debug.log on open (``--fresh-log``).
+    The tiered files always append: they are cross-run diagnostics, so a
+    failure report survives the next batch.
+    """
+    logger = logging.getLogger("x265_archive")
+    logger.setLevel(logging.DEBUG)
+    logger.handlers.clear()
+    logger.propagate = False
+
+    formatter = _make_formatter()
+    mode = "w" if fresh else "a"
+
+    fh = logging.FileHandler(log_file, mode=mode, encoding="utf-8")
+    fh.setLevel(log_level)
     fh.setFormatter(formatter)
     logger.addHandler(fh)
 
+    if log_level <= logging.DEBUG:
+        try:
+            dfh = logging.FileHandler(
+                log_file.parent / DEBUG_LOG_NAME, mode=mode, encoding="utf-8"
+            )
+            dfh.setLevel(logging.DEBUG)
+            dfh.setFormatter(formatter)
+            logger.addHandler(dfh)
+        except OSError:      # pragma: no cover - unwritable log dir
+            pass
+
+    # Tiered files are always written (independent of --log-level) so a
+    # failure report is available without re-running in debug mode.
+    for name, level in ((ERROR_LOG_NAME, logging.ERROR),
+                        (WARN_LOG_NAME, logging.WARNING)):
+        try:
+            handler = logging.FileHandler(
+                log_file.parent / name, encoding="utf-8"
+            )
+            handler.setLevel(level)
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+        except OSError:      # pragma: no cover - unwritable log dir
+            pass
+
     sh = logging.StreamHandler(sys.stdout)
+    sh.setLevel(logging.DEBUG if verbose else logging.INFO)
     sh.setFormatter(formatter)
     logger.addHandler(sh)
 
     return logger
 
 
-def build_file_logger(path: Path) -> logging.Logger:
+def build_file_logger(
+    path: Path,
+    log_level: int = logging.INFO,
+) -> logging.Logger:
     logger = logging.getLogger(f"x265_archive.file.{path}")
-    logger.setLevel(logging.INFO)
+    logger.setLevel(log_level)
     logger.handlers.clear()
     logger.propagate = False
 
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(message)s",
-        "%Y-%m-%d %H:%M:%S",
-    )
+    formatter = _make_formatter()
     fh = logging.FileHandler(path, encoding="utf-8")
+    fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
     logger.addHandler(fh)
     return logger
