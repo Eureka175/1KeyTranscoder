@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import math
 import warnings
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,7 @@ from scipy import fft, signal
 __all__ = [
     "FrameDelay",
     "PairEstimate",
+    "RawStream",
     "TrajectoryStats",
     "estimate_pair",
     "summarize_trajectory",
@@ -113,19 +115,208 @@ class TrajectoryStats:
 # ---------------------------------------------------------------- 输入读取
 
 
-def open_source(src: Any, storage_dtype: str = "f32") -> np.ndarray:
-    """打开 raw 源流: 路径 -> np.memmap (流式, 不全量载入); ndarray -> asarray。
+# 读缓存块大小 (字节) 与每流槽位数: 顺序访问 (帧 hop < 帧长) 时把系统调用
+# 数降低一个数量级, 而内存开销固定为 _BLOCK_BYTES * _BLOCK_SLOTS。
+_BLOCK_BYTES = 1 << 20
+_BLOCK_SLOTS = 4
+
+
+class RawStream:
+    """有界窗口读取器: 只把请求的窗口读进内存, **不做整文件映射**。
+
+    为什么不用 np.memmap: 映射本身几乎不占内存, 但逐字节触碰之后, Windows
+    会把每一个 file-backed 页计入进程 WorkingSet 并长期保留 —— 实测对 4 条
+    110 MB 的轨做整轨扫描, RSS 恰好 +440 MB (见 work/channel_sync_memory_audit.md)。
+    本类改用 seek + read 只取需要的窗口, 峰值内存 = O(窗口 + 读缓存),
+    与文件时长无关; 读到的字节与映射读取**逐位一致**, 因此数值结果不变。
+
+    对调用方暴露 ndarray 兼容的最小接口 (现有调用点无需改动):
+      * ``shape[0]``  样本总数
+      * ``arr[a:b]``  该窗口的只读 ndarray (边界自动裁剪)
+      * ``read_into()``  直接把窗口读进调用方缓冲 (shift_stream 用, 免中间副本)
+      * ``close()``   关闭句柄 (Windows 上删除文件前必须调用)
+    """
+
+    __slots__ = ("path", "dtype", "itemsize", "_fh", "_n", "_blocks")
+
+    def __init__(self, path: str | Path, storage_dtype: str = "f32") -> None:
+        self.path = Path(path)
+        self.dtype = np.dtype("<f4") if storage_dtype == "f32" else np.dtype("<f8")
+        self.itemsize = self.dtype.itemsize
+        self._fh = open(self.path, "rb")
+        try:
+            size = self.path.stat().st_size
+        except OSError:
+            self._fh.close()
+            raise
+        # 与旧 np.memmap 的失败语义保持一致: 空文件 / 长度非 dtype 整数倍
+        # 一律显式报错, 而不是静默当成 0 样本 (否则 shift_stream 会安静地
+        # 写出 0 字节文件, estimate_pair 会静默返回 NaN, 掩盖上游 bug)。
+        if size == 0:
+            self._fh.close()
+            raise ValueError(f"cannot open empty raw file: {self.path}")
+        if size % self.itemsize != 0:
+            self._fh.close()
+            raise ValueError(
+                f"{self.path}: size {size} is not a multiple of dtype "
+                f"{self.dtype.str} ({self.itemsize} bytes)"
+            )
+        self._n = size // self.itemsize
+        self._blocks: "OrderedDict[int, np.ndarray]" = OrderedDict()
+
+    # ---- ndarray 兼容面 ----
+    @property
+    def shape(self) -> tuple[int]:
+        return (self._n,)
+
+    @property
+    def ndim(self) -> int:
+        return 1
+
+    @property
+    def size(self) -> int:
+        return self._n
+
+    def __len__(self) -> int:
+        return self._n
+
+    def __getitem__(self, key: Any) -> np.ndarray:
+        if isinstance(key, slice):
+            if key.step not in (None, 1):
+                raise ValueError("RawStream supports unit-step slices only")
+            start = 0 if key.start is None else int(key.start)
+            stop = self._n if key.stop is None else int(key.stop)
+            if start < 0:
+                start += self._n
+            if stop < 0:
+                stop += self._n
+            start = max(0, min(start, self._n))
+            stop = max(start, min(stop, self._n))
+            return self.read(start, stop - start)
+        idx = int(key)
+        if idx < 0:
+            idx += self._n
+        if not 0 <= idx < self._n:
+            raise IndexError(idx)
+        return self.read(idx, 1)[0]
+
+    # ---- 读取 ----
+    def read(self, start: int, count: int) -> np.ndarray:
+        """[start, start+count) 的只读窗口 (越界裁剪, 不补零)。
+
+        返回值一律**不可写** (单块时是缓存块视图, 跨块时是新数组) —
+        统一只读面既避免调用方误改缓存, 也避免"窄窗报错/宽窗静默"的不一致。
+        调用方一律复制到自己的缓冲 (np.asarray(..., f64) / read_f64 /
+        read_into) 后再使用。
+        """
+        start = max(0, int(start))
+        count = min(int(count), self._n - start)
+        if count <= 0:
+            return np.empty(0, dtype=self.dtype)
+        per_block = max(1, _BLOCK_BYTES // self.itemsize)
+        first = start // per_block
+        last = (start + count - 1) // per_block
+        if first == last:
+            block = self._block(first, per_block)
+            off = start - first * per_block
+            return block[off: off + count]
+        out = np.empty(count, dtype=self.dtype)
+        self._fill(out, 0, start, count, per_block)
+        out.flags.writeable = False
+        return out
+
+    def read_into(self, buf: np.ndarray, offset: int, start: int,
+                  count: int) -> int:
+        """把 [start, start+count) 写进 buf[offset:offset+count]。
+
+        返回实际写入的样本数 (越界时少于 count, 其余由调用方自行补零)。
+        buf 必须与流同 dtype (shift_stream 的路径: 同存储精度, 无需转换)。
+        """
+        start = max(0, int(start))
+        count = min(int(count), self._n - start)
+        if count <= 0:
+            return 0
+        per_block = max(1, _BLOCK_BYTES // self.itemsize)
+        self._fill(buf[offset: offset + count], 0, start, count, per_block)
+        return count
+
+    def _fill(self, out: np.ndarray, out_off: int, start: int, count: int,
+              per_block: int) -> None:
+        pos = start
+        remaining = count
+        written = 0
+        while remaining > 0:
+            idx = pos // per_block
+            block = self._block(idx, per_block)
+            off = pos - idx * per_block
+            # max(..., 0): 文件若在打开后被截断, _block 会返回比预期短的块;
+            # 这里必须保证 take >= 0 且循环必然收敛, 否则 remaining 会反向增长。
+            take = min(remaining, max(0, block.shape[0] - off))
+            if take <= 0:
+                break
+            out[out_off + written: out_off + written + take] = block[off:off + take]
+            written += take
+            pos += take
+            remaining -= take
+
+    def _block(self, idx: int, per_block: int) -> np.ndarray:
+        cached = self._blocks.get(idx)
+        if cached is not None:
+            self._blocks.move_to_end(idx)
+            return cached
+        start = idx * per_block
+        count = min(per_block, self._n - start)
+        self._fh.seek(start * self.itemsize)
+        raw = self._fh.read(count * self.itemsize)
+        if len(raw) < count * self.itemsize:      # 文件被截断: 用实际长度
+            count = len(raw) // self.itemsize
+            raw = raw[: count * self.itemsize]
+        block = np.frombuffer(raw, dtype=self.dtype, count=count)
+        self._blocks[idx] = block
+        while len(self._blocks) > _BLOCK_SLOTS:
+            self._blocks.popitem(last=False)
+        return block
+
+    def close(self) -> None:
+        self._blocks.clear()
+        fh, self._fh = self._fh, None
+        if fh is not None:
+            try:
+                fh.close()
+            except OSError:
+                pass
+
+    def __enter__(self) -> "RawStream":
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
+
+    def __repr__(self) -> str:
+        return (f"RawStream({self.path.name!r}, n={self._n}, "
+                f"dtype={self.dtype.str})")
+
+
+def open_source(src: Any, storage_dtype: str = "f32") -> Any:
+    """打开 raw 源流: 路径 -> RawStream (有界窗口读取, 不做整文件映射);
+    ndarray -> asarray。
 
     storage_dtype: "f32" | "f64" — 中间 raw 文件的存储精度 (见 §6.2 表:
     s32 源走 f64, 其余 f32)。ndarray 输入忽略该参数。
+
+    历史: 旧实现返回 np.memmap; 逐字节触碰整轨会把整条文件计入进程
+    WorkingSet (4×110 MB 轨 -> RSS +440 MB), 已由 work/channel_sync_memory_audit.md
+    实测确认, 故改为有界窗口读取。
     """
     if isinstance(src, (str, Path)):
-        dt = np.dtype("<f4") if storage_dtype == "f32" else np.dtype("<f8")
-        return np.memmap(src, dtype=dt, mode="r")
+        return RawStream(src, storage_dtype)
+    if isinstance(src, RawStream):
+        return src                      # 已有流对象: 原样传递, 由持有者关闭
     arr = np.asarray(src)
     if arr.ndim != 1:
         raise ValueError(f"expected 1-D mono source, got shape {arr.shape}")
     return arr
+
 
 
 def read_f64(arr: np.ndarray, start: int, length: int) -> np.ndarray:
@@ -378,8 +569,55 @@ def estimate_pair(
        带内加权 LS -> fine_delay_samples (诊断/复检, 不驱动修正);
     5) 反相检测: 锚段白化相关面, 仅记录。
     """
-    ref = open_source(ref_src, storage_dtype)
-    tgt = open_source(tgt_src, storage_dtype)
+    opened: list[Any] = []
+    try:
+        ref = open_source(ref_src, storage_dtype)
+        if isinstance(ref_src, (str, Path)):
+            opened.append(ref)
+        tgt = open_source(tgt_src, storage_dtype)
+        if isinstance(tgt_src, (str, Path)):
+            opened.append(tgt)
+        return _estimate_pair(
+            ref, tgt,
+            sample_rate=sample_rate,
+            search_window_ms=search_window_ms,
+            frame_ms=frame_ms,
+            hop_ms=hop_ms,
+            anchor_segment_seconds=anchor_segment_seconds,
+            min_confidence=min_confidence,
+            coarse_rate=coarse_rate,
+            fine_phase_band_hz=fine_phase_band_hz,
+            min_usable_frames=min_usable_frames,
+            frame_min_rms_dbfs=frame_min_rms_dbfs,
+            ref_index=ref_index,
+            tgt_index=tgt_index,
+        )
+    finally:
+        # 只关闭本函数自己从路径打开的流; 调用方传入的流由调用方管理。
+        # opened 逐个追加, 因此第二个 open 抛错时第一个也一定会被关闭。
+        for stream in opened:
+            close = getattr(stream, "close", None)
+            if callable(close):
+                close()
+
+
+def _estimate_pair(
+    ref: Any,
+    tgt: Any,
+    *,
+    sample_rate: int,
+    search_window_ms: float,
+    frame_ms: float,
+    hop_ms: float,
+    anchor_segment_seconds: float,
+    min_confidence: float,
+    coarse_rate: int = 8000,
+    fine_phase_band_hz: tuple[float, float] = (200.0, 8000.0),
+    min_usable_frames: int = 5,
+    frame_min_rms_dbfs: float = -50.0,
+    ref_index: int = -1,
+    tgt_index: int = -1,
+) -> PairEstimate:
     n = min(ref.shape[0], tgt.shape[0])
     if sample_rate % coarse_rate != 0:
         raise ValueError(

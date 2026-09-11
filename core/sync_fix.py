@@ -47,28 +47,40 @@ def shift_stream(
     """整数前移: out[n] = in[n + rint(delay)] (delay>0 前移, 越界补零)。
 
     样本值逐位复制, 不经过任何算术/滤波 — NaN/Inf 原样通过 (健康门
-    已在估计前拦截参与同步的轨)。src 支持 raw 路径 (memmap) 或 ndarray。
+    已在估计前拦截参与同步的轨)。src 支持 raw 路径 (RawStream) 或 ndarray。
+
+    输出用普通文件句柄 seek+write, **不用 np.memmap(mode="w+")** —— 写映射
+    会把整条输出文件的脏页留在进程 WorkingSet (实测单轨峰值 +36 MB)。
+    峰值内存 ≈ 1 个 chunk (fix_chunk_seconds × sample_rate × itemsize)。
     """
     x = open_source(src, storage_dtype)
+    owns = isinstance(src, (str, Path))
     n = x.shape[0]
     shift = int(np.rint(float(delay_samples)))
     dt = np.dtype("<f4") if storage_dtype == "f32" else np.dtype("<f8")
     block_n = max(1, int(round(chunk_seconds * sample_rate)))
-    out = np.memmap(dst, dtype=dt, mode="w+", shape=(n,))
     try:
-        for a in range(0, n, block_n):
-            b = min(n, a + block_n)
-            # out[a:b] = x[a+shift : b+shift], 越界补零
-            block = np.zeros(b - a, dtype=dt)
-            s_lo = a + shift
-            lo = max(0, s_lo)
-            hi = min(n, b + shift)
-            if hi > lo:
-                block[lo - s_lo: hi - s_lo] = x[lo:hi]
-            out[a:b] = block
-        out.flush()
+        with open(dst, "wb") as fh:
+            for a in range(0, n, block_n):
+                b = min(n, a + block_n)
+                # out[a:b] = x[a+shift : b+shift], 越界补零
+                block = np.zeros(b - a, dtype=dt)
+                s_lo = a + shift
+                lo = max(0, s_lo)
+                hi = min(n, b + shift)
+                if hi > lo:
+                    read_into = getattr(x, "read_into", None)
+                    if read_into is not None:
+                        # 直接读进目标块, 免去中间窗口副本
+                        read_into(block, lo - s_lo, lo, hi - lo)
+                    else:
+                        block[lo - s_lo: hi - s_lo] = x[lo:hi]
+                fh.write(block.tobytes())
     finally:
-        del out
+        if owns:
+            close = getattr(x, "close", None)
+            if callable(close):
+                close()
 
 
 def recheck_residual(
@@ -89,8 +101,38 @@ def recheck_residual(
     整数修正的量化残差理论上 <= 0.5 sample — 超过 verify_max_ms 明显
     超差时才判失败 (区分"修正动作: 整数"与"测量结果: 相位斜率")。
     """
-    ref = open_source(ref_src, storage_dtype)
-    tgt = open_source(fixed_src, storage_dtype)
+    opened: list[Any] = []
+    try:
+        ref = open_source(ref_src, storage_dtype)
+        if isinstance(ref_src, (str, Path)):
+            opened.append(ref)
+        tgt = open_source(fixed_src, storage_dtype)
+        if isinstance(fixed_src, (str, Path)):
+            opened.append(tgt)
+        return _recheck(
+            ref, tgt, sample_rate=sample_rate, search_ms=search_ms,
+            anchor_segment_seconds=anchor_segment_seconds,
+            fine_phase_band_hz=fine_phase_band_hz,
+        )
+    finally:
+        # 只关闭本函数自己打开的流; 调用方传入的流由调用方管理
+        # (Windows 上删除 raw 文件前必须关闭句柄)。opened 逐个追加,
+        # 第二个 open 抛错时第一个也一定会被关闭。
+        for stream in opened:
+            close = getattr(stream, "close", None)
+            if callable(close):
+                close()
+
+
+def _recheck(
+    ref: Any,
+    tgt: Any,
+    *,
+    sample_rate: int,
+    search_ms: float,
+    anchor_segment_seconds: float,
+    fine_phase_band_hz: tuple[float, float],
+) -> float:
     n = min(ref.shape[0], tgt.shape[0])
     if n < 4096:
         return float("nan")

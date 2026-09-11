@@ -308,10 +308,23 @@ def _track_health(arr: Any, np: Any) -> tuple[bool, float]:
 
 
 def _close_map(arr: Any) -> None:
-    """关闭 memmap 底层句柄 (Windows 上删除文件前必须先关映射)。"""
+    """关闭流句柄 (Windows 上删除文件前必须先关)。
+
+    RawStream: close() 释放文件句柄; 旧 memmap: 关闭底层 _mmap 映射。
+    """
     m = getattr(arr, "_mmap", None)
     if m is not None:
-        m.close()
+        try:
+            m.close()
+        except OSError:
+            pass
+        return
+    close = getattr(arr, "close", None)
+    if callable(close):
+        try:
+            close()
+        except OSError:
+            pass
 
 
 def repair_remux_timescale(
@@ -846,7 +859,12 @@ def run_channel_sync(
             try:
                 residual = sync_fix.recheck_residual(
                     arrs[anchor],
-                    sync_estimate.open_source(fixed_raw[i], storage[i]),
+                    # 传路径而非就地 open 的流对象: recheck_residual 会自己
+                    # 打开并在 finally 关闭它 (owns_tgt)。就地 open 的流没有
+                    # 任何一方负责关闭, 只能靠 CPython 引用计数; 一旦引用被
+                    # 保留 (异常回溯/调试器) 句柄即悬空, 下面的 unlink 会失败
+                    # 并被静默吞掉, 留下整条 raw 临时文件。
+                    fixed_raw[i],
                     sample_rate=sample_rate,
                     storage_dtype=storage[i],
                     anchor_segment_seconds=eff["anchor_segment_seconds"],
