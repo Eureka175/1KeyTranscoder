@@ -116,7 +116,7 @@ Runtime:   45.3–52.7 s     (目标 < 60 s)     PASS
 
 同步结果正确性（发布判定运行）：`status = applied`、`result_scope = partial`、
 锚点 CH3；CH1 `shift_samples = 1051`（= 该 fixture 冻结标定值
-+21.8958 ms @48 kHz），复检残差 **+0.0180 ms**（≤ 0.05 ms 门限）；
++21.8958 ms ​@48 kHz），复检残差 **+0.0180 ms**（≤ 0.05 ms 门限）；
 低置信/复检超差的 CH2 仍 `untouched`（残差 −2.0602 ms 超门 → 安全放弃，
 未误修）；CH4 `already_aligned`。4 条音轨完整保留，输出可解析、完整解码
 stderr 为空。复跑（r2）决策与 shift 完全一致。
