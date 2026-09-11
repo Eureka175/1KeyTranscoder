@@ -6,8 +6,10 @@
 - **DJI**（djmd 数据流，Osmo Action 系列 / 无人机）：djmd 运动四元数 +
   dbgi + tmcd 时码原生保留，Gyroflow 逐帧消费端校验。
 
-编码后端为 **NVEncC / QSVEncC 硬件编码**（解码恒软解，硬件路径永不回退软件）；
-x265 为手动高压缩选项。**主入口：`1kt.py`。**
+编码后端：**NVEncC / QSVEncC 硬件编码**（HEVC 与 AV1；解码恒软解，硬件
+路径永不回退软件）、**SVT-AV1 软件 AV1**、**x265 手动高压缩档**；
+默认后端为 NVENC HEVC。**当前版本 `v0.6.0`**（HEVC/265 与 AV1 合并主线）。
+**主入口：`1kt.py`。**
 
 > 📚 文档索引见 [docs/README.md](docs/README.md)；评估汇总与决策见
 > [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md)。
@@ -25,6 +27,11 @@ x265 为手动高压缩选项。**主入口：`1kt.py`。**
 
 > ⚠️ 档位 JSON 内的数值为作者实测标定值，请勿改动；调参须以测试集回归
 > 与 `tests/full_autotest.py` 为依据。
+>
+> AV1 三后端（SVT-AV1 / NVENC-AV1 / QSV-AV1）已通过合并后阶段验收：
+> 真实 Sony 素材上的 Sony 元数据保留、4:2:2→4:2:0 策略、AV1 MP4 容器、
+> 色彩元数据保真、以及 `--channel-sync` 组合回归（27 case / 348 断言全绿，
+> 全量短回归 225 PASS / 0 FAIL）。
 
 ## 下载（自包含发布包）
 
@@ -33,14 +40,18 @@ v4.2.0/libx265/libvmaf）+ NVEncC 9.31 + QSVEncC 8.26 + GPAC 26.02**，
 解压即用（另需 Python 3.11+ 与对应 GPU 驱动；Gyroflow 为可选消费端
 工具，请从 gyroflow.xyz 单独安装）。
 
+- **v0.6.0**（`main` 主线 · HEVC/265 + AV1 **合并后首个版本** + AV1 色彩
+  元数据保真修复）：tag 已打在合并后状态上，`git checkout v0.6.0` 即可复现；
+  **自包含发布包尚未构建上传**（需要现成包请用下方两包，需要合并后能力请
+  用 `main` / `v0.6.0` 工作区）
 - **v0.5.1**（AV1 线 · 软件 + 硬件 AV1；tag 现已在 `main` 历史中）：
   [1KeyTranscoder-v0.5.1-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.5.1/1KeyTranscoder-v0.5.1-win64-selfcontained.zip)
 - **v0.4.2**（HEVC/265 线）：
   [1KeyTranscoder-v0.4.2-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.4.2/1KeyTranscoder-v0.4.2-win64-selfcontained.zip)
 
-> 当前 `main` 已合并 AV1 能力（HEVC 与 AV1 同处一条主线），但**尚未为
-> 合并后的状态发布新版本包**（未打新 tag）；上列两包分别对应各线最后
-> 一次发布。自建请直接使用 `main` 工作区。
+> 版本线：`v0.4.x` = HEVC/265 线，`v0.5.x` = AV1 独立线，**`v0.6.0` =
+> 两条线合并进 `main` 后的主线**（AV1 与 HEVC 同处一分支，共用一个入口与
+> 一套保留管线）。上列两包分别对应各线最后一次发布。
 
 ## 快速开始
 
@@ -219,18 +230,23 @@ DJI（djmd）→ DJI
 ## 自动化测试（三级深度）
 
 ```powershell
-python tests\full_autotest.py --level unit        # L1 纯逻辑 (50 项, 秒级, 零外部依赖)
-python tests\full_autotest.py --level toolchain   # L2 + 工具版本/实机能力/旗标白名单 (~13s)
-python tests\full_autotest.py --level full        # L3 + 真实管线集成 + 故障注入 (~3 分钟)
+python tests\full_autotest.py --level unit        # L1 纯逻辑 (155 项, 秒级, 零外部依赖)
+python tests\full_autotest.py --level toolchain   # L2 + 工具版本/实机能力/旗标白名单 (~16s)
+python tests\full_autotest.py --level full        # L3 + 真实管线集成 + 故障注入 (225 项, ~9 分钟)
 python tests\full_autotest.py --level all         # 等同 full
 ```
 
-- **L1 unit**：color token 表、caps 解析、格式规划、失败分类、flag 构造、
-  probe/paths、源分类、缩放引擎、gpac parse_info、dji facts；
-- **L2 toolchain**：真实工具版本、`--check-features` 实机能力、
+> 当前基线：**`--level full` = 225 PASS / 0 FAIL（531 s）**。任何改动后
+> 必须复核该数字不出现新增 FAIL。
+
+- **L1 unit**（155 项）：color token 表、caps 解析、格式规划、失败分类、
+  flag 构造、probe/paths、源分类、缩放引擎、gpac parse_info、dji facts、
+  channel-sync 纯逻辑、AV1 档位与参数映射；
+- **L2 toolchain**（+16 项）：真实工具版本、`--check-features` 实机能力、
   known_flags 白名单、Gyroflow/GPAC 探测；
-- **L3 full**：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
-  截断文件/尾部垃圾/断点续跑/retry-list 故障注入、strip 机制本体。
+- **L3 full**（+54 项）：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
+  截断文件/尾部垃圾/断点续跑/retry-list 故障注入、strip 机制本体、
+  AV1 管线、channel-sync P1 端到端与算法级。
   输入在 `work/autotest/` 自建副本（testsets 只读），报告
   `work/autotest/autotest_report.{json,md}`，退出码 0=全过。
 
@@ -271,6 +287,21 @@ olddocs/                 历史档案存档（各阶段代码快照 / 被取代�
    （djmd 原生保留）；缩放规则仍 PROVISIONAL。详见
    `work/x265_test/x265_test_report.md`。
 5. **档位数值权威性**：JSON 数值为作者实测标定，调参须回归测试集。
+6. **AV1 色彩元数据保真**（v0.6.0 修复）：源素材**未声明**色彩描述时
+   （`color_primaries/transfer/space = unknown`；137 段真实 A7M5 素材中
+   有 7 段如此），AV1 输出**不得凭空带上 bt709**。根因不在本项目也不在
+   编码器——编码器位流本就是 `unspecified`——而在 GPAC/MP4Box 的容器重建：
+   它只在 AV1 sequence header 的 `color_description_present_flag == 1` 时
+   才从位流推导 `colr`，该标志为 0 时写死 `colr nclc 1/1/1`（bt709）。
+   QSVEncC 恰好置了该标志，故 `qsv-av1` 从未暴露此问题；FFmpeg/libsvtav1
+   与 NVEncC 不置，于是 `svtav1`/`nvenc-av1` 被判 critical MODIFIED 而失败
+   且无产出。修复是在项目自己的 mux 边界做**窄口径原地对账**
+   （`preservation/colour.py` + `isobmf.patch_video_colr()`）：仅当源未声明
+   色彩时，把已存在的 `colr` 三元组改写为 `2/2/2`（unspecified）。盒子大小
+   不变，故不触碰任何 stco/co64 偏移；源已声明色彩时**完全不执行**。
+   `preservation` 校验规则**一行未改**（不放宽任何 critical 项）。
+   验收：27 case / 348 断言全绿（T1 7 段 × 三后端 + T2 已知色彩 1 段 ×
+   三后端），修复后输出与源色彩字段完全一致。
 
 ## 已知限制与说明
 
@@ -281,11 +312,15 @@ olddocs/                 历史档案存档（各阶段代码快照 / 被取代�
   特性不生效）；驱动/QSVEncC 版本对需钉住（6557/6559 曾有批量编码回归史）；
 - Sony 4:2:2 成品 = HEVC Rext，播放硬解仅 NVIDIA 50 系，其余需软解播放器
   （VLC/mpv）；分发请出 4:2:0 副本；
-- **AV1**：统一 4:2:0 输出（所有 AV1 后端）；Sony 源保留元数据但不打
-  XAVC tag（brand av01）；SVT-AV1 无场景关键帧（scd 只管码率分配）、
-  mbr 为软上限（非 VBV 硬钳）；4K60 UHQ 档（preset 1，≈1fps 对齐
-  x265 UHQ）编码耗时极高，
-  属基准档非生产实用；
+- **AV1**：
+  - 统一 4:2:0 输出（所有 AV1 后端）；Sony 源保留 rtmd/nrtm/uuid 元数据但
+    不打 XAVC tag（brand av01）；
+  - **源未声明色彩 → 输出也不声明**，不发明 bt709（见关键决策记录 6）；
+  - **受支持输入为 ≥1080p**：低于 1080p 的素材默认不处理
+    （`nvenc_av1.json` 的 `level 6.1` 在受支持范围内实测均可用）；
+  - SVT-AV1 无场景关键帧（scd 只管码率分配）、mbr 为软上限（非 VBV 硬钳）；
+  - 4K60 UHQ 档（preset 1，≈1fps 对齐 x265 UHQ）编码耗时极高，属基准档
+    非生产实用。
 - 非 Sony 非 DJI 素材按策略丢弃元数据（仅视频+音频）；
 - VFR 素材自动 `--avsync forcecfr` 规范化（WARNING 记录）；
 - 经典路径无 1:1 帧闸门（不误杀 VFR）；Sony/DJI 路径有。
@@ -307,10 +342,12 @@ git tag -l                         # pre_S1S5 / post_S1S5 / pre_ui / post_1kt_ui
                                    # post_dji / post_dji_checklevels / post_quality_align
                                    # post_autotest / post_x265 / v0.4.0 / v0.4.1 / v0.4.2
                                    # post_av1 / post_av1_calib / v0.5.0 / v0.5.1
+                                   # v0.6.0 (HEVC+AV1 合并主线, 含 AV1 色彩保真修复)
 git checkout backup/pre-av1-main-merge   # AV1 合并进 main 之前的状态 (回滚点)
 ```
 
 > 分支约定: `main` = **HEVC/265 + AV1 合并主线**（两条线能力同处一分支，
-> 各线最后一次发布包见上节）；`av1` 分支保留为 AV1 独立线历史
+> 各线最后一次发布包见上节；合并后状态打 tag **`v0.6.0`**）；
+> `av1` 分支保留为 AV1 独立线历史
 > （含 post_av1 / post_av1_calib / v0.5.0 / v0.5.1 tag）；
 > `backup/pre-av1-main-merge` = AV1 合并前的 `main` 快照。
