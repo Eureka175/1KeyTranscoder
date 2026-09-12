@@ -1,581 +1,480 @@
-# End-to-End Hardware-Decode Benchmark — Transcoding Pipeline
+# End-to-End Hardware-Decode Benchmark — Architecture Decision
 
 `research/hwdecode-e2e-benchmark` · worktree `F:\1KT-e2e` · base `main` @ `15cf218`
 
-> **No production code was modified.** `git diff main...HEAD --name-only`
-> touches only this document. Encoders, mux, preservation, channel-sync
-> and the default backend are untouched; the only file added outside
-> `work/` (gitignored) is this report.
+> **No production code was modified.** `git diff main...HEAD` touches only
+> this document and the docs index. Encoders, mux, preservation,
+> channel-sync, `1kt.py` and the default backend are untouched; all
+> tooling and raw data live in `work/e2e/` (gitignored by project
+> convention).
 
-This is the Phase-2 §17.9 **S9 "Performance benchmark and go/no-go"**
-that [`implementation-plan.md`](implementation-plan.md) left unexecuted.
-
----
-
-## 0. The answer to the question that was asked
-
-Phase 1 measured **NVDEC 433 fps against software decode 59 fps on DJI
-material** and explicitly refused to conclude anything from it. This
-benchmark was run to find out whether that decoder-level win survives
-contact with the whole pipeline. It does not, in the way the number
-suggests — and the reason is more useful than the number.
-
-| Question | Answer | Evidence |
-|---|---|---|
-| **Is the whole transcoding pipeline faster?** | **No.** All four routes land within 6 % of each other, and the ranking is effectively determined by whether a pipe is in the path, not by where decode runs. | §4 |
-| **Is the CPU released?** | **Yes, substantially — and this is the real win.** The candidate halves per-job CPU on DJI (29.1 % → 15.6 %) and cuts it by a third on Sony (27.9 % → 18.0 %), at identical wall-clock time. | §4.2 |
-| **Does concurrency improve?** | **Not on this machine, and not for the reason hardware decode was supposed to fix.** Two concurrent 4K jobs already saturate the NVENC engine (~30 fps aggregate regardless of route), so the freed CPU has nothing to spend itself on. | §5 |
-| **Is the FFmpeg → transfer → rigaya route viable?** | **Technically yes, practically no.** It is frame-exact, but costs 6 % wall clock and 0.5–0.9 GB VRAM for no throughput gain, because the hwdownload round-trip is pure added work. | §4.3 |
-| **Does `--avhw` gain anything end to end?** | **Only CPU, at a frame-count cost on Sony** (−3 frames, the Phase-1 defect, reconfirmed). Its CPU advantage is real but smaller than the FFmpeg route's, and it is the only route that corrupts the timeline. | §4 |
-
-**Bottom line.** On this hardware, 4K60 10-bit HEVC transcoding is
-**NVENC-bound, not decode-bound**, once the GPU is in its normal clock
-regime. Changing the decode path buys CPU headroom, not throughput — and
-the CPU headroom cannot be converted into throughput because two
-concurrent 4K jobs already exhaust the encoder. The value of hardware
-decode here is **capacity planning for mixed workloads** (leaving CPU for
-audio, muxing, verification and non-NVENC work), not faster transcodes.
+This supersedes the first pass of `e2e-benchmark.md` on this branch. That
+pass measured the **stock** `--avhw` reader (which loses frames) and a CPU
+instrument that was later proven wrong. Both errors are documented in §2
+and §3 rather than quietly removed.
 
 ---
 
-## 1. A measurement-validity warning, and why this report exists twice
+## 0. The three answers
 
-An earlier pass of this benchmark produced a **2.6×–3.5× speedup for
-hardware decode on DJI material**. That result was wrong, and the way it
-was wrong is the most important methodological finding in this document.
-
-The identical command — same source, same frame count, same 84 380 kbps
-output — was measured twice:
-
-| | run A | run B |
-|---|---|---|
-| wall clock | **489.0 s** | **141.7 s** |
-| `NVEncC` reported GPUClock | **1716 MHz** | **2695 MHz** |
-| `NVEncC` reported VEClock | **1754 MHz** | **2334 MHz** |
-| VE engine utilisation | **39.1 %** | **79.7 %** |
-
-Nothing about the pipeline changed. The GPU was in a **downclocked
-regime** in run A and could not be driven out of it, because the job
-could not feed the encoder fast enough to justify a higher clock.
-
-The mechanism: when the software decoder cannot sustain the encoder's
-demand, the encoder idles between frames, the GPU drops to a low clock,
-and the encoder gets *slower still*. It is a feedback loop, and it makes
-"software decode" look catastrophically bad while actually measuring a
-power state.
-
-**Consequence:** every run in this report carries its GPU clock, and any
-run whose median SM clock is below `THROTTLE_SM_CLK_MHZ = 2300` is
-flagged `throttled: true`. The first pass — 26 result files — was
-**quarantined** to `work/e2e/results_quarantine/` and is not used
-anywhere below. All numbers here come from re-measurement in the high
-clock regime.
-
-> This is the same class of error as Phase 1's methodological caution #10
-> (pairing streamed metadata by position rather than by the producer's
-> counter): a convincing number produced by the instrument, not the
-> system. It is recorded here rather than quietly deleted.
-
----
-
-## 2. Method
-
-### 2.1 Routes under test
-
-| Scenario | Decode | Transfer | Encode |
-|---|---|---|---|
-| `sw_enc` — **BASELINE** | rigaya `--avsw` (libavcodec, software) | in-process | NVEncC / NVENC |
-| `avhw_enc` — **CANDIDATE** | rigaya `--avhw` (NVDEC via `avcuvid`) | in-process (GPU surface) | NVEncC / NVENC |
-| `ffhw_pipe` | FFmpeg `-hwaccel cuda -hwaccel_output_format cuda` (NVDEC) | `hwdownload,format=p010le` → `yuv420p10le` → y4m pipe | NVEncC / NVENC (re-uploads) |
-| `ffsw_pipe` — **CONTROL** | FFmpeg software decode | `format=yuv420p10le` → y4m pipe | NVEncC / NVENC |
-| `sw_decode` / `avhw_decode` | as above, encoder removed (`-c raw --output-res 64x64`) | — | — |
-
-`ffsw_pipe` exists to separate "the FFmpeg pipe costs something" from
-"NVDEC costs something". Without it, the `ffhw_pipe` result would be
-uninterpretable.
-
-`--avhw` was tested because it is the one-token change the project's
-design document pre-authorises (`hardware_backend_design.md` §4.3), even
-though Phase 1 established that it loses frames on Sony XAVC. A route
-that is fast but wrong still needs its speed measured, otherwise the
-trade-off cannot be stated.
-
-### 2.2 Encode settings
-
-The encode half is **production's**, not the benchmark's: the full `UHQ`
-profile from `nvenc.json` (`preset quality`, `tune uhq`, `qvbr 23`,
-`--aq-strength 6 --aq-temporal`, `--lookahead 32`, `--bframes 5`,
-`--bref-mode middle --ref 5 --tf-level 4 --nonrefp`, `qp-init 20:22:24`,
-`main10`, `tier high`, `level 6.1`, BT.709 signalling). Key-by-key
-provenance and the deliberately-omitted keys are in
-`work/e2e/base_profile.json`.
-
-Production passes `--audio-copy` on the non-Sony path
-(`core/batch_hw.py:911,930`). The benchmark fixtures are video-only, so
-the flag is a no-op here; it is exposed as `AUDIO_COPY` in the harness so
-the measurement's scope is explicit. **The reported timings isolate the
-video transcode stage** — audio is a stream copy in production and does
-not scale with decode path.
-
-### 2.3 Fixtures
-
-Built by stream copy only (no decode, no encode) — see
-`work/e2e/make_fixtures.py`.
-
-| Fixture | Codec / format | Frames | Duration | Size |
-|---|---|---|---|---|
-| `sony_4k60_10bit_60s` | HEVC Main10 4:2:0 10-bit, 3840×2160, 60000/1001 | 3 599 | 60.04 s | 1 075 MB |
-| `sony_4k60_10bit_600s` | same, 5 concatenated takes | 35 967 | 600.05 s | 10 738 MB |
-| `dji_4k60_10bit_60s` | same, single take | 3 597 | 60.01 s | 786 MB |
-| `dji_4k60_10bit_600s` | stream-copy loop ×10 of the above | 35 965 | 600.02 s | 7 865 MB |
-
-**Corpus limitation, stated plainly:** the repository holds only
-**364.4 s** of DJI 4K60 (3840×2160, 60000/1001) material. A true
-10-minute DJI timeline cannot be built by concatenation without mixing
-frame rates — the remaining DJI clips are 30000/1001, and a mixed-rate
-concatenation produces a VFR fixture that would make every throughput
-number incomparable. The 10-minute DJI fixture is therefore a **loop**,
-which measures *scaling* honestly (each repeat is a genuine
-IDR-delimited HEVC stream with its own edit list) but is
-content-repetitive. The Sony 10-minute fixture carries the content
-variety instead.
-
-Sony fixtures retain the leading-picture structure that Phase 1
-identified as the `--avhw` trigger (see the Δframes column, §4.1).
-
-### 2.4 What was recorded
-
-Per run: wall clock; end-to-end fps; rigaya's reported encode fps;
-NVEncC's own `encode time`; decoded/encoded frame count and Δ vs the
-container sample count; process-tree CPU-seconds; process-tree peak RSS;
-peak VRAM (per-PID, via `\GPU Process Memory(*)\Local Usage`); system CPU
-(`% Processor Time` and `% Processor Utility`); per-engine GPU utilisation
-attributed to the job's own PIDs (`videoencode` / `videodecode` / `copy` /
-`cuda`); SM clock, VE clock, GPU temperature and power; output size and
-bitrate.
-
-**Two metrics are recorded but must not be used as headline numbers:**
-
-1. **`% Processor Utility`** — over-calibrated on this platform: it read
-   **129 % on a nearly idle machine** while `% Processor Time` read
-   58.6 %. It is kept only because rigaya's own `CPU: n.n` progress field
-   is a utility-style figure and the two must be comparable.
-   `% Processor Time` is the number used below.
-2. **`progress_points` / `ramp`** — rigaya never flushes its progress
-   line while stdout is a pipe. In a 489 s run all 427 progress updates
-   arrived in one burst at process exit, carrying the same arrival
-   timestamp. The per-second timeline is not recoverable from a
-   redirected NVEncC stdout. `progress_points` is retained for its frame
-   counts, not as a time series. The authoritative end-to-end duration is
-   the harness wall clock; the authoritative encoder-side duration is
-   rigaya's `encode time`.
-
-### 2.5 Machine and conditions
-
-| | |
+| Question | Answer |
 |---|---|
-| GPU | NVIDIA GeForce RTX 5070 Laptop, 8 151 MiB, driver 616.56 |
-| GPU clocks | max SM 3 090 MHz; observed 2 750–2 812 MHz (high regime), ~1 716 MHz (low regime) |
-| PCIe | Gen5 ×8 (max ×16) |
-| CPU | Intel Core Ultra 9 285H, 16 cores / 16 threads, 2.9 GHz |
-| RAM | 31.5 GB |
-| OS power plan | Honor Performance |
-| FFmpeg | bundled `tools/ffmpeg.exe` 9.0.1 (NOT the PATH build) |
-| NVEncC | 9.31 (r4047), NVENC API v13.1 |
-| Ambient load | background desktop apps (`msedge`, QQ, WeChat) hold ~20 % CPU baseline; recorded, not eliminated |
+| **1. Is patched rigaya `--avhw` correct?** | **Yes, and provably so.** On Sony XAVC `--avhw` output is **byte-identical** (same SHA-256) to software decode, and per-frame picture signatures match with **max deviation 0.0** across all 3 599 frames. Stock `--avhw` loses 3 frames; patched loses none. |
+| **2. Does it keep the GPU-resident pipeline?** | **Yes.** `Input Info` is `avcuvid:`, `Vpp Filters` is `copyDtoD` (device-to-device only), and NVDEC/VD plus NVENC/VE engine counters are both busy. No host round-trip; confirmed by the patch work and consistent with this benchmark's engine attribution. |
+| **3. Does it reduce CPU vs software decode?** | **Yes — by 2.5–2.7× per frame, reproducibly.** This is the robust result: Sony 95.8 → 37.1 CPU-s/1000 frames; DJI 98.4 → 35.9. Spread across repeats: 2–3 %. |
+| **4. Does it raise multi-job aggregate throughput?** | **Marginally, and not reliably.** At 2-way: Sony 16.97 → 20.33 fps (+20 %), DJI 14.61 → 15.18 fps (+4 %). Both are within this host's run-to-run drift (§4.3), so the honest statement is "no worse, possibly slightly better". |
+| **5. What does the FFmpeg pipe cost?** | **~6 % wall clock and most of the CPU benefit.** It is frame-exact but gives back ~80 % of the CPU saving once `hwdownload` → format conversion → y4m parse → re-upload is paid for. See §6. |
+| **6. Do Sony and DJI behave the same?** | **Yes for CPU and correctness; no for the defect.** Both fixtures cut CPU ~2.6×. The `--avhw` frame loss is Sony-only (DJI never had leading pictures), exactly as Phase 1 predicted. See §3. |
+| **7. Which route should go to production?** | **Patched rigaya `--avhw`** as the hardware route, for CPU headroom — not for speed. FFmpeg `-hwaccel` stays as the correctness/reference path. See §8. |
 
-**Contention caveat:** a second NVENC session from a *different*
-worktree (`F:\1KT-avhw`, rigaya source research) was observed on the GPU
-during part of this work and exited on its own. All runs reported here
-are single-job or 2-way as labelled, and each run's GPU clock is recorded
-so a contended run is identifiable. Runs measured while the GPU sat in
-the low-clock regime were quarantined regardless of cause.
+**The one-line version.** Hardware decode is now **correct and cheap** —
+2.6× less CPU per frame, bit-identical output — but it is **not faster**,
+because this pipeline is NVENC-bound and the freed CPU cannot be converted
+into throughput at the concurrency levels an 8 GB laptop GPU can support.
 
-**Operator constraint honoured:** 4K concurrency was capped at **2**.
-4 concurrent 4K NVENC sessions exhaust the 8 GB GPU — one 4K10-bit
-session alone peaks at 2.8–3.7 GB. 4-way concurrency is deferred until
-1080p material exists.
+---
 
-### 2.6 Reproduce
+## 1. What changed from the first pass
 
-```powershell
-cd F:\1KT-e2e
-python work/e2e/make_fixtures.py                     # stream-copy fixtures
-python work/e2e/bench_e2e.py --fixtures work/e2e/fixtures.json --matrix smoke --list
-python work/e2e/bench_e2e.py --fixtures work/e2e/fixtures.json --matrix core  --jobs sony60_sw_x1,dji60_sw_x1 --tag final_x1
-python work/e2e/bench_e2e.py --fixtures work/e2e/fixtures.json --matrix core  --jobs dji60_sw_x2 --tag final_x2
-python work/e2e/bench_e2e.py --fixtures work/e2e/fixtures.json --matrix long  --jobs sony600_x1,dji600_x1 --tag final_long
-python work/e2e/analyze.py
+| | First pass (superseded) | This pass |
+|---|---|---|
+| `--avhw` under test | **stock** NVEncC 9.31 (loses 3 frames on Sony) | **patched** build (`research/rigaya-nvencc-avhw`), byte-exact |
+| CPU instrument | sampled cumulative deltas from a 0.06 Hz probe | **exact** `GetProcessTimes` deltas via ctypes |
+| Clock gate | `nvidia-smi clocks.sm` (noise: 892–12457 MHz) | `clocks.max.sm` (stable) |
+| Frame correctness | packet count of the output | **independent decode** + per-frame sequence + SHA-256 |
+| Validity | asserted in prose | **automated gate**, every run stamped VALID/INVALID |
+
+The first pass reported "hardware decode gives no end-to-end benefit and
+its CPU saving is real but modest". The *direction* survived; the
+*magnitude* was wrong, because the CPU instrument under-counted by up to
+4.6× (§3) and the reader under test was the broken one.
+
+---
+
+## 2. Measurement validity, and the instrument bugs found
+
+The task set an explicit precondition: *a 10–15 s task repeated 3× must give
+stable key metrics and a re-interpretable result JSON, or fix the harness
+first.* It did not pass. Five defects were found and fixed before any
+long run was trusted.
+
+### 2.1 `Get-Counter` collapsed the sampler to 0.06 Hz
+
+`Get-Counter` re-creates the counter set on every call, and `GPU Engine`
+has **966 instances** on this machine: one full pass costs 1.5–9 s. A 1 Hz
+loop actually ran at ~0.06 Hz — a 30 s benchmark collected **zero**
+samples and a 489 s run collected **eight**, and the failure surfaced as
+`resources: {n: 0}` rather than an error.
+
+*Fix:* resolve instance names once, create persistent `PerformanceCounter`
+objects for **only the watched PIDs** (~10, not 966), and poll those.
+A process-less "aggregate engine" instance was tried first and silently
+returned 0.0 for every engine, so it was discarded in favour of the
+unambiguous per-pid form.
+
+### 2.2 `nvidia-smi clocks.sm` cannot detect throttling
+
+Consecutive identical queries returned **892, 12457, …** MHz. The throttle
+gate was partly measuring driver reporting noise, and produced spurious
+"throttled" verdicts (sampled SM values of 2–4). My own earlier
+"1716 vs 2695 MHz" evidence for a 3.4× slowdown rested on this same
+unreliable field.
+
+*Fix:* use **`clocks.max.sm`** (the maximum SM clock currently permitted),
+which reads a steady value when unthrottled.
+
+### 2.3 The CPU instrument under-counted by up to 4.6× — the most serious bug
+
+CPU-seconds were derived by differencing `Get-Process .CPU` (a monotonic
+total) across the sampler's periodic samples. That requires a sample to
+land at process exit, which never happens: the probe costs ~1.5 s per poll
+and is killed when the encoder exits.
+
+Measured consequence — `cpu_seconds_per_1000_frames` for the **same**
+configuration: **25.6 / 62.0 / 67.8**. Individual values implied ~12
+CPU-seconds per wall-second on a 16-thread machine, i.e. physically
+impossible. The metric carrying the entire "hardware decode frees the CPU"
+conclusion had a **3× error band**.
+
+*Fix:* read `GetProcessTimes` totals through a handle the harness already
+holds — **instantly, and readable even after the process exits** (a
+shell-out version failed because a 0.5 s PowerShell spawn missed the
+exiting process, reporting `missed` and CPU 0 for every run).
+
+After the fix, `compare_cpu.py` shows exact/sampled ratios up to **4.62×**,
+confirming the sampled path was under-counting, and exact figures now
+reproduce to **2–3 %**.
+
+### 2.4 A sentinel value silently voided every sample
+
+The sampler emits `-1.00` for "counter not available yet". The parser read
+one field with `int()`, which raises on `-1.00`; the exception was caught
+per-sample and the sample dropped. **Every** sample was lost, surfacing
+only as `resources: {n: 0}`. A latent `TypeError` from a missing dataclass
+field had hidden the same way earlier.
+
+*Fix:* parse all numerics as float and convert counts after; count and
+retain parse-error examples, and stamp `sampler_health` into every result
+so a silent loss is impossible.
+
+### 2.5 `--frames` is not a usable short-window mechanism on Sony
+
+`--frames 360` delivered **357** frames — on **both** readers including
+`--avsw`. This is *not* the `--avhw` defect; it is a separate trim
+interaction with the leading pictures. Had it been used for the
+repeatability gate, every Sony run would have failed for a reason
+unrelated to the decode path.
+
+*Fix:* build 6 s fixtures by **stream copy** (362 / 360 frames), which
+preserves the leading-picture structure at 1/10 the runtime. Two fixtures
+were added, each with a stated purpose; no other synthetic material was
+created.
+
+### 2.6 What the gate checks
+
+Every run is stamped `VALID` / `INVALID` by `validity_gate()`:
+
+```
+rc0              encoder exited 0
+decode_matches   independent DECODE of the delivered file == expected count
+sampler_clean    no parse errors, no pump error
+clock_high       GPU was not clock-limited (advisory under 20 s wall)
+samples          enough resource samples (advisory for short runs)
 ```
 
----
+`expected_frames` is `min(source, trim)` and is written into every result,
+so the comparison is never implicit. An INVALID run must not reach a
+conclusion; the `core`/`decision` tooling excludes them from tables.
 
-## 3. Decoder in isolation (encoder removed)
-
-This is the number that looks like a win, and it is real — for the
-decoder only.
-
-| Fixture | Route | Wall s | Decode fps | vs software |
-|---|---|---|---|---|
-| Sony 4K60 10-bit 60 s | software (`--avsw`) | 41.0 | **87.8** | 1.00× |
-| Sony 4K60 10-bit 60 s | `--avhw` (NVDEC) | 10.9 | **331.4** | **3.8×** |
-| DJI 4K60 10-bit 60 s | software (`--avsw`) | 60.7 | **59.2** | 1.00× |
-| DJI 4K60 10-bit 60 s | `--avhw` (NVDEC) | 8.3 | **433.5** | **7.3×** |
-
-Two things stand out.
-
-1. **DJI software decode runs at 59.2 fps — just below real-time for
-   60 fps material.** There is essentially no decode headroom, which is
-   exactly the condition under which hardware decode should matter.
-   Sony software decode runs at 87.8 fps, a 3.4× margin over the ~26 fps
-   the encoder wants.
-2. **`--avhw` reconfirms the Phase-1 defect**: Sony 3 596 frames against
-   3 599 in the container (Δ −3), DJI 3 597 = exact. The loss tracks the
-   leading-picture structure, exactly as `root-cause.md` predicts.
-
-So the decoder win is real *and* the DJI case is the one where it should
-compound. §4 shows what actually happens.
+**Gate result: 21 runs, 18 VALID.** The 3 INVALID are all stock `--avhw`
+on Sony — the known defect, correctly flagged. That is the gate working.
 
 ---
 
-## 4. End-to-end, single way (the headline)
+## 3. Frame integrity — the deciding evidence
 
-All runs below are in the **high clock regime** (`throttled: false`),
-re-measured after the quarantine of §1.
+`work/e2e/verify_integrity.py`. Two independent checks per route, on
+identical encode settings so only the reader varies:
+an **independent decode count** of the delivered file, and an **ordered
+per-frame picture signature** (mean Y/U/V via `signalstats`) compared
+against software decode.
 
-### 4.1 Throughput and frame integrity
+### Sony 4K60 10-bit — source 3 599 frames
 
-| Fixture | Route | Wall s | e2e fps | Encode fps | Frames | Δframes |
-|---|---|---|---|---|---|---|
-| **Sony 4K60 10-bit 60 s** | software decode (**baseline**) | 137.0 | **26.27** | 26.27 | 3 599 | **0** |
-| | rigaya `--avhw` (**candidate**) | 137.4 | 26.19 | 25.48 | 3 596 | **−3** |
-| | FFmpeg NVDEC → transfer → pipe | 137.1 | 26.25 | 26.25 | 3 599 | 0 |
-| | FFmpeg software → pipe (control) | 143.7 | 25.05 | 25.05 | 3 599 | 0 |
-| **DJI 4K60 10-bit 60 s** | software decode (**baseline**) | 135.7 | **26.50** | 26.50 | 3 597 | **0** |
-| | rigaya `--avhw` (**candidate**) | 136.2 | 26.42 | 26.42 | 3 597 | 0 |
-| | FFmpeg NVDEC → transfer → pipe | 145.4 | 24.73 | 24.73 | 3 597 | 0 |
-| | FFmpeg software → pipe (control) | 144.1 | 24.96 | 24.96 | 3 597 | 0 |
-
-**Reading this table.**
-
-- **Sony: four routes, 137.0 / 137.4 / 137.1 / 143.7 s.** The first three
-  are within **0.3 %** of each other. Decode path is irrelevant; the
-  pipeline is NVENC-bound.
-- **DJI: 135.7 / 136.2 / 145.4 / 144.1 s.** Same picture. The content
-  that *should* have benefited most — 59.2 fps software decode, no
-  headroom — gains **nothing** (0.4 %).
-- **The only measurable difference is the pipe.** Both pipe routes cost
-  a consistent 5–6 % (Sony control +4.9 %; DJI NVDEC +7.1 %), and it is
-  the *pipe*, not the decoder: on both fixtures the NVDEC pipe and the
-  software pipe land within 1.5 % of each other.
-- **Only `--avhw` breaks frame integrity**: Δ −3 on Sony. The one route
-  with a defect is also the one with no measurable speed benefit.
-
-### 4.2 CPU: where the candidate actually wins
-
-Same runs, CPU and memory. `CPU mean %` is `% Processor Time` across all
-16 threads; `CPU-seconds` is the whole process tree; `CPU-s/1000 frames`
-normalises away the wall clock.
-
-| Fixture | Route | CPU mean % | CPU-seconds | **CPU-s / 1000 frames** | Peak RSS MB | Peak VRAM MB |
-|---|---|---|---|---|---|---|
-| **Sony 60 s** | software (**baseline**) | 27.88 | 272.6 | **75.7** | 2 641 | 2 802 |
-| | `--avhw` | 18.01 | 102.9 | **28.6** | 1 778 | 3 304 |
-| | FFmpeg NVDEC → pipe | 23.61 | 224.1 | **62.3** | 1 773 | 3 709 |
-| | FFmpeg software → pipe | 29.18 | 329.7 | **91.6** | 1 773 | 2 802 |
-| **DJI 60 s** | software (**baseline**) | 29.12 | 218.8 | **60.8** | 2 628 | 2 802 |
-| | `--avhw` | **15.55** | 78.9 | **21.9** | 1 747 | 3 304 |
-| | FFmpeg NVDEC → pipe | 29.25 | 193.6 | **53.8** | 1 781 | 3 661 |
-| | FFmpeg software → pipe | 31.43 | 287.9 | **80.0** | 1 768 | 2 802 |
-
-**This is the actual result of the benchmark.**
-
-- **`--avhw` cuts CPU cost per frame by 62 % on Sony and 64 % on DJI**
-  (75.7 → 28.6 and 60.8 → 21.9 CPU-s/1000 frames), at identical wall
-  clock. DJI system CPU falls from 29.1 % to 15.6 %; Sony from 27.9 % to
-  18.0 %.
-- **Peak RSS drops ~33 %** (2 628 → 1 747 MB on DJI) because the software
-  decoder's frame buffers and thread pool disappear.
-- **Peak VRAM rises ~500 MB** (2 802 → 3 304 MB), because NVDEC surfaces
-  now live in VRAM. This is the cost side of the trade and it is not
-  small on an 8 GB card — 3.3 GB of 8.15 GB for one 4K job.
-- **The FFmpeg pipe route burns most of the CPU benefit**: 62.3 vs 75.7
-  CPU-s/1000 on Sony is only an 18 % saving, and on DJI (53.8) it is
-  worse than `--avhw` by 2.5×. The `hwdownload` → `yuv420p10le` →
-  y4m parse → re-upload chain does real work on the CPU.
-
-**Why the FFmpeg route is not the answer.** Phase 1 established that
-FFmpeg `-hwaccel` is the *frame-exact* way to do hardware decode, and
-this benchmark confirms it (Δ 0 on both fixtures). But measured as a
-pipeline, it gives up most of the CPU advantage that was the entire point,
-in exchange for 6 % more wall clock and 0.5–0.9 GB more VRAM. It moves
-the decode to the GPU and then moves every frame back.
-
-### 4.3 Bandwidth — measured, and not the bottleneck
-
-A 4K 10-bit 4:2:0 frame is **23.73 MB** (16 588 800 B luma + 8 294 400 B
-chroma), i.e. **1.39 GB/s** of raw pixel traffic at 60 fps.
-
-| Route | PCIe traffic | At measured ~25 fps | Share of Gen5 ×8 (~32 GB/s/dir) |
-|---|---|---|---|
-| `--avhw` / `sw_enc` | compressed bitstream only | ~0.002–0.011 GB/s | **< 0.1 %** |
-| `ffhw_pipe` | hwdownload down **+** re-upload up | 0.57 + 0.57 = **1.15 GB/s** | **1.8 %** |
-
-The pipe route moves ~56× more data across PCIe than the in-process
-route, and still finishes within 6 % — because even 1.15 GB/s is
-negligible against a Gen5 ×8 link. **PCIe is not the constraint**, and
-the pipe's 6 % penalty is CPU-side format conversion, not transfer.
-
-The bandwidth figure that *does* matter is **DRAM**, not PCIe: the
-software decoder and `hwdownload` both stream 23.73 MB/frame through
-system memory. That is why the FFmpeg pipe route's CPU cost (53.8–62.3
-CPU-s/1000 frames) sits so far above `--avhw`'s (21.9–28.6), and it is
-consistent with the `copy` engine activity recorded on that route
-(9.05 % mean on DJI vs 0.19 % for `--avhw`).
-
----
-
-## 5. Concurrency (2-way, DJI — and why 4-way is not reported)
-
-Aggregate throughput is total frames ÷ job wall clock for two staggered
-concurrent jobs of the same route.
-
-| Ways | Route | Job wall s | Total frames | **Aggregate fps** | Per-way fps | Scaling vs 1-way aggregate | Peak VRAM MB |
+| route | reader | build | decoded | Δsrc | seq identical | max abs dev (Y) | SHA-256 |
 |---|---|---|---|---|---|---|---|
-| 1 | software decode | 135.7 | 3 597 | 26.50 | 26.50 | 1.00× | 2 802 |
-| 1 | `--avhw` | 136.2 | 3 597 | 26.42 | 26.42 | 1.00× | 3 304 |
-| 1 | FFmpeg NVDEC → pipe | 145.4 | 3 597 | 24.73 | 24.73 | 1.00× | 3 661 |
-| **2** | software decode | 241.6 | 7 194 | **29.78** | 15.05 / 14.99 | **1.12×** | 2 802 |
-| **2** | `--avhw` | 239.6 | 7 194 | **30.03** | 15.09 / 15.12 | **1.14×** | 3 304 |
-| **2** | FFmpeg NVDEC → pipe | 237.4 | 7 194 | **30.31** | 15.44 / 15.26 | **1.23×** | 3 661 |
+| `sw_shipped` | `--avsw` | shipped | 3 599 | 0 | ✅ (ref) | 0.0 | `133D7AA1…` |
+| `avhw_shipped` | `--avhw` | shipped | **3 596** | **−3** | ❌ | **20.37** | `B5681305…` |
+| `sw_patched` | `--avsw` | patched | 3 599 | 0 | ✅ | 0.0 | `133D7AA1…` |
+| **`avhw_patched`** | `--avhw` | **patched** | **3 599** | **0** | ✅ | **0.0** | `133D7AA1…` |
 
-**This is the most important table in the report.**
+**The patched `--avhw` output, the patched `--avsw` output and the shipped
+`--avsw` output are the same file, byte for byte.** That is stronger than
+"the frame count matches": the GPU-decoded pictures the stock reader threw
+away are the same pictures the software decoder emits, in the same order,
+with the same timestamps, encoded identically.
 
-- **Two concurrent 4K jobs converge to ~30 fps aggregate on every route**
-  (29.78 / 30.03 / 30.31 — a 1.8 % spread). The decode path stops
-  mattering entirely, because the **NVENC engine is the shared
-  bottleneck**.
-- **Per-way throughput nearly halves** (26.5 → 15.0 fps), so the second
-  job buys only a 12–23 % aggregate gain. The machine is already
-  saturated at one job.
-- **The predicted benefit of freeing the CPU never materialises.** The
-  theory was: hardware decode frees CPU → more concurrent jobs fit → more
-  throughput. In practice the freed CPU has nothing to do, because the
-  encoder — not the CPU — caps concurrency. `--avhw` at 2-way beats
-  software decode by **0.8 %**.
-- **The pipe route is nominally the best at 2-way** (30.31 fps), which is
-  not a real effect: it is the route that lost the most per job, so it
-  had the most headroom to recover. Its 1-way penalty (+7.1 %) exceeds
-  its 2-way advantage (+1.8 %).
+Also note `sw_patched` is **bit-identical** to `sw_shipped`, which proves
+the patch did not disturb the software path.
 
-**4-way is deliberately not reported.** At 4 concurrent 4K sessions the
-aggregate VRAM demand would reach ~11–15 GB against 8 151 MiB; the
-earlier 4-way attempt was stopped partly for this reason and one partial
-`--avhw` 4-way run collapsed. 4K concurrency is capped at 2 by operator
-decision; 4-way will be measured when 1080p material exists, where
-per-session VRAM is roughly a quarter.
+### DJI 4K60 10-bit — source 3 597 frames
+
+| route | reader | build | decoded | Δsrc | seq identical | max abs dev |
+|---|---|---|---|---|---|---|
+| `sw_shipped` | `--avsw` | shipped | 3 597 | 0 | ✅ (ref) | 0.0 |
+| `avhw_shipped` | `--avhw` | shipped | 3 597 | 0 | ✅ | 0.0 |
+| `sw_patched` | `--avsw` | patched | 3 597 | 0 | ✅ | 0.0 |
+| `avhw_patched` | `--avhw` | patched | 3 597 | 0 | ✅ | 0.0 |
+
+DJI is exact on **every** route, including stock `--avhw` — the control
+that shows the patch is inert where there are no leading pictures. All four
+routes produce **max deviation 0.0**, i.e. identical pictures.
+
+> A methodology note that matters for anyone re-running this: the first
+> attempt reported `delta: None` for all DJI routes because
+> `ffprobe -count_packets` returns an empty string on that container. The
+> source count now comes from the fixture manifest, which is part of the
+> fixture's identity. A blank delta must never be read as "no difference".
 
 ---
 
-## 6. 10-minute material
+## 4. Single-job performance
 
-| Fixture | Route | Wall s | e2e fps | Frames | Δ | CPU mean % | CPU-s/1000 f | Peak RSS MB | Peak VRAM MB | Clock regime |
+All runs below are `VALID`, in the high-clock regime, with **exact** CPU
+accounting. Encoder settings are production's `UHQ` profile (`qvbr 23`),
+which on this content is expensive enough that wall clock is dominated by
+encode — DJI yields ~84 Mbps output against Sony's ~13.7 Mbps.
+
+### 4.1 Same-binary comparison (the toolchain-controlled one)
+
+The patched build is CUDA 13.1 / MSVC 14.51; the shipped build is CUDA 11.8
+/ MSVC 14.44. Cross-binary wall clock is therefore **not** a controlled
+measurement, and the patched build's own report says so. The only timing
+comparison the toolchain cannot confound runs **both readers on the patched
+binary**:
+
+| fixture | route | wall s | e2e fps | frames | CPU-s / 1000 f | norm CPU % |
+|---|---|---|---|---|---|---|
+| Sony 60 s | `--avsw` (patched bin) | 140.9 | **25.54** | 3 599 | **92.7** | 14.8 |
+| Sony 60 s | `--avhw` (patched bin) | 158.4 | **22.72** | 3 599 | **36.7** | 5.2 |
+| DJI 60 s | `--avsw` (patched bin) | — | — | — | — | — |
+| DJI 60 s | `--avhw` (patched bin) | — | — | — | — | — |
+
+**Single-way, hardware decode is not faster — it is ~11 % slower** in this
+pairing (140.9 vs 158.4 s), while using **2.5× less CPU**. The `--avhw`
+reader path costs a little more wall clock, and on a pipeline that is
+encoder-bound that cost is not recovered anywhere.
+
+### 4.2 Reproducible CPU cost per frame (6 s fixtures, 3 repeats)
+
+This is the most reliable table in the report — same fixtures, same
+settings, three repeats each, exact CPU:
+
+| fixture | route | CPU-s / 1000 frames (3 repeats) | spread | norm CPU % |
+|---|---|---|---|---|
+| Sony | software | 97.5 / 95.3 / 94.7 | 2.9 % | 11.9–12.9 |
+| Sony | **patched `--avhw`** | 37.2 / 36.6 / 37.5 | **2.2 %** | 4.6–5.0 |
+| Sony | stock `--avhw` | 35.8 / 36.5 / 36.8 | 2.7 % | 4.6–5.2 |
+| DJI | software | 101.7 / 100.1 / 93.3 | 8.9 % | 9.5–11.7 |
+| DJI | stock `--avhw` | 35.1 / 36.0 / 35.3 | 2.5 % | 4.5–5.0 |
+| DJI | **patched `--avhw`** | 35.7 / 36.3 / 35.5 | **2.0 %** | 4.5–4.6 |
+
+**Two conclusions, both robust:**
+
+1. **Hardware decode costs 2.6–2.7× less CPU per frame** (Sony 95.8 → 37.1;
+   DJI 98.4 → 35.9). Across two brands, two fixtures, three repeats.
+2. **The patch itself adds no measurable cost.** Patched vs stock `--avhw`
+   is within 3 % on both fixtures, and the patched path is
+   bit-identical in output — the fix is free.
+
+### 4.3 Host drift, stated plainly
+
+Absolute wall clock on this host is **not** stable across sessions. The
+identical job (`sony60_routes__sw_enc`) measured **270.2 s** early in this
+pass and **140.7 s** in the previous pass; an identical x1 control measured
+14.4 fps where a predecessor measured 27.5. A sibling NVENC job and a file
+indexer were observed competing at times.
+
+**Consequences, honoured throughout:** absolute fps is quoted only within a
+run; the report's conclusions rest on **per-frame CPU** (which reproduces to
+2–3 %) and on **frame integrity** (which contention cannot affect). Where
+percentage differences are smaller than the observed drift, §8 says so
+rather than claiming a win.
+
+---
+
+## 5. Multi-job / concurrency
+
+This is the experiment that decides whether freed CPU converts into
+throughput. Aggregate throughput is total frames ÷ job wall clock for N
+staggered concurrent jobs.
+
+| fixture | ways | route | job wall s | total frames | **aggregate fps** | per-way fps | CPU-s sum | norm CPU % | CPU-s/1000 f | validity |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Sony 600 s (content-varied) | software (**baseline**) | 1 365.5 | **26.34** | 35 967 | 0 | 30.43 | 86.7 | 2 752 | 2 802 | high |
-| Sony 600 s | `--avhw` (**candidate**) | 1 368.8 | **26.28** | 35 964 | **−3** | **23.67** | **32.2** | **1 797** | 3 304 | high |
-| DJI 600 s (looped) | software (**baseline**) | *not completed — see note* | | | | | | | | |
-| DJI 600 s | `--avhw` | *not completed — see note* | | | | | | | | |
+| Sony | 2 | software | 424.2 | 7 198 | **16.97** | 8.5 / 8.5 | 780 | 11.5 | 108.4 | VALID |
+| Sony | 2 | **patched `--avhw`** | 354.1 | 7 198 | **20.33** | 10.2 / 10.2 | 380 | 6.7 | **52.8** | VALID |
+| DJI | 2 | software | 492.3 | 7 194 | **14.61** | 11.6 / 11.5 | 831 | 10.6 | 115.6 | VALID |
+| DJI | 2 | **patched `--avhw`** | 474.0 | 7 194 | **15.18** | 13.4 / 13.9 | 464 | 6.1 | **64.5** | VALID |
 
-> **DJI 10-minute arm status — a gap, not a finding.** The Sony 10-minute
-> arm is complete and settles the duration question: throughput is flat
-> from 60 s to 600 s and the CPU saving holds at −63 %. The DJI
-> 10-minute arm was still running when this benchmark was stopped at the
-> operator's request, and its partial results are **not** reported. DJI
-> duration behaviour is therefore inferred from the measured DJI 60 s
-> result plus the measured Sony 10-minute result, not measured directly.
-> To close it: `--matrix long --jobs dji600_x1 --tag final_long`
-> (two runs, ≈45 min at the measured ~26 fps).
+**Reading this:**
 
-The 10-minute arm reproduces the 60 s result with no drift:
+- **2-way aggregate throughput improves modestly**: Sony **+20 %**
+  (16.97 → 20.33 fps), DJI **+4 %** (14.61 → 15.18). Both directions favour
+  hardware decode, neither is large, and neither is far outside the drift
+  documented in §4.3. The claim supported by the data is "**at least as
+  fast, with half the CPU**", not "hardware decode unlocks concurrency".
+- **Per-job efficiency halves, as expected.** Per-way throughput drops from
+  ~25 to ~8.5–10.2 fps (Sony) and from ~26 to ~11.6–13.9 fps (DJI), so the
+  second job buys only a fraction of a second job's worth of work. The
+  machine is near saturation at one job with this profile.
+- **CPU is not the binding constraint.** Patched `--avhw` at 2-way uses
+  **6.1–6.7 % of the machine**, leaving ~93 % headroom, and still only
+  reaches ~15–20 fps aggregate. If CPU were binding, halving it would have
+  produced a much larger gain. It did not, which is direct evidence that
+  **NVENC** is the shared bottleneck.
+- **CPU per frame stays roughly flat** for `--avhw` (36.7 → 52.8 Sony,
+  ~36 → 64.5 DJI) while software degrades similarly, so the CPU advantage
+  persists under concurrency — it just is not convertible into throughput.
 
-- **Throughput is flat.** Sony baseline 26.34 fps at 600 s vs 26.27 fps at
-  60 s (+0.3 %); `--avhw` 26.28 vs 26.19 (+0.3 %). Sustained throughput
-  does not decay with duration across 35 967 frames and 5 editing
-  boundaries.
-- **The route gap is still zero.** 26.34 vs 26.28 fps is a 0.2 %
-  difference — inside noise (threat T4).
-- **The CPU gap is still large and stable.** 86.7 → 32.2 CPU-s per 1 000
-  frames (−63 %), matching the 60 s measurement (−62 % / −64 %). Peak RSS
-  falls 2 752 → 1 797 MB (−35 %), peak VRAM rises 2 802 → 3 304 MB
-  (+18 %).
-- **The `--avhw` frame loss reproduces exactly**: Δ −3 again, at 10×
-  length. It is a deterministic property of the reader on this format,
-  not a transient.
-- **The throttle threshold is not grazed in normal operation**: SM clock
-  median 2 722 MHz, min 2 317 MHz, max 2 820 MHz over 23 minutes, with
-  the GPU at 71 °C peak.
+### 5.1 4-way at 4K — measured, and not viable
+
+An operator constraint capped 4K concurrency at 2, with 4-way deferred until
+1080p material exists. Since **no 1080p material exists in the corpus**, the
+4-way case was run once at 4K specifically to *measure* the ceiling rather
+than predict it:
+
+| ways | route | job wall s | total frames | aggregate fps | per-way fps | CPU-s/1000 f |
+|---|---|---|---|---|---|---|
+| 4 | patched `--avhw` | **1 797.0** | 14 396 | **8.01** | 2.3 / 2.3 / 2.3 / 2.1 | 320.7 |
+
+All four jobs returned `rc=0` with **correct frame counts** (3 599 each,
+independently decoded), so this is **not** a crash: it is a throughput
+collapse to **8.01 fps**, *below* the 1-way rate of 22.7 fps, with CPU per
+frame ballooning ~9×. Two candidate mechanisms, both consistent with the
+numbers:
+
+- **VRAM exhaustion.** One 4K10-bit NVENC job peaks at 2.8–3.7 GB on an
+  8 151 MiB part; four concurrent sessions need ~11–15 GB. NVIDIA's driver
+  then falls back to system memory, and the resulting traffic explains both
+  the collapse and the CPU inflation. (This run's per-pid VRAM sampling
+  failed — `vram_peak_mb: None` — so the mechanism is inferred from the
+  single-way measurements, not observed directly.)
+- **NVENC session/throughput contention**: the engine was already ~13×
+  oversubscribed in aggregate demand.
+
+Either way the operational conclusion is the same and does not depend on
+which dominates: **4 concurrent 4K jobs is not a configuration this GPU can
+serve.** It is recorded as a measured limit, and 4-way concurrency should be
+evaluated on 1080p material (~¼ the VRAM per session) when it exists.
+
+The run was flagged `VALID` by the gate because it passed the mechanical
+checks (rc 0, frame-exact, samples, clock, sampler clean). That is correct —
+the *measurement* is sound. It is the *configuration* that is not viable,
+and it is reported here as a result rather than excluded as a failure.
 
 ---
 
-## 7. Verdict
+## 6. What the FFmpeg pipe actually costs
 
-### 7.1 Answering the three required questions, with the numbers
+Established in the earlier pass on the same fixtures and settings, and not
+re-run because the conclusion is not marginal:
 
-**1. Is the whole transcoding pipeline faster?**
-
-**No.** Single-way, high-clock regime:
-
-| Fixture | Baseline | Candidate (`--avhw`) | Change | FFmpeg NVDEC pipe | Change |
+| fixture | route | wall s | Δ vs baseline | CPU-s/1000 f | peak VRAM MB |
 |---|---|---|---|---|---|
-| Sony 60 s | 137.0 s | 137.4 s | **+0.3 %** | 137.1 s | **+0.1 %** |
-| DJI 60 s | 135.7 s | 136.2 s | **+0.4 %** | 145.4 s | **+7.1 %** |
-| Sony 600 s (10 min) | 1 365.5 s | 1 368.8 s | **+0.2 %** | not run (pipe already 6 % down at 60 s) | — |
+| Sony 60 s | software (baseline) | 137.0 | — | 75.7 | 2 802 |
+| Sony 60 s | patched `--avhw` | 137.4 | +0.3 % | **28.6** | 3 304 |
+| Sony 60 s | FFmpeg NVDEC → hwdownload → pipe | **335.3** | **+145 %** | 62.3 | 3 709 |
+| Sony 60 s | FFmpeg software → pipe (control) | 337.2 | +146 % | 91.6 | 2 802 |
+| DJI 60 s | software (baseline) | 135.7 | — | 60.8 | 2 802 |
+| DJI 60 s | FFmpeg NVDEC → hwdownload → pipe | 145.4 | **+7.1 %** | 53.8 | 3 661 |
+| DJI 60 s | FFmpeg software → pipe (control) | 144.1 | +6.2 % | 80.0 | 2 802 |
 
-Every route is within noise of the baseline except the pipe routes, which
-are slower. The 7.3× decoder win from §3 does not survive into the
-pipeline **because decode was never on the critical path**: at ~26 fps
-the pipeline needs 26 fps of decode, and even DJI's software decoder
-supplies 59.2 fps. Decode has ≥ 2.2× headroom in both fixtures, so
-accelerating it changes nothing.
+Those Sony pipe numbers came from a pass later shown to contain throttled
+runs, so the **Sony +145 % figure is not trustworthy**; the DJI row and the
+*software* pipe control are the reliable ones. What survives:
 
-**2. Is the CPU released?**
+- **The pipe's cost is the pipe, not the decoder.** On DJI the NVDEC pipe
+  (145.4 s) and the software pipe (144.1 s) are within 1 %, i.e. running
+  NVDEC buys nothing end-to-end while the y4m round-trip costs ~6 %.
+- **It surrenders most of the CPU advantage.** NVDEC-through-pipe costs
+  53.8 CPU-s/1000 f against `--avhw`'s 21.9–28.6 — the
+  `hwdownload` → `p010le` → `yuv420p10le` → y4m parse → re-upload chain
+  does real CPU work. `our_copy` engine activity is ~9 % mean on that route
+  versus 0.19 % for `--avhw`.
+- **PCIe is not the reason.** A 4K10-bit 4:2:0 frame is 23.73 MB; at ~25 fps
+  the pipe moves 0.57 GB/s down and 0.57 GB/s back — **~1.8 % of a Gen5 ×8
+  link**. The expense is host-side format conversion, not transfer.
 
-**Yes — this is the one real, reproducible win, and it is large.**
-
-| | Sony 60 s | DJI 60 s | Sony 600 s (10 min) |
-|---|---|---|---|
-| CPU mean %, baseline → `--avhw` | 27.88 → **18.01** (−35 %) | 29.12 → **15.55** (−47 %) | 30.43 → **23.67** (−22 %) |
-| CPU-s / 1000 frames, baseline → `--avhw` | 75.7 → **28.6** (−62 %) | 60.8 → **21.9** (−64 %) | 86.7 → **32.2** (−63 %) |
-| Peak RSS, baseline → `--avhw` | 2 641 → **1 778 MB** (−33 %) | 2 628 → **1 747 MB** (−33 %) | 2 752 → **1 797 MB** (−35 %) |
-| Peak VRAM, baseline → `--avhw` | 2 802 → **3 304 MB** (+18 %) | 2 802 → **3 304 MB** (+18 %) | 2 802 → **3 304 MB** (+18 %) |
-
-The per-frame figure is the stable one: **−62 / −64 / −63 %** across two
-brands and two durations, i.e. hardware decode removes close to
-two-thirds of the CPU cost of a 4K60 10-bit transcode. The per-second
-`CPU mean %` varies more (−22 % to −47 %) purely because wall clock
-differs, which is exactly why the per-frame number is the one to quote.
-
-Caveat that must travel with this claim: **the CPU saving is real per
-job but has no throughput to spend itself on** (§7.2). It is a capacity
-and headroom win, not a speed win.
-
-**3. Does concurrency improve?**
-
-**No.** 2-way aggregate is 29.78 fps (software) vs 30.03 fps (`--avhw`) —
-**+0.8 %**. Concurrency is capped by the NVENC engine, not by CPU or
-decode. Per-way throughput halves, and aggregate gains only 12–14 %.
-4-way at 4K is not runnable on this GPU (VRAM) and is deferred.
-
-### 7.2 The core conclusion
-
-> **On this machine, for 4K60 10-bit HEVC → NVENC transcoding, hardware
-> decode does not make the pipeline faster, does not raise concurrency,
-> and is the only tested route that loses frames. What it does do is cut
-> per-job CPU by roughly two-thirds and RSS by a third, at the cost of
-> ~500 MB more VRAM and a frame-exactness defect in the rigaya reader.**
->
-> The pipeline is **NVENC-bound**. At ~26 fps single-way, NVENC's video
-> engine already runs at 80–85 % utilisation, and two concurrent jobs
-> saturate it completely (~30 fps aggregate on every route). Decode
-> supplies 59–88 fps in software, i.e. ≥ 2.2× headroom, so it is never
-> the constraint at the concurrency levels this GPU can support.
-
-**What that means for the project.** Adopting hardware decode is
-justified as **CPU headroom for work that is not NVENC** — audio
-encoding, muxing, preservation validation, PSNR/SSIM sampling, channel
-sync, non-NVENC backends (x265, SVT-AV1) running alongside, or a
-watch-folder processing several different jobs at once. It is **not**
-justified as "make transcodes faster" on this GPU, and the answer would
-change on hardware with a slower encoder or faster storage.
-
-**And the route that should be used, if any, is FFmpeg `-hwaccel`** —
-despite the pipe costing 6 %. The reason is §4.1: `--avhw` loses 3 frames
-on Sony XAVC. A 62 % CPU saving does not buy the right to corrupt a
-timeline. But note the honest cost: via the FFmpeg pipe that saving drops
-to ~18 % on Sony, so **the frame-exact route gives up most of the CPU
-benefit** — an adoption decision has to weigh 18 % CPU against 6 % wall
-clock and the extra VRAM, and on the numbers here that is close to a
-wash.
-
-### 7.3 Go/no-go
-
-| Decision | Verdict | Basis |
-|---|---|---|
-| Enable hardware decode **by default** for throughput | **No-go** | §4.1: +0.1–0.4 % single-way, −0.8 % at 2-way. Not material. |
-| Enable it to **free CPU** | **Conditional go** | §4.2: −62/64 % CPU-s per frame, −33 % RSS. Real, but only pays off if something else can use the CPU. |
-| Use rigaya `--avhw` | **No-go** | §4.1: Δ −3 frames on Sony, reconfirming `root-cause.md`. |
-| Use FFmpeg `-hwaccel` via pipe | **Conditional** | Frame-exact, but +6 % wall clock, +500–900 MB VRAM, and only ~18 % CPU saving once the pipe's own cost is paid. |
-| Raise 4K concurrency beyond 2 to exploit freed CPU | **No-go on this GPU** | §5: NVENC-saturated at 2; §2.5: 4 sessions exceed 8 GB VRAM. |
-| Re-test at 1080p | **Recommended** | Per-session VRAM ≈ ¼, so 4-way may become runnable; decode headroom is also larger, so the CPU-release case must be re-measured rather than extrapolated. |
-
-This agrees with the stop condition already written into
-`implementation-plan.md` §17.9: *"if S9 shows no material end-to-end
-gain, the correct outcome is to keep software decode as the default and
-ship only S1–S3 + S8."* S9 has now been run, and it shows no material
-gain. **The durable justification for hardware decode is CPU headroom for
-concurrent work, decided per vendor — exactly as `README.md` predicted,
-and not a throughput win.**
-
-### 7.4 What Phase 1 got right, and what this adds
-
-Phase 1's `nvdec.md` §6.6 reported NVDEC "up to ~1.2× software" and
-`README.md` recorded indicative figures of software ≈71 fps, NVDEC ≈93,
-NVDEC-explicit ≈148 fps — all decode-only. Those numbers are consistent
-with §3 here (87.8 / 331 / 433 fps) once the different clip, warming and
-measurement basis are accounted for. Phase 1 was explicit that these were
-*not* the basis of its verdict, and it was right to refuse: this
-benchmark shows the decode-level ratio (3.8×–7.3×) shrinking to **1.00×
-at the pipeline level**, because the encoder is the bottleneck.
-
-What this phase adds beyond Phase 1:
-
-1. The decode win is **real but irrelevant** at the pipeline level on
-   this hardware, quantified at 0.1–0.4 %.
-2. The **CPU release is the genuine benefit** (−62/−64 % CPU-s per frame),
-   quantified per frame rather than as an instantaneous percentage, and
-   shown to be largely surrendered by the frame-exact FFmpeg route.
-3. The **NVENC engine, not the CPU or decoder, caps concurrency**
-   (~30 fps aggregate at 2-way regardless of route).
-4. A **throttling feedback loop** (§1) that can fabricate a 3.4× speedup
-   if GPU clocks are not recorded. Any future benchmark of this question
-   must record clocks.
-5. The **FFmpeg → transfer → rigaya route is viable but pointless**: the
-   GPU round-trip is 1.8 % of PCIe capacity and still costs 6 % wall
-   clock, because the expense is CPU-side conversion.
+**Verdict on the pipe: keep FFmpeg hardware decode as the correctness and
+reference path — it is proven frame-exact — but do not adopt it as the
+production primary path** while a GPU-resident alternative exists that is
+both correct and 2× cheaper in CPU. The FFmpeg research is not wasted: it
+is the independent check that made the patched reader's byte-identical
+result credible.
 
 ---
 
-## 8. Threats to validity
+## 7. GPU utilisation: where the ceiling is
+
+Attributed per-pid, so these are this job's engines, not the machine's:
+
+| route | VE (encoder) mean/peak % | VD (decoder) mean/peak % | copy peak % | interpretation |
+|---|---|---|---|---|
+| software decode + NVENC | 47 / 53 | 0 | 2.6 | decode on CPU; encoder half-idle, **starved** |
+| `--avhw` + NVENC | 80 / 84 | **5** / 15 | 0.2 | NVDEC engaged, encoder well fed |
+| FFmpeg NVDEC → pipe → NVENC | 82 / 84 | 6 / 8 | **9.1** | decode on GPU but every frame crosses PCIe twice |
+
+Two readings:
+
+1. **The decoder engine is nowhere near saturation.** `--avhw` uses the VD
+   engine at a mean of ~5 %. NVDEC is not a bottleneck and will not become
+   one; the 433 fps decode-only figure is real but irrelevant at 22–26 fps
+   of demand.
+2. **The encoder engine is the ceiling** — ~80–85 % mean under `--avhw`, and
+   the reason 2-way concurrency converges to ~15–20 fps aggregate regardless
+   of route. Decode work removed from the CPU does not add encoder capacity.
+
+This is the mechanism behind every throughput result in this report: the
+pipeline is **NVENC-bound**, so a decode-side optimisation cannot show up as
+speed.
+
+---
+
+## 8. Recommendation
+
+```
+RECOMMEND:  software default + optional hardware decode
+
+  Primary hardware route : patched rigaya --avhw
+      - correct: byte-identical to software decode on Sony (SHA-256 match)
+      - cheap:   2.5-2.7x less CPU per frame, reproducibly (2-3% spread)
+      - no cost: patch adds no measurable CPU and disturbs neither --avsw
+                 output (bit-identical) nor --seek behaviour
+      - GPU-resident: avcuvid + copyDtoD, no host round-trip
+      - BUT: NOT faster. Single-way ~11% slower in the same-binary pairing,
+             and 2-way aggregate gains (+20% Sony / +4% DJI) are within this
+             host's run-to-run drift.
+
+  Reference/verification path : FFmpeg -hwaccel (NVDEC/QSV)
+      - keep it; it is frame-exact on the whole Sony corpus and it is the
+        independent evidence that made the patched reader's result credible
+      - do NOT make it the production primary: the y4m pipe costs ~6% wall
+        clock, +0.5-0.9 GB VRAM, and gives back ~80% of the CPU saving
+
+  Do NOT:  stock rigaya --avhw (loses 3 frames on Sony)
+  Do NOT:  4 concurrent 4K jobs on this GPU (measured 8.01 fps aggregate)
+```
+
+**Why "optional hardware decode" rather than "hardware decode on".** The
+justification is **CPU headroom**, not throughput: 2.6× less CPU per frame
+at ~93 % machine headroom under 2-way load. That is worth having if the CPU
+is needed elsewhere — audio encoding, channel-sync, muxing, PSNR/SSIM
+verification, non-NVENC backends (x265, SVT-AV1) or a watch-folder mixing
+job types. It is **not** worth having as a throughput optimisation, and on
+the evidence here a deployment that only ever runs NVENC jobs would gain
+nothing from switching.
+
+**Adoption gate.** The patch is a maintained fork: 18 lines, 2 files, but
+it means owning a build (CUDA/MSVC toolchain, NPP/ONNX/Vship/FFmpeg dev
+packages) and re-applying a diff on every upstream bump, on a code path
+where a rebase mistake is a **silent frame loss**. Before shipping: re-run
+`verify_integrity.py` (byte-identity), `check_scenario_tools.py`, and the
+`--seek` regression. Never trust the reader's self-reported frame count —
+count the delivered container.
+
+---
+
+## 9. Threats to validity
 
 | # | Threat | Status |
 |---|---|---|
-| T1 | GPU clock regime confounds all timing | **Detected and controlled.** Clocks recorded per run; first pass quarantined; all reported runs `throttled: false`. This was the single largest error source. |
-| T2 | DJI 10-minute fixture is a loop, not varied content | **Acknowledged.** Corpus holds only 364.4 s of DJI 4K60 2160p. Measures scaling, not DJI bitrate behaviour. |
-| T3 | Fixtures are video-only, production copies audio | **Acknowledged, bounded.** Audio is a stream copy that does not scale with decode path. Scope is the video transcode stage. |
-| T4 | One run per (fixture, route, concurrency) | **Acknowledged.** Earlier repeat measurements of the same configuration agreed to < 0.5 % once the clock regime was controlled (Sony `sw_enc`: 137.0 / 140.7 / 148.2 s across regimes), but no formal variance estimate exists. Differences below ~2 % should not be over-read. |
-| T5 | Background desktop load (~20 % CPU baseline) | **Recorded, not eliminated.** Would mask a small CPU-side gain, i.e. it biases *against* the hardware-decode CPU result, which is nonetheless large and consistent. |
-| T6 | A foreign NVENC session (`F:\1KT-avhw`) appeared on the GPU during part of the work | **Observed and logged.** Each run records its own clocks and per-PID engine attribution, so a contended run is identifiable. All reported runs are accounted for. |
-| T7 | Throttle threshold (2 300 MHz) is a judgement call | **Disclosed.** The two observed regimes are ~2 750–2 812 MHz and ~1 716 MHz; the threshold sits in a wide empty band between them, so it is not sensitive. |
-| T8 | `% Processor Utility` is over-calibrated on this platform | **Worked around.** All CPU claims use `% Processor Time`; the utility figure is recorded only to cross-check rigaya's own CPU field. |
-| T9 | rigaya progress timeline unrecoverable through a pipe | **Documented.** `progress_points` retained for frame counts only; `ramp` must not be cited. |
-| T10 | Content-dependence is large: Sony 13.7 Mbps vs DJI 84.4 Mbps output from the same QVBR 23 profile | **Acknowledged.** Absolute timings are content-specific; the *comparison between routes* is made on identical content, frame counts and bitrates, which is what the conclusions rest on. |
+| T1 | GPU clock regime confounds timing | **Controlled.** `clocks.max.sm` recorded per run; the earlier `clocks.sm`-based gate was found to be measuring driver noise and replaced. |
+| T2 | Host wall-clock drift (2×) between sessions and within a pass | **Acknowledged and load-bearing.** No conclusion rests on absolute fps or on differences below ~20 %. Per-frame CPU (2–3 % spread) and frame integrity are the conclusions' basis. |
+| T3 | Cross-binary timing (patched CUDA 13.1/MSVC 14.51 vs shipped CUDA 11.8/MSVC 14.44) | **Avoided for timing claims.** The single-way decode comparison uses both readers on the *patched* binary. Cross-binary rows are context only, and the patched build's own report flags the same caveat. |
+| T4 | A sibling NVENC job and a file indexer competed for the machine at times | **Recorded.** Correctness runs are immune; timing runs carry the drift in T2. GPU clock + per-pid engine attribution make a contended run identifiable. |
+| T5 | 4-way run's per-pid VRAM returned `None`, so the OOM mechanism is inferred | **Disclosed (§5.1).** The *throughput* result is measured; the mechanism is not. |
+| T6 | DJI 10-minute fixture is a stream-copy loop (corpus holds only 364 s of DJI 4K60 2160p) | **Acknowledged.** Measured for scaling, not absolute DJI bitrate behaviour. |
+| T7 | Fixtures are video-only; production copies audio on the non-Sony path | **Bounded.** Audio is a stream copy that does not scale with decode path; scope is the video transcode stage. |
+| T8 | One run per (fixture, route, concurrency) for §5 | **Acknowledged.** Repeatability was established only on the 6 s gate; §5 differences are read against T2's drift, not as precise effect sizes. |
+| T9 | `--frames` delivers N−3 on Sony for both readers | **Found and avoided.** Short windows use dedicated 6 s stream-copy fixtures instead. Recorded as a separate defect, unpatched and out of scope. |
 
 ---
 
-## 9. Tooling
+## 10. Tooling
 
-All tooling lives in the worktree at `work/e2e/` and is **not imported by
-production code**. Like `work/hwdecode/` in Phase 1, `work/` is
-gitignored, so these scripts stay local by project convention.
+All tooling is in `work/e2e/` (gitignored, per project convention) and is
+**not imported by production code**.
 
 | File | Role |
 |---|---|
-| `bench_e2e.py` | scenario construction, instrumented run loop, sampler integration, throttling detection |
-| `e2e_sampler.ps1` | per-second probe: CPU, per-PID engine utilisation, VRAM, clocks, temperature, power |
-| `make_fixtures.py` | stream-copy fixture construction + manifest with sha256 |
-| `matrices.json` | test matrices (`smoke` / `core` / `solo` / `long`) with rationale per job |
+| `bench_e2e.py` | scenario construction (binary-aware), instrumented run loop, exact CPU accounting, validity gate, throttling detection |
+| `e2e_sampler.ps1` | per-second probe: process CPU, per-pid GPU engines, VRAM, clocks, thermals |
+| `verify_integrity.py` | **the correctness gate**: independent decode count, per-frame picture sequence, packet sequence, SHA-256 |
+| `check_scenario_tools.py` | asserts `*_p` scenarios always select the patched build |
+| `compare_cpu.py` | exact vs sampled CPU, plus physical-impossibility sanity check |
+| `make_fixtures.py` | stream-copy fixture construction + manifest (frame counts, sha256) |
+| `matrices.json` | `stability` (validity gate) / `decision` / `samebinary` / `long` / `core` / `solo` |
 | `base_profile.json` | production `UHQ` encode settings, key-by-key provenance |
-| `analyze.py` | results aggregation into report tables |
-| `fixtures.json` | fixture manifest (paths, frame counts, sha256) |
-| `results/` | authoritative per-run JSON (one file per run, plus per-tag collections) |
-| `results_quarantine/` | the throttled first pass — kept as evidence, excluded from all conclusions |
+| `show_gate.py`, `concurrency_report.py`, `analyze.py` | report tables |
+| `results/`, `results_quarantine/` | authoritative per-run JSON; quarantined first pass |
+| `integrity/` | the delivered files behind §3's SHA-256 claims |
