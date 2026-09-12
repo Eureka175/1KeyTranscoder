@@ -387,7 +387,30 @@ patch 引入、帧数/PTS 差异、常量偏移对齐（不是简单的窗口平
 | HD-H02 | P0 | 同 H-01 + 强制硬件失败 | 同上 | **resume after fallback**：state 一致——失败运行的缓存报告**不得**阻止重试；回退后的成功运行可被正确 resume | 注入失败 → 重跑成功 → 再 resume | auto | |
 | HD-H03 | P0 | 长片段 + hardware | 同上 | **interrupted job**：受控中断（terminate）后临时文件按约定清理/保留、状态正确标记、**不得出现 false success** | 启动后中断，检查 work 目录与 report.json | auto | |
 | HD-H04 | P0 | 任意输入 + 强制硬件失败 | 同上 | **retry after hardware failure**：hardware 失败 → retry → 软件成功；retry 不重复已完成的阶段 | 断言阶段执行顺序 | auto | |
-| HD-H05 | P0 | 已有 partial hardware artifact 的输入 | 同上 | **re-run same input**：不会因为残留的 partial hardware 产物产生**错误 resume**（把不完整产物当成完成） | 手工放置 partial 产物后重跑，断言重新执行 | auto | |
+| HD-H05 | P0 | 已有 partial hardware artifact 的输入 | 同上 | **re-run same input**：不会因为残留的 partial hardware 产物产生**错误 resume**（把不完整产物当成完成） | 截断一个完整 intermediate（2% / 50%）后喂给 `_encoded_ok`，并断言完整产物仍被接受 | auto | |
+
+> ⚠️ **本 session 由 HD-H05 抓到的真实生产缺陷（已修）**
+>
+> `_encoded_ok()` 决定 resume 时能否**复用** intermediate，而它当时只问
+> "能不能读到 ≥1 个 video packet"。**被截断的文件满足这个条件**：
+>
+> | 截断比例 | `nb_read_packets`（真正读到的） | 容器声明的 sample 数 | 修复前 `_encoded_ok` | 修复后 |
+> |---|---|---|---|---|
+> | 完整 | 360 | 360 | True | **True**（必须保持） |
+> | 2%（596 MB → 11.9 MB） | 19 | 360 | **True ❌** | **False ✅** |
+> | 2%（28 MB → 564 KB） | **2**（且 stderr 无任何错误） | 360 | **True ❌** | **False ✅** |
+> | 50% | 55 | 360 | **True ❌** | **False ✅** |
+>
+> 后果正是本 session 列为 P0 的 **resume corruption**：中断的运行留下 partial
+> `encoded.mov`，后续运行把它当成完成品 → 交付不完整的编码结果。
+>
+> **为什么此前看不见**：两个不同的数字被混为一谈。截断的 MP4 里 **`stsz` 表
+> （在 moov 里）仍然完好**，所以"容器声明的 sample 数"依旧是 360；而"解复用器
+> 真正读到的 packet 数"塌掉了。旧守卫看的是前者（其实连前者都没看，只看 `> 0`），
+> 生产需要的是后者。修复后守卫比较 **read count vs 源帧数**，并拒绝任何
+> partial/truncated 读取错误；两个 resume 调用点都传入期望值。
+>
+> 这是本 session 唯一一处**由测试矩阵发现并修复的生产缺陷**。
 
 ---
 
