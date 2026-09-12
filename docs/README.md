@@ -94,11 +94,15 @@ F:\1KeyTranscoder\
 | `root-cause.md` | 根因分析（Observation/Evidence/Hypothesis/Experiment/Result/Conclusion） |
 | `design.md` | 目标解码器架构设计 |
 | `implementation-plan.md` | **Phase 2 计划**：§17.1 架构问题 P1–P8、§17.3 解码器 API、§17.4 完整性三层、§17.5 回退契约、§17.9 步骤 S1–S10 |
+| `e2e-benchmark.md` | **S9 端到端基准（已执行）**：软解 vs rigaya `--avhw` vs FFmpeg NVDEC→传输→编码，Sony/DJI × 60s/10min × 1路/2路；含 GPU 降频污染警告与 quarantined 首轮数据 |
 | `test-results/` | 机器可读结果（comparison / corpus / nvdec / qsv / software-ground-truth / summary） |
 
-> ⚠️ **本目录是 Phase 1 调查产物，Phase 2 未执行**：生产 decode/encode/mux/
-> preservation/channel-sync 代码一行未改。当前开发方向与优先级见
-> `work/docs/v1.0.0_requirements.md`（P0-A = 硬件解码方向探索）。
+> ⚠️ **Phase 1 是调查产物，但 `e2e-benchmark.md` 已执行 Phase 2 的 S9 基准**：
+> 生产 decode/encode/mux/preservation/channel-sync 代码一行未改，基准仅在
+> 独立 worktree 的 `work/e2e/`（gitignored）中运行。
+> **S9 结论：端到端吞吐无实质提升（+0.1–0.4%），硬件解码的真实收益是
+> 每帧 CPU 降低约 2/3；管线是 NVENC 受限，不是解码受限。**
+> 当前开发方向与优先级见 `work/docs/v1.0.0_requirements.md`（P0-A = 硬件解码方向探索）。
 
 ## 📁 evaluation/ — 评估报告（分类：评估与调研）
 
