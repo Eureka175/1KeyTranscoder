@@ -3,9 +3,20 @@
 Consumes the authoritative qsv.json profiles verbatim (same
 flag-whitelist mechanism as nvencc). Policy: 4:2:2 sources always plan
 a 4:2:0 conversion — direct 4:2:2 HEVC encode on Arc is the slow path
-(~1.0x vs 2.0x for the conversion), and QSV has no 10-bit H.264
-decode at all (silent avsw fallback confirmed empirically). Hardware
-encode paths always decode with --avsw (software).
+(~1.0x vs 2.0x for the conversion), and QSV has no 10-bit H.264 decode
+at all (silent avsw fallback confirmed empirically).
+
+The decode reader is **not** decided here.  It arrives as an explicit
+``reader`` argument produced by ``encoders.hwdecode.route_decode``, and
+its default is ``avsw`` (software) — the v0.6.2 behaviour.  QSV is the
+tool where "the tool chose differently than you asked" is most likely:
+it silently constructs an ``avsw`` reader when the hardware one cannot
+handle the input, so the integrity gate asserts the reader identity
+printed in ``Input Info`` rather than trusting the command line.
+
+QSVEncC's hardware-decode patch is runtime-proven **on the pinned 8.26
+revision only**; releases 8.27–8.30 were not examined and are not
+claimed.
 """
 
 from __future__ import annotations
@@ -95,11 +106,14 @@ class QsvBackend:
         depth: int,
         vfr: bool = False,
         color: ColorInfo | None = None,
+        reader: str = "avsw",
     ) -> tuple[list[str], list[str], list[str]]:
+        if reader not in ("avsw", "avhw"):
+            raise ValueError(f"unknown decode reader: {reader!r}")
         args, skipped = build_flag_args(profile, PARAM_MAP, self.known)
         cargs, cnotes = color_flag_args(color, self.known)
         args = [
-            "--avsw", "--video-track", "1", "-c", self.codec,
+            f"--{reader}", "--video-track", "1", "-c", self.codec,
             "--output-depth", str(depth),
             *args,
         ]
@@ -131,9 +145,10 @@ class QsvBackend:
         vfr: bool = False,
         audio_copy: bool = False,
         color: ColorInfo | None = None,
+        reader: str = "avsw",
     ) -> tuple[list[str], list[str], list[str]]:
         args, skipped, notes = self.build_args(
-            profile, chroma, depth, vfr, color
+            profile, chroma, depth, vfr, color, reader=reader
         )
         cmd = [str(self.tool), "-i", str(source), *args]
         if audio_copy:

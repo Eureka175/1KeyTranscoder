@@ -4,13 +4,22 @@ failure records, and worker schedulers.
 Extracted from the main program so 1kt.py stays a thin orchestrator.
 
 Key behaviors (final design):
-- hardware encode paths always decode with --avsw (software);
+- hardware encode paths decode with `--avsw` (software) by default;
+  hardware decode is opt-in via `--hw-decode auto|require` and is
+  gated by capability routing plus the frame-integrity gate
+  (encoders/hwdecode.py, encoders/integrity.py);
 - runtime encode failures NO LONGER open a prompt window: the
   downgrade ladder runs automatically (source -> 10bit 4:2:0 ->
   8bit 4:2:0) with a prominent WARNING per rung printed in the work
   window and recorded in logs + failed_files.json when exhausted;
 - capability-driven downgrades happen silently up front (WARNING);
 - reader failures fall back to an MP4Box strip once.
+
+Hardware-decode fallback is deliberately narrow: only a *failed
+integrity gate* or a *reader that was not constructed as requested*
+causes a rerun with software decode, the hardware artifact is deleted
+first so it can never be delivered, and the number of such fallbacks per
+file is capped so a broken toolchain cannot loop.
 """
 
 from __future__ import annotations
@@ -43,6 +52,16 @@ from encoders.hw import (
     read_log_tail,
     run_hw_tool,
 )
+from encoders.hwdecode import (
+    POLICY_AUTO as HW_DECODE_AUTO,
+    POLICY_OFF as HW_DECODE_OFF,
+    POLICY_REQUIRE as HW_DECODE_REQUIRE,
+    R_REQUIRE_UNMET,
+    classify_reader_failure,
+    memoize_unavailable,
+    route_decode,
+)
+from encoders.integrity import verify_encode
 from encoders.nvencc import NvencBackend
 from encoders.qsvencc import QsvBackend
 
@@ -73,6 +92,19 @@ from preservation.pipeline import run_sony_pipeline
 from preservation import dji
 
 StatusCb = Callable[[str, str], None]
+
+# Reader identity each tool prints in "Input Info" when it really built
+# the requested reader. Asserted by the integrity gate: a requested
+# `avhw` that silently became `avsw` must never count as a hardware pass.
+READER_IDENTITY: dict[str, dict[str, str]] = {
+    "nvencc": {"avhw": "avcuvid", "avsw": "avsw"},
+    "qsvencc": {"avhw": "avqsv", "avsw": "avsw"},
+}
+
+# Cap on hardware->software decode reruns for a single file. One is the
+# legitimate case; more than one means the software path is also failing
+# and the ladder must terminate rather than loop.
+MAX_HW_DECODE_FALLBACKS = 1
 
 
 # ---------------------------------------------------------------------------
@@ -262,12 +294,20 @@ def hw_encode_with_fallback(
     file_logger: logging.Logger,
     progress_cb: Callable[[int, float], None] | None = None,
     show_progress: bool = True,
+    hw_decode: str = HW_DECODE_OFF,
+    hw_decode_memo: dict | None = None,
 ) -> tuple[list[str], tuple[str, int], float]:
     """Automatic three-tier downgrade ladder (NO prompt window).
 
     Capability-driven downgrades happen silently up front (WARNING);
     runtime failures run the ladder automatically with a WARNING per
     rung; reader failures use the MP4Box strip fallback once.
+
+    Hardware **decode** is layered on top and is off by default.  When
+    ``hw_decode`` is ``auto``/``require`` the decode reader is chosen by
+    ``encoders.hwdecode.route_decode`` and every hardware result must
+    pass the integrity gate before it is accepted; a failed gate
+    discards the artifact and reruns the same rung with software decode.
     Returns (warnings, final_format). Raises RuntimeError on fatal."""
     warnings: list[str] = []
     caps = backend.caps
@@ -300,6 +340,31 @@ def hw_encode_with_fallback(
             f"[FATAL] no encodable format rung for {chroma}/{depth}"
         )
 
+    # --- hardware-decode routing (HD-B01..B09) ---------------------------
+    memo = hw_decode_memo if hw_decode_memo is not None else {}
+    route = route_decode(
+        policy=hw_decode,
+        backend=backend.name.split("-")[0],
+        codec=backend.codec,
+        chroma=chroma,
+        depth=depth,
+        memo=memo,
+    )
+    file_logger.info("DECODE_ROUTE | %s", route.log_line())
+    if route.hardware:
+        logger.info("[HWDEC] %s", route.log_line())
+    for w in route.warnings:
+        emit_warning(logger, file_logger, w, warnings)
+    if route.reason == R_REQUIRE_UNMET:
+        raise RuntimeError(f"[FATAL] {route.detail}")
+    if not route.hardware and hw_decode == HW_DECODE_REQUIRE:
+        raise RuntimeError(f"[FATAL] {route.detail}")
+
+    reader = route.reader
+    reader_expected = READER_IDENTITY[backend.kind][reader]
+    hw_fallbacks = 0
+    discarded: list[str] = []
+
     cur_input = source
     stripped = False
     rung_idx = 0
@@ -307,7 +372,8 @@ def hw_encode_with_fallback(
     while rung_idx < len(rungs):
         c, d = rungs[rung_idx]
         cmd, skipped, color_notes = backend.command(
-            cur_input, output, profile, c, d, vfr, audio_copy, color
+            cur_input, output, profile, c, d, vfr, audio_copy, color,
+            reader=reader,
         )
         if skipped and rung_idx == 0:
             emit_warning(
@@ -332,6 +398,59 @@ def hw_encode_with_fallback(
         rc, elapsed = run_hw_tool(
             cmd, raw_log, total_frames, label, progress=show_progress
         )
+
+        # --- integrity gate (HD-C11..C13, HD-F05) ------------------------
+        verdict = None
+        if reader == "avhw":
+            try:
+                log_text = raw_log.read_text(
+                    encoding="utf-8", errors="replace"
+                ) if raw_log.is_file() else ""
+            except OSError:
+                log_text = ""
+            verdict = verify_encode(
+                source=source,
+                output=output if (rc == 0 and output.is_file()) else None,
+                log_text=log_text,
+                rc=rc,
+                reader_requested=reader,
+                reader_expected_identity=reader_expected,
+            )
+            file_logger.info("INTEGRITY | %s", verdict.log_line())
+            if not verdict.ok:
+                _cls, _detail = classify_reader_failure(log_text)
+                reason = verdict.reason
+                emit_warning(
+                    logger,
+                    file_logger,
+                    f"hardware decode integrity FAILED on {source.name}: "
+                    f"{reason} — {verdict.detail}",
+                    warnings,
+                )
+                # The artifact must not survive as a delivery candidate.
+                if "discard_hardware_result" in verdict.actions or (
+                    "fallback_to_software" in verdict.actions
+                ):
+                    safe_unlink(output)
+                    discarded.append(f"{reason}: {verdict.detail}")
+                memoize_unavailable(memo, route, reason, verdict.detail)
+                hw_fallbacks += 1
+                if hw_fallbacks > MAX_HW_DECODE_FALLBACKS:
+                    raise RuntimeError(
+                        "[FATAL] hardware decode failed integrity "
+                        f"{hw_fallbacks} times ({reason}: {verdict.detail}); "
+                        "refusing to retry further"
+                    )
+                reader = "avsw"
+                reader_expected = READER_IDENTITY[backend.kind][reader]
+                emit_warning(
+                    logger,
+                    file_logger,
+                    "hardware decode result discarded -> rerunning this "
+                    "format rung with software decode (--avsw)",
+                    warnings,
+                )
+                continue
 
         ok = False
         if rc == 0 and output.is_file() and output.stat().st_size > 0:
@@ -360,16 +479,16 @@ def hw_encode_with_fallback(
             else:
                 ok = True
         if ok:
+            if discarded:
+                file_logger.info(
+                    "HWDEC_SUMMARY | fallbacks=%d discarded=%s",
+                    hw_fallbacks, " | ".join(discarded),
+                )
             return warnings, (c, d), _last_encode_fps(raw_log)
 
         tail = read_log_tail(raw_log)
         cls = "format" if rc == 0 else classify_failure(tail)
 
-        if cls == "environment":
-            raise RuntimeError(
-                f"[FATAL] environment failure (no downgrade retry): "
-                f"{tail[-400:]}"
-            )
         if cls == "reader" and not stripped and gpac is not None:
             try:
                 cur_input = strip_video_audio(
@@ -391,6 +510,12 @@ def hw_encode_with_fallback(
                     f"strip fallback failed: {exc}",
                     warnings,
                 )
+
+        if cls == "environment":
+            raise RuntimeError(
+                f"[FATAL] environment failure (no downgrade retry): "
+                f"{tail[-400:]}"
+            )
 
         # format-class failure -> next rung (automatic, no prompt)
         if rung_idx == len(rungs) - 1:
@@ -635,6 +760,8 @@ def encode_one_sony_hw(
     preserve_reports: Path,
     keep_work: bool,
     no_downgrade: bool,
+    hw_decode: str = HW_DECODE_OFF,
+    hw_decode_memo: dict | None = None,
     check_level: str,
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
@@ -697,6 +824,7 @@ def encode_one_sony_hw(
             total_frames=source_summary["total_frames"],
             ffprobe=ffprobe, audio_copy=False, do_frame_check=True,
             no_downgrade=no_downgrade, gpac=gpac,
+            hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -870,6 +998,8 @@ def encode_one_hw_classic(
     gpac: GpacContainerBackend,
     work_root: Path,
     no_downgrade: bool,
+    hw_decode: str = HW_DECODE_OFF,
+    hw_decode_memo: dict | None = None,
     check_level: str = "basic",
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
@@ -929,6 +1059,7 @@ def encode_one_hw_classic(
             total_frames=source_summary["total_frames"],
             ffprobe=ffprobe, audio_copy=True, do_frame_check=False,
             no_downgrade=no_downgrade, gpac=gpac,
+            hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -1061,6 +1192,8 @@ def encode_one_dji_hw(
     preserve_reports: Path,
     keep_work: bool,
     no_downgrade: bool,
+    hw_decode: str = HW_DECODE_OFF,
+    hw_decode_memo: dict | None = None,
     check_level: str,
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
@@ -1140,6 +1273,7 @@ def encode_one_dji_hw(
             total_frames=source_summary["total_frames"],
             ffprobe=ffprobe, audio_copy=False, do_frame_check=not vfr,
             no_downgrade=no_downgrade, gpac=gpac,
+            hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -1388,6 +1522,8 @@ class BatchCtx:
     multiple_presets: bool = False
     keep_work: bool = False
     no_downgrade: bool = False
+    hw_decode: str = HW_DECODE_OFF
+    hw_decode_memo: dict = field(default_factory=dict)
     check_level: str = "basic"
     ffmpeg: Path | None = None
     quality_opts: dict[str, Any] | None = None
@@ -1485,6 +1621,8 @@ def process_file_hw(
             preserve_reports=ctx.preserve_reports,
             keep_work=ctx.keep_work,
             no_downgrade=ctx.no_downgrade,
+            hw_decode=ctx.hw_decode,
+            hw_decode_memo=ctx.hw_decode_memo,
             check_level=ctx.check_level,
             ffmpeg=ctx.ffmpeg,
             quality_opts=ctx.quality_opts,
@@ -1519,6 +1657,8 @@ def process_file_hw(
             preserve_reports=ctx.preserve_reports,
             keep_work=ctx.keep_work,
             no_downgrade=ctx.no_downgrade,
+            hw_decode=ctx.hw_decode,
+            hw_decode_memo=ctx.hw_decode_memo,
             check_level=ctx.check_level,
             ffmpeg=ctx.ffmpeg,
             quality_opts=ctx.quality_opts,
@@ -1550,6 +1690,8 @@ def process_file_hw(
             gpac=ctx.gpac,
             work_root=ctx.work_root,
             no_downgrade=ctx.no_downgrade,
+            hw_decode=ctx.hw_decode,
+            hw_decode_memo=ctx.hw_decode_memo,
             check_level=ctx.check_level,
             ffmpeg=ctx.ffmpeg,
             quality_opts=ctx.quality_opts,

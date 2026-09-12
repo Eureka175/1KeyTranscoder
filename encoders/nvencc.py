@@ -3,9 +3,15 @@
 Consumes the authoritative nvenc.json profiles verbatim: profile keys
 map to CLI flags via PARAM_MAP, and each flag is validated against the
 tool's own --help before use (flags a given NVEncC version does not
-advertise are skipped and reported as warnings). Hardware encode paths
-always decode with --avsw (software) — hardware-decode frame loss on
-Sony timelines is documented in docs/hardware_backend_design.md 5.2.
+advertise are skipped and reported as warnings).
+
+The decode reader is **not** decided here.  It arrives as an explicit
+``reader`` argument produced by ``encoders.hwdecode.route_decode``, and
+its default is ``avsw`` (software) — the v0.6.2 behaviour.  Hardware
+decode is opt-in via ``--hw-decode`` and is gated on the runtime-proven
+codec/chroma/depth allowlist plus the frame-integrity gate, because the
+stock hardware reader loses frames silently on Sony timelines
+(docs/hardware-decode/integration-test-matrix.md, category C).
 
 Output is a video-only mp4 (explicit -f mp4; the preservation pipeline
 imports it with MP4Box and repairs the millisecond-timescale edit-list
@@ -97,14 +103,24 @@ class NvencBackend:
         depth: int,
         vfr: bool = False,
         color: ColorInfo | None = None,
+        reader: str = "avsw",
     ) -> tuple[list[str], list[str], list[str]]:
         """Full argument list (before -o) for one encode attempt.
 
-        Returns (argv, skipped_keys, color_notes)."""
+        Returns (argv, skipped_keys, color_notes).
+
+        ``reader`` is ``"avsw"`` (software, default) or ``"avhw"``
+        (hardware).  It is always passed explicitly: "let the tool
+        choose" is not an option, because NVEncC's default reader and
+        its silent fallbacks are exactly what the integrity gate has to
+        be able to distinguish.
+        """
+        if reader not in ("avsw", "avhw"):
+            raise ValueError(f"unknown decode reader: {reader!r}")
         args, skipped = build_flag_args(profile, PARAM_MAP, self.known)
         cargs, cnotes = color_flag_args(color, self.known)
         args = [
-            "--avsw", "--video-track", "1", "-c", self.codec,
+            f"--{reader}", "--video-track", "1", "-c", self.codec,
             "--output-depth", str(depth),
             *args,
         ]
@@ -134,9 +150,10 @@ class NvencBackend:
         vfr: bool = False,
         audio_copy: bool = False,
         color: ColorInfo | None = None,
+        reader: str = "avsw",
     ) -> tuple[list[str], list[str], list[str]]:
         args, skipped, notes = self.build_args(
-            profile, chroma, depth, vfr, color
+            profile, chroma, depth, vfr, color, reader=reader
         )
         cmd = [str(self.tool), "-i", str(source), *args]
         if audio_copy:
