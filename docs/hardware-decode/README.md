@@ -51,6 +51,7 @@ the whole corpus rather than on one clip.
 | [`divergence.md`](divergence.md) | per-frame fingerprinting and first-divergence analysis |
 | [`root-cause.md`](root-cause.md) | Observation/Evidence/Hypothesis/Experiment/Result/Conclusion |
 | [`rigaya-avhw-analysis.md`](rigaya-avhw-analysis.md) | **Phase 2** — the exact rigaya source line that discards Sony's leading pictures, why Sony triggers and x265 does not, and a PoC patch |
+| [`nvencc-second-path-analysis.md`](nvencc-second-path-analysis.md) | **Phase 2 follow-up** — `setPocAndFix`: what it prunes, why it does not affect the delivered count, and why it must stay out of the patch |
 | [`design.md`](design.md) | target decoder architecture |
 | [`implementation-plan.md`](implementation-plan.md) | Phase 2 plan, acceptance criteria, risks |
 | [`test-results/`](test-results/) | machine-readable results |
