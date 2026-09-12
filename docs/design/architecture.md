@@ -261,6 +261,26 @@ P1 设计见 `docs/design/channel_sync_p1.md`，实现要点：
 * `--fresh-log` 清空 `total.log`（默认**追加**）。
 * `core/versions.py` 记录工具链版本，供复现与问题定位。
 
+### 9.1 ⚠️ `tools/` 的位置不可变（踩过的坑）
+
+`tools/`（ffmpeg/ffprobe、NVEncC、QSVEncC、GPAC，约 1.3 GB）**被 `.gitignore` 排除**，
+即**不受 git 保护**：删除不进回收站、不留记录，缺失时的症状只是"报错找不到 ffmpeg"。
+
+> **2026-09 两次真实事故**：为让 research 工作树共享工具链，在工作树里建了
+> `tools` → 主 `tools/` 的 **junction**；随后 `git worktree remove --force`
+> 递归删除工作树，把工作树里的**工具链实体副本**一并删除，主 `tools/` 变空。
+
+三条硬规则：
+
+1. **工具链只存在 `F:\1KeyTranscoder\tools\` 一处**，不在任何工作树/临时目录复制或链接它。
+   跨位置引用用参数：`--tool-nvencc` / `--tool-qsvencc` / `--ffmpeg` / `--ffprobe` / `--gpac-dir`。
+2. **不要用 `Move-Item` 移动 junction**（跟随语义，移动的是目标内容）；动带链接的目录前
+   先 `Get-Item <路径> -Force | Select LinkType,Target`。
+3. **`git worktree remove --force` 会删除该工作树下的全部内容**（含未跟踪文件）。
+   执行前用 `git status --ignored` 列一遍，确认没有要紧东西。
+
+根 `README.md` §依赖 有更完整的说明。
+
 ---
 
 ## 10. 必须保持的不变量

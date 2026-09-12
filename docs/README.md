@@ -55,10 +55,18 @@ F:\1KeyTranscoder\
 │                             vce[预留未接]）—— 运行时配置，非文档
 │
 ├── docs/                   📚 文档（见下）
-├── tools/                  自带工具链（ffmpeg/ffprobe 9.0.1、NVEncC 9.31、
-│                             QSVEncC 8.26、VCEEncC 9.12、GPAC）—— 1.34 GB，gitignored
+├── tools/                  ⚠️ 自带工具链 —— gitignored，**只有这一份**
+│   │                         （详见根 README §依赖 的警告框）
+│   ├── ffmpeg.exe / ffprobe.exe      9.0.1 gyan full
+│   ├── NVEncC_9.31_x64/              shipped 版（r4047，CUDA 11.8）
+│   ├── QSVEncC_8.26_x64/             shipped 版（r4504）
+│   ├── GPAC/                         MP4Box 等容器工具
+│   └── avhw/                         ★ 硬解研究用的**补丁版**二进制（非 shipped）
+│       ├── NVEncC_9.31_avhw/         `9.31 (r1)` CUDA 13.1
+│       │                             sha256 dcf6d7a63143c777…7c8be4b
+│       └── QSVEncC_8.26_avhw/        `8.26 (r4504)` 自建
 ├── testsets/               测试素材（1063 文件 / 97.5 GB）—— gitignored
-├── work/                   实验产物与阶段证据（gitignored；含 _worktrees/ 研究分支工作树）
+├── work/                   实验产物与阶段证据（gitignored）
 ├── dist/                   发布产物：v0.6.1 zip + sha256 + manifest（0.54 GB）
 ├── olddocs/                历史代码快照与废弃脚本（详见 olddocs/README.md）
 ├── metadata_forensics/     取证数据（18 文件 / 2.7 MB，被 design 文档引用）
@@ -76,7 +84,7 @@ F:\1KeyTranscoder\
 | `1kt.py` `watchfolder.py` `start.bat` `README.md` `LICENSE` `VERSION` | ✅ | 必需条目（缺失即拒绝构建） |
 | `core/` `encoders/` `preservation/` `tests/` | ✅ | 全部 `.py`（排除 `__pycache__`/.pyc） |
 | `*.json`（档位配置） | ✅ | `TOP_GLOBS = ("*.json",)` |
-| `tools/`（ffmpeg / NVEncC / QSVEncC / GPAC） | ✅ | 仅 `TOOL_FILES` + `TOOL_DIRS` 白名单；**`tools/VCEEncC_9.12_x64` 不入包** |
+| `tools/`（ffmpeg / NVEncC / QSVEncC / GPAC） | ✅ | **白名单制**：`TOOL_FILES = tools/ffmpeg.exe, tools/ffprobe.exe`；`TOOL_DIRS = tools/NVEncC_9.31_x64, tools/QSVEncC_8.26_x64, tools/GPAC`。**不在白名单的目录一律不入包**——`tools/avhw/`（补丁版研究二进制）因此自动排除 |
 | `docs/` `olddocs/` `logs/` `work/` `testsets/` `dist/` `release/` `metadata_forensics/` | ❌ | **明确排除**，见 manifest `excluded_by_design` |
 
 > 即：**文档、实验产物、测试素材、发布工具本身都不进包**，

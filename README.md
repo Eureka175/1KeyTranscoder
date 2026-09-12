@@ -114,11 +114,32 @@ DJI（djmd）→ DJI
 
 ## 依赖
 
+> ## ⚠️ 工具链只有一份：`tools/` 请勿在别处复制，也勿做成 junction/软链接
+>
+> `tools/`（约 1.3 GB：ffmpeg/ffprobe、NVEncC、QSVEncC、GPAC）是**整个项目共享的
+> 唯一工具链**，且被 `.gitignore` 排除 —— **git 不管它**：删掉不进回收站，也不报错。
+>
+> **已发生过两次的真实事故**（2026-09）：为让 research 工作树共享工具链，曾在工作树里
+> 建 `tools` → 主 `tools/` 的 **junction**；随后 `git worktree remove --force`
+> 递归删除该工作树时，把工作树里的**工具链实体副本**一并删除，主 `tools/` 变空，
+> 直到构建与测试全部不可用才发现。
+>
+> **规则（照做即可避免）**
+>
+> 1. **工具链只放 `F:\1KeyTranscoder\tools\`**，不要在任何工作树/临时目录里复制或链接它。
+>    要给别处指定路径就用参数：`--tool-nvencc` / `--tool-qsvencc` / `--ffmpeg` / `--ffprobe` / `--gpac-dir`。
+> 2. **动带链接的目录前先看一眼**：`Get-Item <路径> -Force | Select LinkType,Target`。
+>    **不要用 `Move-Item` 移动 junction** —— 它是"跟随"语义，移动的是目标内容而非链接本身。
+> 3. **`git worktree remove --force` 会删掉该工作树下的全部内容**，包括未被 git 跟踪的文件。
+>    执行前先列一遍未跟踪内容（`git status --ignored`），确认没有要紧东西。
+> 4. **备份/搬运项目时单独确认 `tools/`**：体积大、无 git 记录，缺失时的症状是
+>    "报错找不到 ffmpeg"，而不是"文件丢了"。
+
 | 组件 | 说明 |
 |---|---|
 | GPAC / MP4Box | `C:\Program Files\GPAC`（或 `--gpac-dir`）——容器重建与元数据保留核心（**行为绑定 26.02**，升级须回归） |
 | NVEncC / QSVEncC | `tools/NVEncC_9.31_x64/`、`tools/QSVEncC_8.26_x64/`（或 `--tool-*`） |
-| ffmpeg / ffprobe | 9.0.1 gyan full（tools/ 自带，内置 libx265/libsvtav1 v4.2.0/libvmaf；**必须用项目自带版本**，PATH 老版本不支持 AV1 新特性） |
+| ffmpeg / ffprobe | 9.0.1 gyan full（`tools/` 自带，内置 libx265/libsvtav1 v4.2.0/libvmaf；**必须用项目自带版本**，PATH 老版本不支持 AV1 新特性） |
 | Gyroflow（可选） | 消费端校验（`--check advanced/full`；未安装则提示并跳过） |
 | numpy / scipy（可选） | 仅 `--channel-sync` 延时补偿需要（缺失时该功能跳过并 WARNING，转码不受影响） |
 
