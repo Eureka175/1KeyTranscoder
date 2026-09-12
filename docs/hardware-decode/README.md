@@ -52,6 +52,7 @@ the whole corpus rather than on one clip.
 | [`root-cause.md`](root-cause.md) | Observation/Evidence/Hypothesis/Experiment/Result/Conclusion |
 | [`design.md`](design.md) | target decoder architecture |
 | [`implementation-plan.md`](implementation-plan.md) | Phase 2 plan, acceptance criteria, risks |
+| [`nvencc-avhw-experiment.md`](nvencc-avhw-experiment.md) | **Phase 2, `research/rigaya-nvencc-avhw`** — where inside NVEncC `--avhw` the frames are actually lost, the reader-side patch candidates, and whether the reader is worth fixing |
 | [`test-results/`](test-results/) | machine-readable results |
 
 ## Conclusion table
@@ -66,7 +67,7 @@ the whole corpus rather than on one clip.
 | **Flush-related** | **No.** Divergence is at the head; `in_avhw_not_avsw = ∅`; a drain defect would truncate the tail. `FLUSH_LOSS` and `REORDER_DELAY_ERROR` counts are zero everywhere. |
 | **Reorder-related** | **No.** No reorder, no duplication, no PTS-only change. `ctts` reorder depth is fully honoured by both FFmpeg hardware paths. |
 | **Project integration-related** | **Not the source of the observed loss.** Hardware decode is unreachable (`--avsw` literal at `encoders/nvencc.py:107`, `encoders/qsvencc.py:102`); 8/8 real production deliverables were frame-exact (delta 0). But the integration has **latent verification holes** that would let a future hardware path ship a wrong count at exit 0. |
-| **Root cause confidence** | `Confirmed` for: the rigaya reader drops leading pictures; the loss equals `pictures_before_first_keyframe`; the edit list is **not** the trigger; FFmpeg over the same silicon is exact. `Unconfirmed`: the exact line of rigaya code, and behaviour on All-I / 8-bit / 1080p material. |
+| **Root cause confidence** | `Confirmed` for: the rigaya reader drops leading pictures; the loss equals `pictures_before_first_keyframe`; the edit list is **not** the trigger; FFmpeg over the same silicon is exact. `Unconfirmed`: the exact line of rigaya code, and behaviour on All-I / 8-bit / 1080p material. **Superseded in part by Phase 2:** the exact line *is* now known (see [`nvencc-avhw-experiment.md`](nvencc-avhw-experiment.md) §3) — the pictures are **decoded correctly and then discarded by NVEncC's hardware output stage**, not lost in the reader/decoder. The frame-loss *prediction* above is unaffected. |
 | **Recommended fix** | Never use rigaya `--avhw` for XAVC. If hardware decode is adopted, drive it via **FFmpeg `-hwaccel`** (proven frame-exact) with **format-level capability routing** (QSV: HEVC/4:2:0 only; H.264 4:2:2 → NVDEC or software). Make decode a stage with a contract; validate the frame expectation from container boxes *before* decoding; reconcile four frame counts incl. the currently discarded `encoded N frames`. |
 | **Fallback needed** | **Yes**, but as a safety net, not the control mechanism. Primary control is plan-time capability + structural preconditions; fallback triggers on capability miss, init failure, count mismatch or sequence mismatch. Must be automatic but **never silent**. |
 | **Expected performance gain** | Indicative only, and **not** the basis of the verdict: one long 4K60 clip, warm-up runs on a thermally loaded laptop → software ≈71 fps, QSV ≈60 fps, NVDEC ≈93 fps, NVDEC with explicit `cuda` surfaces ≈148 fps. So **NVDEC is faster than software; QSV is not.** The durable justification for hardware decode is **CPU headroom for concurrent encodes**, decided per vendor. Not a benchmark — see `implementation-plan.md` §17.7. |
@@ -84,6 +85,14 @@ the whole corpus rather than on one clip.
    NVEncC `--avhw` and QSVEncC `--avhw` both lose frames on **100 %** of
    the Sony corpus — the same hardware decoders that FFmpeg drives
    correctly.
+
+   > **Phase 2 refinement.** "Reader layer" means the rigaya *integration*
+   > layer above the decoder, and specifically NVEncC's hardware **output
+   > stage**, not the CUVID/NVDEC decoder. NVEncC's own trace shows all 30
+   > packets reaching NVDEC and NVDEC emitting all 30 pictures, including the
+   > three previously attributed to the reader, which are then dropped on a
+   > timestamp test. See
+   > [`nvencc-avhw-experiment.md`](nvencc-avhw-experiment.md) §2.2 and §3.
 
 3. **The mechanism is known and predictable.** Sony XAVC clips code
    pictures *before* their first keyframe in presentation order, and carry
