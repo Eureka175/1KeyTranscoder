@@ -1,10 +1,15 @@
 # QSVEncC `--avhw` — Behaviour, Failure Modes and Root Cause
 
-`research/rigaya-qsvencc-avhw` · base `main` @ `15cf218` · worktree `F:\1KT-qsv`
+`research/rigaya-qsvencc-avhw` · base `main` @ `15cf218` · worktree `F:\1KeyTranscoder\work\_worktrees\1KT-qsv`
+
+> **Path note.** This worktree was originally created at `F:\1KT-qsv` and was
+> later collected into the project folder under `work\_worktrees\`. Paths in this
+> document have been updated accordingly; nothing else changed.
 
 > **Scope.** Read-only investigation. No production code in `main` or in the
 > 1KeyTranscoder tree was touched; every experiment ran in the separate
-> worktree `F:\1KT-qsv` on branch `research/rigaya-qsvencc-avhw`. Nothing here
+> worktree `F:\1KeyTranscoder\work\_worktrees\1KT-qsv` on branch
+> `research/rigaya-qsvencc-avhw`. Nothing here
 > proposes changing the shipping default backend.
 
 > **Follow-up available.** The open question this document records as
@@ -768,7 +773,7 @@ counted together.
 
 ## 11. Reproduction
 
-Worktree: `F:\1KT-qsv` · branch `research/rigaya-qsvencc-avhw` · base `15cf218`
+Worktree: `F:\1KeyTranscoder\work\_worktrees\1KT-qsv` · branch `research/rigaya-qsvencc-avhw` · base `15cf218`
 
 | Artifact | Purpose |
 |---|---|
@@ -788,7 +793,7 @@ Worktree: `F:\1KT-qsv` · branch `research/rigaya-qsvencc-avhw` · base `15cf218
 Rebuild the matrix:
 
 ```powershell
-cd F:\1KT-qsv\work\qsvavhw
+cd F:\1KeyTranscoder\work\_worktrees\1KT-qsv\work\qsvavhw
 $clips = Get-Content clipset.txt | Where-Object { $_ -ne "" }
 .\matrix.ps1 -Tag full -Clips $clips
 ```

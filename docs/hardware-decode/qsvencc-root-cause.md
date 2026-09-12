@@ -1,6 +1,6 @@
 # QSVEncC Sony 3-Frame Loss — Source-Level Root Cause
 
-`research/rigaya-qsvencc-avhw` · base `main` @ `15cf218` · worktree `F:\1KT-qsv`
+`research/rigaya-qsvencc-avhw` · base `main` @ `15cf218` · worktree `F:\1KeyTranscoder\work\_worktrees\1KT-qsv`
 
 Subject: **QSVEncC 8.26 (r4504)**, source pinned at `rigaya/QSVEnc` `b14c965`,
 built locally from that revision, on Intel Arc 140T / driver `32.0.101.8974`.
@@ -505,7 +505,7 @@ revision; not yet a general claim for later releases.*
 
 ## 10. Reproduction
 
-Worktree `F:\1KT-qsv` · branch `research/rigaya-qsvencc-avhw`
+Worktree `F:\1KeyTranscoder\work\_worktrees\1KT-qsv` · branch `research/rigaya-qsvencc-avhw`
 
 | Artifact | Purpose |
 |---|---|
@@ -523,16 +523,16 @@ Worktree `F:\1KT-qsv` · branch `research/rigaya-qsvencc-avhw`
 
 ```powershell
 # build
-cd F:\1KT-qsv\work\qsvbuild
+cd F:\1KeyTranscoder\work\_worktrees\1KT-qsv\work\qsvbuild
 .\setup_build.ps1
 .\build.ps1 -Config ReleaseStatic -Platform x64
 
 # instrumented trace (ledger)
 $env:RGY_AVHW_TRACE = '1'
-& F:\1KT-qsv\third_party\QSVEnc\_build\x64\ReleaseStatic\QSVEncC64.exe `
+& F:\1KeyTranscoder\work\_worktrees\1KT-qsv\third_party\QSVEnc\_build\x64\ReleaseStatic\QSVEncC64.exe `
     -i <sony.mp4> --avhw -c raw --output-res 256x144 -o NUL 2> trace.txt
 Remove-Item Env:\RGY_AVHW_TRACE
-python F:\1KT-qsv\work\qsvavhw\trace_ledger.py trace.txt
+python F:\1KeyTranscoder\work\_worktrees\1KT-qsv\work\qsvavhw\trace_ledger.py trace.txt
 
 # A/B validation
 .\ab_validate.ps1

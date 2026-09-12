@@ -1,6 +1,10 @@
 # QSVEncC `--avhw` Patch — Provenance and Integration Reference
 
-`research/rigaya-qsvencc-avhw` · base `main` @ `15cf218` · worktree `F:\1KT-qsv`
+`research/rigaya-qsvencc-avhw` · base `main` @ `15cf218` · worktree `F:\1KeyTranscoder\work\_worktrees\1KT-qsv`
+
+> **Path note.** This worktree was originally created at `F:\1KT-qsv` and was
+> later collected into the project folder under `work\_worktrees\`. Paths in this
+> document have been updated accordingly; nothing else changed.
 
 > **What this document is.** The single auditable record for the QSVEncC patch:
 > its exact scope, the revision it was built from, the proof that the patch file
