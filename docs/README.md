@@ -94,11 +94,18 @@ F:\1KeyTranscoder\
 | `root-cause.md` | 根因分析（Observation/Evidence/Hypothesis/Experiment/Result/Conclusion） |
 | `design.md` | 目标解码器架构设计 |
 | `implementation-plan.md` | **Phase 2 计划**：§17.1 架构问题 P1–P8、§17.3 解码器 API、§17.4 完整性三层、§17.5 回退契约、§17.9 步骤 S1–S10 |
+| `qsvencc-avhw-experiment.md` | **Phase 2（`research/rigaya-qsvencc-avhw`）**：QSVEncC `--avhw` 在 Sony/DJI 上的真实行为、四种可区分结果（能力拒绝/读取截断/静默软解回退/真正硬解）、GPU 管线是否保留 |
+| `qsvencc-root-cause.md` | **Phase 2 根因**：QSV 准入过滤器的文件/类/函数/条件，由插桩自建二进制证明；2 处改动的 PoC 与 A/B 验证 |
+| `qsvencc-patch.md` | **补丁溯源与集成参考**：patch sha256、对 `b14c965` 的 clean-apply 证明、被测二进制哈希、构建偏差、A/B 矩阵与**结论边界** |
 | `test-results/` | 机器可读结果（comparison / corpus / nvdec / qsv / software-ground-truth / summary） |
 
-> ⚠️ **本目录是 Phase 1 调查产物，Phase 2 未执行**：生产 decode/encode/mux/
-> preservation/channel-sync 代码一行未改。当前开发方向与优先级见
-> `work/docs/v1.0.0_requirements.md`（P0-A = 硬件解码方向探索）。
+> ℹ️ **本目录的 Phase 1 调查与 Phase 2 根因定位均已完成并封存。**
+> Phase 1 结论（三方对比、可行性判定、结论表）仍然成立；Phase 2 定位到确切源码
+> 位置并在独立 research 分支上完成 build + runtime 验证。四条 research 分支的
+> 最终交叉结论见 `docs/hardware-decode/research-conclusion.md`。
+> 生产 decode/encode/mux/preservation/channel-sync 代码一行未改，硬件解码仍未设为默认。
+> **QSVEncC 补丁的结论边界**：runtime-proven on QSVEncC 8.26 pinned revision;
+> not yet a general claim for later releases.
 
 ## 📁 evaluation/ — 评估报告（分类：评估与调研）
 

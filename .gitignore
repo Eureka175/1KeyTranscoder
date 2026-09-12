@@ -38,3 +38,8 @@ work/
 
 # Release build output (staging tree + archive + manifest)
 dist/
+
+# Third-party source checkouts / SDKs used as build inputs by the research
+# experiment line (rigaya/QSVEnc pinned at b14c965, plus AviSynth+/VapourSynth/
+# OpenVINO/OpenCL SDK stubs). ~1.5 GB, licensed separately, never tracked.
+third_party/
