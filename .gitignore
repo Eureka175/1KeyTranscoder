@@ -12,11 +12,12 @@ logs/
 *.part.mkv
 *.encode.log
 
-# Generated outputs
+# Generated outputs (anchored to the repo root: a bare `archive/` would also
+# match docs/archive/, silently ignoring the documentation archive area)
+/archive/
+/output/
+/testout/
 results/
-output/
-testout/
-archive/
 
 # Python
 __pycache__/
