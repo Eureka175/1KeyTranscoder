@@ -241,7 +241,7 @@ P1 设计见 `docs/design/channel_sync_p1.md`，实现要点：
 但没有任何调用方会传它——这是历史遗留，不是可用开关。
 
 **调研状态：已完成并封存。** P0-A 硬件解码调研由四个 research 分支完成，
-交叉结论见 `docs/archive/hardware-decode/README.md`。要点：
+交叉结论见 `olddocs/docs/hardware-decode/README.md`。要点：
 
 * rigaya `--avhw` 的 Sony 丢帧**根因已定位到厂商特有 pipeline task**，
   两处补丁**均已运行时验证**（NVEncC 9.31 / QSVEncC 8.26 pinned）。
@@ -358,5 +358,5 @@ P1 设计见 `docs/design/channel_sync_p1.md`，实现要点：
 | channel-sync P1 设计 | `docs/design/channel_sync_p1.md` |
 | HEVC 4:2:2 Rext 兼容矩阵 | `docs/design/hevc_422_rext_compatibility.md` |
 | 后端选型评估 | `docs/evaluation/*` |
-| 硬件解码调研（已封存） | `docs/archive/hardware-decode/` |
-| 历史代码快照 | `olddocs/` |
+| 硬件解码调研（已封存） | `olddocs/docs/hardware-decode/` |
+| 历史代码快照 | `olddocs/backup/` |

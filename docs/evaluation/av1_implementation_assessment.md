@@ -4,7 +4,7 @@
 > `.dsh-drop` 会话包）结构化回读（`work/av1_drop/findings_synthesis.md`）；
 > ②本机实现与端到端实测（SVT-AV1 + NVENC AV1 + QSV AV1 三后端真实管线）；
 > ③官方文档与社区实测交叉（详见 `docs/reference/`、
-> `docs/evaluation/av1_hw_tuning_guide.md` 与
+> `olddocs/docs/av1_hw_tuning_guide.md` 与
 > `docs/reference/svt-av1/SVT-AV1_archival_tuning_report.md`）。
 >
 > **结论前置：三后端 AV1（软件 SVT-AV1 + 硬件 NVENC/QSV）已实现并
@@ -129,8 +129,10 @@ ffmpeg 9 的 MOV muxer 拒绝 AV1 → AV1 中间文件改 MP4（GPAC 无差别�
 - `docs/reference/svt-av1/SVT-AV1_archival_tuning_report.md` — SVT-AV1
   v4.2.0 调参调研（官方文档 + community, 全带 URL）
 - `work/av1_drop/findings_synthesis.md` — 前轮 18 子代理结论汇总（带来源 id）
-- `docs/evaluation/av1_hw_tuning_guide.md` — 支持度矩阵 + 逐键翻译 + 预设草案
-- `docs/evaluation/av1_feasibility_report.md` — 可行性总报告（★XAVC 决策）
+- `olddocs/docs/av1_hw_tuning_guide.md` — 支持度矩阵 + 逐键翻译（**已归档**：
+  ⚠️ 支持度/翻译表有效，预设草案作废）
+- `olddocs/docs/av1_feasibility_report.md` — 可行性总报告（**已归档**：
+  ❌ 其 ★XAVC 决策已被反向实现，勿据此判断现行为）
 - `docs/reference/nvenc/`、`docs/reference/qsv/`、`docs/reference/svt-av1/` — 一手资料
 - 本机实测日志：`work/ct_av1_out/`（AV1 管线产物）、`work/autotest/`、`work/av1_calib/smoke_*`
 - git tag `post_av1` — 实现基线

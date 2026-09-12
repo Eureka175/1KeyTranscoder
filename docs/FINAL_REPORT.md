@@ -15,7 +15,7 @@
 >
 > 本文档未覆盖、但已完成的后续工作：**channel-sync P1**（多轨音频延时补偿，
 > 见 `design/channel_sync_p1.md`）、**AV1 四档标定**（`evaluation/av1_calibration.md`）、
-> **硬件解码 P0-A 调研**（已封存，见 [`archive/README.md`](archive/README.md)）、
+> **硬件解码 P0-A 调研**（已封存，见 [`../olddocs/README.md`](../olddocs/README.md)）、
 > 以及 v0.6.2 的**分层日志**与**默认后端自动选择**。
 
 > 汇总日期：2026-08。本文档是近期四份评估的**汇总结论与决策记录**，
@@ -111,15 +111,25 @@ PSY 进入维护收缩期 → 定位为经典路径（非 XAVC）软件高压缩
 
 ```
 docs/
-├── README.md              分类索引
+├── README.md              分类索引（顶部有"我要找什么"任务导向表）
 ├── FINAL_REPORT.md        本文档
-├── design/                设计文档（硬件后端设计/实施报告/集成报告）
-├── evaluation/
-│   ├── hevc_implementation_assessment.md   265 详细程度评估
-│   ├── x265_production_assessment.md       x265 生产就绪评估（★本报告 §4）
-│   ├── av1_feasibility_report.md           AV1 可行性（★本报告 §5）
-│   └── av1_hw_tuning_guide.md              AV1 调参指南（★本报告 §6）
-└── reference/             官方文档与社区调研存档（x265/SVT-AV1/NVENC/QSV/VCE）
-work/x265_prod_eval/        x265 实证产物（管线 dump、真实编码日志、4:2:2 产物）
-work/av1_feasibility/       AV1 实证产物（三后端编码+封装+解码+4K60 基准）
+├── design/                设计文档（architecture.md 为当前架构总览）
+├── evaluation/            评估报告（8 份，索引里有"状态"列）
+├── reference/             第三方一手资料存档（x265/SVT-AV1/NVENC/QSV/VCE）
+└── fixtures/              测试素材清单与冻结基线
+
+olddocs/                   项目唯一归档区
+├── docs/                  已归档文档
+│   ├── hardware-decode/       P0-A 硬解调研（Phase 1）
+│   ├── av1_feasibility_report.md        ★本报告 §5 的原文（❌ 已过期）
+│   ├── svt_av1_archival_assessment.md   ★本报告 §6b 的原文
+│   └── av1_hw_tuning_guide.md           ★本报告 §6 的原文
+└── backup/                历史代码快照
+
+work/x265_prod_eval/        x265 实证产物（未入库，gitignored）
+work/av1_feasibility/       AV1 实证产物（未入库，gitignored）
 ```
+
+> ⚠️ **本报告 §5/§6/§6b 所引的原文已移入归档**（`olddocs/docs/`），因为其结论
+> 已被 v0.6.2 实现取代或部分取代；原文头部保留了状态横幅。现状请看
+> 根 `README.md` 与 `docs/design/architecture.md`。

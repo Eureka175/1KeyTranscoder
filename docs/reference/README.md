@@ -3,7 +3,7 @@
 > **本目录是"外部资料"存档，不是本项目的研究成果。** 这里放的是厂商官方文档、
 > 上游源码片段、GPU 能力探测报告、社区实测抓取等**别人写的东西**（都是我们自己
 > 抓下来存证的）。本项目自己的分析与结论在 `docs/evaluation/`、`docs/design/`
-> 与 `docs/archive/`。
+> 与归档区 [`olddocs/docs/`](../../olddocs/docs/)。
 >
 > 目的只有一个：**让项目文档里的引用可追溯**。评估报告说"MSU 测得同画质省
 > 35–49% 码率"，依据就在这里的某个文件里，而不是一个外部链接。
@@ -29,10 +29,10 @@
 
 | 目录 | 文件数 | 内容 | 对应项目文档 |
 |---|---|---|---|
-| `svt-av1/` | 109 | SVT-AV1 官方文档 + PSY fork + 社区归档实践 + 速度/质量基准 | `evaluation/av1_calibration.md`、`evaluation/svt_av1_archival_assessment.md` |
+| `svt-av1/` | 109 | SVT-AV1 官方文档 + PSY fork + 社区归档实践 + 速度/质量基准 | `evaluation/av1_calibration.md`、`olddocs/docs/svt_av1_archival_assessment.md` |
 | `x265/` | 78 | x265 官方 CLI/preset/releasenotes + 社区归档调研（70 份抓取） | `evaluation/x265_production_assessment.md` |
-| `qsv/` | 18 | QSVEncC 官方选项 + 逐 GPU 能力探测 + 关键 issue 全文 | `evaluation/hevc_implementation_assessment.md`、`archive/hardware-decode/qsv.md` |
-| `nvenc/` | 12 | NVEncC 官方选项 + 各代 GPU 能力探测 + NVIDIA/媒体实测存档 | `evaluation/hevc_implementation_assessment.md`、`archive/hardware-decode/nvdec.md` |
+| `qsv/` | 18 | QSVEncC 官方选项 + 逐 GPU 能力探测 + 关键 issue 全文 | `evaluation/hevc_implementation_assessment.md`、`olddocs/docs/hardware-decode/qsv.md` |
+| `nvenc/` | 12 | NVEncC 官方选项 + 各代 GPU 能力探测 + NVIDIA/媒体实测存档 | `evaluation/hevc_implementation_assessment.md`、`olddocs/docs/hardware-decode/nvdec.md` |
 | `vce/` | 7 | VCEEncC 官方选项/Readme + AMF 编码 API + RDNA3 探测 | 根 `README.md`（VCE 预留） |
 | `misc/` | 2 | 零散网络调研存档 | — |
 

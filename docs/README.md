@@ -10,13 +10,13 @@
 | 查**某后端为什么这样选、参数怎么定的** | [`evaluation/`](evaluation/)（先看该目录索引表里的"状态"列） |
 | 查**某个子系统的设计**（硬件后端 / channel-sync / 4:2:2） | [`design/`](design/) |
 | 找**厂商官方文档 / 上游源码 / GPU 能力探测** | [`reference/README.md`](reference/README.md) |
-| 查**已封存的历史调查**（硬件解码 Phase 1 等） | [`archive/README.md`](archive/README.md) ★ **先读该索引的状态标注** |
+| 查**已封存的历史调查**（硬件解码 Phase 1 等） | [`../olddocs/docs/`](../olddocs/docs/) ★ **先读 [`../olddocs/README.md`](../olddocs/README.md) 的状态标注** |
 | 看**测试素材清单与冻结基线** | [`fixtures/a7m5_channel_sync_fixtures.md`](fixtures/a7m5_channel_sync_fixtures.md) |
 | 看**历史代码快照与废弃脚本** | 根 [`../olddocs/README.md`](../olddocs/README.md) |
 
 > **分类规则**：**design** = 项目自身设计/实施文档；**evaluation** = 本项目的
 > 评估与调研报告；**reference** = 第三方一手资料存档（按厂商分目）；
-> **archive** = 已封存文档（结论仍有效，但不再随代码更新）。
+> **archive** = 已封存文档，已迁至根目录 [`../olddocs/`](../olddocs/README.md)（唯一归档区）。
 > 配置 JSON（nvenc.json 等）是运行时配置，不属于文档，留在根目录；
 > `metadata_forensics/` 是取证数据目录，`work/` 是实验产物，均不入档。
 >
@@ -90,9 +90,9 @@ F:\1KeyTranscoder\
 | **[`architecture.md`](design/architecture.md)** | **★ 端到端架构总览（当前版本）**：两个入口与分支、后端解析四级优先级、三级降级梯、三条源管线、保留管线的幂等/续跑、channel-sync、`--check` 三级、必须保持的不变量、逐文件地图。**新维护者从这里开始读。** |
 | [`hardware_backend_design.md`](design/hardware_backend_design.md) | 硬件后端（NVEncC/QSVEncC）设计定稿，含踩坑结论（5.x 节）。**§4.5/§9/§10.2/附录 B 部分已被后续代码推翻**（默认后端、已删除的 `--auto-downgrade`、控制台询问），以 [`architecture.md`](design/architecture.md) 为准；§5/§6/§7 实测矩阵仍有效 |
 | [`implementation_report.md`](design/implementation_report.md) | 实施报告：降级链与回退路径的故障演练记录（§15 DJI 专线）。**§1/§4/§11 的模块名与开关已过时**；§12–§15 与现行代码一致 |
-| [`INTEGRATION_REPORT.md`](design/INTEGRATION_REPORT.md) | 集成报告（早期版本整合记录）。**§A 模块清单为 2026-08-28 快照，已过时**；§D 的 GPAC-native 时序结论仍是现行实现依据 |
 | [`hevc_422_rext_compatibility.md`](design/hevc_422_rext_compatibility.md) | HEVC 4:2:2 Rext 输出形态、播放兼容矩阵与归档建议 |
 | [`channel_sync_p1.md`](design/channel_sync_p1.md) | **`--channel-sync` P1 设计文档**（algo 2.3.0-p1）：算法、阈值、轨道级降级、fixture 标定、测试矩阵。与 `core/channel_sync.py::DEFAULTS` 逐键一致 |
+| ~~`INTEGRATION_REPORT.md`~~ | 已移入归档：见 [`../olddocs/docs/INTEGRATION_REPORT.md`](../olddocs/docs/INTEGRATION_REPORT.md)（⚠️ 部分过期：§A 模块清单已被 [`architecture.md`](design/architecture.md) 取代，§D 时序结论仍有效） |
 
 ## 📄 发布说明（分类：项目自身文档）
 
@@ -106,16 +106,21 @@ F:\1KeyTranscoder\
 > 含 600 s 长程表）、`work/docs/channel_sync/memory_audit.md`（逐阶段内存归因）、
 > `work/releases/v0.6.1_release_validation.md`（正式发布验证记录）。
 
-## 📁 [archive/](archive/) — 归档区（分类：已封存文档）
+## 📁 归档区 → 已迁至 `olddocs/docs/`
 
-> **归档区不是垃圾场：这里的结论仍然有效、可以引用，只是不再随代码演进更新。**
-> 入口与逐份状态标注见 [`archive/README.md`](archive/README.md)。
-
-| 目录 | 说明 |
-|---|---|
-| `archive/hardware-decode/` | **P0-A 硬件解码调研（已封存）**：Phase 1 调查 11 份 + 机器可读结果 6 份。**注意个别文档部分过期**——`README.md`/`root-cause.md` 中"丢帧在 rigaya reader layer / 确切源码行 Unconfirmed"已被 Phase 2 修正；`README.md` 的"永不用 rigaya `--avhw`"建议已被推翻。**逐份状态见 `archive/README.md` §2.1** |
-
-> 历史**代码**快照与废弃脚本不放这里，在根目录 `olddocs/`。
+> **本目录不再设 archive/ 子目录。** 项目**唯一归档位置**是根目录
+> [`../olddocs/`](../olddocs/README.md)：`olddocs/docs/` 放已归档**文档**，
+> `olddocs/backup/` 放历史**代码**快照。这样避免"两处归档区"再次出现。
+>
+> **归档区不是垃圾场：里面的结论仍然有效、可以引用，只是不再随代码演进更新。**
+>
+> | 归档内容 | 位置 | 状态提示 |
+> |---|---|---|
+> | P0-A 硬件解码调研（Phase 1，16 项） | [`../olddocs/docs/hardware-decode/`](../olddocs/docs/hardware-decode/) | ⚠️ 个别文档部分过期：`README.md`/`root-cause.md` 中"丢帧在 rigaya reader layer / 确切源码行 Unconfirmed"已被 Phase 2 修正；"永不用 rigaya `--avhw`"建议已被推翻 |
+> | 已取代的 AV1 三份评估 + 集成报告 | [`../olddocs/docs/`](../olddocs/docs/) | ❌/⚠️ 见 [`../olddocs/README.md`](../olddocs/README.md) §3.2 |
+> | 逐份状态索引（16 项明细） | [`../olddocs/docs/_ARCHIVE-INDEX.md`](../olddocs/docs/_ARCHIVE-INDEX.md) | — |
+>
+> **读归档文档前先读状态标注**，否则会读到已被推翻的结论。
 
 ## 📁 [evaluation/](evaluation/) — 评估报告（分类：评估与调研）
 
@@ -125,12 +130,11 @@ F:\1KeyTranscoder\
 | [`av1_implementation_assessment.md`](evaluation/av1_implementation_assessment.md) | **AV1 三后端（svtav1/nvenc-av1/qsv-av1）实现评估**：Sony/DJI 保留管线（不打 XAVC tag）+ 端到端实测 + 标定状态 | ✅ **权威（路由/管线）** |
 | [`hevc_implementation_assessment.md`](evaluation/hevc_implementation_assessment.md) | HEVC 实现生产就绪度评估（重写版）：全量代码重读 + 官方文档/社区实测调研 + 本机复测，判定"有条件生产就绪"与上线条件 | ⚠️ 部分过期（§9 AV1 衔接段已被推翻） |
 | [`x265_production_assessment.md`](evaluation/x265_production_assessment.md) | x265 实现生产就绪评估（重写版）：官方文档逐参数核查 + 本机实证 + 生产判定与条件清单 | ⚠️ 部分过期（P0 有 2 项已完成未回填） |
-| [`av1_feasibility_report.md`](evaluation/av1_feasibility_report.md) | AV1 实现可行性总报告 | ❌ **已过期**：核心路由决策被反向实现 |
-| [`av1_hw_tuning_guide.md`](evaluation/av1_hw_tuning_guide.md) | AV1 硬件后端调参指南：NVENC/QSV/VCE 支持度矩阵 + HEVC→AV1 逐键参数翻译表 | ⚠️ 部分过期（支持度/翻译表有效，预设草案作废） |
-| [`svt_av1_archival_assessment.md`](evaluation/svt_av1_archival_assessment.md) | SVT-AV1（含 PSY fork）归档可行性评估：主线/PSY 关系、归档调参、质量与吞吐 | ⚠️ 部分过期（调参有效，§集成定位失效） |
 
-> 上表的"状态"列是 2026-09 审计补注。**过期文档的头部已加状态横幅**，说明
-> 哪几条被推翻、现行依据是哪一份——这样按目录顺序读也不会读到已失效的结论。
+> **已移入归档的评估文档**（2026-09-12）：`av1_feasibility_report.md`（❌ 已过期）、
+> `svt_av1_archival_assessment.md`、`av1_hw_tuning_guide.md`（各 ⚠️ 部分过期）。
+> 位置 [`../olddocs/docs/`](../olddocs/docs/)，状态说明见
+> [`../olddocs/README.md`](../olddocs/README.md) §3.2。**其原文头部仍保留状态横幅。**
 
 ## 📁 [fixtures/](fixtures/) — 测试素材清单（分类：项目自身文档）
 

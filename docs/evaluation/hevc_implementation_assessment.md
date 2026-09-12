@@ -320,7 +320,9 @@ tref 显式 `-ref` 重加、uuid 字节补丁（绕过 GPAC 不写 uuid 的限�
 **本机（代码/实测）**：
 - `docs/design/hardware_backend_design.md`（5.2 帧精确性矩阵、5.3/5.4 速度矩阵、6 全链验收）
 - `docs/design/implementation_report.md`（S1-S5、§7 15/15、§11 并行实测、§14 双后端验收）
-- `docs/design/INTEGRATION_REPORT.md`（GPAC 原生时序方案）
+- `docs/design/INTEGRATION_REPORT.md`（GPAC 原生时序方案）—— **已归档**：
+  见 [`olddocs/docs/INTEGRATION_REPORT.md`](../../olddocs/docs/INTEGRATION_REPORT.md)
+  （⚠️ §A 模块清单过时，§D 时序结论仍有效）
 - `docs/design/hevc_422_rext_compatibility.md`（Rext 播放边界）
 - `work/final_nvenc/.1ktwork/caps/`（本机 5070L dump：1 引擎/B5/L6.2/4:2:2/NVDec 4:2:2）
 - `work/bench/`（本会话基准：吞吐/体积/SSIM/PSNR 原始数据）

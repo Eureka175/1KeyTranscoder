@@ -5,7 +5,7 @@
 > * **§A 的模块清单是 2026-08-28 的快照，已不再描述现状。** 它不含此后新增的
 >   `core/batch_hw.py`、`core/channel_sync.py`、`core/{postprobe,paths,dashboard,versions}.py`、
 >   `encoders/{caps,hw,nvencc,qsvencc,svtav1}.py`、`preservation/{dji,checker,colour,selfcheck,quality}.py`。
->   **当前架构请读 [`architecture.md`](architecture.md)。**
+>   **当前架构请读 [`architecture.md`](../../docs/design/architecture.md)。**
 > * **§D 的 GPAC-native 时序结论仍是现行实现的原始依据**（`preservation/pipeline.py:22-36`
 >   与其逐条一致），这部分继续有效。
 > * 需注意 §126-130"`patch_track_durations()` **is not called by the normal pipeline**"
