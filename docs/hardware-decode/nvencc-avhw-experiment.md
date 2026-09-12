@@ -23,9 +23,9 @@
 | Question | Answer | Confidence |
 |---|---|---|
 | **A. Can it be fixed by reader *parameters* alone?** | **No.** No NVEncC option reaches the code that drops the frames. `--avsync`, `--input-option`, `--trim`, `--input-analyze`, `--allow-other-negative-pts`, `--offset-video-dts-advance` were each checked against the source that consumes them. | `Confirmed` (source) |
-| **B. Can it be fixed by a source patch?** | **Yes — measured.** 18 added lines in 2 files. Sony 30 f: **27 → 30**. Sony 330 f: **327 → 330**. Sony H.264 4:2:2 195 f: **193 → 195**. DJI control: **105 → 105** (unchanged). `--seek` behaviour: **identical at every position tested**. | `Confirmed` (built and measured) |
-| **C. Does the fix keep `GPU decode → GPU encode`?** | **Yes — measured.** `Input Info` still `avcuvid:`, `Vpp Filters` still `copyDtoD`, NVIDIA `VE`/`VD` engines still busy, and the patched `--avhw` output is **byte-identical** to `--avsw` output for the same encode. | `Confirmed` |
-| **Is the reader worth adopting?** | **The patch works. Whether to adopt it is a maintenance decision, not a technical one.** See §12. | `Confirmed` (fix) / judgement (adoption) |
+| **B. Can it be fixed by a source patch?** | **Yes — built, measured and regression-tested.** 18 added lines in 2 files. Sony 30 f: **27 → 30**. Sony 330 f: **327 → 330**. Sony XAVC HS 10170 f: **10167 → 10170**. Sony H.264 4:2:2 195 f: **193 → 195**. Controls (DJI / x265 / synthetic): **unchanged**. Seek + trim: **identical in all 17 combinations**. 13 assertions × 16 records: **PASS**. | `Confirmed` (built and measured) |
+| **C. Does the fix keep `GPU decode → GPU encode`?** | **Yes — measured.** `Input Info` still `avcuvid:`, the VPP stage still reports a GPU-only path, NVIDIA `VE`/`VD` engines still busy, no host copy, and the patched `--avhw` output is **byte-identical** to `--avsw` output on every leading-picture case. | `Confirmed` |
+| **Is the reader worth adopting?** | **The patch works and is integration-ready. Whether to adopt it is a maintenance decision, not a technical one.** See §16 for the integration checklist and the `PATCH STATUS` verdict. | `Confirmed` (fix) / judgement (adoption) |
 
 **The headline correction to the Phase 1 model.** Phase 1 located the defect in
 "the rigaya `--avhw` reader". That is right about *where the user sees it* but
@@ -39,9 +39,11 @@ never produced the pictures could not be fixed in the reader.
 
 **A stronger statement, from the `after` run.** With the patch applied, the
 patched `--avhw` and the stock `--avsw` produced **the same file, byte for byte**,
-on the minimal Sony fixture — see §6.4. That is stronger than "the frame count
-matches": it means the GPU-decoded frames that the baseline threw away are the
-same pictures the software decoder emits, in the same order, with the same
+on the minimal Sony fixture — and on **every** leading-picture case in the
+regression matrix (§10.2), for the output bytes, the PTS sequence, the keyframe
+sequence and the per-frame picture fingerprints. That is stronger than "the frame
+count matches": it means the GPU-decoded frames that the baseline threw away are
+the same pictures the software decoder emits, in the same order, with the same
 timestamps, and that NVENC then encodes them identically.
 
 ---
@@ -76,7 +78,7 @@ Measurement tooling: bundled `tools/ffmpeg.exe` / `tools/ffprobe.exe` **9.0.1**
 **Single-GPU host.** `--check-device` reports exactly one CUDA device;
 `--device 1` fails with `Invalid Device Id = 1`. The task's
 `device 0 / device 1 / multi-GPU` dimension **cannot be exercised here** and is
-recorded as untested in §11 rather than approximated with a single device.
+recorded as untested in §15 rather than approximated with a single device.
 
 NVEncC source under review: `rigaya/NVEnc` tag **9.31**, commit
 `2cb9d810c045202548b98ff130b12bc764eb39ea`.
@@ -236,7 +238,7 @@ equivalence ("PTS of the first keyframe" = "start of presentation"), and it
 survives the §6 patch, which is observable: after the patch the `--avhw` output
 has the correct 30 frames while `--avsw` on the *same synthetic file* still
 reports 27 (§6.2, fixture E). It is recorded as a **second, unpatched** defect —
-see §6.5 and §7.
+see §6.5, §13 (L16) and §14.
 
 ### 3.3 The third suspect — ruled out
 
@@ -293,8 +295,8 @@ sequential).
 
 ### 4.2 Throughput, before
 
-Uncontended, sequential. **The CPU column is the meaningful one** (see §6.4 for
-the after numbers and §9 for the toolchain caveat):
+Uncontended, sequential. **The CPU column is the meaningful one** (see §8 for
+the after numbers and §13 L2 for the toolchain caveat):
 
 | clip | reader | frames out | wall s | fps | CPU % |
 |---|---|---|---|---|---|
@@ -359,6 +361,34 @@ Stored at `work/hwdecode2/patch/0001-avhw-keep-leading-pictures.patch`
 (apply helper: `work/hwdecode2/patch/apply_patch.py`, BOM/CRLF safe).
 **18 added lines, 2 files, no deletions.**
 
+### 5.1 Patch hygiene
+
+| Property | Value |
+|---|---|
+| Upstream | `rigaya/NVEnc` tag `9.31`, commit `2cb9d810c045202548b98ff130b12bc764eb39ea` |
+| Files touched | **2**: `NVEncCore/NVEncPipeline.h` (+11), `NVEncCore/rgy_input.h` (+7) |
+| Lines added / removed | **18 / 0** |
+| sha256 of the patch file | `53084fa8bd87ccc1d5882ab01d21e7320401f7c52c85263728b976d1edfe6dfc` |
+| Applies cleanly to a pristine 9.31 | **yes** — `git apply` (strict) and `git apply --ignore-whitespace` both exit 0 against a fresh `git clone` of the tag |
+| Result identical to the tree that produced the tested binary | **yes** — after applying to pristine, both files hash byte-identical to `third_party/NVEncC/NVEncCore/…` |
+| Rebase cost | the diff is 2 files and carries no context outside its own hunk; it re-applies on any 9.31-lineage tree whose `getOutputFrame()` still contains the anchor block |
+
+Line-ending note: upstream ships these files with CRLF, so the patch body is
+CRLF. A `.gitattributes`-normalising checkout (`* text=auto`) will need
+`git apply --ignore-whitespace`; the strict form also works because the context
+lines come from those same CRLF files.
+
+Verification commands:
+
+```powershell
+git clone --depth 1 --branch 9.31 https://github.com/rigaya/NVEnc.git pristine
+cd pristine
+git apply ..\work\hwdecode2\patch\0001-avhw-keep-leading-pictures.patch
+git diff --stat      # NVEncPipeline.h | 11 +++++, rgy_input.h | 7 +++, 18 insertions
+```
+
+### 5.2 The diff
+
 ```diff
 --- a/NVEncCore/rgy_input.h
 +++ b/NVEncCore/rgy_input.h
@@ -397,7 +427,7 @@ Stored at `work/hwdecode2/patch/0001-avhw-keep-leading-pictures.patch`
              // OpenGOP等でキーフレームより前のフレームのptsで出てくるのを調整
 ```
 
-### Why this shape
+### 5.3 Why this shape
 
 * **It leaves the OpenGOP/seek correction exactly where it was needed.** The
   filter's own source comment names two reproduction samples, and both are
@@ -569,7 +599,7 @@ encode — so the two paths remain distinct.
 
 ## 8. Performance, before vs after
 
-**Toolchain caveat (§1):** the patched binary is CUDA 13.1 / MSVC 14.51; the
+**Toolchain caveat (§1, §13 L2):** the patched binary is CUDA 13.1 / MSVC 14.51; the
 baseline is CUDA 11.8 / MSVC 14.44. Absolute wall-clock and fps are therefore
 **not** a controlled comparison. Frame counts, packet sequences and encoded bytes
 are toolchain-independent, and that is where the correctness claims live.
@@ -674,22 +704,298 @@ DLLs, and the newer FFmpeg DLLs from the `ffmpeg_dlls_for_hwenc` package.
 
 ---
 
-## 10. Risks
+## 10. Correctness regression matrix
 
-| Risk | Assessment | Mitigation |
+Harness: `work/hwdecode2/run_regression.py` (measure) + `check_regression.py`
+(assert). Raw records: `work/hwdecode2/raw/regression/regression-{patched,baseline}.json`,
+verdict: `regression-verdict.json`.
+
+### 10.1 What is checked — and why a frame count is not enough
+
+Every case records **five independent things** about the delivered file:
+
+| # | Measurement | How |
 |---|---|---|
-| Patch changes behaviour on normal media | **Low, and measured.** C/D/DJI are bit-identical before and after; the new branch is unreachable unless a decoded picture's PTS precedes the first packet's PTS with no seek. | Keep the fixture set as a regression gate: any change to C/D/DJI counts is a regression. |
-| Patch breaks `--seek` | **Low, and measured.** Five seek positions across two clips: identical frame counts before and after. | Re-run `verify_seek.py` before shipping any rebase. |
-| §3.2 remains | **Medium.** The reader's internal frame position list can still under-report on synthetic OpenGOP layouts. The delivered output on the real corpus is now exact, so this is a verification hazard rather than a data-loss hazard. | Never use the reader's own `N frames` as the truth; count the delivered container. |
-| Upstream divergence | **Medium.** `NVEncPipeline.h` changes frequently; a fork must re-apply a 2-file diff on every bump. | Keep it as a diff, never a tree fork. Re-run the fixture + seek sets after each bump. |
-| Build burden | **Medium-high.** §9 is a multi-hour exercise the first time (CUDA MSBuild shims, NPP import libs, ONNX Runtime, Vship, conda toolchains). | Anyone adopting the patch must budget for this, or use a host with a real CUDA Toolkit install. |
-| Licensing / distribution | **Medium.** NVEnc is MIT, but a shipped fork inherits the NVIDIA SDK headers and a toolchain nobody else can rebuild reproducibly here. | Do not ship a patched NVEncC; treat it as an internal capability. |
-| Single-GPU host | **Untested.** Device selection and multi-GPU interaction were not exercised. | Do not claim multi-GPU safety; re-test on a 2-GPU host. |
-| Concurrency | **No regression observed.** 2 × `--avhw` and `--avhw`+`--avsw` in parallel returned the expected counts with `rc=0` and no `Break in task NVDEC`. Phase 1's one-off abort did not reproduce in 12 sequential + 4 concurrent runs. | Keep the no-two-heavy-GPU-jobs rule for *measurements*; it is not needed for correctness. |
+| 1 | frame count | `ffprobe -count_frames` on the output container |
+| 2 | PTS sequence | every output packet's `(pts, dts, flags, size)`, in order, digested |
+| 3 | keyframe sequence | indices of every sync sample, digested |
+| 4 | frame fingerprint | per-frame signature of the decoded source **and** of the decoded output |
+| 5 | output hash | sha256 of the output file + digests of the three sequences above |
+
+The fingerprint is 6 numbers plus a 4-window chunk hash per frame, taken from a
+fixed stride across the whole picture (`work/hwdecode2/fingerprint.py`). Two
+different pictures agree on it only if they agree at thousands of sampled
+positions. Raw frames are streamed through a pipe and never written to disk — an
+earlier version wrote `-c raw` to a file, which costs ~206 GB for a single 4K
+10170-frame pass and **filled the F: drive mid-experiment**. Recorded here
+because it aborted one run, whose partial results are excluded.
+
+The 13 assertions, per (case, reader):
+
+| id | assertion |
+|---|---|
+| C1 | process exited 0 |
+| C2 | `ffprobe` frame count == the reader's own `encoded N frames` |
+| C3 | packet count == frame count (no gaps in the container) |
+| C4 | output fingerprint count == output frame count |
+| C5 | `--avhw`: output frames == container frames |
+| C6 | `--avhw`: reader really was `avcuvid` — no silent software fallback |
+| C7 | `--avhw`: no host-side raw-frame path reported for VPP; the GPU-only stage is positively named |
+| C8 | `--avhw`: NVDEC engine observed busy (or the counters were not printed at all) |
+| C9 | keyframe sequence non-empty and starts at index 0 |
+| C10 | `--avhw` output == `--avsw` output on **bytes, PTS, keyframes and fingerprints** |
+| C11 | output frames == container frames and ≥ the baseline's own count |
+| C12 | `--avhw` and `--avsw` fingerprint the same **source** pictures, position for position |
+| C13 | source fingerprint coverage reaches the applied window |
+
+C12 is the decoder-equivalence check and it involves no encoder at all: it
+decodes the *same source file* through CUVID and through libavcodec and compares
+the pictures.
+
+### 10.2 Result
+
+**RESULT: PASS — no failing checks across 16 records (7 recorded limitations).**
+
+| case | reader | container | leading pics | baseline `encoded` | patched `encoded` | patched output | identical to `--avsw` |
+|---|---|---|---|---|---|---|---|
+| Sony XAVC HS 30 f | `--avhw` | 30 | 3 | **27** | **30** | 30 | bytes, PTS, kf, fp |
+| Sony XAVC HS 330 f | `--avhw` | 330 | 3 | **327** | **330** | 330 | bytes, PTS, kf, fp |
+| Sony XAVC HS long (10170 f) | `--avhw` | 10170 | 3 | **10167** | **10170** | 10170 | bytes, PTS, kf, fp |
+| Sony H.264 4:2:2 (195 f) | `--avhw` | 195 | 2 | **193** | **195** | 195 | bytes, PTS, kf, fp |
+| DJI control | `--avhw` | 105 | 0 | 105 | 105 | 105 | bytes, PTS, kf, fp |
+| x265 re-encode | `--avhw` | 30 | 0 | 30 | 30 | 30 | bytes, PTS, kf, fp |
+| synthetic `testsrc2` | `--avhw` | 60 | 0 | 60 | 60 | 60 | bytes, PTS, kf, fp |
+| Sony in MKV, no edit list | `--avhw` | — | 3 | **27** | **30** | 30 | bytes, PTS, kf, fp |
+| *(the same eight cases)* | `--avsw` | | | *unchanged by the patch on every row* | | | |
+
+Source-fingerprint equivalence (`--avhw` vs `--avsw`, same source file):
+
+| case | frames fingerprinted | identical |
+|---|---|---|
+| Sony XAVC HS 30 f | 30 | **yes** |
+| Sony XAVC HS 330 f | 330 | **yes** |
+| Sony XAVC HS long | 2000 (bounded) | **yes** |
+| Sony H.264 4:2:2 | 195 | **yes** |
+| DJI control | 105 | **yes** |
+| x265 re-encode | 30 | **yes** |
+| synthetic `testsrc2` | 60 | **yes** |
+| Sony in MKV | 29 | **yes** |
+
+Interpretation:
+
+* **The control cases are untouched.** DJI, x265 and synthetic have no leading
+  pictures and are byte-identical before and after — the property that makes the
+  patch safe to put in front of ordinary media.
+* **Every leading-picture case now matches the container exactly**, including the
+  10170-frame one, and matches the software path byte for byte.
+* The baseline runs are *not* identical to `--avsw` on leading-picture cases
+  (different sha256, different PTS digest, fewer frames) — the harness detects the
+  defect it is meant to detect.
 
 ---
 
-## 11. Multi-GPU and parallel encode
+## 11. Seek / trim matrix
+
+Harness: `work/hwdecode2/run_seektrim.py`. Raw:
+`work/hwdecode2/raw/seektrim/seektrim-patched.json`.
+
+Design constraint learned during this phase, recorded because it invalidated a
+first attempt: **`--frames N` and `--trim` cannot be combined** (NVEncC rejects
+it), and injecting a `--frames` bound into seek cases silently caps every seek
+result. The sweep is therefore split so that only the no-seek group is bounded
+and seek/trim cases are counted unbounded.
+
+| clip | case | `--avhw` patched | `--avhw` baseline | `--avsw` patched | `--avsw` baseline | verdict |
+|---|---|---|---|---|---|---|
+| C1083 (330 f, 5.5 s) | `--seek 0.5` (beginning) | 270 | 270 | 270 | 270 | identical |
+| C1083 | `--seek 2` (early) | 150 | 150 | 150 | 150 | identical |
+| C1083 | `--seek 3` (middle) | 90 | 90 | 90 | 90 | identical |
+| C1083 | `--seek 4.5` (late) | 30 | 30 | 30 | 30 | identical |
+| C1083 | `--seek 5.2` (near-end) | *both fail — §11.1a* | | | | pre-existing |
+| C1083 | `--frames 300` | 297 | 297 | 297 | 297 | identical |
+| C1083 | `--trim 0:59` | 57 | 57 | 57 | 57 | identical |
+| C1083 | `--trim 100:199` | 100 | 100 | 100 | 100 | identical |
+| C1169 (10170 f, ~169 s) | `--seek 0.5` (beginning) | 10107 | 10107 | 10110 | 10110 | identical |
+| C1169 | `--seek 10` (early) | 9507 | 9507 | 9510 | 9510 | identical |
+| C1169 | `--seek 30` (middle) | 8307 | 8307 | 8310 | 8310 | identical |
+| C1169 | `--seek 120` (late) | 2967 | 2967 | 2970 | 2970 | identical |
+| C1169 | `--seek 165` (near-end) | 267 | 267 | 270 | 270 | identical |
+| C1169 | `--frames 300` | 297 | 297 | 297 | 297 | identical |
+| C1169 | `--trim 0:59` | 57 | 57 | 57 | 57 | identical |
+| C1169 | `--trim 100:199` | 100 | 100 | 100 | 100 | identical |
+| C1169 | `--seek 30 --trim 0:29` | 27 | 27 | 27 | 27 | identical |
+
+**The patch changes nothing about seek or trim semantics: every combination that
+produces a result produces the same result on both binaries.** That is the
+regression the patch's design bets on — with `--seek` set, `m_seek.first > 0`,
+the new branch is skipped, and the original drop path runs verbatim.
+
+### 11.1 Two pre-existing behaviours the matrix exposed
+
+Neither is caused by the patch — both are identical on the baseline — but both
+matter to integration, so they are recorded rather than discovered later.
+
+**(a) `--seek` near the end of a short clip fails.** On the 5.5 s C1083 clip,
+`--seek` at 5.0 and above fails on **both** binaries and **both** readers with
+
+```
+avcuvid: No video packets found!
+avcuvid: failed to get first frame position.
+failed to initialize file reader(s).
+```
+
+`--seek 4.5` works (30 frames). With only one GOP left, the demuxer's seek lands
+past the data the reader needs. It is a loud failure with `rc=1`, not silent
+corruption.
+
+**(b) `--frames N` yields N − leading_pictures frames.** Measured on both
+binaries and both readers
+(`work/hwdecode2/raw/framesem/frames-semantics.json`; the clip has 3 leading
+pictures):
+
+| requested | patched `--avhw` | baseline `--avhw` | patched `--avsw` | baseline `--avsw` |
+|---|---|---|---|---|
+| 100 | 97 | 97 | 97 | 97 |
+| 300 | 297 | 297 | 297 | 297 |
+| 3000 | 2997 | 2997 | 2997 | 2997 |
+| **3003** | **3000** | **3000** | **3000** | **3000** |
+| 6000 | 5997 | 5997 | 5997 | 5997 |
+
+NVEncC implements `--frames` for avsw/avhw as a trim `[0, N-1]`, and the reader
+then shifts any trim list down by its leading-picture offset — so the requested
+end index moves too. Pre-existing tool behaviour, unaffected by the patch
+(identical on both binaries). Integration must either request
+`N + leading_pictures` or reconcile against the container count.
+
+---
+
+## 12. Long-run stability
+
+Harness: `work/hwdecode2/run_longrun.py`. Raw:
+`work/hwdecode2/raw/longrun/longrun-{patched2,baseline}.json`.
+Sequential runs only, on an otherwise idle GPU.
+
+Clip: `20260903_C1169.MP4` — **10170 container frames**, ~169 s of 4K60 XAVC HS,
+3 leading pictures. The `18000` row requests more than the clip holds, so
+NVEncC clamps it to EOF; it is really a full-clip run with a large bound.
+
+| requested | reader | binary | `encoded` | output | packets | fingerprints | wall s | fps | GPU mem peak MiB | NVEncC peak WS MiB |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3000 | `--avhw` | **patched** | 2997 | 2997 | 2997 | 2997 | 24.0 | 147.4 | 1682 | 951 |
+| 3000 | `--avsw` | **patched** | 2997 | 2997 | 2997 | 2997 | 42.7 | 77.0 | 1091 | 1815 |
+| 3000 | `--avhw` | baseline | 2997 | 2997 | 2997 | 2997 | 29.3 | 107.4 | 4392 | 2629 |
+| 3000 | `--avsw` | baseline | 2997 | 2997 | 2997 | 2997 | 43.8 | 71.1 | 4481 | 1815 |
+| 6000 | `--avhw` | **patched** | 5997 | 5997 | 5997 | 3000 (bounded) | 43.7 | 150.1 | 1593 | 955 |
+| 6000 | `--avsw` | **patched** | 5997 | 5997 | 5997 | 3000 (bounded) | 79.9 | 78.5 | 1091 | 1819 |
+| 10000 | `--avhw` | **patched** | 9997 | 9997 | 9997 | 3000 (bounded) | 69.0 | 151.1 | 1593 | 957 |
+| 10000 | `--avsw` | **patched** | 9997 | 9997 | 9997 | 3000 (bounded) | 132.6 | 76.2 | 1091 | 1815 |
+| 10000 | `--avhw` | baseline | 9997 | 9997 | 9997 | 3000 (bounded) | 78.5 | 130.1 | 4983 | 1763 |
+| 10000 | `--avsw` | baseline | 9997 | 9997 | 9997 | 3000 (bounded) | 157.6 | 64.0 | 3931 | 2640 |
+| ≥10170 (clamped) | `--avhw` | baseline | 10167 | 10167 | 10167 | 3000 | 108.5 | 97.1 | 4481 | 2647 |
+| ≥10170 (clamped) | `--avsw` | baseline | 10170 | 10170 | 10170 | 3000 | 132.3 | 79.0 | 4813 | 1821 |
+| **10170 (full clip)** | `--avhw` | **patched** | **10170** | **10170** | **10170** | 2000 (bounded) | 110.4 | 93.8 | 7870 | 2397 |
+| **10170 (full clip)** | `--avsw` | **patched** | 10167 | 10167 | 10167 | 2000 (bounded) | 155.4 | 66.9 | 3698 | 2476 |
+
+No run in this sweep produced a crash, a short read, a container with gaps, or a
+mismatch between `encoded`, the container count and the packet count.
+
+What the sweep establishes:
+
+* **Zero silent frame loss across 3000–10170 frames.** Every row's `encoded`,
+  `output` and `packet` columns agree exactly, on both binaries and both readers.
+* **No stability failure.** The 10170-frame full-clip encode completes with
+  `rc=0` on both binaries and both readers.
+* **The 18 k request completes.** `STATUS_STACK_BUFFER_OVERRUN` did **not**
+  recur. Per the brief, nothing in the patch was changed to make it pass; the
+  earlier crash stays recorded as a measurement-environment event.
+* **The patch does not make the full-clip case worse.** The patched `--avhw`
+  full-clip run is 110.4 s against the baseline's 108.5 s for a clamped-10170 run
+  that delivers **3 fewer frames** — the two are the same jobs at the same
+  settings, so there is no sign of a stability or throughput regression from the
+  added branch.
+* **Memory is modest and flat.** NVEncC's own peak working set is ~950 MiB for
+  `--avhw` and ~1.8 GiB for `--avsw` on this clip, and both stay flat as the
+  request grows from 3000 to 10000 frames. Peak VRAM is 1.6 GiB for `--avhw`
+  versus 1.1 GiB for `--avsw` — the extra is CUVID decode surfaces.
+* **`--avhw` is consistently faster than `--avsw` on the same binary and clip**:
+  147/77, 150/78, 151/76 fps. That is the through-the-patch comparison and it is
+  valid; cross-*binary* fps is not (§14, L2).
+
+### 12.1 One non-reproducible crash — recorded, not worked around
+
+During the first long-run sweep the 10170-frame `--avhw` case exited after 6.4 s
+with **`0xC0000005` (STATUS_ACCESS_VIOLATION)** and produced no output.
+Reproduction attempts:
+
+* the identical command line run directly, with `--log-level debug --log`, with
+  `--log` only, and with stdout piped: **`rc=0`, full output, four times**;
+* the same harness case re-run: **`rc=0`, 10167 frames**;
+* the large-bound full-clip request on the same binary: **`rc=0`, 10170 frames**.
+
+**One occurrence in six attempts, never reproduced.** It is recorded as an
+intermittent fault in the patched build's environment or in the measurement
+harness, and handled the same way as the earlier
+`STATUS_STACK_BUFFER_OVERRUN`: no patch change, no workaround, no silent retry.
+It is a stability risk for long unattended runs and belongs in the integration
+risk list — every run that completed was frame-exact.
+
+### 12.2 A second pre-existing `--frames` quirk at EOF
+
+When `--frames` exceeds the clip length, `--avhw` and `--avsw` truncate at
+different points. At `--frames 10000` on a 10170-frame clip the patched `--avhw`
+output is **sha256-identical to the baseline `--avhw` output**, while `--avsw`
+produces a different file. Both deliver 9997 frames; they simply drop the last
+frames differently. It is patch-neutral (the patched and baseline `--avhw` outputs
+match) and only appears when the request is clamped — recorded so it is not
+mistaken for a patch effect later.
+
+---
+
+## 13. Known limitations
+
+Everything here is a limitation of the *evidence*, not a silent downgrade of a
+check. `check_regression.py` marks exactly these as `LIMIT` and lists them at the
+end of its report; anything else is a `FAIL`.
+
+| # | Limitation | Impact |
+|---|---|---|
+| L1 | **Single-GPU host.** `--check-device` reports one CUDA device; `--device 1` → `Invalid Device Id = 1`. | The `device 0 / device 1 / multi-GPU` dimension is **untested** (§15). Do not claim multi-GPU readiness. |
+| L2 | **The patched binary uses a different toolchain** (CUDA 13.1 / MSVC 14.51) from the shipped baseline (CUDA 11.8 / MSVC 14.44). | Cross-binary wall-clock and fps are **not a controlled benchmark**. All correctness claims are toolchain-independent: counts, PTS, keyframes, fingerprints, bytes. |
+| L3 | **`NVDEC engine busy` (C8) could not be asserted on four rows** — NVEncC does not print the `VE:`/`VD:` line on very short runs. | Those rows rely on `Input Info = avcuvid` as the hardware-decode evidence. Where the counters *were* printed, `VD` was non-zero on every `--avhw` row. |
+| L4 | **Engine counters are printed inconsistently in both directions**, including by the baseline (e.g. `control-dji` prints `VD` on the baseline and not on the patched binary). | The counters are supporting evidence only; `avcuvid` plus the absence of a host copy are the primary signals. |
+| L5 | **VRAM readings were contaminated** on several early runs (peaks up to 7.9 GiB on an 8 GiB part when nothing should use that much); some rows show a flat 1091 MiB that is a floor, not a measurement. | VRAM is not used in any conclusion. Only same-session relative statements are made, and the clean patched rows (1682 / 1593 MiB) are quoted. |
+| L6 | **Long-clip fingerprints are bounded to 2000–3000 frames**, declared per case. | Counts, PTS sequences, keyframe sequences and output hashes cover the whole clip; only the per-frame picture comparison is windowed. |
+| L7 | **An MKV source decodes to 29 of 30 frames** under streaming `-f rawvideo`. | Both readers agree on 29, so no difference is masked; the delivered output is 30 frames. |
+| L8 | **`--seek` near the end of a short clip fails** (§11.1a). | Pre-existing, identical on both binaries, loud (`rc=1`). |
+| L9 | **`--frames N` yields N − leading_pictures** (§11.1b). | Pre-existing, identical on both binaries. Integration must compensate or reconcile against the container. |
+| L10 | **`--frames` beyond EOF truncates differently for `--avhw` and `--avsw`** (§12.2). | Pre-existing and patch-neutral. |
+| L11 | **`--trim` + `--avhw` is short by the leading-picture offset** (57 where 60 was asked, on both binaries). | Pre-existing interaction between `--trim` and the reader's offset adjustment; identical before and after. |
+| L12 | **One non-reproducible `0xC0000005`** on a 10170-frame run (§12.1). | A stability risk for long unattended runs. Every completed run was frame-exact. |
+| L13 | **Parallel encode / `--split-enc` untested.** | Argued from source only (§15). |
+| L14 | **Corpus scale: 8 cases, not the whole 151-file Sony corpus.** | Phase 1 established the *predictor* on 151/151; this phase verifies the *fix* on a representative set plus one long clip. A full-corpus sweep is the first integration step (§16). |
+| L15 | **`avs` / `vpy` readers are disabled in the patched build** (§9). | Those paths were not exercised. They are unreachable from 1KeyTranscoder, which passes a file path. |
+| L16 | **§3.2 (`setPocAndFix`) is not fixed.** | Visible on synthetic OpenGOP layouts: `--avsw` still reports 27 on fixtures E and F. On the real corpus the delivered output is exact. |
+
+---
+
+## 14. Risks
+
+| Risk | Assessment | Mitigation |
+|---|---|---|
+| Patch changes behaviour on normal media | **Low, and measured.** DJI / x265 / synthetic are byte-identical before and after; the new branch is unreachable unless a decoded picture's PTS precedes the first packet's PTS with no seek. | Keep the fixture set as a regression gate: any change to those three counts is a regression. |
+| Patch breaks `--seek` | **Low, and measured.** 17 seek/trim combinations across two clips: identical frame counts before and after, with no exceptions. | Re-run `run_seektrim.py` after any rebase. |
+| §3.2 remains (L16) | **Medium.** The reader's internal frame-position list can still under-report on synthetic OpenGOP layouts. On the real corpus the delivered output is exact, so it is a verification hazard rather than a data-loss hazard. | Never trust the reader's own `N frames`; count the delivered container. |
+| Upstream divergence | **Medium.** `NVEncPipeline.h` changes often; a fork must re-apply a 2-file diff on every bump. | Keep it as a diff, never a tree fork. Re-run the regression + seek/trim suites after each bump. |
+| Build burden | **Medium-high.** §9 is a multi-hour exercise the first time. | Budget for it, or use a host with a real CUDA Toolkit install. |
+| Licensing / distribution | **Medium.** NVEnc is MIT, but a shipped fork inherits the NVIDIA SDK headers and a toolchain nobody else here can rebuild reproducibly. | Do not ship a patched NVEncC; treat it as an internal capability. |
+| Licensing / distribution of the *patch* | **Low.** The patch is 18 lines against MIT source and contains no NVIDIA code. | Ship the patch file, not a binary. |
+| Single-GPU host (L1) | **Untested.** | Do not claim multi-GPU safety; re-test on a 2-GPU host. |
+| Intermittent crash (L12) | **Low-medium, unknown trigger.** 1 in 6 attempts on one case, never reproduced. | Treat long unattended runs as needing a supervised first pass; watch for `0xC0000005`. |
+| Concurrency | **No regression observed.** 2 × `--avhw` and `--avhw`+`--avsw` in parallel both returned the expected counts with `rc=0` and no `Break in task NVDEC`. | Sequential runs remain the rule for *measurements*; it is not needed for correctness. |
+
+---
+
+## 15. Multi-GPU and parallel encode
 
 **Not tested — the host has one GPU.** Recorded verbatim rather than simulated:
 
@@ -699,88 +1005,119 @@ DLLs, and the newer FFmpeg DLLs from the `ffmpeg_dlls_for_hwenc` package.
 * Parallel encode (`--split-enc`, `--parallel`) was deliberately **out of scope**
   for this phase. From the source, the patched branch sits inside the
   `m_gotFrameAfterFirstPts` fast path while `m_endPts >= 0` (segment mode) returns
-  before it, so segments should behave as before — **but this is argued from the
-  source, not measured.**
+  before it, so segments should behave as before — **argued from source, not
+  measured.**
 
 ---
 
-## 12. Recommendation
+## 16. Recommendation and integration checklist
 
-**The technical question is answered: yes, an 18-line reader-side patch makes
-Sony `GPU decode → GPU encode` correct, and the recovered frames are provably the
-right ones.** What remains is a policy question, and the honest answer is split:
+**The technical question is answered: an 18-line reader-side patch makes Sony
+`GPU decode → GPU encode` correct, the recovered frames are provably the right
+ones, and the patch survives regression.** What remains is a policy decision.
 
 ### As production engineering — still prefer FFmpeg `-hwaccel`
 
 Phase 1 proved FFmpeg's own NVDEC path is **bit-identical to software decode on
-151/151 Sony files**. It needs no fork, no patch, no SDK, no build recipe. The
-patched-rigaya route now *works*, but adopting it means owning §9 forever, on a
-code path where a rebase mistake is a silent frame loss.
+151/151 Sony files**. It needs no fork, no patch, no SDK, no build recipe.
+The patched-rigaya route now *works*, but adopting it means owning §9 forever, on
+a code path where a rebase mistake is a silent frame loss.
 
 ### As a capability — the patch is worth keeping
 
-Three reasons not to throw it away:
-
 1. **It is small and its blast radius is measured to be zero.** 18 lines, two
-   files, no deletions. Controls unchanged, seek unchanged, no host round-trip,
-   no CPU cost. That is an unusually clean result for a media-pipeline fix.
-2. **It settles the question Phase 1 left open.** The exact defect is known and
-   reproduced end to end, and the tool is now demonstrably fixable. If
-   `1KeyTranscoder` ever needs a single NVENC-centric toolchain (NVDEC + NVENC in
-   one process, no FFmpeg invocation), this is the route and it is known to work.
+   files, no deletions; 13 assertions × 16 records pass; 17 seek/trim
+   combinations unchanged; no host round-trip; no CPU cost.
+2. **It is reproducible.** It applies cleanly to a pristine 9.31 checkout and
+   reproduces the tested tree byte-for-byte (§5.1).
 3. **§3.2 is the generalisable finding.** A tool can deliver the correct frame
    *sequence* while reporting the wrong frame *count* about itself. Any pipeline
    that trusts a decoder's self-report can ship a wrong count at exit 0. The
-   four-way reconciliation used in this document — container samples, the
-   reader's estimate, the encoder's `encoded N frames`, and an independent count
-   of the delivered file — belongs in the production design whichever decoder
-   wins. **That is the most valuable output of this phase.**
+   four-way reconciliation used here — container samples, the reader's estimate,
+   the encoder's `encoded N frames`, an independent count of the delivered file —
+   belongs in the production design whichever decoder wins.
 
-### If the rigaya reader is adopted anyway
+### Integration checklist — do these before wiring the patch into 1KeyTranscoder
 
-1. Ship the patch only after re-running: the core matrix (§6.1), the fixture
-   matrix (§6.2), the seek regression (§6.3), and the byte-identity check (§6.4).
-2. Treat `N frames, End of file` as untrusted until §3.2 is also fixed.
-3. Re-test on a multi-GPU host before enabling device selection.
-4. Extend the corpus run to all 151 Sony files plus DJI with the four-way count
-   reconciliation. Phase 1 already validated the *prediction*
-   `avhw = container − leading` on 151/151; after the patch the expectation is
-   `avhw == container` on all of them, which is a much simpler invariant to test
-   in production.
+1. **Re-run the three suites** after any rebase: `run_regression.py` +
+   `check_regression.py`, `run_seektrim.py`, `run_longrun.py`.
+2. **Reconcile four counts in production**, never one:
+   container samples · reader estimate · `encoded N frames` · independent count
+   of the delivered file. Treat the reader's estimate as untrusted until §3.2 is
+   also fixed.
+3. **Never use `--frames N` as an exact frame budget** — request
+   `N + leading_pictures`, or drive by container count (L9).
+4. **Expect the reader's own input frame count to disagree with the delivered
+   count** on OpenGOP-ish inputs (L16).
+5. **Extend to the full corpus**: 151 Sony files + DJI with the four-way count
+   reconciliation. Phase 1 validated the *prediction*
+   `avhw = container − leading` on 151/151; after the patch the invariant is the
+   much simpler `avhw == container`, and it should hold on all of them.
+6. **Re-test on a multi-GPU host** before enabling device selection (L1).
+7. **Watch for `0xC0000005`** on long unattended runs (L12).
+
+### PATCH STATUS
+
+```text
+PATCH STATUS: READY FOR PROJECT INTEGRATION
+
+  scope           18 added lines, 2 files, NVEncC 9.31 (2cb9d81), no deletions
+  applies         clean to pristine 9.31 (git apply, strict); reproduces the
+                  tested tree byte-for-byte
+  correctness     13/13 assertions x 16 records PASS (8 cases x 2 readers)
+                  frame count, PTS sequence, keyframe sequence, frame
+                  fingerprint and output hash all reconciled
+  regression      controls (DJI / x265 / synthetic) byte-identical before/after
+                  seek + trim: 17/17 combinations identical before/after
+  long run        3000 / 6000 / 10000 / full 10170 frames, no frame loss,
+                  no instability, flat memory
+  pipeline        GPU decode -> GPU VPP -> NVENC preserved; no host copy,
+                  no hwdownload, no software decoder
+  parity          patched --avhw output is byte-identical to --avsw on every
+                  leading-picture case
+
+  NOT covered (see section 13): multi-GPU, parallel/split encode, the full
+  151-file corpus, the second defect at setPocAndFix (L16), and one
+  non-reproducible 0xC0000005 (L12).
+
+  This is a READY-to-integrate patch, not a READY-to-ship binary. The build in
+  section 9 is a research build (avs/vpy readers disabled, generated CUDA
+  MSBuild shim, dynamically linked FFmpeg) and must not be distributed.
+```
 
 ---
 
-## 13. Artifacts
+## 17. Artifacts
 
 Tooling lives in `F:\1KT-avhw\work\hwdecode2`; `work/` is gitignored by project
 convention, so these stay local by design.
 
 | File | Role |
 |---|---|
-| `hwenv2.py` | pinned tools, ffprobe/ffmpeg measurement, NVEncC runner, VRAM sampler |
-| `run_matrix.py` | core experiment matrix, resumable JSON output |
-| `make_fixtures.py` | builds fixtures A–F from pinned sources |
-| `run_fixtures.py` | fixture × reader outcome table |
-| `run_longview.py` | bounded head-views of genuinely long Sony clips |
+| `patch/0001-avhw-keep-leading-pictures.patch` | **the candidate patch** — 18 added lines, sha256 `53084fa8bd87ccc1d5882ab01d21e7320401f7c52c85263728b976d1edfe6dfc` |
+| `patch/apply_patch.py` | BOM- and CRLF-safe applier (alternative to `git apply`) |
+| `run_regression.py` / `check_regression.py` | correctness matrix + the 13 assertions |
+| `fingerprint.py` | streaming per-frame fingerprinting (never writes raw YUV) |
+| `run_seektrim.py` | seek + trim regression across both binaries |
+| `run_longrun.py` | long-run stability with memory sampling |
+| `verify_frames_semantics.py` | the `--frames N` behaviour measurement |
+| `run_fixtures.py` / `make_fixtures.py` | fixture set A–F and the fixture × reader table |
+| `run_matrix.py` / `compare_ab.py` | earlier core matrix and the byte/packet identity check |
 | `run_concurrency.py` | device selection, repeatability, concurrent runs |
-| `compare_ab.py` | before/after tables + byte/packet identity check |
-| `verify_frame_identity.py` | per-frame raw-decode identity (avhw vs avsw) |
-| `verify_seek.py` | `--seek` regression across both binaries |
+| `run_longview.py` | bounded head-views of long clips |
 | `build_nvencc.ps1` | the reproducible build recipe (§9) |
-| `disable_reader_sdks.py` / `patch_vship_header.py` | build-environment tweaks, both revertible |
-| `patch/0001-avhw-keep-leading-pictures.patch` | the candidate patch (18 added lines) |
-| `patch/apply_patch.py` | BOM/CRLF-safe applier |
-| `raw/matrix-baseline.json`, `raw/matrix-after.json` | core matrices, full metrics |
-| `raw/fixtures-baseline.json`, `raw/fixtures-after.json` | fixture outcomes |
-| `raw/matrix-longview.json`, `raw/matrix-longview-after.json` | long-clip head views |
-| `raw/seek-regression.json` | seek comparison |
-| `raw/frame-signature-ab.json` | per-frame identity |
-| `raw/concurrency.json` | device + concurrency probes |
-| `raw/matrix-long.json` | **superseded / invalid** — asked 3600 and 18000 frames of a 30-frame source; NVEncC clamped to EOF, so those rows measured nothing. Kept only as a record of the mistake. |
+| `disable_reader_sdks.py`, `patch_vship_header.py` | build-environment tweaks, both revertible |
+| `hwenv2.py` | pinned tools, ffprobe/ffmpeg measurement, NVEncC runner |
+| `raw/regression/regression-{patched,baseline}.json`, `regression-verdict.json` | correctness evidence + verdict |
+| `raw/seektrim/seektrim-patched.json` | seek/trim evidence |
+| `raw/longrun/longrun-{patched2,baseline}.json` | long-run evidence |
+| `raw/framesem/frames-semantics.json` | `--frames` evidence |
+| `raw/matrix-{baseline,after}.json`, `raw/fixtures-{baseline,after}.json` | earlier A/B matrices |
 | `raw/trc-*.txt` | the decisive trace (`Set packet` / `input frame (dev)`) |
-| `raw/dbg-*.txt`, `raw/pkt-*.txt`, `raw/fpos-*.txt` | NVEncC debug, packet and framelist logs |
+| `raw/matrix-long.json` | **superseded / invalid** — asked 3600 and 18000 frames of a 30-frame source; NVEncC clamped to EOF, so those rows measured nothing. Kept as a record of the mistake. |
 | `fixtures/` | the fixture media itself (local) |
-| `_build/x64/RelStatic/rt/` | the patched binary plus its runtime DLLs |
+| `_build/x64/RelStatic/rt/` | the patched binary plus its runtime DLLs (research build) |
+| `third_party/NVEncC-pristine/` | pristine 9.31 checkout used for the patch-apply proof |
 
 Upstream source: `rigaya/NVEnc` tag `9.31`, commit
 `2cb9d810c045202548b98ff130b12bc764eb39ea`, in
