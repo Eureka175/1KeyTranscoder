@@ -1341,15 +1341,16 @@ def encode_one_dji_hw(
 
         if report is None:
             # 1. video-only encode (reuse validated intermediate)
-            if not _encoded_ok(ffprobe, encoded_mov):
+            want = source_summary.get("total_frames") or None
+            if not _encoded_ok(ffprobe, encoded_mov, expected=want):
                 try:
                     encoded_mov.unlink()
                 except OSError:
                     pass
                 encode_video(src, encoded_mov)
-            if not _encoded_ok(ffprobe, encoded_mov):
+            if not _encoded_ok(ffprobe, encoded_mov, expected=want):
                 raise RuntimeError(
-                    f"video intermediate unreadable: {encoded_mov}"
+                    f"video intermediate unreadable or incomplete: {encoded_mov}"
                 )
 
             # 2-4. shared DJI rebuild: manifest -> GPAC mux ->
@@ -1506,9 +1507,39 @@ def is_dji_source(streams: list[dict[str, Any]]) -> bool:
     )
 
 
-def _encoded_ok(ffprobe: Path, path: Path) -> bool:
-    """A reusable intermediate must be a real file with >=1 video
-    packet, not a partial artifact of an interrupted encode."""
+_PARTIAL_READ_PATTERNS = (
+    "partial file",
+    "moov atom not found",
+    "invalid data found",
+    "truncated",
+    "error reading header",
+)
+
+
+def _encoded_ok(
+    ffprobe: Path, path: Path, expected: int | None = None
+) -> bool:
+    """May this intermediate be *reused* as a complete encode?
+
+    This gates resume: a ``True`` here means the file is taken as finished
+    and is not re-encoded.  The previous implementation asked only whether
+    at least one video packet could be read, which a **truncated** file
+    passes — measured: cutting a 596 MB intermediate to 2 % still yielded
+    ``nb_read_packets = 19``, rc = 0, and ``_encoded_ok == True``.  An
+    interrupted run could therefore leave a partial ``encoded.mov`` that a
+    later resume would treat as complete and deliver.
+
+    Three conditions now, in order of strength:
+
+    1. the file exists and is non-empty;
+    2. the demuxer reports no partial/truncated read error;
+    3. when ``expected`` is known, the packet count equals it exactly.
+
+    ``expected`` is the source's own frame count, so this is the same
+    reference the hardware-decode integrity gate uses: reconcile against
+    the delivered container, never against a self-report.
+    """
+    path = Path(path)
     if not (path.is_file() and path.stat().st_size > 0):
         return False
     try:
@@ -1522,10 +1553,18 @@ def _encoded_ok(ffprobe: Path, path: Path) -> bool:
         )
         if proc.returncode != 0:
             return False
+        combined = ((proc.stdout or "") + (proc.stderr or "")).lower()
+        if any(p in combined for p in _PARTIAL_READ_PATTERNS):
+            return False
         streams = json.loads(proc.stdout).get("streams", [])
-        return bool(streams and int(
-            streams[0].get("nb_read_packets") or 0
-        ) > 0)
+        if not streams:
+            return False
+        packets = int(streams[0].get("nb_read_packets") or 0)
+        if packets <= 0:
+            return False
+        if expected is not None and packets != expected:
+            return False
+        return True
     except (OSError, ValueError, json.JSONDecodeError):
         return False
 

@@ -181,6 +181,32 @@ def do_encode(
     return er, cm
 
 
+def _read_packet_count(ffprobe: Path, path: Path) -> int | None:
+    """How many video packets can the demuxer actually READ?
+
+    Distinct from the container's declared sample count: a truncated MP4
+    still carries an intact ``stsz`` table promising every frame, so the
+    declared number stays correct while the read number collapses. The
+    production partial-artifact guard works on the read number.
+    """
+    try:
+        p = subprocess.run(
+            [str(ffprobe), "-v", "error", "-count_packets",
+             "-select_streams", "v:0", "-show_entries",
+             "stream=nb_read_packets", "-of", "json", str(path)],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=1800)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if p.returncode != 0:
+        return None
+    try:
+        streams = json.loads(p.stdout).get("streams", [])
+        return int(streams[0]["nb_read_packets"]) if streams else None
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
 def reconciliation(cm: checks.CountManifest) -> dict:
     ok, reasons = checks.reconcile(cm)
     return {"ok": ok, "reasons": reasons, "counts": cm.to_json()}
@@ -2785,116 +2811,220 @@ def f08(t, ctx):
 # --- G ---------------------------------------------------------------------
 
 
-def _channel_sync_fixture() -> tuple[Path | None, str]:
-    """A real multichannel PCM source for channel-sync interaction tests."""
-    for cand in [FX.REAL_FIELD_DIRS["field_adjust"], FX.REAL_FIELD_DIRS["field_validate"]]:
-        if not cand.is_dir():
+BASELINE_CSV = (ROOT / "tests" / "fixtures" / "channel_sync"
+                / "a7m5_real_137_baseline.csv")
+
+
+def _channel_sync_fixture(min_tracks: int = 3) -> tuple[Path | None, str]:
+    """A real multichannel PCM source for channel-sync interaction tests.
+
+    The four-wire-lav layout is the A7M5 material: four mono PCM tracks.
+    The whole 20260904 corpus qualifies; which clip is chosen depends on
+    what the frozen baseline says that clip does, so each G test can
+    exercise a different decision path rather than the same one three
+    times.
+    """
+    from tests.hwdecode.probe import probe_input
+
+    ordered: list[FX.Fixture] = sorted(
+        FX.real_a7m5(), key=lambda f: probe_input(
+            f.path, leading_scan=False).container_samples or 0
+    ) if (FX.real_a7m5() and True) else []
+    for fx in ordered:
+        if not fx.path.is_file():
             continue
-        for p in sorted(cand.iterdir()):
-            if p.suffix.lower() in (".mp4", ".mov"):
-                from tests.hwdecode.probe import probe_input
-                f = probe_input(p, leading_scan=False)
-                if f.audio_streams >= 3:
-                    return p, p.name
+        if probe_input(fx.path, leading_scan=False).audio_streams >= min_tracks:
+            yield_marker = None  # noqa: F841
+            return fx.path, fx.fid
     return None, ""
 
 
-def _run_channel_sync(path: Path, work: Path) -> dict:
+def baseline_rows(fx: FX.Fixture) -> dict[int, dict]:
+    """Frozen channel-sync baseline rows for a clip, keyed by stream index.
+
+    The baseline was frozen on the real 137-segment A7M5 corpus, so it is
+    the pre-integration ground truth: comparing against it is a real
+    regression check, where merely re-running and comparing to itself
+    would not be.
+    """
+    if not BASELINE_CSV.is_file():
+        return {}
+    import csv as _csv
+
+    name = fx.path.name
+    out: dict[int, dict] = {}
+    with BASELINE_CSV.open(encoding="utf-8", newline="") as f:
+        for row in _csv.DictReader(f):
+            if Path(row.get("file", "")).name != name:
+                continue
+            try:
+                idx = int(row.get("stream", len(out)))
+            except (TypeError, ValueError):
+                idx = len(out)
+            out[idx] = row
+    return out
+
+
+def _baseline_row_for(rows: dict[int, dict], order: int) -> dict | None:
+    """The CSV has no stream column; rows are in stream order."""
+    return rows.get(order)
+
+
+def _run_channel_sync_for(fx: FX.Fixture) -> dict:
+    import json as _json
+    import subprocess as _sp
+
     from core.channel_sync import run_channel_sync
-    from tests.hwdecode.probe import probe_input
-    facts = probe_input(path, leading_scan=False)
-    streams = []
-    try:
-        import json as _j
-        p = subprocess.run(
-            [str(ROOT / "tools" / "ffprobe.exe"), "-v", "error",
-             "-print_format", "json", "-show_streams", "-i", str(path)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=300)
-        streams = _j.loads(p.stdout).get("streams", [])
-    except Exception:  # noqa: BLE001
-        streams = []
+
+    r = _sp.run(
+        [str(ROOT / "tools" / "ffprobe.exe"), "-v", "error",
+         "-print_format", "json", "-show_streams", "-i", str(fx.path)],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=600)
+    streams = _json.loads(r.stdout).get("streams", [])
     return run_channel_sync(
-        source=path, ffmpeg=ROOT / "tools" / "ffmpeg.exe",
-        work_dir=work, streams=streams, opts=None, log=lambda m: None,
-    )
+        source=fx.path, ffmpeg=ROOT / "tools" / "ffmpeg.exe",
+        work_dir=FX.WORK / f"g_sync_{fx.fid}", streams=streams,
+        opts=None, log=lambda m: None)
+
+
+def _compare_tracks(res: dict, rows: dict[int, dict]) -> tuple[list[dict], list[str]]:
+    """Compare measured per-track decisions against the frozen baseline."""
+    detail, problems = [], []
+    chans = res.get("channels") or []
+    for i, c in enumerate(chans):
+        row = _baseline_row_for(rows, i)
+        entry = {
+            "stream": c.get("stream", i),
+            "decision": c.get("decision"),
+            "reason": c.get("reason"),
+            "shift_samples": c.get("shift_samples"),
+            "baseline_decision": row.get("decision") if row else None,
+            "baseline_reason": row.get("reason") if row else None,
+            "baseline_shift": row.get("shift_samples") if row else None,
+        }
+        if row:
+            if row.get("decision") and c.get("decision") != row["decision"]:
+                problems.append(
+                    f"stream {i}: decision {c.get('decision')!r} != baseline "
+                    f"{row['decision']!r}")
+            breason = (row.get("reason") or "").strip()
+            if breason and (c.get("reason") or "") != breason:
+                problems.append(
+                    f"stream {i}: reason {c.get('reason')!r} != baseline "
+                    f"{breason!r}")
+            bshift = (row.get("shift_samples") or "").strip()
+            if bshift:
+                try:
+                    if c.get("shift_samples") is None or int(
+                            c["shift_samples"]) != int(float(bshift)):
+                        problems.append(
+                            f"stream {i}: shift {c.get('shift_samples')} != "
+                            f"baseline {bshift}")
+                except (TypeError, ValueError):
+                    pass
+        detail.append(entry)
+    return detail, problems
+
+
+def _g_clip(preferred: tuple[str, ...]) -> FX.Fixture | None:
+    for fid in preferred:
+        fx = FX.by_id(fid)
+        if fx is not None and fx.path.is_file():
+            return fx
+    return None
 
 
 @impl("g01_channel_sync_aligned")
 def g01(t, ctx):
-    src, name = _channel_sync_fixture()
-    if src is None:
+    """Already-aligned material must stay untouched, exactly as frozen."""
+    fx = _g_clip(("20260904_c1186", "20260904_c1187", "20260904_c1180"))
+    if fx is None:
         return _res(t, "HD-G01", STATUS_SKIP,
-                    reason="no >=3-track PCM fixture in the corpus")
-    ev, problems = {}, []
-    try:
-        res = _run_channel_sync(src, FX.WORK / "g01_sync")
-    except Exception as exc:  # noqa: BLE001
+                    reason="no real multichannel clip available")
+    rows = baseline_rows(fx)
+    if not rows:
         return _res(t, "HD-G01", STATUS_BLOCKED,
-                    reason=f"channel-sync could not run: {exc}")
-    ev["fixture"] = name
-    ev["status"] = res.get("status")
-    ev["channels"] = res.get("channels")
-    if res.get("status") not in ("applied", "aligned", "unchanged", "no_change",
-                                 "not_needed", "skipped"):
-        problems.append(f"unexpected channel-sync status {res.get('status')}")
-    # determinism: a second identical call must give the same decision
-    res2 = _run_channel_sync(src, FX.WORK / "g01_sync2")
-    ev["status_second_run"] = res2.get("status")
-    ev["channels_second_run"] = res2.get("channels")
-    if json.dumps(res.get("channels"), sort_keys=True, default=str) != json.dumps(
-        res2.get("channels"), sort_keys=True, default=str
-    ):
-        problems.append("channel-sync decision is not deterministic across runs")
+                    reason=f"{fx.path.name} is absent from the frozen baseline")
+    res = _run_channel_sync_for(fx)
+    detail, problems = _compare_tracks(res, rows)
+    ev = {"fixture": fx.fid, "status": res.get("status"),
+          "detail": res.get("detail"), "tracks": detail,
+          "baseline_source": str(BASELINE_CSV.relative_to(ROOT))}
+    if res.get("status") not in ("already_aligned", "applied", "measure_failed"):
+        problems.append(f"unrecognised status {res.get('status')!r}")
+    decisions = {d["decision"] for d in detail}
+    if "fixed" in decisions:
+        problems.append(
+            "an already-aligned clip was modified (a fixed decision appeared)")
     return _res(t, "HD-G01", STATUS_PASS if not problems else STATUS_FAIL,
-                actual=f"status={res.get('status')}, deterministic across runs",
+                actual=f"status={res.get('status')}, {len(detail)} tracks match "
+                       f"the frozen baseline",
                 reason="; ".join(problems), evidence=ev)
 
 
 @impl("g02_channel_sync_delay")
 def g02(t, ctx):
-    src, name = _channel_sync_fixture()
-    if src is None:
+    """A fixed-delay clip must produce the same integer shift as frozen."""
+    fx = _g_clip(("20260904_c1183", "20260904_c1184", "20260904_c1182"))
+    if fx is None:
         return _res(t, "HD-G02", STATUS_SKIP,
-                    reason="no >=3-track PCM fixture in the corpus")
-    ev, problems = {}, []
-    res = _run_channel_sync(src, FX.WORK / "g02_sync")
-    ev["status"] = res.get("status")
-    ev["channels"] = res.get("channels")
-    ev["fixture"] = name
-    bad = [c for c in (res.get("channels") or [])
-           if c.get("decision") not in (None, "untouched", "shifted",
-                                        "no_change", "aligned", "kept")]
-    ev["unexpected_decisions"] = bad
-    if res.get("status") in ("measure_failed", "verify_failed"):
-        ev["note"] = ("measurement did not converge on this fixture; that is a "
-                      "valid per-track outcome, not an integration failure")
-    if bad:
-        problems.append(f"{len(bad)} tracks reported an unknown decision")
+                    reason="no real multichannel clip available")
+    rows = baseline_rows(fx)
+    if not rows:
+        return _res(t, "HD-G02", STATUS_BLOCKED,
+                    reason=f"{fx.path.name} is absent from the frozen baseline")
+    res = _run_channel_sync_for(fx)
+    detail, problems = _compare_tracks(res, rows)
+    fixed = [d for d in detail if d["decision"] == "fixed"]
+    ev = {"fixture": fx.fid, "status": res.get("status"),
+          "detail": res.get("detail"), "tracks": detail,
+          "fixed_tracks": fixed}
+    if not fixed:
+        problems.append(
+            "no track received a fixed decision on a clip the baseline "
+            "records as corrected")
+    for d in fixed:
+        sh = d.get("shift_samples")
+        if sh is None or not isinstance(sh, int):
+            problems.append(
+                f"stream {d['stream']}: shift {sh!r} is not an integer sample "
+                "count")
     return _res(t, "HD-G02", STATUS_PASS if not problems else STATUS_FAIL,
-                actual=f"status={res.get('status')}, per-track decisions recorded",
+                actual=(f"status={res.get('status')}, "
+                        f"{len(fixed)} fixed track(s) with the baseline shift"),
                 reason="; ".join(problems), evidence=ev)
 
 
 @impl("g03_channel_sync_unusable")
 def g03(t, ctx):
-    src, name = _channel_sync_fixture()
-    if src is None:
+    """Unusable tracks stay untouched and do not block the healthy ones."""
+    fx = _g_clip(("20260904_c1188", "20260904_c1183", "20260904_c1178"))
+    if fx is None:
         return _res(t, "HD-G03", STATUS_SKIP,
-                    reason="no >=3-track PCM fixture in the corpus")
-    res = _run_channel_sync(src, FX.WORK / "g03_sync")
+                    reason="no real multichannel clip available")
+    rows = baseline_rows(fx)
+    if not rows:
+        return _res(t, "HD-G03", STATUS_BLOCKED,
+                    reason=f"{fx.path.name} is absent from the frozen baseline")
+    res = _run_channel_sync_for(fx)
+    detail, problems = _compare_tracks(res, rows)
     chans = res.get("channels") or []
-    ev = {"fixture": name, "status": res.get("status"), "channels": chans}
-    problems = []
-    # any track that could not be measured must be marked untouched and
-    # must not have blocked the others
-    untouched = [c for c in chans if c.get("decision") == "untouched"]
-    ev["untouched"] = len(untouched)
-    if len(chans) > 1 and len(untouched) == len(chans) and res.get("status") == "applied":
-        problems.append("every track untouched yet status is applied")
+    untouched = [d for d in detail if d["decision"] == "untouched"]
+    anchored = [d for d in detail if d["decision"] == "anchor"]
+    ev = {"fixture": fx.fid, "status": res.get("status"),
+          "detail": res.get("detail"), "tracks": detail,
+          "untouched": len(untouched), "anchored": len(anchored)}
+    for d in untouched:
+        if not d.get("reason"):
+            problems.append(
+                f"stream {d['stream']} is untouched without a reason; the "
+                "refusal must be explainable")
+    if not anchored and res.get("status") != "measure_failed":
+        problems.append("no anchor track selected on a measurable clip")
     return _res(t, "HD-G03", STATUS_PASS if not problems else STATUS_FAIL,
-                actual=f"{len(chans)} tracks, {len(untouched)} untouched, "
-                       f"status={res.get('status')}",
+                actual=(f"status={res.get('status')}, {len(untouched)} track(s) "
+                        f"left untouched with reasons, {len(anchored)} anchor"),
                 reason="; ".join(problems), evidence=ev)
 
 
@@ -3300,29 +3430,79 @@ def h05(t, ctx):
             planted += 1
     ev = {"planted": planted}
     problems = []
+    ffprobe = ROOT / "tools" / "ffprobe.exe"
+    expected = ctx.fact(fx).container_samples
+
+    # A whole, unmodified encode must still be accepted, otherwise the
+    # guard would be useless in the other direction.
+    hw, _ = do_encode(ctx, tid="HD-H05", fx=fx, backend="nvenc",
+                      reader="avhw", tag="ref")
+    if not hw.output_exists:
+        return _res(t, "HD-H05", STATUS_BLOCKED,
+                    reason="could not obtain an artifact to test the guard with")
+    good = Path(hw.output)
+    ev["intact"] = {
+        "declared_packets": checks.output_packet_count(good),
+        "read_packets": _read_packet_count(ffprobe, good),
+        "expected": expected,
+        "accepted_with_expected": bh._encoded_ok(ffprobe, good, expected=expected),
+    }
+    if ev["intact"]["accepted_with_expected"] is not True:
+        problems.append(
+            "a complete intermediate was rejected, so the guard would "
+            "re-encode every resume")
+
+    # Now the artifact H-05 exists for: a partial write left behind by an
+    # interrupted run.  Measured: a truncated MP4 reports a small
+    # nb_read_packets with rc=0 and often no error text at all, so only
+    # the expected-count comparison catches it.
+    data = good.read_bytes()
+    for frac, label in ((0.02, "2pct"), (0.5, "50pct")):
+        bad = RUNS / f"HD-H05_truncated_{label}.mp4"
+        bad.write_bytes(data[: max(2048, int(len(data) * frac))])
+        # Two different numbers matter here and they are not the same:
+        # `output_packet_count` reads the container's own sample table,
+        # which a truncated file still carries intact, while
+        # `_encoded_ok` uses ffprobe's nb_read_packets, i.e. how many
+        # packets the demuxer could actually READ. The guard works on the
+        # second; measuring the first would report 360 and prove nothing.
+        declared = checks.output_packet_count(bad)
+        packets = _read_packet_count(ffprobe, bad)
+        with_expected = bh._encoded_ok(ffprobe, bad, expected=expected)
+        without = bh._encoded_ok(ffprobe, bad)
+        ev[f"truncated_{label}"] = {
+            "bytes": bad.stat().st_size,
+            "declared_packets": declared,
+            "read_packets": packets,
+            "expected": expected,
+            "accepted_with_expected": with_expected,
+            "accepted_without_expected": without,
+        }
+        if with_expected:
+            problems.append(
+                f"truncated ({label}) artifact accepted as complete with the "
+                f"expected count supplied ({packets} of {expected} packets) — "
+                "a resume could deliver a partial encode")
+        if packets == expected:
+            problems.append(
+                f"truncated ({label}) artifact reports the full read count; "
+                "the probe is not discriminating")
+
+    # the guard is only as good as its call sites: resume must pass the
+    # expectation through
+    src_text = (ROOT / "core" / "batch_hw.py").read_text(encoding="utf-8")
+    ev["call_sites_pass_expected"] = src_text.count(
+        "_encoded_ok(ffprobe, encoded_mov, expected=want)") == 2
+    if not ev["call_sites_pass_expected"]:
+        problems.append(
+            "the resume path does not pass an expected frame count to "
+            "_encoded_ok")
+
     if planted:
-        ok = bh._encoded_ok(ROOT / "tools" / "ffprobe.exe",
-                            next(work.rglob("video/encoded.mov")))
-        ev["encoded_ok_on_truncated"] = ok
-        if ok:
-            problems.append("_encoded_ok accepted a truncated artifact")
-    else:
-        # no prior run left an intermediate: validate the guard directly
-        bad = RUNS / "HD-H05_truncated.mov"
-        hw, _ = do_encode(ctx, tid="HD-H05", fx=fx, backend="nvenc",
-                          reader="avhw", tag="ref", frames=24)
-        if hw.output_exists:
-            data = Path(hw.output).read_bytes()
-            bad.write_bytes(data[: max(2048, len(data) // 50)])
-            ok = bh._encoded_ok(ROOT / "tools" / "ffprobe.exe", bad)
-            ev["synthetic_truncated_accepted"] = ok
-            if ok:
-                problems.append("_encoded_ok accepted a synthetic truncated artifact")
-        else:
-            return _res(t, "HD-H05", STATUS_BLOCKED,
-                        reason="could not obtain an artifact to truncate")
+        ev["planted_intermediates"] = planted
     return _res(t, "HD-H05", STATUS_PASS if not problems else STATUS_FAIL,
-                actual="a partial artifact is rejected, so no false resume",
+                actual=("a partial intermediate is rejected by the "
+                        "expected-count check and a complete one is accepted"),
                 reason="; ".join(problems), evidence=ev)
 
 
