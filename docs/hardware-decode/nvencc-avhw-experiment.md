@@ -16,6 +16,13 @@
 > padded, dropped or re-stamped to make counts agree. No frame count was used on
 > its own as a correctness test.
 
+> **Branch close-out.** This document is the experiment record and is unchanged
+> by the close-out. The consolidated provenance record for the patch it
+> describes — baseline revision, patch sha256, clean-apply verification, tested
+> binary hash, build inputs, runtime test matrix and integration prerequisites —
+> is [`nvencc-patch.md`](nvencc-patch.md). The cross-branch conclusion is
+> `docs/hardware-decode/research-conclusion.md`.
+
 ---
 
 ## 0. Bottom line
@@ -1131,6 +1138,11 @@ PATCH STATUS: READY FOR PROJECT INTEGRATION
   This is a READY-to-integrate patch, not a READY-to-ship binary. The build in
   section 9 is a research build (avs/vpy readers disabled, generated CUDA
   MSBuild shim, dynamically linked FFmpeg) and must not be distributed.
+
+  Consolidated provenance record (baseline revision, patch sha256, clean-apply
+  proof against a freshly cloned pristine baseline, tested binary hash, build
+  inputs, runtime test matrix, integration prerequisites):
+      docs/hardware-decode/nvencc-patch.md
 ```
 
 ---

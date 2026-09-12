@@ -53,6 +53,7 @@ the whole corpus rather than on one clip.
 | [`design.md`](design.md) | target decoder architecture |
 | [`implementation-plan.md`](implementation-plan.md) | Phase 2 plan, acceptance criteria, risks |
 | [`nvencc-avhw-experiment.md`](nvencc-avhw-experiment.md) | **Phase 2, `research/rigaya-nvencc-avhw`** — where inside NVEncC `--avhw` the frames are actually lost, the reader-side patch candidates, and whether the reader is worth fixing |
+| [`nvencc-patch.md`](nvencc-patch.md) | **Patch provenance and integration reference** — baseline revision, patch sha256, clean-apply proof, tested binary hash, build inputs, runtime test matrix, known limitations, integration prerequisites |
 | [`test-results/`](test-results/) | machine-readable results |
 
 ## Conclusion table
