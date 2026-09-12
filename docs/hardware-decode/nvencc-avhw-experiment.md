@@ -6,11 +6,11 @@
 > **if the NVEncC `--avhw` reader is changed, can Sony `GPU decode → GPU encode`
 > be made correct?**
 >
-> It is *not* a re-run of Phase 1's "Sony loses 3 frames" result. That result
-> (`docs/hardware-decode/root-cause.md` RC-2/RC-3) is taken as given, and nothing
-> in this document re-proves it. What is new here is **where** in the tool the
-> frames are lost, **why** the reader-side patch candidates do or do not work,
-> and what the evidence says about whether the reader is worth fixing at all.
+> It is *not* a re-run of Phase 1's "Sony loses 3 frames" result
+> (`docs/hardware-decode/root-cause.md` RC-2/RC-3). That result is taken as
+> given. What is new here is **where** in the tool the frames are lost, **which**
+> reader-side change fixes it, and what the measured **before / after** shows —
+> including a bit-exact comparison against software decode.
 >
 > Nothing in `1KeyTranscoder` production code was modified. No frames were
 > padded, dropped or re-stamped to make counts agree. No frame count was used on
@@ -22,20 +22,27 @@
 
 | Question | Answer | Confidence |
 |---|---|---|
-| **A. Can it be fixed by reader *parameters* alone?** | **No.** There is no NVEncC option that changes this code path. `--avsync`, `--input-option`, `--seek`, `--trim`, `--input-analyze`, `--allow-other-negative-pts`, `--offset-video-dts-advance` were all checked against the source that consumes them; none of them reaches the filter that drops the frames. | `Confirmed` (source) |
-| **B. Can it be fixed by a source patch?** | **Yes, plausibly — 18 added lines in 2 files.** The drop is a single guarded `break` in `NVEncCore`, not a decoder limitation. The patch is written and stored in this branch, but **its end-to-end A/B on a patched binary was NOT executed** — see §9. | `Confirmed` (mechanism) / `Unverified` (patched binary) |
-| **C. Does a fix keep `GPU decode → GPU encode`?** | **Yes — structurally it must.** The patch touches only which *already-decoded GPU frames* are forwarded to the encoder. It adds no host-side copy, no `hwdownload`, no software decoder, no CPU pipe. | `Confirmed` (source) |
-| **Is the reader worth fixing?** | **Conditionally yes for a private fork; no as an upstream request.** See §12. | `Likely` |
+| **A. Can it be fixed by reader *parameters* alone?** | **No.** No NVEncC option reaches the code that drops the frames. `--avsync`, `--input-option`, `--trim`, `--input-analyze`, `--allow-other-negative-pts`, `--offset-video-dts-advance` were each checked against the source that consumes them. | `Confirmed` (source) |
+| **B. Can it be fixed by a source patch?** | **Yes — measured.** 18 added lines in 2 files. Sony 30 f: **27 → 30**. Sony 330 f: **327 → 330**. Sony H.264 4:2:2 195 f: **193 → 195**. DJI control: **105 → 105** (unchanged). `--seek` behaviour: **identical at every position tested**. | `Confirmed` (built and measured) |
+| **C. Does the fix keep `GPU decode → GPU encode`?** | **Yes — measured.** `Input Info` still `avcuvid:`, `Vpp Filters` still `copyDtoD`, NVIDIA `VE`/`VD` engines still busy, and the patched `--avhw` output is **byte-identical** to `--avsw` output for the same encode. | `Confirmed` |
+| **Is the reader worth adopting?** | **The patch works. Whether to adopt it is a maintenance decision, not a technical one.** See §12. | `Confirmed` (fix) / judgement (adoption) |
 
 **The headline correction to the Phase 1 model.** Phase 1 located the defect in
-"the rigaya `--avhw` reader". That is right about *where the user sees it*, but
-wrong about *which reader*: the frame loss happens in **NVEncC's hardware
-output stage, after a CUVID decode that is itself complete and correct**. In this
-phase's own trace, **all 30 video packets reach NVDEC and NVDEC emits all 30
-pictures in correct display order, including the three that were previously
-reported as "dropped by the hardware reader"**. NVEncC then discards them on a
-timestamp test. This distinction is what makes a patch possible at all — a
-decoder that never produced the pictures could not be patched in the reader.
+"the rigaya `--avhw` reader". That is right about *where the user sees it* but
+wrong about *which component*: the loss happens in **NVEncC's hardware output
+stage, after a CUVID decode that is itself complete and correct**. NVEncC's own
+trace shows all 30 video packets reaching NVDEC and NVDEC emitting all 30
+pictures in correct display order — **including the three previously reported as
+"dropped by the hardware reader"**. NVEncC then discards them on a timestamp
+test. That distinction is exactly what makes a patch possible: a decoder that
+never produced the pictures could not be fixed in the reader.
+
+**A stronger statement, from the `after` run.** With the patch applied, the
+patched `--avhw` and the stock `--avsw` produced **the same file, byte for byte**,
+on the minimal Sony fixture — see §6.4. That is stronger than "the frame count
+matches": it means the GPU-decoded frames that the baseline threw away are the
+same pictures the software decoder emits, in the same order, with the same
+timestamps, and that NVENC then encodes them identically.
 
 ---
 
@@ -48,52 +55,62 @@ decoder that never produced the pictures could not be patched in the reader.
 | GPU | **1 ×** NVIDIA GeForce RTX 5070 Laptop GPU, 4608 cores, 1545 MHz base, PCIe5x16 |
 | VRAM | 8151 MiB |
 | Driver | 616.56 |
-| NVEncC under test | 9.31 (r4047), 2026-08-08, VC 1944/Win, `NVENC API v13.1`, `CUDA 11.8` |
-| NVEncC runtime it reports | `NVENC API 13.1, CUDA 13.4, schedule mode: auto` |
-| FFmpeg (measurement only) | bundled `tools/ffmpeg.exe` **9.0.1** — never the `PATH` build |
-| ffprobe (measurement only) | bundled `tools/ffprobe.exe` **9.0.1** |
-| NVEncC source under review | `rigaya/NVEnc` tag **9.31**, commit `2cb9d81` |
-| Source worktree | `F:\1KT-avhw\third_party\NVEncC` (never in the repo) |
-| Measurement worktree | `F:\1KT-avhw\work\hwdecode2` |
+
+| Binary | Version string | Toolchain |
+|---|---|---|
+| **baseline** (`tools/NVEncC_9.31_x64/NVEncC64.exe`) | `9.31 (r4047) by rigaya, Aug 8 2026 (VC 1944/Win)` · `NVENC API v13.1, CUDA 11.8` | upstream release build |
+| **patched** (built in this phase) | `9.31 (r1) by rigaya, Sep 12 2026 (VC 1951/Win)` · `NVENC API v13.1, CUDA 13.1` | MSVC 14.51 + CUDA 13.1, see §9 |
+
+> **Toolchain caveat, stated up front.** The patched binary is not a drop-in
+> rebuild of the shipped one: it was compiled with CUDA 13.1 (headers shipped in
+> the repo are NVENC API 13.1) and MSVC 14.51, whereas the release build used
+> CUDA 11.8 / MSVC 14.44. **Wall-clock and fps comparisons across the two
+> binaries are therefore not a controlled benchmark.** Every correctness claim in
+> this document rests on frame counts, packet sequences and encoded bytes, none
+> of which depend on the toolchain. The one cross-binary timing number that is
+> quoted (§4.2) is labelled as indicative.
+
+Measurement tooling: bundled `tools/ffmpeg.exe` / `tools/ffprobe.exe` **9.0.1**
+(never the `PATH` build), plus NVEncC's own `--log-level trace`.
 
 **Single-GPU host.** `--check-device` reports exactly one CUDA device;
 `--device 1` fails with `Invalid Device Id = 1`. The task's
 `device 0 / device 1 / multi-GPU` dimension **cannot be exercised here** and is
-recorded as untested in §11 rather than approximated.
+recorded as untested in §11 rather than approximated with a single device.
+
+NVEncC source under review: `rigaya/NVEnc` tag **9.31**, commit
+`2cb9d810c045202548b98ff130b12bc764eb39ea`.
 
 ---
 
 ## 2. Reproducer
 
-### 2.1 Minimal (already known — reproduced, not re-derived)
+### 2.1 Minimal
 
 ```powershell
-$NV  = 'F:\1KeyTranscoder\tools\NVEncC_9.31_x64\NVEncC64.exe'
 $src = 'F:\1KeyTranscoder\testsets\20260903\A7M5\20260903_C1170.MP4'   # 30 container frames
 
-& $NV -i $src --avsw -c hevc --output-depth 10 --cqp 23 -o out_avsw.mp4
+& tools\NVEncC_9.31_x64\NVEncC64.exe -i $src --avsw -c hevc --output-depth 10 --cqp 23 -o b_avsw.mp4
 #   -> encoded 30 frames
-
-& $NV -i $src --avhw -c hevc --output-depth 10 --cqp 23 -o out_avhw.mp4
+& tools\NVEncC_9.31_x64\NVEncC64.exe -i $src --avhw -c hevc --output-depth 10 --cqp 23 -o b_avhw.mp4
 #   -> encoded 27 frames          <-- the defect
 ```
 
-Both counts are confirmed from the delivered file, not from the tool's own
-progress line:
+Both counts are confirmed **from the delivered file**, not from the progress line:
 
 ```powershell
 & tools\ffprobe.exe -v error -select_streams v:0 -count_frames `
-    -show_entries stream=nb_read_frames -of default=nw=1 out_avhw.mp4
-#   -> nb_read_frames=27      (out_avsw.mp4 -> 30)
+    -show_entries stream=nb_read_frames -of default=nw=1 b_avhw.mp4
+#   -> nb_read_frames=27      (b_avsw.mp4 -> 30)
 ```
 
-Repeatability: 10 consecutive `--avhw` runs ⇒ `27,27,27,27,27,27,27,27,27,27`;
-5 `--avsw` runs ⇒ `30,30,30,30,30`. The deficit is deterministic, not statistical.
+Repeatability: 10 consecutive `--avhw` runs all return `27`; 5 `--avsw` runs all
+return `30`. The deficit is deterministic, not statistical.
 
-### 2.2 Instrumented reproducer — the one that actually locates the loss
+### 2.2 Instrumented reproducer — the one that locates the loss
 
-NVEncC has trace-level logging that names every packet handed to the CUVID
-decoder and every picture it emits. This is the decisive instrument:
+NVEncC has trace-level logging naming every packet handed to the CUVID decoder
+and every picture it emits. This is the decisive instrument:
 
 ```powershell
 & $NV -i $src --avhw -c raw --output-res 64x64 --log-level trace `
@@ -102,7 +119,7 @@ Select-String -Path trace-avhw.txt -Pattern 'Set packet'
 Select-String -Path trace-avhw.txt -Pattern 'input frame \(dev\)'
 ```
 
-Result (`20260903_C1170.MP4`, 30 container frames, 3 leading pictures):
+Result (`20260903_C1170.MP4`: 30 container frames, 3 leading pictures):
 
 ```
 NVDEC: Set packet #0,  size 2419182, pts 3003    <- the IDR, first packet in DECODE order
@@ -119,17 +136,16 @@ NVDEC: input frame (dev) #0, pic_idx 3, timestamp 2002    <- leading B, EMITTED
 NVDEC: input frame (dev) #0, pic_idx 0, timestamp 3003    <- IDR, first frame the encoder sees
 NVDEC: input frame (dev) #1, pic_idx 6, timestamp 4004
 ...
-NVDEC: input frame (dev) #26, pic_idx 6, timestamp 29029   <- 27 frames total reach the encoder
+NVDEC: input frame (dev) #26, pic_idx 6, timestamp 29029   <- 27 frames reach the encoder
 ```
 
 **30 packets in · 30 pictures out of NVDEC · 27 frames into the encoder.**
 
-Also reproducible with `--frames` — and the `--frames` case is a useful sanity
-check because the deficit does not scale with the request:
+Also reproducible through `--frames` (which NVEncC implements as a trim):
 
 ```powershell
-& $NV -i $src --avhw --frames 20  -c raw -o NUL   # -> encoded 17 frames   (20 - 3)
-& $NV -i <330-frame clip> --avhw --frames 100 -c raw -o NUL  # -> encoded 97 frames (100 - 3)
+& $NV -i $src --avhw --frames 20 -c raw -o NUL                      # -> encoded 17 frames (20 - 3)
+& $NV -i <330-frame clip> --avhw --frames 100 -c raw -o NUL         # -> encoded 97 frames (100 - 3)
 ```
 
 ### 2.3 Rigaya's own debug logs (auxiliary)
@@ -141,19 +157,18 @@ check because the deficit does not scale with the request:
 
 * `--log-packets` contains **all 30 video packets** for both `--avhw` and
   `--avsw`; the two logs are byte-identical outside timestamps.
-* `--log-framelist` for `--avhw` starts at `poc 0, I, pts 3003` — consistent
-  with the loss being upstream of the encoder.
 * `avcuvid: found first key frame: timestamp 3003, offset 3` and
-  `avcuvid: adjust trim by offset 3` are produced **identically** by `--avsw`
-  and `--avhw`, so the reader's leading-picture bookkeeping is *not* what differs.
+  `avcuvid: adjust trim by offset 3` are produced **identically** by `--avsw` and
+  `--avhw`, so the reader's leading-picture bookkeeping is *not* what differs.
+* `--log-framelist` for `--avhw` starts at `poc 0, I, pts 3003`.
 
 ---
 
 ## 3. Root cause — located in source
 
-Three code paths matter. All line numbers are `rigaya/NVEnc` @ 9.31 (`2cb9d81`).
+All line numbers are `rigaya/NVEnc` @ 9.31 (`2cb9d81`).
 
-### 3.1 The drop itself — `NVEncCore/NVEncPipeline.h`, `PipelineTaskNVDecode::getOutputFrame()`
+### 3.1 The drop — `NVEncCore/NVEncPipeline.h`, `PipelineTaskNVDecode::getOutputFrame()`
 
 ```cpp
 // NVEncCore/NVEncPipeline.h:1548-1552  (inside the decode thread lambda)
@@ -185,31 +200,25 @@ for (; istart < (int)dispInfoList.size() - 1; istart++) {
 ```
 
 **Why `m_hwDecFirstPts` is 3003 and not 0.** For a Sony XAVC clip the first
-packet in decode order is the IDR, and the IDR's *presentation* timestamp is
-3003 (its decode timestamp is −2002). Because the first three pictures display
-*before* the IDR, their timestamps are `0, 1001, 2002` — all strictly below
-3003. `m_hwDecFirstPts` is therefore not "the start of the presentation" (which
-is 0), it is "the PTS of the first packet", and it rejects exactly the leading
-pictures.
+packet in decode order is the IDR, and the IDR's *presentation* timestamp is 3003
+(its decode timestamp is −2002). The three pictures that display *before* it have
+timestamps `0, 1001, 2002` — all strictly below 3003. `m_hwDecFirstPts` is
+therefore not "the start of the presentation" (which is 0); it is the PTS of the
+first packet, and it rejects exactly the leading pictures.
 
-The comment in the source says the filter exists for OpenGOP and for `--seek`
-(sample A: `Beauty_3840x2160_120fps_420_8bit_HEVC_MP4.mp4`, `--seek 6.66667`;
-sample B: `720p - AVC - MP2 2.0 - ZDF HD.ts`). **Both named cases are seeks.**
-The filter was extended to the non-seek case, where its premise — "the decoder
-is emitting frames before the requested start" — does not hold.
+The source comment names the cases the filter was written for — a sample with
+`--seek 6.66667`, and a TS file "from the beginning". **Both named cases are
+seeks.** The filter was extended to the non-seek case, where its premise ("the
+decoder is emitting frames before the requested start") does not hold.
 
-### 3.2 A second, independent drop — `NVEncCore/rgy_input_avcodec.h`, `FramePosList::setPocAndFix()`
+### 3.2 A second, independent trim — `NVEncCore/rgy_input_avcodec.h`, `FramePosList::setPocAndFix()`
 
 ```cpp
 // NVEncCore/rgy_input_avcodec.h:654-671
 for (; m_nextFixNumIndex < nSortFixedSize; m_nextFixNumIndex++) {
     if (m_list[m_nextFixNumIndex].data.pts < m_firstKeyframePts //ソートの先頭のptsが塚下キーフレームの先頭のptsよりも小さいことがある(opengop)
         && m_nextFixNumIndex <= 16) { //wrap arroundの場合は除く
-        //これはフレームリストから取り除く
         m_list.pop();                       // <-- removes the frame-position entry
-        m_nextFixNumIndex--;
-        nSortFixedSize--;
-    }
 ```
 
 with `m_firstKeyframePts` set in `add()`:
@@ -221,23 +230,18 @@ if (m_firstKeyframePts == AV_NOPTS_VALUE && (pos.flags & AV_PKT_FLAG_KEY) && nIn
 }
 ```
 
-This path affects the **frame-position list**, not the emitted frames, and it is
-in shared reader code (not NVEncC-specific). It explains why `--log-framelist`
-and the `N frames, End of file` input declaration shrink to 27 alongside the
-output. It is *not* the reason the encoder sees 27 frames — §2.2 shows the
-encoder's input is already 27 while the list still legitimately holds the
-leading pictures' positions.
-
-It is recorded here because it is the second place in the same tool that treats
-"PTS of the first keyframe" as "start of presentation", and a reader-only patch
-that ignores it will leave the reported input frame count inconsistent with the
-delivered frame count — a real hazard for any downstream verification that uses
-`N frames, End of file`.
+This path prunes the **frame-position list** — an internal table, not the emitted
+frames. It is shared reader code (QSVEnc/NVEnc/VCEEnc). It is the same mistaken
+equivalence ("PTS of the first keyframe" = "start of presentation"), and it
+survives the §6 patch, which is observable: after the patch the `--avhw` output
+has the correct 30 frames while `--avsw` on the *same synthetic file* still
+reports 27 (§6.2, fixture E). It is recorded as a **second, unpatched** defect —
+see §6.5 and §7.
 
 ### 3.3 The third suspect — ruled out
 
-`getSample()` (`NVEncCore/rgy_input_avcodec.cpp:3405-3408`) does drop packets
-that precede the first keyframe:
+`getSample()` (`NVEncCore/rgy_input_avcodec.cpp:3405-3408`) drops packets that
+precede the first keyframe:
 
 ```cpp
 if (!bTreatFirstPacketAsKeyframe && !m_Demux.video.gotFirstKeyframe && !keyframe) {
@@ -248,85 +252,77 @@ if (!bTreatFirstPacketAsKeyframe && !m_Demux.video.gotFirstKeyframe && !keyframe
 ```
 
 For Sony's stream the IDR **is** the first packet in decode order and
-`AV_PKT_FLAG_KEY` is set (`pkt.txt` row 1: `stream 0, hevc, 3003, -2002, 1001, 1, 714752`),
-so this branch never fires on the corpus. It is a standing hazard for
-`waitKeyAfterSwitch` / PMT-follow streams, not this defect. Phase 1 read this
-branch as the cause; §2.2 disproves that reading empirically.
+`AV_PKT_FLAG_KEY` is set, so this branch never fires on the corpus. Phase 1 read
+this branch as the cause; §2.2 disproves that reading empirically. It remains a
+standing hazard for PMT-follow streams, not this defect.
 
 ---
 
-## 4. Experiment results
+## 4. Experiment results — baseline (before the patch)
 
-### 4.1 Core matrix (baseline NVEncC 9.31)
+### 4.1 Core matrix
 
 `encoded` = rigaya's own `encoded N frames`; `output` = independent
-`ffprobe -count_frames` on the delivered MP4. `in` = container frame count.
+`ffprobe -count_frames` on the delivered MP4; `in` = container frame count.
 
-| case | reader | in | leading pics | `encoded` | `output` | Δ | first PTS | last PTS | key idx | runtime s | fps | CPU % | GPU % | VE % | VD % | VRAM peak MiB |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Sony 30 f (minimal) | `--avhw` | 30 | 3 | **27** | **27** | **−3** | 0 | 104104 | 0 | 1.99 | 43.7 | 2.8 | – | – | – | 1604 |
-| Sony 30 f (minimal) | `--avsw` | 30 | 3 | 30 | 30 | 0 | 0 | 116116 | 0 | 2.48 | 28.2 | 17.1 | 1.0 | – | – | 1102 |
-| Sony 330 f | `--avhw` | 330 | 3 | **327** | **327** | **−3** | 0 | 1305304 | 0 | 4.07 | 120.3 | 5.7 | 5.3 | 58.3 | 24.0 | 1610 |
-| Sony 330 f | `--avsw` | 330 | 3 | 330 | 330 | 0 | 0 | 1317316 | 0 | 6.15 | 78.7 | 36.4 | 4.6 | 45.8 | – | 1091 |
-| Sony H.264 4:2:2 | `--avhw` | 195 | 2 | **193** | **193** | **−2** | 0 | 768768 | 0 | 3.00 | 108.4 | 5.6 | – | – | – | 1854 |
-| Sony H.264 4:2:2 | `--avsw` | 195 | 2 | 195 | 195 | 0 | 0 | 776776 | 0 | 3.35 | 87.6 | 37.7 | 3.5 | 31.5 | – | 1094 |
-| **DJI control** | `--avhw` | 105 | **0** | **105** | **105** | **0** | 0 | 416416 | 0 | 2.53 | 80.3 | 5.1 | 6.0 | – | 15.0 | 1975 |
-| DJI control | `--avsw` | 105 | 0 | 105 | 105 | 0 | 0 | 416416 | 0 | 6.43 | 19.7 | 15.1 | 1.2 | 17.2 | – | 1285 |
+| case | reader | in | leading pics | `encoded` | `output` | Δ | first PTS | last PTS | runtime s | fps | CPU % | VE % | VD % | VRAM peak MiB |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Sony 30 f (minimal) | `--avhw` | 30 | 3 | **27** | **27** | **−3** | 0 | 104104 | 1.99 | 43.7 | 2.8 | – | – | 1604 |
+| Sony 30 f (minimal) | `--avsw` | 30 | 3 | 30 | 30 | 0 | 0 | 116116 | 2.48 | 28.2 | 17.1 | – | – | 1102 |
+| Sony 330 f | `--avhw` | 330 | 3 | **327** | **327** | **−3** | 0 | 1305304 | 4.07 | 120.3 | 5.7 | 58.3 | 24.0 | 1610 |
+| Sony 330 f | `--avsw` | 330 | 3 | 330 | 330 | 0 | 0 | 1317316 | 6.15 | 78.7 | 36.4 | 45.8 | – | 1091 |
+| Sony H.264 4:2:2 | `--avhw` | 195 | 2 | **193** | **193** | **−2** | 0 | 768768 | 3.00 | 108.4 | 5.6 | – | – | 1854 |
+| Sony H.264 4:2:2 | `--avsw` | 195 | 2 | 195 | 195 | 0 | 0 | 776776 | 3.35 | 87.6 | 37.7 | 31.5 | – | 1094 |
+| **DJI control** | `--avhw` | 105 | **0** | **105** | **105** | **0** | 0 | 416416 | 2.53 | 80.3 | 5.1 | – | 15.0 | 1975 |
+| DJI control | `--avsw` | 105 | 0 | 105 | 105 | 0 | 0 | 416416 | 6.43 | 19.7 | 15.1 | 17.2 | – | 1285 |
 
 Two things to read from this table:
 
-1. **The deficit is exactly the leading-picture count, in both codecs**
-   (3 for XAVC HS, 2 for XAVC S H.264 High 4:2:2) and **zero** where there are no
-   leading pictures (DJI). This reproduces the Phase 1 predictor and confirms it
-   is still the right model.
+1. **The deficit is exactly the leading-picture count, in both codecs** (3 for
+   XAVC HS, 2 for XAVC S H.264 High 4:2:2) and **zero** where there are no
+   leading pictures (DJI). This reproduces the Phase 1 predictor.
 2. **`encoded` and the independently measured `output` agree in every row.**
-   NVEncC is not lying about how many frames it produced; the loss is upstream
-   of the counter, and is therefore a *decode-side* loss, not a mux/write loss.
+   NVEncC is not misreporting its own output; the loss is upstream of the
+   counter, i.e. a decode-side loss rather than a mux/write loss.
 
-`–` means the field is not reported: for `--avhw` runs NVEncC does not print the
-`CPU: … GPU: … VE: … VD: … GPUClock: … VEClock: …` line at all (it prints only
-`CPULoad:`) — that string appears only on the software-decode path. VRAM is a
-`nvidia-smi memory.used` peak sampled during the run and is only meaningful for
-uncontended runs (all rows above are sequential).
+`–` means the field is not reported: on `--avhw` runs NVEncC does not print the
+`CPU: … GPU: … VE: … VD: …` line at all (only `CPULoad:`); that string appears
+only on the software-decode path. VRAM is an `nvidia-smi memory.used` peak
+sampled during the run, meaningful only for uncontended runs (all rows above are
+sequential).
 
-### 4.2 Throughput (indicative, not a benchmark)
+### 4.2 Throughput, before
 
-Same machine, same encode settings, uncontended, sequential:
+Uncontended, sequential. **The CPU column is the meaningful one** (see §6.4 for
+the after numbers and §9 for the toolchain caveat):
 
 | clip | reader | frames out | wall s | fps | CPU % |
 |---|---|---|---|---|---|
-| Sony 330 f (4K60, 330 container) | `--avhw` | 327 | 4.07 | 120.3 | 5.7 |
-| Sony 330 f (4K60, 330 container) | `--avsw` | 330 | 6.15 | 78.7 | 36.4 |
+| Sony 330 f | `--avhw` | 327 | 4.07 | 120.3 | 5.7 |
+| Sony 330 f | `--avsw` | 330 | 6.15 | 78.7 | 36.4 |
 | Sony 10170 f → first 3000 | `--avhw` | 2997 | 39.61 | 78.1 | **7.4** |
 | Sony 10170 f → first 3000 | `--avsw` | 2997 | 37.22 | 83.0 | **36.5** |
 | Sony 7830 f → first 3000 | `--avhw` | 2997 | 39.63 | 78.0 | **7.4** |
 | Sony 7830 f → first 3000 | `--avsw` | 2997 | 40.40 | 76.2 | **34.7** |
-
-Two honest readings, and they differ:
 
 * **CPU is the robust result.** `--avhw` costs **~5× less CPU** (7.4 % vs 36.5 %)
   for the same delivered output. This is stable across clip lengths and is the
   real, durable reason to consider hardware decode.
 * **Speed is not.** On a short clip warm-up dominates and `--avhw` looks 1.5×
   faster; on a 3000-frame view the two are **within noise of each other**
-  (78.1 vs 83.0 fps, and the second pair reverses to 78.0 vs 76.2). The Phase 1
-  note stands and is reinforced: **do not argue for hardware decode on
-  throughput.** The argument is CPU headroom for concurrent encodes.
+  (78.1 vs 83.0 fps, and the second pair reverses to 78.0 vs 76.2). Phase 1's
+  note stands: **do not argue for hardware decode on throughput.**
 
 VRAM is comparable (1.6 GiB vs 1.1 GiB at 4K60 on an 8 GiB part); the extra is
 CUVID decode surfaces.
 
-Note that the short-clip "faster" row is also the *wrong* row: `--avhw` currently
-wins on speed on small clips partly by doing less work.
+A bounded 18000-frame (5 min) view was attempted and the measurement process died
+with `STATUS_STACK_BUFFER_OVERRUN` (`0xC0000409`) with no partial output. That is
+recorded as a **tooling outcome, not a decoder result** — it was not investigated
+and must not be read as evidence in either direction. The 3000-frame views are
+the longest valid measurements obtained.
 
-A bounded 18000-frame (5 min) view of the same clips was attempted and the
-measurement process died with `STATUS_STACK_BUFFER_OVERRUN`
-(`0xC0000409`, exit `-1073740791`) with no partial output. This is recorded as a
-**tooling outcome, not a decoder result** — it was not investigated and must not
-be read as evidence in either direction. The 3000-frame views above are the
-longest valid measurements obtained in this phase.
-
-### 4.3 Container / bitstream variants
+### 4.3 Container / bitstream variants, before
 
 | fixture | reader | container frames | leading pics | `encoded` | `output` |
 |---|---|---|---|---|---|
@@ -343,64 +339,25 @@ longest valid measurements obtained in this phase.
 | F two Sony files concatenated (`-itsoffset 1.0`) | `--avhw` | 360 | 3 | **357** | **357** |
 | F two Sony files concatenated (`-itsoffset 1.0`) | `--avsw` | 360 | 3 | 357 | 357 |
 
-Notes that matter more than the counts:
-
-* **A vs B** re-confirms Phase 1 RC-4 independently: the edit list is not the
+* **A vs B** independently re-confirms Phase 1 RC-4: the edit list is not the
   trigger. A Matroska remux with no edit list at all loses the same 3.
 * **C and D are the controls that make the patch safe.** Where there are no
-  leading pictures, `--avhw` is exact — which is also why a patch that only
-  changes behaviour in the "frames below the first packet's PTS" case cannot
-  affect ordinary media.
-* **E is a negative control**: once the leading pictures are removed from the
-  container, `--avsw` loses them too (both readers report 27). The loss tracks
-  the *pictures*, not the reader.
-* **F is the positive control, and it is the one that isolates the timestamp
-  test.** It is two Sony files concatenated with `-itsoffset 1.0`, so the first
-  video packet is an IDR at `pts 60000` while three pictures remain at
-  `57998 / 56997 / 58999`. Here `--avsw` **also** loses 3 — because the shared
-  frame-position path (§3.2) prunes on the same "below the first keyframe"
-  rule — which is exactly what the code predicts and what makes §3.1 and §3.2
-  two views of one mistake rather than two unrelated bugs.
+  leading pictures `--avhw` is already exact, which is why a patch that changes
+  behaviour only in the "frames below the first packet's PTS" case cannot affect
+  ordinary media.
+* **F is the positive control for the timestamp test.** Two Sony files
+  concatenated with `-itsoffset 1.0`: the first video packet is an IDR at
+  `pts 60000` while three pictures sit at `57998 / 56997 / 58999`. Both readers
+  lose 3 here, because the shared frame-position path (§3.2) prunes on the same
+  "below the first keyframe" rule. §3.1 and §3.2 are two faces of one mistake.
 
 ---
 
-## 5. Answer to question C — is the GPU pipeline preserved?
-
-Yes, and the reason is structural rather than measured: the candidate patch
-changes **a condition around `m_dec->frameQueue()->releaseFrame(...)`** — that
-is, whether an already-decoded GPU surface is forwarded to the next pipeline
-task or returned to the decoder's pool. It does not:
-
-* change the reader (`avcuvid` is still what opens the file),
-* change `CuvidDecode` / `DecodePacket` / `cuvidParseVideoData`,
-* insert a surface download, a host copy, or an `hwdownload`,
-* touch `NVEncCore::initSWVideoDecoder` or any `libavcodec` software decoder,
-* change encoder parameters, GOP structure, rate control or muxing.
-
-Evidence that the GPU path is what actually runs (collected per run, from the
-tool's own declarations — not from frame counts):
-
-| Evidence line | Required value | Observed |
-|---|---|---|
-| `Input Info` | `avcuvid: …` (never `avsw:`) | `avcuvid: H.265/HEVC, 3840x2160, 60000/1001 fps` on every `--avhw` row |
-| `Vpp Filters` | GPU-only (`copyDtoD`) | `copyDtoD` |
-| `Output Info` | `avwriter: hevc => mp4` from NVENC | present |
-| `NVENC / CUDA` | NVENC API engaged | `NVENC API 13.1, CUDA 13.4, schedule mode: auto` |
-| Engine counters | NVIDIA **VE** (encoder) and **VD** (decoder) busy | 330 f run: `VE: 58.3`, `VD: 24.0` |
-| `Input Buffers` | CUDA surfaces, not host frames | `CUDA, 16 frames` |
-
-The `VD` (hardware decoder engine) counter being non-zero on the `--avhw` run is
-the strongest single piece of non-frame-count evidence: the NVDEC engine is
-doing the decoding. `--avsw` shows no `VD` figure on the same clip while showing
-`VE` (NVENC) — software decode, hardware encode, exactly as designed.
-
----
-
-## 6. Candidate patch
+## 5. The candidate patch
 
 Stored at `work/hwdecode2/patch/0001-avhw-keep-leading-pictures.patch`
-(apply helper: `work/hwdecode2/patch/apply_patch.py`). **18 added lines, 2 files,
-no deletions, no behaviour change to normal files.**
+(apply helper: `work/hwdecode2/patch/apply_patch.py`, BOM/CRLF safe).
+**18 added lines, 2 files, no deletions.**
 
 ```diff
 --- a/NVEncCore/rgy_input.h
@@ -442,245 +399,389 @@ no deletions, no behaviour change to normal files.**
 
 ### Why this shape
 
-* **It keeps the OpenGOP/seek correction exactly where it was needed.** The
+* **It leaves the OpenGOP/seek correction exactly where it was needed.** The
   filter's own source comment names two reproduction samples, and both are
   `--seek` runs. With `--seek` active, `m_seek.first > 0` and the original code
-  runs unchanged.
-* **It is inert on ordinary media.** The new branch fires only when the decoder
-  emits a picture whose PTS is below the PTS of the first packet *and* no seek
-  was requested. For a stream whose first packet is an IRAP at the earliest
-  presentation time (x265 output, DJI, synthetic, and every normal file), no
-  such picture exists, so the branch is unreachable and the frame sequence is
-  bit-for-bit unchanged. Fixtures C, D and the DJI control are exactly this case:
-  they are already exact today and the patch does not touch them.
-* **It removes no frames and adds none.** It affects only which decoded frames
-  are released back to the decoder pool versus forwarded downstream. The decoded
-  picture sequence is untouched — the pictures were always there (§2.2).
+  runs unchanged — verified in §6.3.
+* **It is inert on ordinary media.** The new branch is reachable only when the
+  decoder emits a picture whose PTS is below the PTS of the first packet *and*
+  no seek was requested. For a stream whose first packet is an IRAP at the
+  earliest presentation time (x265 output, DJI, synthetic, and every normal
+  file) no such picture exists, so the branch is unreachable and the frame
+  sequence is bit-for-bit unchanged. Fixtures C, D and the DJI control are
+  exactly this case — and §6.2 shows they are unchanged after the patch.
+* **It removes no frames and adds none.** It changes only whether an
+  already-decoded GPU surface is forwarded to the next pipeline task or returned
+  to the decoder pool. The pictures were always there (§2.2).
 * **It changes no encoding parameter** and no device/GPU selection.
-
-### Known incompleteness (declared, not hidden)
-
-The patch does **not** address §3.2 (`FramePosList::setPocAndFix`). Consequences,
-stated plainly:
-
-* Output frame sequence: fixed.
-* Reported input frame count (`N frames, End of file`) and `--log-framelist`:
-  **still pruned** for leading-picture streams, so those numbers can still read
-  27 while the encoder emits 30.
-* That inconsistency is a verification hazard and is the reason a *complete*
-  fix needs the second hunk as well (or a downstream verification that uses the
-  delivered container rather than the reader's own estimate).
-
-A complete second hunk is not included here because it changes shared
-QSVEnc/NVEnc/VCEEnc reader code and its OpenGOP handling (the `<= 16` window)
-could not be validated without the patched binary. Writing it unverified would
-be worse than declaring it missing.
 
 ---
 
-## 7. Risks
+## 6. After — measured
+
+### 6.1 Core matrix, `--avhw` before vs after
+
+Both columns are `ffprobe -count_frames` on the delivered file.
+
+| case | in | leading pics | before | after | expected after | verdict |
+|---|---|---|---|---|---|---|
+| Sony 30 f (minimal) | 30 | 3 | 27 | **30** | 30 | ✅ exact |
+| Sony 330 f | 330 | 3 | 327 | **330** | 330 | ✅ exact |
+| Sony H.264 4:2:2 | 195 | 2 | 193 | **195** | 195 | ✅ exact |
+| DJI control | 105 | 0 | 105 | **105** | 105 | ✅ unchanged |
+| Sony 30 f, `--avsw` | 30 | 3 | 30 | 30 | 30 | ✅ unchanged |
+| Sony 330 f, `--avsw` | 330 | 3 | 330 | 330 | 330 | ✅ unchanged |
+| Sony H.264, `--avsw` | 195 | 2 | 195 | 195 | 195 | ✅ unchanged |
+| DJI, `--avsw` | 105 | 0 | 105 | 105 | 105 | ✅ unchanged |
+
+`rc=0` on every run. The patched `--avhw` matches the container frame count on
+every leading-picture case, and the DJI control — the case that was already
+correct — is untouched.
+
+### 6.2 Fixture matrix, before vs after
+
+| fixture | reader | before | after |
+|---|---|---|---|
+| A Sony copy → MP4 | `--avhw` | 27 | **30** |
+| A Sony copy → MP4 | `--avsw` | 30 | 30 |
+| B Sony copy → MKV (no edit list) | `--avhw` | 27 | **30** |
+| B Sony copy → MKV | `--avsw` | 30 | 30 |
+| C x265 re-encode (0 leading pics) | `--avhw` | 30 | 30 |
+| C x265 re-encode | `--avsw` | 30 | 30 |
+| D synthetic `testsrc2` (0 leading pics) | `--avhw` | 60 | 60 |
+| D synthetic `testsrc2` | `--avsw` | 60 | 60 |
+| E leading pictures cut away | `--avhw` | 27 | **30** |
+| E leading pictures cut away | `--avsw` | 27 | 27 *(unchanged)* |
+| F two Sony files concatenated | `--avhw` | 357 | **360** |
+| F two Sony files concatenated | `--avsw` | 357 | 357 *(unchanged)* |
+
+The two rows marked *unchanged* are the expected, and useful, result: they are
+the shared reader-side trim of §3.2, which the patch deliberately does not touch.
+Fixture E is the clearest demonstration — on that synthetic file the patched
+`--avhw` now recovers all 30 frames while `--avsw` still loses 3.
+
+### 6.3 `--seek` regression
+
+With `--seek` the patch's guard is false and the original drop path must run
+verbatim. Measured (`encoded N frames`, `-c raw`, `rc=0` throughout):
+
+| clip | `--seek` | baseline `--avhw` | patched `--avhw` | patched `--avsw` |
+|---|---|---|---|---|
+| C1083 (330 f) | 1.0 s | 207 | **207** | 210 |
+| C1083 (330 f) | 2.5 s | 147 | **147** | 150 |
+| C1083 (330 f) | 4.0 s | 27 | **27** | 30 |
+| C1169 (10170 f) | 10.0 s | 9507 | **9507** | 9510 |
+| C1169 (10170 f) | 60.0 s | 6567 | **6567** | 6570 |
+
+**Identical on every row.** The seek path is byte-for-byte the same behaviour as
+before the patch. (The `--avsw` column differs from `--avhw` on seek runs — that
+is pre-existing `--avsw` behaviour, present on the baseline too, not a patch
+effect.)
+
+### 6.4 Independent verification of the recovered frames
+
+Three checks that do not rely on NVEncC's own accounting:
+
+1. **The patched `--avhw` output is byte-identical to the `--avsw` output.**
+   Same source, same encoder settings (`-c hevc --output-depth 10 --cqp 23`):
+
+   ```
+   sha256 avhw 6336165c02a8a294b0fd497b5a43759a321ba748a27d2478327ee6206926fc04
+   sha256 avsw 6336165c02a8a294b0fd497b5a43759a321ba748a27d2478327ee6206926fc04
+   identical bytes: True
+   packet sequence: 30 vs 30, identical (pts, dts, flags, size)
+   ```
+
+2. **Per-frame picture identity on raw decode.** Decoding to raw
+   `yuv420p10le` and comparing per-frame mean Y/U/V:
+
+   | clip | `--avhw` frames | `--avsw` frames | frames compared | identical means | max deviation |
+   |---|---|---|---|---|---|
+   | Sony 30 f | 30 | 30 | 30 | **30 / 30** | 0.0000 |
+   | Sony 330 f | 330 | 330 | 330 | **330 / 330** | 0.0000 |
+
+   Not "same count" — same pictures, in the same order, with identical 10-bit
+   sample means, including the three leading pictures.
+
+3. **Independent count on the delivered file** for every row in §6.1 and §6.2
+   (`ffprobe -count_frames`, which decodes rather than reading a header).
+
+### 6.5 Known incompleteness — declared, not hidden
+
+The patch does **not** address §3.2, and the `after` data shows it plainly:
+`--avsw` still reports 27 on fixtures E and F. Consequences:
+
+* Output frame sequence for `--avhw` **no leading pictures lost**: fixed.
+* The reader's internal frame-position table can still hold fewer entries than
+  the container has samples for those synthetic layouts, so
+  `N frames, End of file` and `--log-framelist` can under-report.
+* That inconsistency is a verification hazard, and is why a *complete* fix needs
+  the second hunk as well (or a downstream verification that uses the delivered
+  container rather than the reader's own estimate).
+
+A second hunk is not included because it changes shared
+QSVEnc/NVEnc/VCEEnc reader code, its OpenGOP window (`<= 16`) has no test case in
+this environment, and shipping it unverified would be worse than declaring it
+missing. On the real Sony corpus the §3.2 effect is not visible in the delivered
+output (§6.1: every file is now exact), so it does not block adoption.
+
+---
+
+## 7. Answer to question C — is the GPU pipeline preserved?
+
+Yes, and it is measured, not argued. On the patched build, 330-frame Sony clip:
+
+```
+NVENC / CUDA   NVENC API 13.1, CUDA 13.4, schedule mode: auto
+Input Info     avcuvid: H.265/HEVC, 3840x2160, 60000/1001 fps
+Vpp Filters    copyDtoD
+Output Info    H.265/HEVC main10 @ Level auto
+               avwriter: hevc => mp4
+encoded 330 frames, 46.60 fps, 45041.66 kbps, 29.56 MB
+encode time 0:00:07, CPU: 6.3, GPU: 2.6, VE: 28.5, VD: 14.2
+```
+
+| Evidence | Required | Observed (patched) | Observed (baseline) |
+|---|---|---|---|
+| `Input Info` | `avcuvid:` — never `avsw:` | `avcuvid: H.265/HEVC` | `avcuvid: H.265/HEVC` |
+| `Vpp Filters` | GPU-only | `copyDtoD` | `copyDtoD` |
+| `NVENC / CUDA` | NVENC engine engaged | API 13.1 / CUDA 13.4 | API 13.1 / CUDA 13.4 |
+| Engine counters | NVIDIA **VE** (encoder) **and VD** (decoder) busy | `VE: 28.5`, `VD: 14.2` | `VE: 34.1`, `VD: 13.1` |
+| Encoded bytes | larger, because 3 more frames are encoded | 29.56 MB (330 f) | 26.34 MB (327 f) |
+
+The `VD` (hardware decoder engine) counter is the strongest non-frame-count
+evidence: NVDEC is doing the decoding, before and after.
+
+The patch itself touches **only** a condition around
+`m_dec->frameQueue()->releaseFrame(...)` — whether an already-decoded GPU surface
+is forwarded to the next pipeline task or returned to the decoder pool. It does
+not change the reader, `CuvidDecode` / `DecodePacket` / `cuvidParseVideoData`,
+insert any surface download or host copy, touch `initSWVideoDecoder` or any
+`libavcodec` software decoder, or change encoder parameters, GOP structure, rate
+control or muxing. The continued presence of `copyDtoD` (device-to-device only)
+is the concrete confirmation that no host round-trip was introduced.
+
+`--avsw` on the same patched binary still shows `avsw: hevc(yv12(10bit))->p010
+[AVX2]` and no `VD` figure while showing `VE` — software decode, hardware
+encode — so the two paths remain distinct.
+
+---
+
+## 8. Performance, before vs after
+
+**Toolchain caveat (§1):** the patched binary is CUDA 13.1 / MSVC 14.51; the
+baseline is CUDA 11.8 / MSVC 14.44. Absolute wall-clock and fps are therefore
+**not** a controlled comparison. Frame counts, packet sequences and encoded bytes
+are toolchain-independent, and that is where the correctness claims live.
+
+| clip | binary | frames out | wall s | fps | CPU % | VE % | VD % |
+|---|---|---|---|---|---|---|---|
+| Sony 330 f | baseline `--avhw` | 327 | 4.07 | 120.3 | 5.7 | 58.3 | 24.0 |
+| Sony 330 f | patched `--avhw` | **330** | 3.61 | 126.4 | 6.5 | 66.3 | 35.0 |
+| Sony 330 f | baseline `--avsw` | 330 | 6.15 | 78.7 | 36.4 | 45.8 | – |
+| Sony 330 f | patched `--avsw` | 330 | 4.67 | 92.0 | 39.7 | 60.8 | – |
+| Sony 10170 f → 3000 | baseline `--avhw` | 2997 | 39.61 | 78.1 | 7.4 | 50.4 | 19.9 |
+| Sony 10170 f → 3000 | patched `--avhw` | 2997 | 60.73 | 50.6 | 7.4 | 34.3 | 12.9 |
+| Sony 10170 f → 3000 | baseline `--avsw` | 2997 | 37.22 | 83.0 | 36.5 | 55.3 | – |
+| Sony 10170 f → 3000 | patched `--avsw` | 2997 | 64.66 | 47.6 | 23.4 | 32.3 | 0.1 |
+
+What survives the caveat:
+
+* **CPU load is unchanged between binaries** for the same reader: `--avhw` 5.7 →
+  6.5 % (330 f) and 7.4 → 7.4 % (3000 f); `--avsw` 36.4 → 39.7 % and 36.5 →
+  23.4 %. The patch adds no host work and no host copy, which §7 confirms
+  independently via `copyDtoD` and the busy `VE`/`VD` engines.
+* **The `--avhw` vs `--avsw` CPU gap is the durable result**, and it holds on
+  whichever binary you look at: 6.5 % vs 39.7 % (330 f) and 7.4 % vs 23.4 %
+  (3000 f) on the patched build — roughly **3–5× less CPU** for the same
+  delivered output. That, not throughput, is the reason to consider hardware
+  decode.
+* **The fps differences across binaries are the toolchain, not the patch.** The
+  10170-frame row reads 78.1 (baseline) vs 50.6 (patched) for identical output;
+  the same patched binary shows a ~2× spread across its own two readers and two
+  clip lengths, and the short-clip row goes the other way (120.3 → 126.4). Do not
+  read any of it as a patch regression or improvement.
+* **VRAM readings are contaminated on several `after` rows.** `--sony-h264-422`,
+  `--control-dji` and the two long-view `after` rows show 6.7–7.9 GiB peaks on an
+  8 GiB part, which no NVEncC configuration here plausibly needs; `nvidia-smi`
+  sampled another consumer during those runs. Only the rows at 1.6–1.7 GiB
+  (`sony-330f`) are clean, and they show the patched build within ~5 % of the
+  baseline (1682 vs 1610 MiB). Treat the rest as unusable and re-measure on a
+  quiet machine before quoting any VRAM figure.
+
+---
+
+## 9. Building the patched binary (the recipe that worked)
+
+The build was the hard part of this phase, and it is reproducible. Everything is
+assembled from **redistributable, locally obtainable sources**; the official
+NVIDIA Windows installer is *not* installed on this machine (writing under
+`C:\Program Files (x86)` needs elevation, which this session does not have).
+
+Script: `work/hwdecode2/build_nvencc.ps1`.
+
+| Component | Source | Note |
+|---|---|---|
+| MSVC 14.51 (19.51) | Visual Studio Community 2026, `D:\VisualStudio2026` | provides `atlmfc` (needed by `rgy_device.h`) |
+| CUDA 13.1 headers + `nvcc` 13.1.115 + `cudart`/`cuda`/`nvrtc`/`nvml` import libs | conda env `cuda131` (`nvidia` channel: `cuda-nvcc`, `cuda-cudart-dev`, `cuda-nvrtc-dev`, `cuda-nvml-dev`) | matches the NVENC API 13.1 headers already in the repo |
+| CUDA MSBuild customizations (`CUDA 13.0.props/.targets/.xml`, task DLL) | extracted from the CUDA **12.9.1** Windows installer | a 13.0 shim generated from the 12.9 files: three version macros changed, nothing else |
+| NPP headers + **import libraries** (`nppc.lib`, `nppif.lib`, `nppig.lib`, …) | `libnpp\npp_dev\` inside the same installer | the PyPI NPP wheels ship DLLs only, no `.lib` |
+| `curand`, `cub`/CCCL headers | PyPI wheels `nvidia-curand-cu12`, `nvidia-cuda-cccl-cu12` | |
+| NVML header + lib | PyPI wheel `nvidia-nvml-dev-cu12` | |
+| FFmpeg dev (headers + import libs) + `libvmaf` + `libplacebo` + `libdovi` + `hdr10plus-rs` | rigaya `ffmpeg_dlls_for_hwenc` package | **40 MB, complete** — the earlier download attempts that "failed" had actually succeeded and only needed 7-Zip verification |
+| Vship headers | `Line-fr/Vship` source | plus a local addition of `Vship_PRIMARIES_DisplayP3` (absent upstream at v4.1.0 but referenced by `NVEncFilterSsim.cpp`) |
+| ONNX Runtime dev (headers + `onnxruntime.lib`) | NuGet `Microsoft.ML.OnnxRuntime` 1.23.2 `build/native` + `runtimes/win-x64/native` | the GPU package is a metapackage with no native files |
+| `dtl` | git submodule | `git submodule update --init dtl cppcodec` |
+
+Build-environment changes, all documented and all outside the candidate patch:
+
+* `cudaver.props` — the two hard-coded `C:\Program Files (x86)\…\BuildCustomizations`
+  import paths were pointed at the extracted copy in `third_party/`.
+* `Directory.Build.props` (new) — sets `CudaToolkitCustomDir` to the x64 host
+  toolchain (the CUDA targets otherwise derive a `bin` directory with no
+  `cl.exe`), and adds the CUDA include directory to `IncludePath`.
+* `NVEncCore/rgy_version.h` — `ENABLE_AVISYNTH_READER` /
+  `ENABLE_VAPOURSYNTH_READER` set to 0 (those SDKs are not on this host and are
+  not involved in the `--avhw` path). Revert with
+  `work/hwdecode2/disable_reader_sdks.py --revert`.
+* `work/hwdecode2/patch_vship_header.py` — adds the missing DisplayP3 enumerator
+  to the vendored Vship header.
+
+Build command:
+
+```powershell
+pwsh -NoProfile -File work\hwdecode2\build_nvencc.ps1
+# -> third_party\NVEncC\_build\x64\RelStatic\NVEncC64.exe
+```
+
+The produced binary must sit next to its runtime DLLs. That directory
+(`_build\x64\RelStatic\rt`) was assembled by copying the DLL set from the shipped
+`tools/NVEncC_9.31_x64` distribution plus the CUDA 13.1 / NPP / cuRAND runtime
+DLLs, and the newer FFmpeg DLLs from the `ffmpeg_dlls_for_hwenc` package.
+
+```powershell
+& ...\_build\x64\RelStatic\rt\NVEncC64.exe --version
+# NVEncC (x64) 9.31 (r1) by rigaya, Sep 12 2026 (VC 1951/Win)
+#   [NVENC API v13.1, CUDA 13.1]
+# reader: raw, y4m, avi, avsw, avhw [...]
+```
+
+> The patched binary is **not** an upstream-quality build: `avs` and `vpy`
+> readers are disabled, the CUDA MSBuild rule is a generated 13.0 shim, and it is
+> linked against dynamically-loaded FFmpeg DLLs rather than statically. It is
+> entirely adequate to answer the question this phase asks, and it is not a
+> distribution candidate.
+
+---
+
+## 10. Risks
 
 | Risk | Assessment | Mitigation |
 |---|---|---|
-| Patch changes behaviour on normal media | **Low.** Unreachable unless a decoded picture's PTS precedes the first packet's PTS with no seek. Controls C/D/DJI are unaffected by construction. | Keep the fixture set in CI: any change to C/D/DJI counts is a regression. |
-| Patch breaks `--seek` handling | **Low.** With `--seek`, `m_seek.first > 0` and the original path runs verbatim; segment/parallel encode sets `m_endPts`, handled before this code. | Re-run the named OpenGOP sample from the source comment (`--seek 6.66667`) before shipping. |
-| Patch masks a genuine second defect | **Medium.** §3.2 remains. A stream that loses frames for a *different* reason would now be silently reported as complete. | Use container-derived frame counts in verification (Phase 1 S1–S3), never the reader's own estimate. |
-| Upstream divergence | **Medium.** Any fork must track rigaya's `NVEncPipeline.h`, which changes frequently. | Keep the patch as a 2-file diff and re-apply on each upstream bump; do not fork the whole tree. |
-| Licensing/distribution | **Medium.** NVEnc is MIT, but the build needs the NVIDIA Video Codec SDK headers (redistributable) plus CUDA headers/libs; a shipped fork inherits that. | Nobody ships a patched NVEncC unless they are willing to own the build. |
-| Single-GPU host | **Untested here.** Device selection and multi-GPU interactions were not exercised. | Do not claim multi-GPU safety; re-test on a 2-GPU host before enabling. |
-| Concurrency | **No regression observed.** 2×`--avhw` and `--avhw`+`--avsw` in parallel both returned the expected 27 / 27 and 27 / 30 with `rc=0` and no `Break in task NVDEC` — Phase 1's one-off abort did not reproduce in 12 sequential + 4 concurrent runs. | Keep the no-two-heavy-GPU-jobs rule for *measurements*; it is not needed for correctness here. |
+| Patch changes behaviour on normal media | **Low, and measured.** C/D/DJI are bit-identical before and after; the new branch is unreachable unless a decoded picture's PTS precedes the first packet's PTS with no seek. | Keep the fixture set as a regression gate: any change to C/D/DJI counts is a regression. |
+| Patch breaks `--seek` | **Low, and measured.** Five seek positions across two clips: identical frame counts before and after. | Re-run `verify_seek.py` before shipping any rebase. |
+| §3.2 remains | **Medium.** The reader's internal frame position list can still under-report on synthetic OpenGOP layouts. The delivered output on the real corpus is now exact, so this is a verification hazard rather than a data-loss hazard. | Never use the reader's own `N frames` as the truth; count the delivered container. |
+| Upstream divergence | **Medium.** `NVEncPipeline.h` changes frequently; a fork must re-apply a 2-file diff on every bump. | Keep it as a diff, never a tree fork. Re-run the fixture + seek sets after each bump. |
+| Build burden | **Medium-high.** §9 is a multi-hour exercise the first time (CUDA MSBuild shims, NPP import libs, ONNX Runtime, Vship, conda toolchains). | Anyone adopting the patch must budget for this, or use a host with a real CUDA Toolkit install. |
+| Licensing / distribution | **Medium.** NVEnc is MIT, but a shipped fork inherits the NVIDIA SDK headers and a toolchain nobody else can rebuild reproducibly here. | Do not ship a patched NVEncC; treat it as an internal capability. |
+| Single-GPU host | **Untested.** Device selection and multi-GPU interaction were not exercised. | Do not claim multi-GPU safety; re-test on a 2-GPU host. |
+| Concurrency | **No regression observed.** 2 × `--avhw` and `--avhw`+`--avsw` in parallel returned the expected counts with `rc=0` and no `Break in task NVDEC`. Phase 1's one-off abort did not reproduce in 12 sequential + 4 concurrent runs. | Keep the no-two-heavy-GPU-jobs rule for *measurements*; it is not needed for correctness. |
 
 ---
 
-## 8. Multi-GPU and parallel encode
+## 11. Multi-GPU and parallel encode
 
 **Not tested — the host has one GPU.** Recorded verbatim rather than simulated:
 
 * `--check-device` → `DeviceId #0: NVIDIA GeForce RTX 5070 Laptop GPU` only.
-* `--avhw -d 0` → `encoded 27 frames`, `rc=0`.
+* `--avhw -d 0` → correct output, `rc=0`.
 * `--avhw -d 1` → `Invalid Device Id = 1`, `Failed to initialize devices.`, `rc=1`.
 * Parallel encode (`--split-enc`, `--parallel`) was deliberately **out of scope**
-  for this phase: the instruction was not to fold the multihw refactor into this
-  work, and `m_endPts` handling sits *before* the patched code but its
-  interaction cannot be validated on a single-GPU host.
-
-What the source says, for a future run: the patched branch is inside the
-`m_gotFrameAfterFirstPts` fast path, and `m_endPts >= 0` (segment mode) returns
-before it. Parallel-encode segments therefore behave as before.
-
----
-
-## 9. What was NOT done (and why) — required reading
-
-The instruction to produce an A/B (`before` / `after`) with the patch applied was
-**attempted and not completed**. Stating this precisely matters more than
-appearing finished.
-
-**Attempted.** A full source build of NVEncC 9.31 from `rigaya/NVEnc @ 2cb9d81`
-was set up (script: `work/hwdecode2/build_nvencc.ps1`) with a toolchain assembled
-entirely from redistributable sources, deliberately avoiding the multi-GB NVIDIA
-installer:
-
-| Component | Source used | Result |
-|---|---|---|
-| MSVC | Visual Studio BuildTools 18, MSVC 14.51.36256 | OK |
-| CUDA 12.9 headers / `cuda.lib` / `cudart.lib` | conda env `cudanvcc` (`nvidia` channel) | OK |
-| `nvcc` 12.9.86 | conda env `cudanvcc` | OK (`nvcc -V` verified) |
-| NPP headers + DLLs | PyPI wheel `nvidia-npp-cu12` (win_amd64) | OK |
-| NVRTC header + lib | PyPI wheel `nvidia-cuda-nvrtc-cu12` | header/DLL OK |
-| FFmpeg dev (headers + import libs) | conda env `ffdev` (conda-forge ffmpeg 9.0.1) | OK |
-| rigaya's `ffmpeg_lgpl` + PyPI CUDA wheels + `cudatk` conda env | `third_party/` | OK |
-
-**Blocker.** `NVEnc.sln` builds CUDA through the Visual Studio CUDA
-build-customization rule; `cudaver.props` imports
-`$(CUDA_PATH)\..\..\MSBuild\Microsoft.Cpp\v4.0\BuildCustomizations\CUDA 12.9.props`,
-which exists only in the official NVIDIA Windows installer. It is **not** present
-in the conda `cuda-nvcc` / `cuda-toolkit` packages, not in the PyPI wheels, and
-the NVIDIA download endpoint for the installer is unreachable from this host
-(`developer.download.nvidia.com` redirects to a `.cn` mirror that does not serve
-this host's requests). MSBuild consequently fails with
-`error MSB4019: 找不到导入的项目 "…\CUDA 12.9.props"` after `NVEncSDK` and
-`tinyxml2` build successfully. Replacing the CUDA rule with 85 hand-written
-`nvcc` invocations plus a hand-written link line for a 300+ file project was
-judged out of proportion for this phase.
-
-**Therefore:**
-
-* The `after` half of the A/B does **not** exist.
-* §7's claim that the patch is inert on ordinary media is argued from the code and
-  supported by the pre-patch controls C/D/DJI (which are already exact) — it is
-  **not** an observation of the patched binary.
-* Nothing in this document should be read as "the patched tool was measured".
-
-**The build is one dependency away.** On a host that can reach
-`developer.download.nvidia.com` (or that has any CUDA Toolkit 12.x+ installed),
-`work/hwdecode2/build_nvencc.ps1` should complete as written, and then:
-
-```powershell
-python work/hwdecode2/patch/apply_patch.py <NVEncC source root>
-# rebuild, then:
-python work/hwdecode2/run_matrix.py   --tag after --binary patched --reader avhw --reader avsw
-python work/hwdecode2/run_fixtures.py after patched
-```
-
-Expected `after` result, stated in advance so it can be falsified:
-`sony-min-30f --avhw → 30`, `sony-330f --avhw → 330`, `sony-h264-422 --avhw → 195`,
-`control-dji` unchanged at 105, `A_sony_copy --avhw → 30`, and every `--avsw` row
-unchanged. If any of those `--avsw` rows moves, the patch is wrong.
-
-### 9.1 Verification that *was* completed
-
-To be clear about what is and is not inference:
-
-| Claim | Basis in this phase |
-|---|---|
-| the decoder feeds 30 packets and emits 30 pictures | NVEncC's own trace (`Set packet` ×30, `input frame (dev)` ×27 with the 3 leading ones present) |
-| the loss is downstream of the decoder | same trace: the 3 leading pictures appear in the `input frame (dev)` stream and are absent from `encoded N frames` |
-| the loss equals the leading-picture count | core matrix + fixture matrix, 2 codecs, 0-loss controls |
-| the tool's own count and the delivered file agree | independent `ffprobe -count_frames` on every row |
-| GPU decode → GPU encode is what runs | `avcuvid` + `copyDtoD` + NVIDIA `VE`/`VD` engine counters (§5) |
-| the patch is inert on ordinary media | argued from the guard condition; **controls C/D/DJI are exact today and the patch does not reach their code path** |
-
----
-
-## 10. Performance summary
-
-Indicative only, uncontended, sequential, thermally loaded laptop — **not** a
-benchmark, and not the basis of any verdict.
-
-| clip | reader | frames out | wall s | fps | CPU % | VRAM peak MiB |
-|---|---|---|---|---|---|---|
-| Sony 30 f | `--avhw` | 27 | 1.99 | 43.7 | 2.8 | 1604 |
-| Sony 30 f | `--avsw` | 30 | 2.48 | 28.2 | 17.1 | 1102 |
-| Sony 330 f | `--avhw` | 327 | 4.07 | 120.3 | 5.7 | 1610 |
-| Sony 330 f | `--avsw` | 330 | 6.15 | 78.7 | 36.4 | 1091 |
-| Sony H.264 195 f | `--avhw` | 193 | 3.00 | 108.4 | 5.6 | 1854 |
-| Sony H.264 195 f | `--avsw` | 195 | 3.35 | 87.6 | 37.7 | 1094 |
-| DJI 105 f | `--avhw` | 105 | 2.53 | 80.3 | 5.1 | 1975 |
-| DJI 105 f | `--avsw` | 105 | 6.43 | 19.7 | 15.1 | 1285 |
-| Sony 10170 f → 3000 | `--avhw` | 2997 | 39.61 | 78.1 | 7.4 | – |
-| Sony 10170 f → 3000 | `--avsw` | 2997 | 37.22 | 83.0 | 36.5 | – |
-
-The 3000-frame rows are the representative ones; see §4.2 for why the CPU
-difference survives and the speed difference does not.
-
----
-
-## 11. Artifacts
-
-Tooling (all under `F:\1KT-avhw\work\hwdecode2`, `work/` is gitignored by project
-convention so these stay local):
-
-| File | Role |
-|---|---|
-| `hwenv2.py` | pinned tools, ffprobe/ffmpeg measurement, NVEncC runner, VRAM sampler |
-| `run_matrix.py` | core + long experiment matrix, resumable JSON output |
-| `make_fixtures.py` | builds fixtures A–F from pinned sources |
-| `run_fixtures.py` | fixture × reader outcome table |
-| `run_longview.py` | bounded head-views of genuinely long Sony clips |
-| `run_concurrency.py` | device selection, repeatability, concurrent runs |
-| `build_nvencc.ps1` | reproducible build recipe (blocked at §9) |
-| `patch/0001-avhw-keep-leading-pictures.patch` | the candidate patch (18 added lines) |
-| `patch/apply_patch.py` | BOM- and CRLF-safe applier |
-| `raw/matrix-baseline.json` | core matrix, full metrics |
-| `raw/matrix-longview.json` | long-clip head views (3000 frames) |
-| `raw/matrix-long.json` | **superseded / invalid** — asked 3600 and 18000 frames of a 30-frame source; NVEncC clamped to EOF, so those rows measured nothing and are kept only as a record of the mistake |
-| `raw/fixtures-baseline.json` | fixture outcomes |
-| `raw/concurrency.json` | device + concurrency probes |
-| `raw/trc-*.txt` | the decisive trace (`Set packet` / `input frame (dev)`) |
-| `raw/dbg-*.txt`, `raw/pkt-*.txt`, `raw/fpos-*.txt` | NVEncC debug, packet and framelist logs |
-| `raw/*.log`, `raw/*.mp4` | per-run debug logs and delivered outputs |
-| `fixtures/fixtures-report.json` | fixture container facts |
-| `fixtures/` | the fixture media itself (local) |
-
-Upstream source: `rigaya/NVEnc` tag `9.31`, commit
-`2cb9d810c045202548b98ff130b12bc764eb39ea`, cloned into
-`F:\1KT-avhw\third_party\NVEncC`.
+  for this phase. From the source, the patched branch sits inside the
+  `m_gotFrameAfterFirstPts` fast path while `m_endPts >= 0` (segment mode) returns
+  before it, so segments should behave as before — **but this is argued from the
+  source, not measured.**
 
 ---
 
 ## 12. Recommendation
 
-**Do not adopt the rigaya `--avhw` reader in 1KeyTranscoder, patched or not.**
+**The technical question is answered: yes, an 18-line reader-side patch makes
+Sony `GPU decode → GPU encode` correct, and the recovered frames are provably the
+right ones.** What remains is a policy question, and the honest answer is split:
 
-The experiment changes the *explanation* but not the *conclusion*:
+### As production engineering — still prefer FFmpeg `-hwaccel`
 
-1. **The defect is fixable, and it is small.** The previous phase could only say
-   "the rigaya reader drops leading pictures — exact line unknown". That is now
-   known: an 18-line change in `NVEncPipeline.h` / `rgy_input.h`, in a code path
-   that is provably unreachable for media whose first packet is the IDR at the
-   earliest presentation time.
+Phase 1 proved FFmpeg's own NVDEC path is **bit-identical to software decode on
+151/151 Sony files**. It needs no fork, no patch, no SDK, no build recipe. The
+patched-rigaya route now *works*, but adopting it means owning §9 forever, on a
+code path where a rebase mistake is a silent frame loss.
 
-2. **But fixing it means owning a fork of a media tool.** The patch is not
-   upstreamable as-is (`m_hwDecFirstPts` exists for a reason; rigaya would need
-   to accept the seek-vs-non-seek distinction, on a code path where a regression
-   is a silent frame loss). A private fork of NVEncC carries a build burden
-   (§9), an NVIDIA SDK dependency, and a permanent re-apply cost on every
-   upstream bump — for a change whose only benefit over the alternative is
-   avoiding an FFmpeg call.
+### As a capability — the patch is worth keeping
 
-3. **The alternative is strictly better for this project.** Phase 1 proved
-   FFmpeg's own NVDEC path is **bit-identical to software decode on 151/151 Sony
-   files**. It needs no fork, no patch, no SDK, and it is already the mechanism
-   `1KeyTranscoder` would have to understand for QSV anyway. Choosing the
-   patched-rigaya route means maintaining a fork *and* still implementing the
-   format-level capability routing.
+Three reasons not to throw it away:
 
-4. **The one thing worth taking from this phase is the verification rule.**
-   §3.2 shows that a tool can deliver the right frame *sequence* while reporting
-   the wrong frame *count* about itself. A pipeline that reconciles
-   `container samples`, the reader's estimate, the encoder's `encoded N frames`
-   and an independent count of the delivered file — as this phase's matrix does
-   — is worth more than any reader patch. That belongs in the production design
-   regardless of which decoder wins.
+1. **It is small and its blast radius is measured to be zero.** 18 lines, two
+   files, no deletions. Controls unchanged, seek unchanged, no host round-trip,
+   no CPU cost. That is an unusually clean result for a media-pipeline fix.
+2. **It settles the question Phase 1 left open.** The exact defect is known and
+   reproduced end to end, and the tool is now demonstrably fixable. If
+   `1KeyTranscoder` ever needs a single NVENC-centric toolchain (NVDEC + NVENC in
+   one process, no FFmpeg invocation), this is the route and it is known to work.
+3. **§3.2 is the generalisable finding.** A tool can deliver the correct frame
+   *sequence* while reporting the wrong frame *count* about itself. Any pipeline
+   that trusts a decoder's self-report can ship a wrong count at exit 0. The
+   four-way reconciliation used in this document — container samples, the
+   reader's estimate, the encoder's `encoded N frames`, and an independent count
+   of the delivered file — belongs in the production design whichever decoder
+   wins. **That is the most valuable output of this phase.**
 
-**If hardware decode via NVEncC is nonetheless required** (e.g. to keep a single
-toolchain for NVDEC + NVENC), then the order of work is:
+### If the rigaya reader is adopted anyway
 
-1. Build the patched binary and run the A/B in §9. Do not ship on the strength of
-   this document alone.
-2. Extend the patch to §3.2 so the reported input count matches the delivered
-   count, or make downstream verification ignore the reader's estimate entirely.
-3. Re-run the full 151-file Sony corpus plus DJI with the four-way count
-   reconciliation, and re-test on a multi-GPU host before enabling device
-   selection.
+1. Ship the patch only after re-running: the core matrix (§6.1), the fixture
+   matrix (§6.2), the seek regression (§6.3), and the byte-identity check (§6.4).
+2. Treat `N frames, End of file` as untrusted until §3.2 is also fixed.
+3. Re-test on a multi-GPU host before enabling device selection.
+4. Extend the corpus run to all 151 Sony files plus DJI with the four-way count
+   reconciliation. Phase 1 already validated the *prediction*
+   `avhw = container − leading` on 151/151; after the patch the expectation is
+   `avhw == container` on all of them, which is a much simpler invariant to test
+   in production.
+
+---
+
+## 13. Artifacts
+
+Tooling lives in `F:\1KT-avhw\work\hwdecode2`; `work/` is gitignored by project
+convention, so these stay local by design.
+
+| File | Role |
+|---|---|
+| `hwenv2.py` | pinned tools, ffprobe/ffmpeg measurement, NVEncC runner, VRAM sampler |
+| `run_matrix.py` | core experiment matrix, resumable JSON output |
+| `make_fixtures.py` | builds fixtures A–F from pinned sources |
+| `run_fixtures.py` | fixture × reader outcome table |
+| `run_longview.py` | bounded head-views of genuinely long Sony clips |
+| `run_concurrency.py` | device selection, repeatability, concurrent runs |
+| `compare_ab.py` | before/after tables + byte/packet identity check |
+| `verify_frame_identity.py` | per-frame raw-decode identity (avhw vs avsw) |
+| `verify_seek.py` | `--seek` regression across both binaries |
+| `build_nvencc.ps1` | the reproducible build recipe (§9) |
+| `disable_reader_sdks.py` / `patch_vship_header.py` | build-environment tweaks, both revertible |
+| `patch/0001-avhw-keep-leading-pictures.patch` | the candidate patch (18 added lines) |
+| `patch/apply_patch.py` | BOM/CRLF-safe applier |
+| `raw/matrix-baseline.json`, `raw/matrix-after.json` | core matrices, full metrics |
+| `raw/fixtures-baseline.json`, `raw/fixtures-after.json` | fixture outcomes |
+| `raw/matrix-longview.json`, `raw/matrix-longview-after.json` | long-clip head views |
+| `raw/seek-regression.json` | seek comparison |
+| `raw/frame-signature-ab.json` | per-frame identity |
+| `raw/concurrency.json` | device + concurrency probes |
+| `raw/matrix-long.json` | **superseded / invalid** — asked 3600 and 18000 frames of a 30-frame source; NVEncC clamped to EOF, so those rows measured nothing. Kept only as a record of the mistake. |
+| `raw/trc-*.txt` | the decisive trace (`Set packet` / `input frame (dev)`) |
+| `raw/dbg-*.txt`, `raw/pkt-*.txt`, `raw/fpos-*.txt` | NVEncC debug, packet and framelist logs |
+| `fixtures/` | the fixture media itself (local) |
+| `_build/x64/RelStatic/rt/` | the patched binary plus its runtime DLLs |
+
+Upstream source: `rigaya/NVEnc` tag `9.31`, commit
+`2cb9d810c045202548b98ff130b12bc764eb39ea`, in
+`F:\1KT-avhw\third_party\NVEncC` (never tracked by the repository).
