@@ -15,6 +15,14 @@
 >
 > No production code was modified in this phase. Everything below is measured
 > on real binaries, real media and the reader's own logs.
+>
+> **Final status (branch close-out).** `SEPARATE_FIX` stands and is unchanged.
+> Two follow-ups on the *main* question — which patch variant to prefer (§9) and
+> whether the NVEncC discard filter should be removed at all — were settled on
+> the sibling branch `research/rigaya-nvencc-avhw`: the shipped NVEncC patch is
+> the **seek-gated** variant (`theirs` in §9's terms), and it is runtime-proven
+> with a zero seek delta. `setPocAndFix` remains **unpatched and out of scope**
+> everywhere, exactly as §8 argues. Nothing in this document is retracted.
 
 ---
 

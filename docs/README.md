@@ -92,13 +92,19 @@ F:\1KeyTranscoder\
 | `qsv.md` / `nvdec.md` | QSV / NVDEC 逐项结果与吞吐 |
 | `divergence.md` | 逐帧指纹与首次分歧分析 |
 | `root-cause.md` | 根因分析（Observation/Evidence/Hypothesis/Experiment/Result/Conclusion） |
+| `rigaya-avhw-analysis.md` | **Phase 2 源码考古（`research/rigaya-avhw-source`）**：NVEncC `--avhw` 丢弃 Sony 先行图像的确切源码位置、触发条件、为何 x265 不触发，以及 PoC 补丁；文末 §Close-out 给出每条结论的最终状态与**不得声称**的三条 |
+| `nvencc-second-path-analysis.md` | **Phase 2 跟进**：`FramePosList::setPocAndFix` 剪枝的是**表项**而非投递帧；与本次丢帧无关，必须独立处理（`SEPARATE_FIX`） |
 | `design.md` | 目标解码器架构设计 |
 | `implementation-plan.md` | **Phase 2 计划**：§17.1 架构问题 P1–P8、§17.3 解码器 API、§17.4 完整性三层、§17.5 回退契约、§17.9 步骤 S1–S10 |
 | `test-results/` | 机器可读结果（comparison / corpus / nvdec / qsv / software-ground-truth / summary） |
 
-> ⚠️ **本目录是 Phase 1 调查产物，Phase 2 未执行**：生产 decode/encode/mux/
-> preservation/channel-sync 代码一行未改。当前开发方向与优先级见
-> `work/docs/v1.0.0_requirements.md`（P0-A = 硬件解码方向探索）。
+> ℹ️ **本目录的 Phase 1 调查与 Phase 2 源码考古均已完成并封存。**
+> Phase 1 结论（三方对比、headline findings、结论表）仍然成立；Phase 2 在此基础上
+> 定位到确切源码行，并在独立 research 分支上完成了 build + runtime 验证。
+> 四条 research 分支的最终交叉结论见
+> `docs/hardware-decode/research-conclusion.md`（由
+> `research/hwdecode-e2e-benchmark` 收口时写入）。
+> 生产 decode/encode/mux/preservation/channel-sync 代码一行未改，硬件解码仍未设为默认。
 
 ## 📁 evaluation/ — 评估报告（分类：评估与调研）
 

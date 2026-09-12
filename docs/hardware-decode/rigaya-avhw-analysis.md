@@ -10,6 +10,20 @@
 > [`root-cause.md`](root-cause.md) · [`divergence.md`](divergence.md) ·
 > [`investigation.md`](investigation.md)
 
+> **BRANCH CLOSED — SOURCE ARCHAEOLOGY ONLY.** This document is the *source-level*
+> analysis. It was written **before** a patched binary existed, so its
+> "patch feasibility" and "recommendation" sections carry the state of that
+> moment: they argue by model and by `git apply --check`, and they say the patch
+> is **not runtime-validated**. That is a statement about *this phase's*
+> environment (no CUDA toolkit, no NVDEC headers), not about the patch.
+>
+> The patch this document proposes was subsequently **built and runtime
+> validated** in the sibling branch `research/rigaya-nvencc-avhw`. See §Close-out
+> at the end of this file for the disposition of every claim, and the
+> `nvencc-patch.md` provenance record on that branch. Nothing in this document is
+> retracted; its confidence grades are preserved as written and are restated
+> with their final status in §Close-out.
+
 ---
 
 ## Observed behavior
@@ -601,3 +615,101 @@ python work\verify_truncation.py work\raw\yuv\sw.yuv work\raw\yuv\hw.yuv 64
 | A two-line patch restores `container_samples` frames with monotonic PTS | **`Likely`** (validated by model against real decoder output; **not** runtime-validated) |
 | The same defect exists in the QSVEncC/VCEEncC pipelines | **`Unconfirmed`** — must be re-located per tool |
 | Pattern A / pattern B behaviour is preserved | **`Unconfirmed`** (reasoned; reference samples unavailable) |
+
+---
+
+# Close-out (research branch `research/rigaya-avhw-source`)
+
+Added when this branch was closed out. **No new experiment was run for this
+section.** It records the final disposition of the claims above, marks the three
+statements that must **not** be made, and points at where each claim was
+independently validated after this document was written.
+
+## C1. What this branch was for, and what it is not
+
+| | |
+|---|---|
+| Question | *Where* in rigaya's own source do Sony's leading pictures disappear, and is the shared reader responsible? |
+| Method | source read + the shipped binary's own `--log-level debug` / `trace` / `--log-packets` / `--log-framelist` output + a standalone model of the exact loop |
+| **Not** in scope | building or running a patched binary (impossible here: no `nvcc`, no NVDEC headers — §Patch feasibility) |
+
+The branch's deliverable is therefore **code-level attribution with an explicit
+evidence ceiling**, not a validated fix. The fix was validated later, on a
+different branch, on a different machine configuration.
+
+## C2. Proven — as confirmed statements
+
+These are the sentences this branch is entitled to assert. Each was derived here
+and none has been weakened since.
+
+| # | Statement | Evidence in this document | Final status |
+|---|---|---|---|
+| P1 | The **shared reader is not the frame-loss root cause**. `rgy_input_avcodec.cpp/.h` is the demuxer for `--avsw` and `--avhw` alike, and a defect that fires only under `--avhw` cannot live in code both paths share. | `rgy_input.cpp:629-692` constructs `RGYInputAvcodec` for both formats; the keyframe gate at `:3405` logs `offset 0` on every fixture for both readers | **Stands**, and was independently re-confirmed at frame-hash level by the QSVEncC line (`docs/hardware-decode/qsvencc-root-cause.md` §6.2) |
+| P2 | **NVEncC's hardware output-stage filtering is one independent root cause.** `PipelineTaskNVDecode::getOutputFrame()` (`NVEncCore/NVEncPipeline.h`) treats `m_hwDecFirstPts` — the PTS of the first packet *fed to the decoder*, i.e. the first IRAP — as the first PTS that should be *presented*, and discards everything below it. | Decoder callback log (`DecPictureDisplay` 30/30, 195/195, 360/360, 105/105) shows every picture is produced; `CheckPTS`'s first frame is the IRAP; the loop arithmetic `targetStart = size − 1` reproduces all measured counts | **Stands.** Later runtime-proven: the frames are recovered by the patch below, and the patched output is byte-identical to `--avsw` |
+| P3 | **QSVEncC's pipeline admission filter is a second, independent root cause**, in different code. `PipelineTaskMFXDecode::sendBitstream()` (`QSVPipeline/qsv_pipeline_ctrl.h`) rejects every MFX output presented before the first fed packet's PTS. | This document only *predicted* it (R7: "the same class of defect likely exists in the QSVEncC pipeline headers and must be re-located there"). It was then located and patched on `research/rigaya-qsvencc-avhw`. | **Stands as a prediction that was subsequently confirmed** — but the confirmation lives on the QSVEncC branch, not here |
+| P4 | **`FramePosList::setPocAndFix` is an independent metadata-table issue.** It removes entries whose PTS precedes the first keyframe from the reader's frame-position table (`<= 16` anti-wraparound bound). | `nvencc-second-path-analysis.md` §4-§7: the same prune fires **identically** for `--avsw` and `--avhw` (`--log-framelist` byte-identical, `trim=3` on both), and `--avsw` still delivers all frames | **Stands.** It is a table/reporting defect, not a frame-delivery defect |
+| P5 | **The trigger is a stream-shape property, not a codec and not a container.** `avhw_frames = container_samples − pictures_before_first_keyframe`. | Measured on 5 fixtures here; Phase 1 validated the same predictor on 297/297 runs | **Stands** for the measured corpus (XAVC HS, XAVC S H.264 4:2:2, x265, MKV, synthetic, DJI) |
+
+## C3. Must NOT be claimed
+
+Stated explicitly because each of these is a tempting over-read of this
+document's contents.
+
+| # | Do not claim | Why |
+|---|---|---|
+| N1 | **That `setPocAndFix` caused the observed frame loss.** | Directly refuted by measurement: the prune fires identically on `--avsw` (which delivers every frame) and on `--avhw`. It removes *table entries*, not delivered frames. It is a separate defect and is **not** part of any patch. `nvencc-second-path-analysis.md` §8 gives four independent reasons it must stay out of the fix. |
+| N2 | **That all rigaya versions, or all rigaya tools, have the same bug.** | Only two pinned revisions were examined: `rigaya/NVEnc` tag `9.31` (`2cb9d81`) and `rigaya/QSVEnc` `b14c965` (= 8.26). Nothing was checked between or after those revisions. The rule is common to the two implementations; *"checked on two pinned revisions"* is the claim, not *"all versions"*. |
+| N3 | **That all codecs / containers / Sony material are affected.** | Measured on XAVC HS (HEVC Main10 4:2:0, 3 leading pictures) and XAVC S (H.264 High 4:2:2 10-bit, 2 leading pictures), in MP4 and MKV, plus controls. All-I, 8-bit and 1080p material was not exercised. The conditional statement "any stream whose first IRAP is not first in presentation order is affected" is an *inference from the mechanism*, consistent with every measurement here — not a measured result over all Sony media. |
+| N4 | **That this branch's patch was runtime-validated.** | It was not, in this environment. That claim belongs to `research/rigaya-nvencc-avhw`, whose build and regression matrix are recorded there. |
+| N5 | **That the fixture E/F crop is a frame-loss defect.** | It is `AV_PKT_FLAG_DISCARD` on the leading samples, honoured by `getSample()`, and FFmpeg's own decode agrees (27, not 30). Recorded in `nvencc-second-path-analysis.md` §5. |
+
+## C4. Where each claim was later validated
+
+This branch deliberately does not extend its own experiments. The runtime
+evidence for the fixes lives on the sibling branches:
+
+| Claim from this branch | Validated at | Result |
+|---|---|---|
+| NVEncC output-stage drop site (P2) | `research/rigaya-nvencc-avhw` — built patch + 13 assertions × 16 records, seek/trim matrix, long-run sweep | Sony `n−3 → n`; controls unchanged; output byte-identical to `--avsw` |
+| QSVEncC admission filter (P3) | `research/rigaya-qsvencc-avhw` — instrumented build, per-frame SHA-256 A/B | Sony `n−3 → n`; `avqsv` reader retained; refusal and controls unchanged |
+| `setPocAndFix` non-impact (P4) | `nvencc-second-path-analysis.md` (this branch) + `qsvencc-root-cause.md` §7 | Confirmed on both tools independently |
+| CPU economics of the fix | `research/hwdecode-e2e-benchmark` | 2.5–2.7× less CPU per frame; not faster |
+
+## C5. Provenance of the two patches, re-verified at close-out
+
+Re-checked when this branch was closed, against **freshly cloned pristine
+upstream checkouts** (not against the build trees):
+
+| | NVEncC | QSVEncC |
+|---|---|---|
+| Upstream | `rigaya/NVEnc` tag `9.31`, commit `2cb9d810c045202548b98ff130b12bc764eb39ea` (`VER_STR_FILEVERSION "9.31"`) | `rigaya/QSVEnc` commit `b14c9652b34b998351516cc63c86eb990c01c7c8` (`VER_STR_FILEVERSION "8.26"`) |
+| Patch file | `0001-avhw-keep-leading-pictures.patch` | `0001-avhw-keep-leading-pictures.patch` |
+| Patch sha256 | `53084fa8bd87ccc1d5882ab01d21e7320401f7c52c85263728b976d1edfe6dfc` | `5621ebb0f0277743a3bb5f18176134a134857d72e8a67f7f452c63dd08e53d98` |
+| Files touched | 2 (`NVEncCore/NVEncPipeline.h` +11, `NVEncCore/rgy_input.h` +7) | 2 (`QSVPipeline/qsv_pipeline_ctrl.h` +10/−1, `QSVPipeline/rgy_input.h` +6) |
+| Deletions | 0 | 1 line replaced (the condition) |
+| `git apply --check` on pristine | **exit 0** | **exit 0** |
+| Patched file hashes equal the built tree | **yes**, byte-for-byte (`daed88a7…`, `e03e828e…`) | **yes**, byte-for-byte once the tested tree's instrumentation-only lines and one stray blank line are excluded |
+
+Both patches touch research/build trees only. Neither is applied to, or required
+by, anything in `main`.
+
+## C6. Close-out verdict
+
+```text
+research/rigaya-avhw-source
+  verdict   : SOURCE ARCHAEOLOGY COMPLETE — READY TO ARCHIVE
+  delivers  : code-level attribution for both root causes, the reader
+              exoneration, the setPocAndFix separation, and the predictor's
+              derivation from source
+  does not  : validate a patch, claim version or corpus generality, or
+              propose any production change
+  fix status: out of scope here; see research/rigaya-nvencc-avhw and
+              research/rigaya-qsvencc-avhw
+```
+
+The one operational recommendation in this document that was **superseded** is
+§Recommendation item 6 ("FFmpeg `-hwaccel` remains the recommended hardware
+path"), which was written when no patched rigaya build existed. The final
+cross-branch position is recorded in `docs/hardware-decode/research-conclusion.md`.
+Item 2 — *keep `--avsw` as 1KeyTranscoder's default* — was **not** superseded:
+hardware decode stays non-default until an integration session validates it.
