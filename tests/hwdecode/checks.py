@@ -493,21 +493,51 @@ def packet_manifest(path: Path, limit: int | None = None) -> dict:
 
 
 def pts_monotonic(path: Path) -> tuple[bool, str]:
-    """Are presentation timestamps strictly increasing?"""
+    """Is the **presentation** timeline well formed?
+
+    Note the trap this function exists to avoid: ffprobe reports packets in
+    *decode* order, and with B-frames that order is not monotonic in PTS by
+    design. Checking the raw sequence would report every normal B-frame
+    stream as broken — the first version of this test did exactly that.
+    The meaningful properties are that every PTS is distinct and that the
+    sorted presentation times form a regular cadence.
+    """
     pk = packet_table(path)
     times = []
     for p in pk:
-        t = p.get("pts_time") or p.get("dts_time")
+        t = p.get("pts_time")
         try:
             times.append(float(t))
         except (TypeError, ValueError):
             continue
     if len(times) < 2:
         return False, "not enough timestamps"
-    for i in range(1, len(times)):
-        if times[i] <= times[i - 1]:
-            return False, f"non-monotonic at index {i}: {times[i-1]} -> {times[i]}"
-    return True, "monotonic"
+    if len(set(times)) != len(times):
+        dupes = len(times) - len(set(times))
+        return False, f"{dupes} duplicated presentation timestamps"
+    srt = sorted(times)
+    gaps = [srt[i + 1] - srt[i] for i in range(len(srt) - 1)]
+    lo, hi = min(gaps), max(gaps)
+    if hi > 0 and lo < hi * 0.5:
+        return False, (
+            f"presentation cadence is irregular: gap range "
+            f"{lo:.6f}..{hi:.6f}"
+        )
+    return True, (
+        f"{len(times)} distinct presentation timestamps, gap "
+        f"{lo:.6f}..{hi:.6f}"
+    )
+
+
+def presentation_times(path: Path) -> list[float]:
+    pk = packet_table(path)
+    out = []
+    for p in pk:
+        try:
+            out.append(float(p.get("pts_time")))
+        except (TypeError, ValueError):
+            continue
+    return sorted(out)
 
 
 def parse_tool_log(text: str) -> dict:

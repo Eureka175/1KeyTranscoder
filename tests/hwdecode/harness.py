@@ -2196,6 +2196,30 @@ def d09(t, ctx):
 # --- E ---------------------------------------------------------------------
 
 
+def source_color_args(ctx: Ctx, fx: FX.Fixture) -> tuple[list[str], list[str]]:
+    """Colour-signalling flags the production path would pass for a source.
+
+    The E tests must exercise the *production* colour path, not a bare
+    encode: without these flags NVEncC writes no ``colr`` box at all, so a
+    "colour preserved" test would compare two equally-empty results and
+    pass for the wrong reason.
+    """
+    from core.color import ColorInfo
+    from encoders.hw import color_flag_args, known_flags
+
+    v = ctx.fact(fx).video
+    ci = ColorInfo(
+        primaries=v.color_primaries or "",
+        transfer=v.color_transfer or "",
+        matrix=v.color_space or "",
+        range=v.color_range or "",
+    )
+    tool = ROOT / sources.load_provenance()["backends"]["nvenc"][
+        "hardware_decode"]["binary"]
+    args, notes = color_flag_args(ci, known_flags(tool))
+    return args, notes
+
+
 def _meta_pair(ctx, fx, *, tid: str, tag: str, **kw):
     hw, cm_hw = do_encode(ctx, tid=tid, fx=fx, backend="nvenc", reader="avhw",
                           tag=f"{tag}hw", **kw)
@@ -2295,17 +2319,45 @@ def e03(t, ctx):
 
 @impl("e04_colour_metadata")
 def e04(t, ctx):
+    """Colour signalling must survive the hardware path *and* match the source.
+
+    Comparing hardware against software alone is not enough here: if the
+    harness forgot to pass the colour flags, both sides would carry no
+    ``colr`` box and the comparison would pass on two empty results. So
+    the production colour flags are passed explicitly and the result is
+    also compared against the source.
+    """
     fx = FX.SONY_HS
     skip = _require_fixture(fx, "HD-E04", ctx)
     if skip:
         return skip
-    hw, sw, hf, sf = _meta_pair(ctx, fx, tid="HD-E04", tag="col")
+    cargs, cnotes = source_color_args(ctx, fx)
+    hw, sw, hf, sf = _meta_pair(ctx, fx, tid="HD-E04", tag="col", extra=cargs)
     a, b = _meta_fields(hf), _meta_fields(sf)
     if a is None or b is None:
         return _res(t, "HD-E04", STATUS_BLOCKED, reason="missing output metadata")
+    src_v = ctx.fact(fx).video
     keys = ("color_range", "color_space", "color_primaries", "color_transfer")
-    ev = {"hw": {k: a[k] for k in keys}, "sw": {k: b[k] for k in keys}}
-    problems = [f"{k}: {a[k]!r} != {b[k]!r}" for k in keys if a[k] != b[k]]
+    src = {"color_range": src_v.color_range, "color_space": src_v.color_space,
+           "color_primaries": src_v.color_primaries,
+           "color_transfer": src_v.color_transfer}
+    ev = {"hw": {k: a[k] for k in keys}, "sw": {k: b[k] for k in keys},
+          "source": src, "colour_args": cargs, "colour_notes": cnotes}
+    problems = []
+    for k in keys:
+        if a[k] != b[k]:
+            problems.append(f"{k}: hardware {a[k]!r} != software {b[k]!r}")
+    # the source values must actually have been signalled, not silently dropped
+    signalled = [k for k in keys if a[k] not in (None, "unknown")]
+    ev["signalled_fields"] = signalled
+    if not signalled:
+        problems.append(
+            "no colour metadata reached the output at all, so the "
+            "comparison is vacuous")
+    for k in keys:
+        if src[k] and a[k] in (None, "unknown"):
+            problems.append(
+                f"{k}: source declares {src[k]!r} but the output signals nothing")
     return _res(t, "HD-E04", STATUS_PASS if not problems else STATUS_FAIL,
                 actual="; ".join(f"{k}={a[k]}" for k in keys),
                 reason="; ".join(problems), evidence=ev)
@@ -2323,18 +2375,26 @@ def e05(t, ctx):
     mono_hw, msg_hw = checks.pts_monotonic(Path(hw.output))
     mono_sw, msg_sw = checks.pts_monotonic(Path(sw.output))
     pc = packet_compare(Path(hw.output), Path(sw.output))
+    pt_hw = checks.presentation_times(Path(hw.output))
+    pt_sw = checks.presentation_times(Path(sw.output))
     a, b = _meta_fields(hf), _meta_fields(sf)
     ev = {"pts_monotonic_hw": mono_hw, "pts_monotonic_sw": mono_sw,
-          "message": msg_hw, "packets": pc,
+          "message": msg_hw, "message_sw": msg_sw, "packets": pc,
+          "presentation_times_equal": pt_hw == pt_sw,
+          "presentation_first_hw": pt_hw[:5], "presentation_first_sw": pt_sw[:5],
           "duration_hw": a["duration"] if a else None,
           "duration_sw": b["duration"] if b else None,
           "fps_hw": a["avg_frame_rate"] if a else None,
           "fps_sw": b["avg_frame_rate"] if b else None}
     problems = []
     if not mono_hw:
-        problems.append(f"hardware PTS not monotonic: {msg_hw}")
+        problems.append(f"hardware presentation timeline malformed: {msg_hw}")
     if not mono_sw:
-        problems.append(f"software PTS not monotonic: {msg_sw}")
+        problems.append(f"software presentation timeline malformed: {msg_sw}")
+    if pt_hw != pt_sw:
+        problems.append(
+            "presentation timestamps differ between readers "
+            f"({pt_hw[:3]} vs {pt_sw[:3]})")
     if not pc["pts_equal"] or not pc["dts_equal"]:
         problems.append("PTS/DTS sequences differ between readers")
     if a and b and a["duration"] != b["duration"]:
@@ -2353,7 +2413,9 @@ def e06(t, ctx):
     skip = _require_fixture(fx, "HD-E06", ctx)
     if skip:
         return skip
-    hw, sw, hf, sf = _meta_pair(ctx, fx, tid="HD-E06", tag="colr")
+    cargs, cnotes = source_color_args(ctx, fx)
+    hw, sw, hf, sf = _meta_pair(ctx, fx, tid="HD-E06", tag="colr",
+                                extra=cargs)
     if not hw.output_exists or not sw.output_exists:
         return _res(t, "HD-E06", STATUS_BLOCKED, reason="missing output")
 
@@ -2382,14 +2444,19 @@ def e06(t, ctx):
     src_colr = read_colr(fx.path)
     hw_colr = read_colr(Path(hw.output))
     sw_colr = read_colr(Path(sw.output))
-    ev = {"source_colr": src_colr, "hw_colr": hw_colr, "sw_colr": sw_colr}
+    ev = {"source_colr": src_colr, "hw_colr": hw_colr, "sw_colr": sw_colr,
+          "colour_args": cargs, "colour_notes": cnotes}
     problems = []
     if hw_colr is None:
-        problems.append("hardware output carries no colr box")
+        problems.append(
+            "hardware output carries no colr box even with the production "
+            "colour flags applied")
     if hw_colr != sw_colr:
         problems.append("hardware colr differs from software colr")
-    if src_colr and hw_colr and hw_colr[:2] != src_colr[:2]:
-        problems.append("colr colour_type differs from the source")
+    if src_colr and hw_colr and hw_colr[:8] != src_colr[:8]:
+        problems.append(
+            f"colr colour_type/primaries prefix differs from the source "
+            f"(hw {hw_colr[:8]} vs src {src_colr[:8]})")
     return _res(t, "HD-E06", STATUS_PASS if not problems else STATUS_FAIL,
                 actual=f"colr hardware={hw_colr} software={sw_colr}",
                 reason="; ".join(problems), evidence=ev)
@@ -2449,7 +2516,7 @@ def f01(t, ctx):
     for backend, extra in (("nvenc", ["--device", "1"]),
                            ("qsv", ["--device", "9"])):
         er, cm = do_encode(ctx, tid="HD-F01", fx=fx, backend=backend,
-                           reader="avhw", tag="baddev", frames=8, extra=extra)
+                           reader="avhw", tag="baddev", extra=extra)
         code, detail = classify_reader_failure(er.log_text, rc=er.rc)
         ev[backend] = {"rc": er.rc, "reason_code": code, "detail": detail,
                        "output_exists": er.output_exists,
@@ -2464,7 +2531,7 @@ def f01(t, ctx):
                 problems.append(f"{backend}: unclassified failure code {code}")
     # the software path must still succeed
     sw, cm_sw = do_encode(ctx, tid="HD-F01", fx=fx, backend="nvenc",
-                          reader="avsw", tag="recovery", frames=8)
+                          reader="avsw", tag="recovery")
     ok, reasons = checks.reconcile(cm_sw)
     ev["software_recovery"] = {"rc": sw.rc, "ok": ok, "reasons": reasons}
     if not ok:
@@ -2487,7 +2554,7 @@ def f02(t, ctx):
     routed = route_decode(policy="auto", backend="qsv", codec="h264",
                           chroma="4:2:2", depth=10)
     sw, cm_sw = do_encode(ctx, tid="HD-F02", fx=fx, backend="qsv", reader="avsw",
-                          tag="recovery", frames=24)
+                          tag="recovery")
     ok, reasons = checks.reconcile(cm_sw)
     ev = {
         "hardware_attempt": {"rc": er.rc, "output_exists": er.output_exists,
@@ -2634,15 +2701,35 @@ def f07(t, ctx):
     ev["capability_refusal"] = {"warnings": r.warnings, "reason": r.reason}
     if not r.warnings:
         problems.append("capability refusal produced no warning")
+    # A capability refusal stays a capability refusal even once memoized:
+    # the specific reason must not degrade into a generic one.
     memo: dict = {}
     memoize_unavailable(memo, r, "capability_refused", "test detail")
     r2 = route_decode(policy="auto", backend="qsv", codec="h264",
                       chroma="4:2:2", depth=10, memo=memo)
-    ev["memoized"] = {"warnings": r2.warnings, "reason": r2.reason}
+    ev["memoized_refusal"] = {"warnings": r2.warnings, "reason": r2.reason,
+                              "memo": {str(k): v for k, v in memo.items()}}
     if not r2.warnings:
-        problems.append("memoized unavailability produced no warning")
-    if r2.reason != "reader_unavailable":
-        problems.append(f"memoized reason is {r2.reason}")
+        problems.append("memoized refusal produced no warning")
+    if r2.reason != "capability_refused":
+        problems.append(
+            f"memoized refusal lost its specific reason (got {r2.reason})")
+    # The memo must actually suppress a *runtime* unavailability: use an
+    # otherwise-proven combination so the memo is the only reason to refuse.
+    r3 = route_decode(policy="auto", backend="nvenc", codec="hevc",
+                      chroma="4:2:0", depth=10)
+    memo2: dict = {}
+    memoize_unavailable(memo2, r3, "device_unavailable", "no usable device")
+    r4 = route_decode(policy="auto", backend="nvenc", codec="hevc",
+                      chroma="4:2:0", depth=10, memo=memo2)
+    ev["memoized_runtime"] = {"before": r3.to_json(), "after": r4.to_json()}
+    if r3.hardware is not True:
+        problems.append("baseline combination is not hardware-eligible")
+    if r4.hardware or r4.reason != "reader_unavailable":
+        problems.append(
+            f"memoized runtime unavailability not honoured (got {r4.reason})")
+    if not r4.warnings:
+        problems.append("memoized runtime unavailability produced no warning")
     # unproven combinations must warn too
     r3 = route_decode(policy="auto", backend="nvenc", codec="av1",
                       chroma="4:2:0", depth=10)
