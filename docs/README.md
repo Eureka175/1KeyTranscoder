@@ -94,12 +94,15 @@ F:\1KeyTranscoder\
 | `root-cause.md` | 根因分析（Observation/Evidence/Hypothesis/Experiment/Result/Conclusion） |
 | `design.md` | 目标解码器架构设计 |
 | `implementation-plan.md` | **Phase 2 计划**：§17.1 架构问题 P1–P8、§17.3 解码器 API、§17.4 完整性三层、§17.5 回退契约、§17.9 步骤 S1–S10 |
-| `e2e-benchmark.md` | **S9 端到端基准（已执行，含 patched `--avhw`）**：软解 vs **patched** rigaya `--avhw` vs stock `--avhw` vs FFmpeg NVDEC→传输→编码；Sony/DJI × 60s × 1路/2路/4路；含逐帧完整性证明（SHA-256 字节相同）、精确 CPU 计量与 validity gate |
+| `e2e-benchmark.md` | **S9 端到端基准（已执行，含 patched `--avhw`）**：软解 vs **patched** rigaya `--avhw` vs stock `--avhw` vs FFmpeg NVDEC→传输→编码；Sony/DJI × 60s × 1路/2路/4路；含逐帧完整性证明（SHA-256 字节相同）、精确 CPU 计量与 validity gate；§0.1 = 已观测/推断未证/未测三者分离，§8.1 = 集成 session 行动指南 |
+| `research-conclusion.md` | **★四条 research 分支的最终交叉结论**：已验证状态表、三个独立根因（NVEncC 输出级过滤 / QSV 准入过滤 / `FramePosList` 元数据表）、工程建议与结论边界、集成前置条件、开放事项。**进入 integration 前先读这一份。** |
 | `test-results/` | 机器可读结果（comparison / corpus / nvdec / qsv / software-ground-truth / summary） |
 
 > ⚠️ **Phase 1 是调查产物，但 `e2e-benchmark.md` 已执行 Phase 2 的 S9 基准**：
 > 生产 decode/encode/mux/preservation/channel-sync 代码一行未改，基准仅在
 > 独立 worktree 的 `work/e2e/`（gitignored）中运行。
+> 该文件已随 `research/hwdecode-e2e-benchmark` 分支收口，新增 §0.1（**已观测 /
+> 推断未证 / 未测**三者分离）与 §8.1（集成 session 行动指南）。
 >
 > **S9 结论（第二轮，已纳入 patched reader）**：
 > - **patched `--avhw` 正确且证明充分**：Sony 上与软解输出 **SHA-256 完全相同**，
@@ -109,10 +112,15 @@ F:\1KeyTranscoder\
 > - **吞吐基本不变**：单路同二进制对比反而慢 ~11%；2 路聚合 +20%(Sony)/+4%(DJI)，
 >   落在主机漂移范围内。
 > - **管线是 NVENC 受限**：2 路仅用 6–7% 机器 CPU 仍只有 ~15–20 fps 聚合，
->   解码引擎均值仅 ~5%。4 路 4K 实测崩溃到 8.01 fps，不可用。
+>   解码引擎均值仅 ~5%。4 路 4K 实测崩溃到 8.01 fps，不可用
+>   （**注意：崩溃的机制属推断，未由 VRAM telemetry 直接证明**）。
+>
+> **一句话结论：硬件解码的主要收益是 CPU 余量，而不是单任务速度提升。**
 >
 > 建议：**保留软解为默认 + 硬解可选（patched `--avhw`）**，其价值是 CPU 余量而非速度；
-> FFmpeg `-hwaccel` 保留为正确性/参考路径，不作生产主路径。
+> FFmpeg `-hwaccel` 保留为正确性/参考路径，**不作生产主路径**
+> （raw pipe 会损失约 80% 的 CPU 收益）。
+> 四条 research 分支的最终交叉结论见 `docs/hardware-decode/research-conclusion.md`。
 > 当前开发方向与优先级见 `work/docs/v1.0.0_requirements.md`（P0-A = 硬件解码方向探索）。
 
 ## 📁 evaluation/ — 评估报告（分类：评估与调研）

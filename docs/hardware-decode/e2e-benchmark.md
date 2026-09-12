@@ -13,6 +13,17 @@ pass measured the **stock** `--avhw` reader (which loses frames) and a CPU
 instrument that was later proven wrong. Both errors are documented in §2
 and §3 rather than quietly removed.
 
+> **Branch close-out.** This document is the final benchmark report for
+> `research/hwdecode-e2e-benchmark`. Added at close-out: §0.1 (observed vs
+> inferred, consolidated) and §8.1 (the guidance an integration session needs).
+> No measurement was added or re-run; the raw records in `work/e2e/results/`
+> are unchanged.
+>
+> **The one sentence to carry forward:**
+>
+> > **Hardware decode's main benefit is CPU headroom, not a guaranteed
+> > single-job speed-up.**
+
 ---
 
 ## 0. The three answers
@@ -31,6 +42,47 @@ and §3 rather than quietly removed.
 2.6× less CPU per frame, bit-identical output — but it is **not faster**,
 because this pipeline is NVENC-bound and the freed CPU cannot be converted
 into throughput at the concurrency levels an 8 GB laptop GPU can support.
+
+---
+
+## 0.1 Observed vs inferred — keep these apart
+
+Every conclusion in this report is one of the three kinds below. The split is
+given here once, so no downstream reader has to guess which kind a number is.
+
+### A. Observed — measured directly, reproducible
+
+| # | Observation | Where | Reproducibility |
+|---|---|---|---|
+| O1 | **CPU reduction of 2.5–2.7× per frame.** Sony 95.8 → 37.1 CPU-s/1000 frames; DJI 98.4 → 35.9. | §4.2 | 3 repeats each, spread **2–3 %** — the most reliable table in the report |
+| O2 | **The patch is free.** Patched vs stock `--avhw` within 3 % CPU on both fixtures, with bit-identical output. | §4.2 | same |
+| O3 | **Single-job throughput does not improve; it drops ~11 %** on the same-binary pairing (Sony 140.9 s `--avsw` vs 158.4 s patched `--avhw`, 25.54 vs 22.72 fps). | §4.1 | one pairing, same binary → toolchain-controlled |
+| O4 | **Two-way aggregate throughput rises**, Sony 16.97 → 20.33 fps (+20 %), DJI 14.61 → 15.18 (+4 %). | §5 | **one run per cell** (T8); both directions favour hardware decode |
+| O5 | **GPU utilisation:** NVDEC (VD) mean ~5 %, NVENC (VE) mean 80–84 % under `--avhw`; `copy` peak 0.2 % vs 9.1 % on the FFmpeg pipe. | §7 | per-pid attribution |
+| O6 | **4-way 4K collapses to 8.01 fps aggregate** — below the 1-way 22.7 fps — with CPU per frame ~9× higher. All four jobs returned `rc=0` with correct frame counts. | §5.1 | one run; throughput measured, mechanism not (see B2) |
+| O7 | **FFmpeg raw-pipe cost:** on DJI the NVDEC pipe (145.4 s) and the software pipe (144.1 s) are within 1 %; the pipe costs ~6 % wall clock and gives back most of the CPU saving (NVDEC-through-pipe 53.8 CPU-s/1000 f vs `--avhw` 21.9–28.6). | §6 | earlier pass, same fixtures and settings |
+| O8 | **Byte-identity of the patched `--avhw` output with software decode**, on Sony (3 599 f) and DJI (3 597 f), plus per-frame signature max deviation 0.0. | §3 | independent decode + per-frame sequence + SHA-256 |
+
+### B. Inferred / uncertain — do **not** quote as confirmed mechanism
+
+| # | Inference | Why it is not an observation |
+|---|---|---|
+| B1 | **Hardware decode "unlocks" concurrency** | **Not supported.** The 2-way gains (O4) are within this host's run-to-run drift (§4.3, T2). The data supports "**at least as fast, with half the CPU**", not "unlocks throughput". |
+| B2 | **The 4-way 4K collapse is caused by VRAM exhaustion** (one 4K10-bit NVENC job peaks at 2.8–3.7 GB; four sessions need ~11–15 GB on an 8 151 MiB part) | **Inferred, not proved.** That run's per-pid VRAM sampling returned `vram_peak_mb: None`, so the mechanism was never observed directly. An alternative — NVENC session/throughput contention, the engine already ~13× oversubscribed — fits the same numbers. **Which one dominates is unknown.** Only the throughput result (O6) is measured. |
+| B3 | **The pipeline is NVENC-bound**, so a decode-side optimisation cannot show up as speed | **Well-supported inference, not a direct measurement.** Evidence: 2-way `--avhw` uses only 6.1–6.7 % of the machine and still reaches only ~15–20 fps aggregate; VE mean 80–85 %; VD mean ~5 %. Consistent and strong, but the ceiling was not isolated by a controlled encoder-capacity experiment. |
+| B4 | **Absolute wall clock and fps are comparable across sessions or binaries** | **False and load-bearing.** The same job measured 270.2 s early in one pass and 140.7 s in another; a sibling NVENC job and a file indexer competed at times. Differences below ~20 % are not interpretable. |
+| B5 | **DJI scaling behaviour generalises** | The DJI 10-minute fixture is a **stream-copy loop** (the corpus holds only 364 s of DJI 4K60 2160p). Measured for scaling, not absolute DJI bitrate behaviour. |
+| B6 | **Audio and mux paths behave the same** | Fixtures are video-only; production copies audio on the non-Sony path. Scope is the video transcode stage. |
+| B7 | **The patched binary's behaviour generalises to a shipped build** | The patched build is CUDA 13.1 / MSVC 14.51 against a shipped CUDA 11.8 / MSVC 14.44 baseline. Timing comparisons avoid this (§4.1 uses one binary); correctness claims are toolchain-independent, but the build itself is a research build. |
+
+### C. Untested — declared, not approximated
+
+* Multi-GPU / device selection (single-GPU host).
+* Parallel or `--split-enc` encode.
+* The full 151-file Sony corpus (this benchmark uses purpose-built fixtures).
+* 4-way and higher concurrency at 1080p — **no 1080p material exists in the
+  corpus**, so the operator constraint that caps 4K at 2 was not re-evaluated.
+* Any rigaya revision other than the two pinned ones.
 
 ---
 
@@ -310,22 +362,27 @@ than predict it:
 All four jobs returned `rc=0` with **correct frame counts** (3 599 each,
 independently decoded), so this is **not** a crash: it is a throughput
 collapse to **8.01 fps**, *below* the 1-way rate of 22.7 fps, with CPU per
-frame ballooning ~9×. Two candidate mechanisms, both consistent with the
-numbers:
+frame ballooning ~9× — a measured result (O6 in §0.1).
 
-- **VRAM exhaustion.** One 4K10-bit NVENC job peaks at 2.8–3.7 GB on an
-  8 151 MiB part; four concurrent sessions need ~11–15 GB. NVIDIA's driver
-  then falls back to system memory, and the resulting traffic explains both
-  the collapse and the CPU inflation. (This run's per-pid VRAM sampling
-  failed — `vram_peak_mb: None` — so the mechanism is inferred from the
-  single-way measurements, not observed directly.)
-- **NVENC session/throughput contention**: the engine was already ~13×
-  oversubscribed in aggregate demand.
+**The mechanism is not measured.** Two candidates are consistent with the
+numbers, and this report does **not** pick a winner:
+
+- **VRAM exhaustion (inferred).** One 4K10-bit NVENC job peaks at 2.8–3.7 GB
+  on an 8 151 MiB part; four concurrent sessions need ~11–15 GB. NVIDIA's
+  driver would then fall back to system memory, and the resulting traffic
+  explains both the collapse and the CPU inflation. **This run's per-pid VRAM
+  sampling failed** (`vram_peak_mb: None`), so no VRAM telemetry exists for the
+  4-way case; the mechanism rests on extrapolating single-way peaks.
+- **NVENC session/throughput contention (inferred).** The engine was already
+  ~13× oversubscribed in aggregate demand.
 
 Either way the operational conclusion is the same and does not depend on
 which dominates: **4 concurrent 4K jobs is not a configuration this GPU can
 serve.** It is recorded as a measured limit, and 4-way concurrency should be
-evaluated on 1080p material (~¼ the VRAM per session) when it exists.
+evaluated on 1080p material (~¼ the VRAM per session) when it exists — and
+instrumented with working VRAM sampling, so the mechanism can be settled
+rather than inferred (see §9 T5 and §Open items in
+`docs/hardware-decode/research-conclusion.md`).
 
 The run was flagged `VALID` by the gate because it passed the mechanical
 checks (rc 0, frame-exact, samples, clock, sampler clean). That is correct —
@@ -441,6 +498,75 @@ where a rebase mistake is a **silent frame loss**. Before shipping: re-run
 `verify_integrity.py` (byte-identity), `check_scenario_tools.py`, and the
 `--seek` regression. Never trust the reader's self-reported frame count —
 count the delivered container.
+
+---
+
+## 8.1 Guidance for the integration session
+
+Added at close-out. This is the answer to *"what should the integration session
+actually do with this?"* — nothing here is a new measurement.
+
+### The headline, stated so it cannot be misread
+
+```
+Hardware decode's main benefit is CPU HEADROOM,
+not a guaranteed single-job speed-up.
+```
+
+Concretely, from the observed results in §0.1:
+
+| Expectation | What the data supports |
+|---|---|
+| "Hardware decode makes transcodes faster" | **No.** Single-job is ~11 % *slower* on the same-binary pairing (O3), and the 2-way gain is within host drift (O4, B1). |
+| "Hardware decode frees the CPU" | **Yes, reproducibly.** 2.5–2.7× less CPU per frame, 2–3 % spread (O1), and the patch adds none of it back (O2). |
+| "Hardware decode is correct" | **Yes, for the patched path** — byte-identical to software decode on both fixtures (O8). Stock `--avhw` is not. |
+| "50 % CPU means 2× the jobs" | **No.** The pipeline is NVENC-bound (B3); 2-way `--avhw` already leaves ~93 % of the machine idle and still only reaches ~15–20 fps aggregate. |
+
+**Who should turn it on.** A deployment that needs the CPU for something other
+than the NVENC job itself — audio encoding, channel-sync, muxing, PSNR/SSIM
+verification, or a mixed watch-folder running non-NVENC backends (x265,
+SVT-AV1). A deployment that only ever runs NVENC jobs gains nothing from
+switching (§8).
+
+### Architecture guidance — which path is which
+
+| Role | Route | Why |
+|---|---|---|
+| **Default** | **software decode** | unchanged from today; frame-exact, no fork, no build, no new failure mode |
+| **Hardware route** (opt-in) | **patched rigaya `--avhw`** | correct and byte-identical (O8), 2.5–2.7× cheaper in CPU (O1), GPU-resident with no host round-trip (§7) |
+| **Correctness / reference / fallback** | **FFmpeg `-hwaccel` (NVDEC/QSV)** | independent implementation, proven frame-exact on the whole Sony corpus, and it is what made the patched reader's result credible |
+| **Do NOT** | **FFmpeg decode → CPU raw pipe as the production primary** | it is frame-exact but the y4m round-trip costs ~6 % wall clock and **gives back ~80 % of the CPU saving** (O7) — i.e. it forfeits the only benefit hardware decode has |
+| **Do NOT** | **stock rigaya `--avhw`** | silent 3-frame head truncation on Sony, exit 0 (§3) |
+| **Do NOT** | **4 concurrent 4K jobs on an 8 GB laptop GPU** | measured collapse to 8.01 fps aggregate (O6) |
+
+### Prerequisites the integration session must satisfy
+
+1. **Do not make hardware decode the default** until integration validation
+   completes. The research branches deliberately changed no default.
+2. **Keep a software fallback** and keep it loud — never a silent switch.
+   Capability refusal, init failure, count mismatch and sequence mismatch must
+   each be distinguishable in a log.
+3. **Reconcile counts against the delivered container**, never against the
+   decoder's or reader's self-report. Four-way: container samples · reader
+   estimate · `encoded N frames` · independent count of the output.
+4. **Validate with picture identity, not counts.** On this project a count check
+   alone passed a truncated stream; the per-frame signature and SHA-256 are what
+   caught it.
+5. **Re-run the correctness gate after any rigaya rebase** — the patch sits on a
+   code path where a rebase mistake is a silent frame loss.
+6. **Carry the caveats with the numbers**: QSV later-version compatibility, the
+   `--frames N` shortfall on Sony, `--seek 0` semantics, and the 4-way mechanism
+   being inferred rather than measured. All are listed in
+   `docs/hardware-decode/research-conclusion.md` §Open items.
+
+### Concurrency guidance
+
+| Ways | Verdict |
+|---|---|
+| 1 | supported; **no speed gain** from hardware decode, only CPU |
+| 2 | supported; **at least as fast, half the CPU** — the defensible claim |
+| 4 (4K) | **not viable on this GPU** — measured 8.01 fps aggregate (O6) |
+| 4 (1080p) | **unknown** — no 1080p material exists in the corpus |
 
 ---
 
