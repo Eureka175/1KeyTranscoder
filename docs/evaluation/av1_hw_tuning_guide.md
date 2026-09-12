@@ -1,5 +1,18 @@
 # AV1 硬件后端调参指南：NVENC / QSV / VCE 支持度与 HEVC→AV1 参数翻译
 
+> ## ⚠️ 部分过期 — ③预设 JSON 草案 已被实测标定取代（2026-09 补注）
+>
+> 本文档**①支持度矩阵与 ②逐键翻译表仍然有效**（是理解 NVENC/QSV/VCE 的 AV1
+> 能力边界与参数对应关系的主要依据）。但 **③预设 JSON 草案已作废**，请勿直接
+> 落盘：
+>
+> * 草案给的是 **CQP 路线**，而实际档位走 **QVBR / ICQ**：
+>   `nvenc_av1.json` = qvbr **26/30/38/34**、`qsv_av1.json` = icq **23/26/32/28**。
+> * **当前权威标定**：`docs/evaluation/av1_calibration.md`（2026-08-31 实测定案，
+>   数值与档位 JSON 逐键一致）。
+> * 本文档 §5.6 提到的"AV1 后端默认仅经典路径"门控，也已被 §路由决策取代 ——
+>   见 `av1_implementation_assessment.md`。
+
 > 配套文档：`av1_feasibility_report.md`（同目录，可行性总报告）。
 > 本指南产出三件事：①三后端 AV1 支持度矩阵（本地工具实测 + 联网调研）；
 > ②以项目现有成熟 HEVC 档（nvenc.json / qsv.json / vce.json）为基准的

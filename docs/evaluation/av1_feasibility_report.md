@@ -1,5 +1,20 @@
 # 1KeyTranscoder · AV1 实现可行性评估报告
 
+> ## ⚠️ 已过期 — 核心路由决策已被反向实现（2026-09 补注）
+>
+> **本文档"AV1 不进 Sony 元数据保留管线"的决策已被实际实现推翻。** 请勿据此
+> 判断当前行为。原文保留不删，作为决策过程的记录。
+>
+> | 本文档的说法 | 现行实际行为 | 依据 |
+> |---|---|---|
+> | "AV1 **不默认集成** Sony 元数据保留管线"、"Sony XAVC（有 rtmd）❌ 不保留元数据，默认路由到经典路径" | Sony 源走 **AV1 保留管线**：`rtmd`/`nrtm`/`uuid` 全量保留，**仅不打 XAVC tag**（AV1 不在 XAVC 规范内） | `core/batch_hw.py:713-721`、`preservation/validate.py:163-172`、`1kt.py:944-950` |
+> | 预留开关 `--av1-keep-rtmd-experimental` | **该参数不存在** | `1kt.py:915-1083` argparse |
+> | `--encoder svt-av1` | 合法取值是 **`svtav1`** | `1kt.py:941` |
+> | 预设草案 `svt_av1.json` | 实际是 **`svtav1.json` + `svtav1_scaling.json`** | `1kt.py:1423,1517` |
+>
+> **当前权威文档**：路由与管线策略见 `av1_implementation_assessment.md`；
+> 四档实测标定数值见 `av1_calibration.md`。
+
 > 评估日期：2026-08（会话实证 + 联网调研）
 > 结论前置：技术链路**可行**（本机 NVENC/QSV/SVT 三条路径均已端到端实测）。
 > 但经 XAVC 标准合规性复核后**调整定位**：

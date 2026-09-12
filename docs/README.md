@@ -2,32 +2,44 @@
 
 > 本目录存放 1KeyTranscoder 的全部文档（根目录只保留 `README.md`）。
 > 分类规则：**design = 项目自身设计/实施文档；evaluation = 本项目的评估与
-> 调研报告；reference = 第三方一手资料存档（按厂商分目）；misc = 网络调研
-> 碎片存档。** 配置 JSON（nvenc.json 等）是运行时配置，不属于文档，留在
-> 根目录；`metadata_forensics/` 是取证数据目录，`work/` 是实验产物，均不入档。
+> 调研报告；reference = 第三方一手资料存档（按厂商分目）；archive = 已封存
+> 文档（结论仍有效，但不再随代码更新）。** 配置 JSON（nvenc.json 等）是运行时
+> 配置，不属于文档，留在根目录；`metadata_forensics/` 是取证数据目录，
+> `work/` 是实验产物，均不入档。
 > 历史代码快照与废弃脚本在根目录 **`olddocs/`**（详见 olddocs/README.md）。
 >
-> ★ **`FINAL_REPORT.md`** — 最终报告：四份评估的汇总结论、决策记录与路线图。
+> ★ **想先了解"代码到底怎么跑"** → [`design/architecture.md`](design/architecture.md)
+> ★ **`FINAL_REPORT.md`** — 最终报告：四份评估的汇总结论、决策记录与路线图
+>   （**§1/§2/§5/§7 已被 v0.6.2 实现取代**，见其头部状态横幅）
+>
+> ⚠️ **2026-09 文档审计补注**：本索引与若干评估文档此前存在**事实性错误与
+> 过期结论**（目录文件数、默认后端、AV1 路由策略等）。已逐项更正，并在
+> 受影响文档头部加了状态横幅，指明"哪几条被推翻、现行依据是哪一份"。
+> 原文一律保留，未做删改——历史结论被推翻是研究过程的正常部分。
 
 ## 项目文件夹结构（整体架构）
 
 ```
 F:\1KeyTranscoder\
-├── 1kt.py                  主入口（CLI + 三条管线：Sony 保留 / DJI 保留 / 经典）
+├── 1kt.py                  主入口（CLI + 编排；硬件批量逻辑在 core/batch_hw.py）
 ├── watchfolder.py          轮询批处理入口（转调 1kt.py）
 ├── start.bat               双击启动
 ├── VERSION                 版本号唯一来源（0.6.2）
 ├── LICENSE                 LGPL-3.0-or-later
 │
-├── core/                   ★ 运行时核心（54 文件）：config / probe / paths /
-│                             scaling / source_classifier / hw / batch_hw /
-│                             channel_sync / sync_estimate / sync_fix /
-│                             logging_utils / dashboard / versions / color …
-├── encoders/               ★ 编码后端（24 文件）：nvencc / qsvencc / x265 /
+├── core/                   ★ 运行时核心（19 个 .py）：config / probe / postprobe /
+│                             paths / scaling / source_classifier / batch_hw /
+│                             channel_sync / sync_estimate / mp4_channel_sync /
+│                             sync_fix / logging_utils / dashboard / dashboard_ui /
+│                             models / versions / version / color
+├── encoders/               ★ 编码后端（8 个 .py）：nvencc / qsvencc / x265 /
 │                             svtav1 / caps / hw(plan_initial_format) / base
-├── preservation/           ★ 元数据保留（46 文件）：sony / dji / gpac / isobmf /
-│                             validate / colour / selfcheck / gyroflow
-├── tests/                  自动化测试（三级深度）+ fixtures（137 段冻结基线 CSV）
+├── preservation/           ★ 元数据保留（16 个 .py）：pipeline / sony / dji / gpac /
+│                             isobmf / validate / checker / selfcheck / quality /
+│                             colour / gyroflow / backends / audio_sync / models /
+│                             poc_video
+├── tests/                  自动化测试（full_autotest / run_selfcheck / sony_selfcheck）
+│                             + fixtures/channel_sync（137 段冻结基线 CSV）
 ├── release/                发布工具：build_release.py / verify_package.py
 │
 ├── *.json                  档位配置（nvenc / nvenc_av1 / qsv / qsv_aligned /
@@ -36,14 +48,18 @@ F:\1KeyTranscoder\
 │
 ├── docs/                   📚 文档（见下）
 ├── tools/                  自带工具链（ffmpeg/ffprobe 9.0.1、NVEncC 9.31、
-│                             QSVEncC 8.26、GPAC 26.02）—— 1.37 GB，gitignored
+│                             QSVEncC 8.26、VCEEncC 9.12、GPAC）—— 1.34 GB，gitignored
 ├── testsets/               测试素材（1063 文件 / 97.5 GB）—— gitignored
-├── work/                   实验产物与阶段证据（详见 work/docs/v1.0.0_requirements.md）
-├── dist/                   发布产物：v0.6.1 zip + sha256 + manifest（3.5 GB）
+├── work/                   实验产物与阶段证据（gitignored；含 _worktrees/ 研究分支工作树）
+├── dist/                   发布产物：v0.6.1 zip + sha256 + manifest（0.54 GB）
 ├── olddocs/                历史代码快照与废弃脚本（详见 olddocs/README.md）
-├── metadata_forensics/     取证数据（8 文件 / 0.5 MB，被 design 文档引用）
+├── metadata_forensics/     取证数据（18 文件 / 2.7 MB，被 design 文档引用）
 └── logs/                   运行时日志输出（gitignored）
 ```
+
+> 各目录文件数按 **git 跟踪的 `.py` 文件**计（2026-09 实测）。此前版本标注的
+> 54/24/46 与实际不符，已更正。**端到端管线与实际模块职责见
+> [`design/architecture.md`](design/architecture.md)。**
 
 ### 是否进入正式发布包（`release/build_release.py` allowlist）
 
@@ -63,11 +79,12 @@ F:\1KeyTranscoder\
 
 | 文件 | 说明 |
 |---|---|
-| `hardware_backend_design.md` | 硬件后端（NVEncC/QSVEncC）设计定稿，含踩坑结论（5.x 节） |
-| `implementation_report.md` | 实施报告：降级链与回退路径的完整故障演练记录（§15 DJI 专线） |
-| `INTEGRATION_REPORT.md` | 集成报告（早期版本整合记录） |
+| **`architecture.md`** | **★ 端到端架构总览（当前版本）**：两个入口与分支、后端解析四级优先级、三级降级梯、三条源管线、保留管线的幂等/续跑、channel-sync、`--check` 三级、必须保持的不变量、逐文件地图。**新维护者从这里开始读。** |
+| `hardware_backend_design.md` | 硬件后端（NVEncC/QSVEncC）设计定稿，含踩坑结论（5.x 节）。**§4.5/§9/§10.2/附录 B 部分已被后续代码推翻**（默认后端、已删除的 `--auto-downgrade`、控制台询问），以 `architecture.md` 为准；§5/§6/§7 实测矩阵仍有效 |
+| `implementation_report.md` | 实施报告：降级链与回退路径的故障演练记录（§15 DJI 专线）。**§1/§4/§11 的模块名与开关已过时**；§12–§15 与现行代码一致 |
+| `INTEGRATION_REPORT.md` | 集成报告（早期版本整合记录）。**§A 模块清单为 2026-08-28 快照，已过时**；§D 的 GPAC-native 时序结论仍是现行实现依据 |
 | `hevc_422_rext_compatibility.md` | HEVC 4:2:2 Rext 输出形态、播放兼容矩阵与归档建议 |
-| `channel_sync_p1.md` | **`--channel-sync` P1 设计文档**（algo 2.3.0-p1）：算法、阈值、轨道级降级、fixture 标定、测试矩阵 |
+| `channel_sync_p1.md` | **`--channel-sync` P1 设计文档**（algo 2.3.0-p1）：算法、阈值、轨道级降级、fixture 标定、测试矩阵。与 `core/channel_sync.py::DEFAULTS` 逐键一致 |
 
 ## 📄 发布说明（分类：项目自身文档）
 
@@ -81,36 +98,31 @@ F:\1KeyTranscoder\
 > 含 600 s 长程表）、`work/docs/channel_sync/memory_audit.md`（逐阶段内存归因）、
 > `work/releases/v0.6.1_release_validation.md`（正式发布验证记录）。
 
-## 📁 hardware-decode/ — 硬件解码调查（分类：项目专项调查）
+## 📁 archive/ — 归档区（分类：已封存文档）
 
-| 文件 | 说明 |
+> **归档区不是垃圾场：这里的结论仍然有效、可以引用，只是不再随代码演进更新。**
+> 入口与逐份状态标注见 [`archive/README.md`](archive/README.md)。
+
+| 目录 | 说明 |
 |---|---|
-| `README.md` | **调查总纲与可行性判定**：QSV/NVDEC/rigaya `--avhw` 三方结论、headline findings、结论表 |
-| `investigation.md` | 完整结构化报告（12 节），含 §10 现有缺陷清单（P1–P8） |
-| `corpus.md` | Sony 语料构成与识别特征（151 文件 / 188,475 帧 / 64.87 GiB） |
-| `ground-truth.md` | 软解基准如何建立与验证 |
-| `qsv.md` / `nvdec.md` | QSV / NVDEC 逐项结果与吞吐 |
-| `divergence.md` | 逐帧指纹与首次分歧分析 |
-| `root-cause.md` | 根因分析（Observation/Evidence/Hypothesis/Experiment/Result/Conclusion） |
-| `design.md` | 目标解码器架构设计 |
-| `implementation-plan.md` | **Phase 2 计划**：§17.1 架构问题 P1–P8、§17.3 解码器 API、§17.4 完整性三层、§17.5 回退契约、§17.9 步骤 S1–S10 |
-| `test-results/` | 机器可读结果（comparison / corpus / nvdec / qsv / software-ground-truth / summary） |
+| `archive/hardware-decode/` | **P0-A 硬件解码调研（已封存）**：Phase 1 调查 11 份 + 机器可读结果 6 份。**注意个别文档部分过期**——`README.md`/`root-cause.md` 中"丢帧在 rigaya reader layer / 确切源码行 Unconfirmed"已被 Phase 2 修正；`README.md` 的"永不用 rigaya `--avhw`"建议已被推翻。**逐份状态见 `archive/README.md` §2.1** |
 
-> ⚠️ **本目录是 Phase 1 调查产物，Phase 2 未执行**：生产 decode/encode/mux/
-> preservation/channel-sync 代码一行未改。当前开发方向与优先级见
-> `work/docs/v1.0.0_requirements.md`（P0-A = 硬件解码方向探索）。
+> 历史**代码**快照与废弃脚本不放这里，在根目录 `olddocs/`。
 
 ## 📁 evaluation/ — 评估报告（分类：评估与调研）
 
-| 文件 | 说明 |
-|---|---|
-| `av1_feasibility_report.md` | AV1 实现可行性总报告（含 ★XAVC 合规边界决策） |
-| `av1_hw_tuning_guide.md` | AV1 硬件后端调参指南：NVENC/QSV/VCE 支持度矩阵 + HEVC→AV1 逐键参数翻译表 + 预设 JSON 草案 |
-| `av1_implementation_assessment.md` | **AV1 三后端（svtav1/nvenc-av1/qsv-av1）实现评估**：Sony/DJI 保留管线（不打 XAVC tag）+ 端到端实测 + 标定状态 |
-| `av1_calibration.md` | **★AV1 档位标定报告（2026-08-31 实测定案）**：SVT-AV1 四档 + 硬件 QVBR/ICQ 重标定, VMAF/XPSNR 矩阵与定案依据 |
-| `hevc_implementation_assessment.md` | **HEVC 实现生产就绪度评估（重写版）**：全量代码重读 + 官方文档/社区实测调研 + 本机复测，判定"有条件生产就绪"与上线条件 |
-| `x265_production_assessment.md` | **x265 实现生产就绪评估（重写版）**：官方文档逐参数核查 + 本机实证 + 生产判定与条件清单 |
-| `svt_av1_archival_assessment.md` | **SVT-AV1（含 PSY fork）归档可行性评估**：主线/PSY 关系、归档调参、质量与吞吐、集成定位 |
+| 文件 | 说明 | 状态 |
+|---|---|---|
+| `av1_calibration.md` | **★AV1 档位标定报告（2026-08-31 实测定案）**：SVT-AV1 四档 + 硬件 QVBR/ICQ 重标定，VMAF/XPSNR 矩阵与定案依据。数值与档位 JSON 逐键一致 | ✅ **权威（数值）** |
+| `av1_implementation_assessment.md` | **AV1 三后端（svtav1/nvenc-av1/qsv-av1）实现评估**：Sony/DJI 保留管线（不打 XAVC tag）+ 端到端实测 + 标定状态 | ✅ **权威（路由/管线）** |
+| `hevc_implementation_assessment.md` | HEVC 实现生产就绪度评估（重写版）：全量代码重读 + 官方文档/社区实测调研 + 本机复测，判定"有条件生产就绪"与上线条件 | ⚠️ 部分过期（§9 AV1 衔接段已被推翻） |
+| `x265_production_assessment.md` | x265 实现生产就绪评估（重写版）：官方文档逐参数核查 + 本机实证 + 生产判定与条件清单 | ⚠️ 部分过期（P0 有 2 项已完成未回填） |
+| `av1_feasibility_report.md` | AV1 实现可行性总报告 | ❌ **已过期**：核心路由决策被反向实现 |
+| `av1_hw_tuning_guide.md` | AV1 硬件后端调参指南：NVENC/QSV/VCE 支持度矩阵 + HEVC→AV1 逐键参数翻译表 | ⚠️ 部分过期（支持度/翻译表有效，预设草案作废） |
+| `svt_av1_archival_assessment.md` | SVT-AV1（含 PSY fork）归档可行性评估：主线/PSY 关系、归档调参、质量与吞吐 | ⚠️ 部分过期（调参有效，§集成定位失效） |
+
+> 上表的"状态"列是 2026-09 审计补注。**过期文档的头部已加状态横幅**，说明
+> 哪几条被推翻、现行依据是哪一份——这样按目录顺序读也不会读到已失效的结论。
 
 ## 📁 fixtures/ — 测试素材清单（分类：项目自身文档）
 

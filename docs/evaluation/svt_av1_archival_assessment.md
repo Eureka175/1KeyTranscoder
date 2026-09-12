@@ -1,5 +1,19 @@
 # SVT-AV1（含 PSY fork）归档可行性评估报告
 
+> ## ⚠️ 部分过期 — §集成定位 已被实现取代（2026-09 补注）
+>
+> 本文档**归档调参部分的结论仍然有效**（压缩率优势、preset/CRF 甜点、
+> film-grain、tune 等），但 **§7 集成定位一节的三项说法均已不成立**：
+>
+> | 本文档的说法 | 现行实际 |
+> |---|---|
+> | `--encoder svt-av1` | 合法取值是 **`svtav1`**（`1kt.py:941`） |
+> | 配置文件 `svt_av1.json` | **`svtav1.json` + `svtav1_scaling.json`**（`1kt.py:1423,1517`） |
+> | "SVT-AV1 输出**同样不进入** Sony 保留管线（仅经典路径）" | svtav1 遇 rtmd 数据流时**调用保留管线** `encode_one_sony(..., codec="av1")`（`1kt.py:1741-1779`） |
+>
+> **当前权威文档**：调参见 `av1_calibration.md`；路由策略见
+> `av1_implementation_assessment.md`。
+
 > 评估日期：2026-08。方法：官方文档核查（Parameters.md v4.2.0 等已存档
 > docs/reference/svt-av1/）+ 本机实证（4K60 真实素材基准）+ 三方联网调研
 > （主线演进 / PSY 现状 / 社区归档实践）。

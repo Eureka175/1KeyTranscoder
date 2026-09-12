@@ -1,5 +1,23 @@
 # 1KeyTranscoder · 最终评估报告
 
+> ## ⚠️ 本文档 §1/§2/§5/§7 已被 v0.6.2 实际实现取代（2026-09 补注）
+>
+> 汇总日期为 2026-08，此后项目发生了三件本文档未记录的变化。**要了解当前状态，
+> 请以根 `README.md` 与 [`design/architecture.md`](design/architecture.md) 为准。**
+> 本文档的**评估原文链接与 §3/§4/§6 的评估结论仍然可查**，保留作决策记录。
+>
+> | 本文档的说法（§1/§2/§5/§7） | 现行实际（v0.6.2） |
+> |---|---|
+> | "评估完成待实施：AV1（NVENC/QSV 硬件 + SVT 软件）"、"AV1 📋 待实施" | **三个 AV1 后端均已实施**（`--encoder nvenc-av1\|qsv-av1\|svtav1`） |
+> | "AV1 **仅非 XAVC 经典路径**"、"XAVC 素材恒用 HEVC"、"AV1 不默认集成元数据保留管线" | Sony 源走 **AV1 保留管线**：保留 `rtmd`/`nrtm`/`uuid`，**仅不打 XAVC tag** |
+> | "NVENC HEVC ✅ 生产默认 / QSV HEVC ✅ 生产默认" | **无固定默认后端**：未给 `--encoder` 时按能力自动选择 **NVENC → QSV → x265**（`--no-hw-autoselect` 固定 x265） |
+> | "~7800 行核心 Python" | 现为 `core/`+`encoders/`+`preservation/` ≈ **11,700 行**（本次实测） |
+>
+> 本文档未覆盖、但已完成的后续工作：**channel-sync P1**（多轨音频延时补偿，
+> 见 `design/channel_sync_p1.md`）、**AV1 四档标定**（`evaluation/av1_calibration.md`）、
+> **硬件解码 P0-A 调研**（已封存，见 [`archive/README.md`](archive/README.md)）、
+> 以及 v0.6.2 的**分层日志**与**默认后端自动选择**。
+
 > 汇总日期：2026-08。本文档是近期四份评估的**汇总结论与决策记录**，
 > 详细证据见各评估原文（docs/evaluation/）与参考资料存档（docs/reference/）。
 > **重要声明：各编码器档位 JSON（nvenc/qsv/vce/x265/x265_scaling）内的

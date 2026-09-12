@@ -10,23 +10,30 @@
 路径永不回退软件）、**SVT-AV1 软件 AV1**、**x265 手动高压缩档**；
 **未指定 `--encoder` 时按能力优先自动选择：NVENC → QSV → x265**
 （v0.6.2 起；加 `--no-hw-autoselect` 可固定为 x265，即 v0.6.1 及更早的行为）。
-注意 `--config` 里的 `encoder` 字段优先级最高，会覆盖自动选择。
+注意 `--config` 里的 `encoder` 字段与 `--encoder` **二者不一致时直接报错**，
+不会静默取舍。
 **当前版本 `v0.6.2`**（HEVC/265 与 AV1 合并主线）。
 **主入口：`1kt.py`。**
 
-> 📚 文档索引见 [docs/README.md](docs/README.md)；评估汇总与决策见
-> [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md)。
+> 📚 文档索引见 [docs/README.md](docs/README.md)；**代码实际怎么跑见
+> [docs/design/architecture.md](docs/design/architecture.md)**；评估汇总与决策见
+> [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md)（注意其头部状态横幅）。
 
 ## 编码器矩阵
 
 | 后端 | 状态 | 档位 JSON | 定位 |
 |---|---|---|---|
-| NVEncC（NVIDIA NVENC HEVC） | ✅ 生产默认 | `nvenc.json` | 主后端。本机 5070 Laptop：HQ 4K60 ≈ 23fps，4:2:2 直编 Rext 保真 |
-| QSVEncC（Intel QSV HEVC） | ✅ 生产 | `qsv.json` / **`qsv_aligned.json`** | 第二后端。`qsv_aligned.json` 为按 NVENC 同档质量标定的对齐版（见下） |
-| x265（软件 HEVC） | ✅ 手动高压缩档（P0 修复完成） | `x265.json` + `x265_scaling.json` | 质量优先冷归档 / 4:2:2 保真唯一软件路径（吞吐受限，缩放规则仍 PROVISIONAL，见 `work/x265_test/`） |
+| NVEncC（NVIDIA NVENC HEVC） | ✅ 生产（**自动选择首选**） | `nvenc.json` | 主后端。本机 5070 Laptop：HQ 4K60 ≈ 23fps，4:2:2 直编 Rext 保真 |
+| QSVEncC（Intel QSV HEVC） | ✅ 生产（**自动选择次选**） | `qsv.json` / **`qsv_aligned.json`** | 第二后端。`qsv_aligned.json` 为按 NVENC 同档质量标定的对齐版（见下） |
+| x265（软件 HEVC） | ✅ 手动高压缩档 + **自动选择兜底** | `x265.json` + `x265_scaling.json` | 质量优先冷归档 / 4:2:2 保真唯一软件路径。**无可用硬件后端时由自动选择选中**（v0.6.2 起）；吞吐受限，缩放规则仍 PROVISIONAL |
 | VCEEncC（AMD VCE HEVC） | 预留（JSON 已备未接） | `vce.json` | AMD 机器扩展 |
 | **SVT-AV1（软件 AV1）** | ✅ 已实施（四档标定完成，见评估） | `svtav1.json` + `svtav1_scaling.json` | `--encoder svtav1`；ffmpeg 9.0.1 内置 SVT-AV1 v4.2.0；Sony/DJI 元数据保留管线；软件 AV1 体积/细节优势（档位对标 x265 判定见 `docs/evaluation/av1_calibration.md`） |
 | **AV1**（NVENC/QSV 硬件） | ✅ 已实施 | `nvenc_av1.json` / `qsv_av1.json` | 免版税备选；`--encoder nvenc-av1\|qsv-av1`；Sony 源同样走保留管线（不打 XAVC tag） |
+
+> ⚠️ **"生产默认"这一列的含义**：**没有固定默认后端。** 未给 `--encoder` 时按
+> 能力探测自动选择 NVENC → QSV → x265（见文首）；AV1 三后端**不在**自动选择
+> 序列内（不静默换 codec）。`--no-hw-autoselect` 可固定为 x265。
+> 端到端管线与后端解析细节见 [`docs/design/architecture.md`](docs/design/architecture.md)。
 
 > ⚠️ 档位 JSON 内的数值为作者实测标定值，请勿改动；调参须以测试集回归
 > 与 `tests/full_autotest.py` 为依据。
@@ -51,10 +58,11 @@ v4.2.0/libx265/libvmaf）+ NVEncC 9.31 + QSVEncC 8.26 + GPAC 26.02**，
 - **v0.6.0**（`main` 主线 · HEVC/265 + AV1 合并后首个版本 + AV1 色彩
   元数据保真修复）：该版本**长程 channel-sync 内存问题未修复**（10 min/4CH
   峰值 RSS 达 605–713 MB），**不建议用于长素材的 `--channel-sync`**，请用
-  v0.6.1。**注意：历史上未发布 v0.6.0 的独立发布包；仓库里 `v0.6.0` 这个
-  tag 指向的是发布基建（`VERSION` / `release/` / `--version`）落地之前的
-  mainline commit**，与本节描述的能力不完全对应——需要复现合并后能力请用
-  `v0.6.1`（或 `main` 上的 `f721b1f` 及其后提交）
+  v0.6.1。**注意：历史上未发布 v0.6.0 的独立发布包**——`dist/` 中只有
+  v0.6.1 的产物。`v0.6.0` 这个 tag 指向 `e024bb9`，**正是引入发布基建
+  （`VERSION` / `release/` / `--version`）的那个 commit**（该 commit 自带
+  `VERSION=0.6.0` 与 `release/build_release.py`），与本节描述的能力对应；
+  只是当时并未用它打出发布包。需要可下载的合并后版本请用 `v0.6.1`
 - **v0.5.1**（AV1 线 · 软件 + 硬件 AV1；tag 现已在 `main` 历史中）：
   [1KeyTranscoder-v0.5.1-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.5.1/1KeyTranscoder-v0.5.1-win64-selfcontained.zip)
 - **v0.4.2**（HEVC/265 线）：

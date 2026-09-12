@@ -1,5 +1,17 @@
 # 1KeyTranscoder Integration Report — Phase 2 (GPAC-native timing)
 
+> ## ⚠️ 部分过期 — 模块清单过时，§D 时序结论仍有效（2026-09 补注）
+>
+> * **§A 的模块清单是 2026-08-28 的快照，已不再描述现状。** 它不含此后新增的
+>   `core/batch_hw.py`、`core/channel_sync.py`、`core/{postprobe,paths,dashboard,versions}.py`、
+>   `encoders/{caps,hw,nvencc,qsvencc,svtav1}.py`、`preservation/{dji,checker,colour,selfcheck,quality}.py`。
+>   **当前架构请读 [`architecture.md`](architecture.md)。**
+> * **§D 的 GPAC-native 时序结论仍是现行实现的原始依据**（`preservation/pipeline.py:22-36`
+>   与其逐条一致），这部分继续有效。
+> * 需注意 §126-130"`patch_track_durations()` **is not called by the normal pipeline**"
+>   已被硬件路径推翻：`preservation/pipeline.py:312-318` 在 `fix_hw_timing=True`
+>   时会调用它（原因见 `implementation_report.md:26-29`）。
+
 Date: 2026-08-28. Toolchain: GPAC 26.02-rev0-g118e60a9-master
 (`C:\Program Files\GPAC`), ffmpeg/ffprobe in `tools\`, Python 3.14,
 Gyroflow 1.6.3 (`D:\Gyroflow-windows64\Gyroflow.exe`), x265 preset HQ
