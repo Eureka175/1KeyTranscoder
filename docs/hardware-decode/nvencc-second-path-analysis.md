@@ -496,7 +496,8 @@ SEPARATE_FIX
 | `work/raw/bin-mine/` | this session's build (unconditional variant), runnable with its DLLs |
 
 > **Worktree hygiene.** The prior session's build tree lives in a *different*
-> worktree (`F:\1KT-avhw`, branch `research/rigaya-nvencc-avhw`). It was used
+> worktree (`work\_worktrees\1KT-avhw` in the project folder; originally
+> `F:\1KT-avhw`, branch `research/rigaya-nvencc-avhw`). It was used
 > read-only, and the header and both copies of its `NVEncC64.exe` were restored
 > and SHA-256-verified afterwards. This session's binary is kept inside this
 > worktree at `work/raw/bin-mine/`, so nothing here depends on that worktree
@@ -509,9 +510,9 @@ Upstream source: `rigaya/NVEnc` tag `9.31`, commit
 
 ```powershell
 $base   = 'F:\1KeyTranscoder\tools\NVEncC_9.31_x64\NVEncC64.exe'
-$mine   = 'F:\1KeyTranscoder-rigaya-research\work\raw\bin-mine\NVEncC64.exe'
-$theirs = 'F:\1KeyTranscoder-rigaya-research\work\raw\bin-theirs\NVEncC64.exe'
-$E      = 'F:\1KT-avhw\work\hwdecode2\fixtures\E_leadremoved.mp4'
+$mine   = 'F:\1KeyTranscoder\work\_worktrees\1KeyTranscoder-rigaya-research\work\raw\bin-mine\NVEncC64.exe'
+$theirs = 'F:\1KeyTranscoder\work\_worktrees\1KeyTranscoder-rigaya-research\work\raw\bin-theirs\NVEncC64.exe'
+$E      = 'F:\1KeyTranscoder\work\_worktrees\1KT-avhw\work\hwdecode2\fixtures\E_leadremoved.mp4'
 $C1170  = 'F:\1KeyTranscoder\testsets\20260903\A7M5\20260903_C1170.MP4'
 
 # 1. what setPocAndFix removes, and that both readers agree byte-for-byte

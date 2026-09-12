@@ -1,6 +1,6 @@
 # rigaya `--avhw` Source Archaeology — Phase 2
 
-> **Branch**: `research/rigaya-avhw-source` (worktree `F:\1KeyTranscoder-rigaya-research`, from `main` @ `15cf218`)
+> **Branch**: `research/rigaya-avhw-source` (worktree `F:\1KeyTranscoder\work\_worktrees\1KeyTranscoder-rigaya-research`, from `main` @ `15cf218`)
 > **Phase**: 2 — locate the exact rigaya source path that discards Sony's
 > leading pictures.
 > **Production code status**: **unmodified.** Nothing in this worktree's
