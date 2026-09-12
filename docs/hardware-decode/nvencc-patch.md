@@ -1,6 +1,10 @@
 # NVEncC `--avhw` Patch — Provenance and Integration Reference
 
-`research/rigaya-nvencc-avhw` · base `main` @ `15cf218` · worktree `F:\1KT-avhw`
+`research/rigaya-nvencc-avhw` · base `main` @ `15cf218` · worktree `F:\1KeyTranscoder\work\_worktrees\1KT-avhw`
+
+> **Path note.** This worktree was originally created at `F:\1KT-avhw` and was
+> later collected into the project folder under `work\_worktrees\`. Paths in this
+> document have been updated accordingly; nothing else changed.
 
 > **What this document is.** A single, auditable record of *what the patch is,
 > what built it, what was measured, and what is still open* — written when the

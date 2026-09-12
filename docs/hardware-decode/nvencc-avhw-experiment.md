@@ -1149,8 +1149,8 @@ PATCH STATUS: READY FOR PROJECT INTEGRATION
 
 ## 17. Artifacts
 
-Tooling lives in `F:\1KT-avhw\work\hwdecode2`; `work/` is gitignored by project
-convention, so these stay local by design.
+Tooling lives in `F:\1KeyTranscoder\work\_worktrees\1KT-avhw\work\hwdecode2`; `work/`
+is gitignored by project convention, so these stay local by design.
 
 | File | Role |
 |---|---|
@@ -1185,4 +1185,9 @@ convention, so these stay local by design.
 
 Upstream source: `rigaya/NVEnc` tag `9.31`, commit
 `2cb9d810c045202548b98ff130b12bc764eb39ea`, in
-`F:\1KT-avhw\third_party\NVEncC` (never tracked by the repository).
+`F:\1KeyTranscoder\work\_worktrees\1KT-avhw\third_party\NVEncC` (never tracked by
+the repository).
+
+> **Path note.** Tooling and build-input paths above were originally under
+> `F:\1KT-avhw\`; the worktree was later collected into the project folder under
+> `work\_worktrees\`. Paths have been updated accordingly.
