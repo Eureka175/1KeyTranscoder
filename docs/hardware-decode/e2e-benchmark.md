@@ -1,6 +1,12 @@
 # End-to-End Hardware-Decode Benchmark — Architecture Decision
 
-`research/hwdecode-e2e-benchmark` · worktree `F:\1KT-e2e` · base `main` @ `15cf218`
+`research/hwdecode-e2e-benchmark` · worktree `F:\1KeyTranscoder\work\_worktrees\1KT-e2e` · base `main` @ `15cf218`
+
+> **Path note.** The four research worktrees were originally created at the `F:\`
+> root (`F:\1KT-e2e`, `F:\1KT-avhw`, `F:\1KT-qsv`,
+> `F:\1KeyTranscoder-rigaya-research`) and were later collected into the project
+> folder under `work\_worktrees\`. Every path in this document has been updated
+> to the new location; nothing else changed.
 
 > **No production code was modified.** `git diff main...HEAD` touches only
 > this document and the docs index. Encoders, mux, preservation,
