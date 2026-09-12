@@ -18,9 +18,9 @@ XAVC without corrupting the frame sequence?**
 |---|---|---|
 | **FFmpeg QSV hardware decode** | ✅ **FEASIBLE for HEVC 4:2:0** · ❌ **NOT available for H.264 4:2:2 10-bit** | 146/146 bit-identical to software; the other 5 fail loudly (`rc=69`), never silently |
 | **FFmpeg NVDEC hardware decode** | ✅ **FEASIBLE for the whole corpus** | 151/151 bit-identical to software, both codecs, both chroma formats |
-| **rigaya `--avhw` reader** | ❌ **NOT FEASIBLE** | deterministic frame loss on 151/151 files, predicted exactly by container structure |
+| **rigaya `--avhw` reader** | ⚠️ **NOT FEASIBLE AS SHIPPED** — **FIXABLE and fixed at source** | deterministic frame loss on 151/151 files, predicted exactly by container structure; Phase 2 located the two vendor-specific code sites and both patches are runtime-proven (`qsvencc-patch.md`). Shipped binaries remain unusable for Sony XAVC. |
 | **1KeyTranscoder today** | ✅ frame-exact, because it decodes in software | 8/8 real production deliverables, `delta = 0` |
-| **Can it be adopted?** | ✅ **Yes, through FFmpeg `-hwaccel`, with format-level capability routing.** ❌ No, through the rigaya `--avhw` reader. | the two hardware decoders do not cover the same formats, so a single switch is the wrong abstraction |
+| **Can it be adopted?** | ✅ **Yes, through FFmpeg `-hwaccel`, with format-level capability routing.** ✅ **Also yes through the *patched* rigaya `--avhw` path** (NVEncC patch = integration candidate; QSVEncC patch = runtime-proven on its pinned revision only). ❌ **Not** through stock rigaya `--avhw`. | the two hardware decoders do not cover the same formats, so a single switch is the wrong abstraction; and the rigaya route requires owning a patch + build |
 
 What "feasible" means here, concretely — for every one of the 188,475
 corpus frames, the hardware decode produced an **identical picture
@@ -55,7 +55,10 @@ the whole corpus rather than on one clip.
 | [`design.md`](design.md) | target decoder architecture |
 | [`implementation-plan.md`](implementation-plan.md) | Phase 2 plan, acceptance criteria, risks |
 | [`nvencc-avhw-experiment.md`](nvencc-avhw-experiment.md) | **Phase 2, `research/rigaya-nvencc-avhw`** — where inside NVEncC `--avhw` the frames are actually lost, the reader-side patch candidates, and whether the reader is worth fixing |
-| [`nvencc-patch.md`](nvencc-patch.md) | **Patch provenance and integration reference** — baseline revision, patch sha256, clean-apply proof, tested binary hash, build inputs, runtime test matrix, known limitations, integration prerequisites |
+| [`nvencc-patch.md`](nvencc-patch.md) | **NVEncC patch provenance and integration reference** — baseline revision, patch sha256, clean-apply proof, tested binary hash, build inputs, runtime test matrix, known limitations, integration prerequisites |
+| [`qsvencc-avhw-experiment.md`](qsvencc-avhw-experiment.md) | **Phase 2, `research/rigaya-qsvencc-avhw`** — what QSVEncC `--avhw` really does on Sony and DJI, the four distinguishable outcomes (capability refusal / reader truncation / software fallback / true hardware decode), and whether the GPU pipeline is preserved |
+| [`qsvencc-root-cause.md`](qsvencc-root-cause.md) | **Phase 2 root cause** — file, class, function and condition of the QSV admission filter, proved by an instrumented from-source build; the 2-edit PoC and its A/B validation |
+| [`qsvencc-patch.md`](qsvencc-patch.md) | **QSVEncC patch provenance and integration reference** — patch sha256, clean-apply proof against `b14c965`, tested binary hash, build deviations, A/B matrix, and the claim boundary |
 | [`test-results/`](test-results/) | machine-readable results |
 
 ## Conclusion table
@@ -70,8 +73,8 @@ the whole corpus rather than on one clip.
 | **Flush-related** | **No.** Divergence is at the head; `in_avhw_not_avsw = ∅`; a drain defect would truncate the tail. `FLUSH_LOSS` and `REORDER_DELAY_ERROR` counts are zero everywhere. |
 | **Reorder-related** | **No.** No reorder, no duplication, no PTS-only change. `ctts` reorder depth is fully honoured by both FFmpeg hardware paths. |
 | **Project integration-related** | **Not the source of the observed loss.** Hardware decode is unreachable (`--avsw` literal at `encoders/nvencc.py:107`, `encoders/qsvencc.py:102`); 8/8 real production deliverables were frame-exact (delta 0). But the integration has **latent verification holes** that would let a future hardware path ship a wrong count at exit 0. |
-| **Root cause confidence** | `Confirmed`: the rigaya **hardware-decode pipeline task** discards leading pictures (NVEncC `PipelineTaskNVDecode::getOutputFrame()`, `NVEncPipeline.h`; QSVEncC `PipelineTaskMFXDecode::sendBitstream()`, `qsv_pipeline_ctrl.h` — two independent sites, one shared *rule*); the loss equals `pictures_before_first_keyframe`; the edit list is **not** the trigger; FFmpeg over the same silicon is exact; the **shared reader is not the cause**. `Confirmed` and separately scoped: `FramePosList::setPocAndFix` prunes frame-position **table entries** on both readers and changes no delivered frame. Still `Unconfirmed`: behaviour on All-I / 8-bit / 1080p material, and any rigaya revision other than the two pinned ones. **Phase 1 原文将此列为 `Unconfirmed`（确切源码行），Phase 2 已定位并运行时验证 —— 见 [`nvencc-avhw-experiment.md`](nvencc-avhw-experiment.md) §3。** |
-| **Recommended fix** | **Superseded by Phase 2** (was: "never use rigaya `--avhw` for XAVC"). Current position: the rigaya `--avhw` defects are **fixable and fixed at source** — the NVEncC patch is built and runtime-proven and is an integration candidate; the QSVEncC patch is runtime-proven on its pinned revision only. Keep **software decode as the default**; keep **FFmpeg `-hwaccel` as an independent correctness/reference/fallback path**; do **not** adopt an FFmpeg → CPU raw-pipe route as the primary architecture. Whatever ships, keep format-level capability routing (QSV: HEVC/4:0 only; H.264 4:2:2 → NVDEC or software), validate the frame expectation from container boxes *before* decoding, and reconcile frame counts against the delivered container rather than the reader's self-report. Cross-branch wording: [`research-conclusion.md`](research-conclusion.md)（合并后已在本目录）。 |
+| **Root cause confidence** | `Confirmed`: the rigaya **hardware-decode pipeline task** discards leading pictures (NVEncC `PipelineTaskNVDecode::getOutputFrame()`, `NVEncPipeline.h`; QSVEncC `PipelineTaskMFXDecode::sendBitstream()`, `qsv_pipeline_ctrl.h` — two independent sites, one shared *rule*); the loss equals `pictures_before_first_keyframe`; the edit list is **not** the trigger; FFmpeg over the same silicon is exact; the **shared reader is not the cause**. `Confirmed` and separately scoped: `FramePosList::setPocAndFix` prunes frame-position **table entries** on both readers and changes no delivered frame. Still `Unconfirmed`: behaviour on All-I / 8-bit / 1080p material, and any rigaya revision other than the two pinned ones. **Phase 1 原文将"确切源码行"列为 `Unconfirmed`；Phase 2 已定位并运行时验证 —— NVEncC 见 [`nvencc-avhw-experiment.md`](nvencc-avhw-experiment.md) §3，QSVEncC 见 [`qsvencc-root-cause.md`](qsvencc-root-cause.md) §2-§4。** |
+| **Recommended fix** | **Superseded by Phase 2** (was: "never use rigaya `--avhw` for XAVC"). Current position: the rigaya `--avhw` defects are **fixable and fixed at source** — the NVEncC patch is built and runtime-proven and is an integration candidate ([`nvencc-patch.md`](nvencc-patch.md)); the QSVEncC patch is runtime-proven on its pinned 8.26 revision only ([`qsvencc-patch.md`](qsvencc-patch.md)). Keep **software decode as the default**; keep **FFmpeg `-hwaccel` as an independent correctness/reference/fallback path**; do **not** adopt an FFmpeg → CPU raw-pipe route as the primary architecture. Whatever ships, keep format-level capability routing (QSV: HEVC/4:2:0 only; H.264 4:2:2 → NVDEC or software), validate the frame expectation from container boxes *before* decoding, and reconcile frame counts against the delivered container rather than the reader's self-report. Cross-branch wording: [`research-conclusion.md`](research-conclusion.md)。 |
 | **Fallback needed** | **Yes**, but as a safety net, not the control mechanism. Primary control is plan-time capability + structural preconditions; fallback triggers on capability miss, init failure, count mismatch or sequence mismatch. Must be automatic but **never silent**. |
 | **Expected performance gain** | Indicative only, and **not** the basis of the verdict: one long 4K60 clip, warm-up runs on a thermally loaded laptop → software ≈71 fps, QSV ≈60 fps, NVDEC ≈93 fps, NVDEC with explicit `cuda` surfaces ≈148 fps. So **NVDEC is faster than software; QSV is not.** The durable justification for hardware decode is **CPU headroom for concurrent encodes**, decided per vendor. Not a benchmark — see `implementation-plan.md` §17.7. |
 | **Implementation complexity** | **Medium.** Abstraction + verification + capability routing are self-contained and reuse existing seams (`build_args`, `EncoderBackend`, `caps.py`). The hard part is not the decoder — it is deciding correctly up front and verifying honestly. Verification fixes (S1–S3 + S8) are worth doing even if hardware decode never ships. |
@@ -91,19 +94,17 @@ the whole corpus rather than on one clip.
 
    > **Phase 2 correction (important).** "Reader layer" here means the
    > rigaya *integration* layer, **not** the shared demuxer
-   > (`rgy_input_avcodec.cpp/.h`, which `--avsw` and `--avhw` share) and not
-   > the decoder. Phase 2 shows the **decoder emits every picture** and the
-   > loss happens downstream, in two **vendor-specific pipeline tasks**:
-   > NVEncC's `PipelineTaskNVDecode::getOutputFrame()`
-   > (`NVEncCore/NVEncPipeline.h`) and QSVEncC's
-   > `PipelineTaskMFXDecode::sendBitstream()`
+   > (`rgy_input_avcodec.cpp/.h`, byte-identical between the two tools and
+   > shared by `--avsw` and `--avhw`) and not the decoder. Phase 2 shows the
+   > **decoder emits every picture** and the loss happens downstream, in two
+   > **vendor-specific pipeline tasks**: NVEncC's
+   > `PipelineTaskNVDecode::getOutputFrame()` (`NVEncCore/NVEncPipeline.h`)
+   > and QSVEncC's `PipelineTaskMFXDecode::sendBitstream()`
    > (`QSVPipeline/qsv_pipeline_ctrl.h`). See
-   > [`rigaya-avhw-analysis.md`](rigaya-avhw-analysis.md) and, on the
-   > QSVEncC branch, `docs/hardware-decode/qsvencc-root-cause.md`.
+   > [`rigaya-avhw-analysis.md`](rigaya-avhw-analysis.md) and
+   > [`qsvencc-root-cause.md`](qsvencc-root-cause.md) §2 and §4.
 
-   > **Phase 2 refinement.** "Reader layer" means the rigaya *integration*
-   > layer above the decoder, and specifically NVEncC's hardware **output
-   > stage**, not the CUVID/NVDEC decoder. NVEncC's own trace shows all 30
+   > **Phase 2 refinement (NVEncC detail).** NVEncC's own trace shows all 30
    > packets reaching NVDEC and NVDEC emitting all 30 pictures, including the
    > three previously attributed to the reader, which are then dropped on a
    > timestamp test. See
@@ -112,7 +113,8 @@ the whole corpus rather than on one clip.
 3. **The mechanism is known and predictable.** Sony XAVC clips code
    pictures *before* their first keyframe in presentation order, and carry
    an edit list whose presentation start is not a keyframe. The hardware
-   output stage treats the first **fed packet's** PTS (the IRAP) as the
+   output stage treats the first **fed packet's** PTS (the IRAP, also reported
+   as IDR in NVEncC's log) as the
    presentation start and silently discards the pictures below it:
 
    ```
@@ -122,7 +124,8 @@ the whole corpus rather than on one clip.
    ```
 
    Verified against every measured case, and subsequently explained from
-   source (`rigaya-avhw-analysis.md` §Exact trigger).
+   source (`rigaya-avhw-analysis.md` §Exact trigger；QSVEncC 侧见
+   [`qsvencc-root-cause.md`](qsvencc-root-cause.md) §2-§3).
 
 4. **It is not the edit list.** A Matroska remux with no edit list at all
    still loses 3 frames; an x265 re-encode carrying the *same* edit list
