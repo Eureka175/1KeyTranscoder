@@ -119,6 +119,7 @@ C 类不允许只比较其中两个数。每个 C 用例都记录：
 | HD-A06 | P0 | integration 的工具解析路径 | both | 工具路径**只**来自显式解析（config/`TOOLS` 解析结果），绝不从 `PATH` 抓取；解析结果写入日志 | 在 `PATH` 中注入一个同名的诱饵 binary，确认解析结果不变 | auto | |
 | HD-A07 | P1 | patched binary 运行环境 | both | 缺 DLL 等环境问题表现为**启动失败**而非错误结果；启动失败必须可分类（不落到 integrity 判定） | 在缺 DLL 的目录副本中启动，断言 rc≠0 且分类为 startup | auto | |
 | HD-A08 | P1 | provenance 记录 | both | `docs/hardware-decode/toolchain-provenance.json` 与磁盘实际 binary 一致；任何不一致在测试开始时即报错退出 | harness 启动自检 | auto | |
+| HD-A09 | P0 | 同时存在两套 build 的 `tools/` 树 | both | **默认路径必须解析到 shipped build，绝不解析到 research build**。`find_hw_tool` 是目录 glob；若不显式排除 `tools/avhw/`，结果会依赖排序，而两个 build 只在**行为**上不同——误换后要到丢帧才会被发现 | 解析两个工具名，断言路径落在 shipped 目录、结果确定，且 `tools/avhw` 被排除 | auto | |
 
 **已知限制（A 类）**
 
@@ -173,6 +174,7 @@ eligible(backend, codec, chroma, depth) := 该四元组在 runtime-proven allowl
 | HD-B07 | P1 | VFR 源 | 两者 | VFR 源的 `--avsync forcecfr` 与 reader 选择互不干扰；VFR + hardware 组合有明确决策（不得因 VFR 而静默改 reader 或反之） | 构造 VFR 输入，断言参数组合与日志 | auto | |
 | HD-B08 | P1 | 任意输入 | 两者 | 路由决策**确定性**且**可审计**：同输入同环境两次决策完全一致；决策与 reason code 进 per-file 日志与 CSV | 两次独立运行比对决策 JSON；检查日志字段存在 | auto | |
 | HD-B09 | P0 | 任意输入 | 两者 | **能力拒绝与丢帧在决策与日志中可区分**：`capability_refused` / `not_proven` / `reader_unavailable` / `count_mismatch` / `sequence_mismatch` 各自独立 reason code，不得都写成 "failed" | 触发各类失败，断言 reason code 互不相同且语义正确 | auto | |
+| HD-B10 | P0 | 同时存在两套 build 的 `tools/` 树 | 两者 | **硬件解码必须绑定在 provenance 校验过的 patched build 上**。`policy=off` 时不做任何 override；`auto`/`require` 时按 sha256 绑定；build 缺失或 hash 不符时给出 reason code，**绝不静默改用 shipped build**。理由：用 shipped build 是"安全但无用"——每份结果都会被 integrity gate 拒绝，功能看似开启实则从未运行 | 三档 policy 各解析一次 + 伪造 hash 的副本 + 缺失 build | auto | |
 
 ---
 
@@ -245,16 +247,54 @@ eligible(backend, codec, chroma, depth) := 该四元组在 runtime-proven allowl
   patch 前后完全相同，是**独立于本 patch 的既有语义**（open item #2）。
   同样的短少也出现在 `--trim` 上。
 
+> ⚠️ **本 session 实测修正了上面两条的边界，并新增一条 research 未记录的发现。**
+> 详见 §D.3。要点：`--frames` / `--trim` 上 hw 与 sw **字节相同**（安全）；
+> **`--seek` 上两者不等价**（丢帧数相同、PTS 相同、画面不同）——这是 research
+> 线没有测过的东西，因为 research 只验证了"seek 相对 stock 不变"，
+> 从未验证"seek 与 `--avsw` 相等"。
+
 ### D.1 Seek / trim
 
 | ID | Sev | Input | Backend | Expected behaviour | Verification method | Auto | Result |
 |---|---|---|---|---|---|---|---|
 | HD-D01 | P0 | `sony_hs_c0886`(360)、`sony_422_c9037`(195) | patched `avhw` vs `avsw` | full decode（无 seek/trim）逐帧等值 | 六方对账 + 指纹 | auto | |
-| HD-D02 | P0 | 同上 | 同上 | **start seek** 至少 4 点：`0`、近开头、中段、近结尾。`avhw` 与 `avsw` 在每个点上的输出帧序列、PTS、首帧、duration 一致 | 逐点两次编码 + 全序列比对 | auto | |
-| HD-D03 | P0 | 同上 | 同上 | **trim** 至少 3 组：`0→N`、中段→N、近结尾 | 同上 | auto | |
-| HD-D04 | P0 | 10 个片段 × 5–10 个位置 | 同上 | **repeated seek**：逐位置比较输出帧序列、PTS、首帧、duration，全部一致 | 参数化扫描 | auto | |
-| HD-D05 | P0 | D-01…D-04 的全部关键用例 | 同上 | hw 与 sw **内容一致**（不是"都能跑"） | 汇总 D-01…D-04 的指纹结果 | auto | |
-| HD-D06 | P1 | `sony_hs_c0886` | patched `avhw` | **`--seek 0` 边界**：显式 `--seek 0` 与不传 seek 的行为差异被**明确记录**（research 判定该差异"未在任何验证中可观测"）。本测试的作用是把该边界变成**已测事实**，不允许继续停留在"未观测" | 显式 `--seek 0` vs 无 seek，比对输出与 reader 行为 | auto | |
+| HD-D02 | P0 | `sony_hs_c0886` | patched `avhw` vs `avsw` | **契约经实测修正（原假设 hw==sw 被推翻）**：证明差异真实（同 reader 重复运行作为确定性对照）→ 因此 **routing 必须在请求 seek 时拒绝硬件解码** → 软件路径在每个 seek 点上精确 | 每个位置 hw×2 + sw×2 编码、指纹与 packet manifest 比对；再对路由函数断言 `seek_not_equivalent` | auto | |
+| HD-D03 | P0 | `sony_hs_c0886` | 同上 | **trim** 至少 3 组：`0→N`、中段→N、近结尾。hw 与 sw **字节相同** | 成对编码 + sha256 + 帧数 | auto | |
+| HD-D04 | P0 | 真实长片段 × 5–8 个位置 | 同上 | **repeated seek**：逐位置测量，并断言"计数与 PTS 相等但画面不同"这一形态可复现、且两侧各自确定 | 参数化扫描 + 同 reader 重复对照 | auto | |
+| HD-D05 | P0 | D-01…D-04 的全部关键用例 | 同上 | **按操作分开给契约**：`--trim` → hw 与 sw 字节相同；`--seek` → reader 不等价，故硬件被拒绝（不是放宽判据，而是**不把不等价的路径接进生产**） | trim 比对 + seek 测量 + 路由断言；若某天 seek 变成等价，本条会**主动报错**提示守卫过严 | auto | |
+| HD-D06 | P1 | `sony_hs_c0886` | patched `avhw` | **`--seek 0` 边界**：显式 `--seek 0` 与不传 seek 的行为差异被**明确记录**（research 判定该差异"未在任何验证中可观测"）。本测试把该边界变成**已测事实** | 显式 `--seek 0` vs 无 seek，比对输出与 reader 行为 | auto | |
+
+### D.3 `--seek` 不等价 —— 本 session 的独立发现（新）
+
+**结论：在时间 seek 上，rigaya 硬件 reader 与软件 reader 交付的是不同的画面。**
+
+| 观测 | 值 |
+|---|---|
+| 帧数 | 相等（例如 `--seek 0.5 --frames 16` 两侧各 13 帧） |
+| PTS 序列 | **完全相同**（`0, 16016, 8008, 4004, 12012, …`） |
+| keyframe 索引 | 相同 |
+| 画面内容 | **13/13 帧不同**，mean 偏差最大 **252**（10-bit 域 0–1023） |
+| 同 reader 重复运行 | hw×2 与 sw×2 各自**字节相同** → 差异不是编码器随机性 |
+| `patched --avhw` vs `stock --avhw` | **字节相同**（`73b9610a…`）→ **patch 不是原因** |
+| full encode（无 seek） | hw 与 sw **字节相同**（`ef621733…`） |
+| `--frames` / `--trim` | hw 与 sw **字节相同** |
+
+**因果结论**：patch 按设计在"有 seek"时**原样运行原过滤器**，所以 patched seek ==
+stock seek，逐字节相同；差异来自 rigaya reader 在时间 seek 上的既有语义，
+**不是本 patch 引入的**。research 线只验证了"seek 相对 stock 不变"（3/3），
+从未把它与 `--avsw` 对比，因此该差异此前未被记录。
+
+**工程处置（不是放宽判据）**：`route_decode(seek_requested=True)` 直接拒绝硬件解码，
+reason code = `seek_not_equivalent`，并出声。于是"硬件解码不得改变交付画面"
+这一生产契约**由构造保证**，而不是靠事后检测。
+
+**实际影响**：**零**。production 代码从不使用 `--seek`、`--trim`、`--frames`
+（`git grep` 全库只有本 harness 自身命中）。
+
+**尚未解释**：两个 reader 在 seek 上为何选到不同画面。已排除：编码器随机性、
+patch 引入、帧数/PTS 差异、常量偏移对齐（不是简单的窗口平移）。
+本 session 不为此展开新的 root-cause 考古——它不影响生产路径，
+且已被守卫覆盖。记为 open follow-up。
 
 ### D.2 `--frames N` 独立矩阵（**不得与 full-input 完整性混为一谈**）
 
@@ -429,8 +469,8 @@ P0 PASS / P1 PASS / P2 PASS
 
 | Category | Tests | PASS | FAIL | BLOCKED | SKIP | P0 status |
 |---|---|---|---|---|---|---|
-| A Toolchain | 8 | | | | | |
-| B Routing | 9 | | | | | |
+| A Toolchain | 9 | | | | | |
+| B Routing | 10 | | | | | |
 | C Frame integrity | 13 | | | | | |
 | D Seek / trim / --frames | 9 | | | | | |
 | E Preservation | 7 | | | | | |
@@ -440,4 +480,4 @@ P0 PASS / P1 PASS / P2 PASS
 | I Concurrency | 5 | | | | | |
 | J Long-run / corpus | 6 | | | | | |
 | K Golden baseline | 2 | | | | | |
-| **Total** | **81** | | | | | |
+| **Total** | **83** | | | | | |

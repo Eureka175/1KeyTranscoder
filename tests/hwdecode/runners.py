@@ -225,28 +225,67 @@ def truncate_video(path: Path, keep: int, dest: Path) -> Path:
     return dest
 
 
-def reorder_or_duplicate(path: Path, dest: Path) -> Path:
-    """Build a count-preserving but content-wrong artifact for HD-C12.
+def reorder_or_duplicate(path: Path, dest: Path, *, frames: int | None = None,
+                         rotate: int = 1) -> Path:
+    """Build a **count-preserving, order-wrong** artifact (HD-C10).
 
-    Drops one frame from the head and duplicates one frame at the tail,
-    so the total count is unchanged while the ordered picture sequence
-    is not.  A counting gate cannot see this; a sequence gate must.
+    The point of this artifact is to be invisible to a counting gate.  To
+    make that a fair test, the corruption must isolate *ordering* and
+    nothing else: the honest and the rotated artifacts are therefore both
+    produced by the same lossless-as-possible encoder with the same
+    settings over the same source frames, so the only difference between
+    them is the order in which the pictures appear.
+
+    ``shuffleframes`` takes a per-output-frame list of source indices;
+    rotating that list by ``rotate`` moves the head of the sequence to the
+    tail without changing how many pictures there are.
     """
     dest.parent.mkdir(parents=True, exist_ok=True)
     ff = str(ROOT / "tools" / "ffmpeg.exe")
-    # decode to raw, drop first frame, duplicate last frame, re-encode
-    tmp = dest.with_suffix(".mkv")
+    n = frames or _video_packet_count(path)
+    if not n:
+        raise RuntimeError(f"cannot determine frame count for {path}")
+    perm = "|".join(str((i + rotate) % n) for i in range(n))
     cmd = [
         ff, "-y", "-v", "error", "-i", str(path), "-map", "0:v:0",
-        "-vf", "select='not(eq(n,0))'", "-vsync", "0",
-        "-c:v", "libx265", "-preset", "ultrafast", "-crf", "18",
-        "-x265-params", "log-level=none", str(tmp),
+        "-vf", f"shuffleframes={perm}",
+        "-c:v", "libx265", "-preset", "ultrafast", "-crf", "12",
+        "-x265-params", "log-level=none", "-pix_fmt", "yuv420p10le",
+        str(dest),
     ]
-    subprocess.run(cmd, capture_output=True, timeout=3600)
-    # append one duplicate of the last frame
-    cmd2 = [
-        ff, "-y", "-v", "error", "-i", str(tmp), "-map", "0:v:0",
-        "-c", "copy", "-bsf:v", "hevc_metadata", str(dest),
-    ]
-    subprocess.run(cmd2, capture_output=True, timeout=3600)
+    p = subprocess.run(cmd, capture_output=True, timeout=7200)
+    if p.returncode != 0 or not dest.is_file():
+        raise RuntimeError(
+            f"shuffleframes re-encode failed ({p.returncode}): "
+            f"{p.stderr.decode('utf-8', 'replace')[-500:]}"
+        )
     return dest
+
+
+def honest_reencode(path: Path, dest: Path) -> Path:
+    """The un-shuffled twin of :func:`reorder_or_duplicate`.
+
+    Same source, same encoder, same settings — so a fingerprint
+    difference between the two artifacts can only come from ordering.
+    """
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    ff = str(ROOT / "tools" / "ffmpeg.exe")
+    cmd = [
+        ff, "-y", "-v", "error", "-i", str(path), "-map", "0:v:0",
+        "-c:v", "libx265", "-preset", "ultrafast", "-crf", "12",
+        "-x265-params", "log-level=none", "-pix_fmt", "yuv420p10le",
+        str(dest),
+    ]
+    p = subprocess.run(cmd, capture_output=True, timeout=7200)
+    if p.returncode != 0 or not dest.is_file():
+        raise RuntimeError(
+            f"honest re-encode failed ({p.returncode}): "
+            f"{p.stderr.decode('utf-8', 'replace')[-500:]}"
+        )
+    return dest
+
+
+def _video_packet_count(path: Path) -> int | None:
+    from .checks import output_packet_count
+
+    return output_packet_count(path)

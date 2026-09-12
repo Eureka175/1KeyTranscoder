@@ -438,6 +438,7 @@ def verify_sequence(
             first = i
             break
     if first is not None:
+        counts["first_diff_index"] = first
         return IntegrityVerdict(
             False, R_SEQUENCE_MISMATCH,
             f"ordered picture sequence differs at index {first} "

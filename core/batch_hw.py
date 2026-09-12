@@ -59,6 +59,7 @@ from encoders.hwdecode import (
     R_REQUIRE_UNMET,
     classify_reader_failure,
     memoize_unavailable,
+    resolve_decode_tool,
     route_decode,
 )
 from encoders.integrity import verify_encode
@@ -226,13 +227,43 @@ def hw_backend_for(
 ):
     """Build a hardware backend + probe/save capabilities at run start.
 
-    encoder_name: "nvenc"/"qsv" (HEVC) or "nvenc-av1"/"qsv-av1" (AV1)."""
+    encoder_name: "nvenc"/"qsv" (HEVC) or "nvenc-av1"/"qsv-av1" (AV1).
+
+    When ``--hw-decode`` is anything other than ``off`` the *hardware
+    decode* binary is resolved through ``resolve_decode_tool``, which pins
+    it to the provenance-verified patched build.  The shipped build is
+    never used for hardware decode: it loses frames on Sony material, so
+    every result would be rejected by the integrity gate and the feature
+    would be quietly useless."""
     base = encoder_name.split("-", 1)[0]
     kind = "nvencc" if base == "nvenc" else "qsvencc"
     codec = "av1" if encoder_name.endswith("-av1") else "hevc"
     exe_name = "NVEncC64.exe" if kind == "nvencc" else "QSVEncC64.exe"
     explicit = args.tool_nvencc if kind == "nvencc" else args.tool_qsvencc
+    decode_policy = getattr(args, "hw_decode", HW_DECODE_OFF)
+
     tool = find_hw_tool(script_dir, exe_name, explicit)
+    if decode_policy != HW_DECODE_OFF:
+        dt = resolve_decode_tool(
+            kind=kind, script_dir=script_dir, explicit=explicit,
+            policy=decode_policy,
+        )
+        if dt.usable:
+            if Path(dt.path).resolve() != Path(tool).resolve():
+                logger.info(
+                    "[HWDEC] decode tool: %s (%s)", dt.path, dt.detail
+                )
+            tool = Path(dt.path)
+        else:
+            # Not fatal here: routing will see no proven path and the
+            # ladder decides between a loud software fallback and a hard
+            # failure under --hw-decode require.
+            logger.warning(
+                "[HWDEC] no usable hardware-decode build (%s): %s",
+                dt.reason, dt.detail,
+            )
+            setattr(args, "_hw_decode_tool_reason", (dt.reason, dt.detail))
+
     caps = probe_backend(tool, kind)
     caps_dir = work_root / "caps"
     if caps is None:
@@ -296,6 +327,7 @@ def hw_encode_with_fallback(
     show_progress: bool = True,
     hw_decode: str = HW_DECODE_OFF,
     hw_decode_memo: dict | None = None,
+    seek_requested: bool = False,
 ) -> tuple[list[str], tuple[str, int], float]:
     """Automatic three-tier downgrade ladder (NO prompt window).
 
@@ -340,7 +372,7 @@ def hw_encode_with_fallback(
             f"[FATAL] no encodable format rung for {chroma}/{depth}"
         )
 
-    # --- hardware-decode routing (HD-B01..B09) ---------------------------
+    # --- hardware-decode routing (HD-B01..B10) ---------------------------
     memo = hw_decode_memo if hw_decode_memo is not None else {}
     route = route_decode(
         policy=hw_decode,
@@ -349,6 +381,7 @@ def hw_encode_with_fallback(
         chroma=chroma,
         depth=depth,
         memo=memo,
+        seek_requested=seek_requested,
     )
     file_logger.info("DECODE_ROUTE | %s", route.log_line())
     if route.hardware:

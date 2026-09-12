@@ -41,6 +41,10 @@
      "title": "Provenance self-check gates the run", "input": "provenance json", "backend": "both",
      "expected": "verify_provenance raises when any hash or version token mismatches",
      "verification": "run verify_provenance twice, then with a deliberately wrong expectation", "automation": "auto"},
+    {"id": "HD-A09", "category": "A", "severity": "P0", "impl": "a09_default_resolution_excludes_research",
+     "title": "Default tool resolution excludes the research builds", "input": "tools/ tree holding both builds", "backend": "both",
+     "expected": "find_hw_tool returns the shipped build deterministically; tools/avhw is never selected by a glob",
+     "verification": "resolve both tool names and assert the shipped path plus the exclusion rule", "automation": "auto"},
 
     {"id": "HD-B01", "category": "B", "severity": "P0", "impl": "b01_sony_hs_routing",
      "title": "Sony XAVC HS routing", "input": "sony_hs_c0886", "backend": "nvenc+qsv",
@@ -77,6 +81,10 @@
      "title": "Refusal and frame loss are distinguishable", "input": "synthetic logs of each failure class", "backend": "both",
      "expected": "capability_refused / device_unavailable / reader_unavailable / decode_failed / count_mismatch / sequence_mismatch all distinct",
      "verification": "classify_reader_failure on each real/synthetic log fragment; assert distinct codes", "automation": "auto"},
+    {"id": "HD-B10", "category": "B", "severity": "P0", "impl": "b10_hw_decode_binary_pinned",
+     "title": "Hardware decode is pinned to the verified build", "input": "tools/ tree holding both builds", "backend": "both",
+     "expected": "policy off -> no decode-tool override; policy auto/require -> the patched build by sha256; a missing or mismatched build yields a reason code instead of a silent fallback to the shipped build",
+     "verification": "resolve_decode_tool across policies plus a corrupted-copy negative", "automation": "auto"},
 
     {"id": "HD-C01", "category": "C", "severity": "P0", "impl": "c01_three_way_sony",
      "title": "Sony short: stock vs patched vs software", "input": "sony_hs_c0886 (360, leading=3)", "backend": "nvenc",

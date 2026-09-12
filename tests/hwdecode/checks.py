@@ -272,19 +272,26 @@ def independent_frame_count_ffmpeg(path: Path, timeout: int = 7200) -> int | Non
     return last
 
 
-def reconcile(cm: CountManifest) -> tuple[bool, list[str]]:
+def reconcile(
+    cm: CountManifest, *, expected: int | None = None
+) -> tuple[bool, list[str]]:
     """Do all available counts agree?
 
-    Returns ``(ok, reasons)``.  The container's declared sample count is
-    the reference where it exists — it is the number the *file* claims,
-    which is what a delivered artifact must contain.  The reader's
-    self-report is recorded but **never** used as the reference: it
-    under-reports on XAVC by construction (RC-3).
+    Returns ``(ok, reasons)``.  Without ``expected``, the container's
+    declared sample count is the reference — it is the number the *file*
+    claims, which is what a delivered artifact must contain.  Pass
+    ``expected`` for a deliberately partial encode (``--frames``/``--trim``),
+    where the container count is the whole file and therefore the wrong
+    yardstick.
+
+    The reader's self-report is recorded but **never** used as the
+    reference: it under-reports on XAVC by construction (RC-3), so
+    trusting it would mask exactly the loss being looked for.
     """
     reasons: list[str] = []
-    ref = cm.container_expected
+    ref = expected if expected is not None else cm.container_expected
     if ref is None:
-        reasons.append("no container reference count available")
+        reasons.append("no reference count available")
         return False, reasons
 
     for label, value in (
@@ -296,7 +303,7 @@ def reconcile(cm: CountManifest) -> tuple[bool, list[str]]:
         if value is None:
             reasons.append(f"{label} unavailable")
         elif value != ref:
-            reasons.append(f"{label}={value} != container={ref}")
+            reasons.append(f"{label}={value} != reference={ref}")
     return not reasons, reasons
 
 

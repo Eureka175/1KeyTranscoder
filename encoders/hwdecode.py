@@ -64,6 +64,14 @@ R_SEQUENCE_MISMATCH = "sequence_mismatch"
 R_METADATA_MISMATCH = "metadata_mismatch"
 R_INTEGRITY_OK = "integrity_ok"
 R_REQUIRE_UNMET = "require_unmet"
+# Measured in this session (matrix HD-D02/D-04/D-05): on a time seek the
+# rigaya hardware reader delivers *different pictures* than the software
+# reader, deterministically, with the same count and the same PTS
+# sequence. The patch does not cause it — patched and stock `--avhw` seek
+# output are byte-identical — it is pre-existing reader semantics that the
+# research line never measured, because it only ever checked "seek
+# unchanged vs stock", never "seek equal to --avsw".
+R_SEEK_NOT_EQUIVALENT = "seek_not_equivalent"
 
 # reason codes that mean "the hardware path was never usable here"
 _HARDWARE_UNAVAILABLE = frozenset({
@@ -132,6 +140,7 @@ def route_decode(
     chroma: str,
     depth: int,
     memo: dict | None = None,
+    seek_requested: bool = False,
 ) -> DecodeRoute:
     """Decide the decode reader for one input.
 
@@ -139,6 +148,12 @@ def route_decode(
     facts (see :func:`memoize_unavailable`); it lets a reader that failed
     to initialise once stop being retried for every subsequent file
     without turning "failed once" into a permanent global claim.
+
+    ``seek_requested`` must be set when the encode carries a temporal
+    window (``--seek``).  Hardware decode is then refused outright: the
+    two rigaya readers are not seek-equivalent, and a transcode whose
+    delivered pictures depend on which reader ran is exactly the silent
+    behaviour change this integration exists to prevent.
     """
     key = (backend, codec, chroma, depth)
 
@@ -161,6 +176,20 @@ def route_decode(
     if policy == POLICY_OFF:
         return _sw(R_POLICY_OFF, "policy=off is the default; software decode",
                    warn=False)
+
+    if seek_requested:
+        detail = (
+            "a time seek was requested and the hardware reader is not "
+            "seek-equivalent to the software reader (measured: identical "
+            "count and PTS, different pictures, deterministic on both sides)"
+        )
+        if policy == POLICY_REQUIRE:
+            return DecodeRoute(
+                reader=READER_HW, hardware=False, reason=R_REQUIRE_UNMET,
+                detail=f"policy=require but {detail}", policy=policy,
+                backend=backend, codec=codec, chroma=chroma, depth=depth,
+            )
+        return _sw(R_SEEK_NOT_EQUIVALENT, detail, warn=True)
 
     if key in REFUSED:
         detail = REFUSED[key]
@@ -277,3 +306,117 @@ def _first_line_with(text: str, needle: str) -> str:
 
 def is_hardware_unavailable(reason: str) -> bool:
     return reason in _HARDWARE_UNAVAILABLE
+
+
+# ---------------------------------------------------------------------------
+# which binary may perform hardware decode
+# ---------------------------------------------------------------------------
+#
+# The shipped `tools/NVEncC_9.31_x64` and `tools/QSVEncC_8.26_x64` builds
+# carry the Sony head-loss defect. Asking them for `--avhw` would lose
+# frames on every XAVC file — the integrity gate would then reject every
+# result and the hardware path would never actually run, which is safe but
+# useless. So hardware decode is pinned to the patched research builds by
+# hash, and the hash is asserted before the binary is used.
+#
+# Those builds are **research builds and must not be distributed**
+# (`release/build_release.py` does not whitelist `tools/avhw/`, and `docs/`
+# is excluded from the package). The practical consequence, stated plainly:
+# in a shipped installation `--hw-decode auto` degrades to software with
+# reason `not_proven`, and `--hw-decode require` fails loudly. That is the
+# intended behaviour, not a bug — hardware decode is a validated optional
+# path in a developer checkout, never a shipped default.
+
+PATCHED_BUILD: dict[str, dict] = {
+    "nvenc": {
+        "rel": "tools/avhw/NVEncC_9.31_avhw/NVEncC64.exe",
+        "sha256": "dcf6d7a63143c777e54a749281bef7ee1dd50d61c44b14d128e66a1217c8be4b",
+        "version_must_contain": ("9.31", "(r1)", "Sep 12 2026"),
+    },
+    "qsv": {
+        "rel": "tools/avhw/QSVEncC_8.26_avhw/QSVEncC64.exe",
+        "sha256": "f5df83f12911d99d69b07e8270d6cdef4a8e4b62adb06711599c8cee62f8804d",
+        "version_must_contain": ("8.26", "(r4504)", "Sep 12 2026"),
+    },
+}
+
+
+@dataclass
+class DecodeTool:
+    """The binary that may perform hardware decode, and why."""
+
+    path: object | None          # Path when usable, else None
+    role: str                    # "patched" | "explicit" | "unusable"
+    reason: str
+    detail: str
+
+    @property
+    def usable(self) -> bool:
+        return self.path is not None
+
+
+def _sha256(path) -> str | None:
+    import hashlib
+
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(8 * 1024 * 1024), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def resolve_decode_tool(
+    *, kind: str, script_dir, explicit=None, policy: str = POLICY_OFF
+) -> DecodeTool:
+    """Pick the binary allowed to do hardware decode.
+
+    ``kind`` is ``"nvencc"`` or ``"qsvencc"``.  An explicit operator path
+    wins; otherwise the provenance-recorded patched build is used and must
+    hash-match before it is trusted.
+    """
+    from pathlib import Path
+
+    base = "nvenc" if kind == "nvencc" else "qsv"
+    if policy == POLICY_OFF:
+        return DecodeTool(None, "unusable", R_POLICY_OFF, "policy=off")
+
+    if explicit:
+        p = Path(explicit)
+        if not p.is_absolute():
+            p = Path(script_dir) / p
+        if not p.is_file():
+            return DecodeTool(None, "explicit", R_READER_UNAVAILABLE,
+                              f"explicit tool path not found: {p}")
+        return DecodeTool(p, "explicit", R_PROVEN,
+                          "explicit tool path supplied by the operator")
+
+    spec = PATCHED_BUILD[base]
+    p = Path(script_dir) / spec["rel"]
+    if not p.is_file():
+        return DecodeTool(
+            None, "unusable", R_NOT_PROVEN,
+            f"the patched hardware-decode build is not present at "
+            f"{spec['rel']}; the shipped {base} build must not be used for "
+            f"hardware decode because it loses frames on Sony material",
+        )
+    actual = _sha256(p)
+    if actual != spec["sha256"]:
+        return DecodeTool(
+            None, "unusable", R_NOT_PROVEN,
+            f"{spec['rel']} does not match the recorded provenance "
+            f"(got {actual}, expected {spec['sha256']}); refusing to use an "
+            f"unverified hardware-decode build",
+        )
+    return DecodeTool(p, "patched", R_PROVEN,
+                      f"patched build verified by sha256 {actual[:16]}")
+
+
+def decode_tool_is_stock(backend: str, path) -> bool:
+    """Guard: is this the shipped (defective) build?"""
+    from pathlib import Path
+
+    p = str(path).replace("\\", "/").lower()
+    return "tools/avhw/" not in p and f"tools/{backend}" in p
