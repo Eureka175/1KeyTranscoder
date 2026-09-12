@@ -370,7 +370,9 @@ Stored at `work/hwdecode2/patch/0001-avhw-keep-leading-pictures.patch`
 | Lines added / removed | **18 / 0** |
 | sha256 of the patch file | `53084fa8bd87ccc1d5882ab01d21e7320401f7c52c85263728b976d1edfe6dfc` |
 | Applies cleanly to a pristine 9.31 | **yes** — `git apply` (strict) and `git apply --ignore-whitespace` both exit 0 against a fresh `git clone` of the tag |
-| Result identical to the tree that produced the tested binary | **yes** — after applying to pristine, both files hash byte-identical to `third_party/NVEncC/NVEncCore/…` |
+| Result identical to the tree that produced the tested binary | **yes** — verified on both patched files after a deliberate revert/re-apply cycle (§5.1.1) |
+| Tested binary | `NVEncC64.exe`, 77 757 440 bytes, sha256 `dcf6d7a63143c777e54a749281bef7ee1dd50d61c44b14d128e66a1217c8be4b` |
+| Provenance record | `work/hwdecode2/raw/provenance.json` — patch hash, per-file hashes, binary hash, tree status, build-env changes |
 | Rebase cost | the diff is 2 files and carries no context outside its own hunk; it re-applies on any 9.31-lineage tree whose `getOutputFrame()` still contains the anchor block |
 
 Line-ending note: upstream ships these files with CRLF, so the patch body is
@@ -386,6 +388,37 @@ cd pristine
 git apply ..\work\hwdecode2\patch\0001-avhw-keep-leading-pictures.patch
 git diff --stat      # NVEncPipeline.h | 11 +++++, rgy_input.h | 7 +++, 18 insertions
 ```
+
+#### 5.1.1 Provenance check — and one defect it caught in this phase's own workspace
+
+The build tree is untracked, so "the binary came from this patch" is not
+self-evident. It is now asserted two ways:
+
+1. **Source ↔ patch.** Reverting both files in a pristine checkout and
+   re-applying the patch reproduces the built tree's files **byte for byte**:
+
+   | file | pristine + patch | built tree | match |
+   |---|---|---|---|
+   | `NVEncCore/NVEncPipeline.h` | `daed88a78fbd091a1db159fd3cc9a1cdead46f56c0891aae6b3dd1e37aa0b00d` | same | ✅ |
+   | `NVEncCore/rgy_input.h` | `e03e828e06b44f90ef95578866e7fb67cec602b1b6bf5e04f374a53004641627` | same | ✅ |
+
+2. **Behaviour.** The rebuilt binary was re-run through the whole suite and
+   reproduced **every output sha256 bit-for-bit** (§10.2).
+
+> **What went wrong, recorded because it nearly invalidated the result.** During
+> a mid-phase audit the build tree was found with `NVEncPipeline.h` patched but
+> `rgy_input.h` reverted to upstream — i.e. exactly half the patch present, after
+> the binary had been built. The audit's first check compared the *patched* tree
+> against a *pristine* one and produced a false "identical" reading, and a
+> subsequent `git apply --check` "failed" only because the tree was already
+> patched. The correct procedure, now written into `record_provenance.py`, is to
+> compare the built tree against **pristine + patch**, not against either alone.
+> The tree was restored, the binary **rebuilt from the verified sources**, and the
+> entire suite re-run; all results in this document are from the rebuilt binary.
+> Independent confirmation that the two builds are equivalent: the output sha256
+> matches on all eight cases, including the 30-frame one
+> (`6336165c02a8…`), the 330-frame one (`ce7816ed0025…`) and the 10170-frame one
+> (`6e27c8565648…`).
 
 ### 5.2 The diff
 
@@ -754,7 +787,7 @@ the pictures.
 
 ### 10.2 Result
 
-**RESULT: PASS — no failing checks across 16 records (7 recorded limitations).**
+**RESULT: PASS — no failing checks across 16 records (9 recorded limitations).**
 
 | case | reader | container | leading pics | baseline `encoded` | patched `encoded` | patched output | identical to `--avsw` |
 |---|---|---|---|---|---|---|---|
@@ -899,6 +932,14 @@ NVEncC clamps it to EOF; it is really a full-clip run with a large bound.
 No run in this sweep produced a crash, a short read, a container with gaps, or a
 mismatch between `encoded`, the container count and the packet count.
 
+> **Confirmed on the rebuilt binary.** After the provenance fix in §5.1.1 the
+> sweep was repeated with the binary rebuilt from the verified sources
+> (`work/hwdecode2/raw/longrun/longrun-patched-final.json`) and reproduced the same
+> numbers: 2997 / 2997 / 9997 / 9997 frames, `--avhw` 147.3 and 151.4 fps against
+> `--avsw` 81.5 and 88.8 fps, NVEncC peak working set 949–956 MiB (`--avhw`)
+> versus 1817–1822 MiB (`--avsw`), VRAM 1593–1682 MiB versus 1099–1102 MiB. Output
+> hashes match the first pass on every case.
+
 What the sweep establishes:
 
 * **Zero silent frame loss across 3000–10170 frames.** Every row's `encoded`,
@@ -961,8 +1002,8 @@ end of its report; anything else is a `FAIL`.
 |---|---|---|
 | L1 | **Single-GPU host.** `--check-device` reports one CUDA device; `--device 1` → `Invalid Device Id = 1`. | The `device 0 / device 1 / multi-GPU` dimension is **untested** (§15). Do not claim multi-GPU readiness. |
 | L2 | **The patched binary uses a different toolchain** (CUDA 13.1 / MSVC 14.51) from the shipped baseline (CUDA 11.8 / MSVC 14.44). | Cross-binary wall-clock and fps are **not a controlled benchmark**. All correctness claims are toolchain-independent: counts, PTS, keyframes, fingerprints, bytes. |
-| L3 | **`NVDEC engine busy` (C8) could not be asserted on four rows** — NVEncC does not print the `VE:`/`VD:` line on very short runs. | Those rows rely on `Input Info = avcuvid` as the hardware-decode evidence. Where the counters *were* printed, `VD` was non-zero on every `--avhw` row. |
-| L4 | **Engine counters are printed inconsistently in both directions**, including by the baseline (e.g. `control-dji` prints `VD` on the baseline and not on the patched binary). | The counters are supporting evidence only; `avcuvid` plus the absence of a host copy are the primary signals. |
+| L3 | **`NVDEC engine busy` (C8) could not be asserted on five rows** — NVEncC prints the `VE:`/`VD:` line only sometimes, and for short clips it often does not print it at all. It is not a clean short-clip rule either: `control-synthetic` (60 frames) printed it in one pass and not in another. | Those rows fall back to `Input Info = avcuvid` plus the GPU-only VPP stage. On **every** row where the counters were printed, `--avhw` showed `VD > 0` (33.7 % and 38.0 % on the two longest cases). Engine counters are corroboration, never the sole evidence. |
+| L4 | **Engine counters are printed inconsistently across runs and across binaries** — the same case can show them in one pass and not the next, and the baseline sometimes prints `VD` where the patched build does not (e.g. `control-dji`). | The counters are supporting evidence only. `Input Info = avcuvid`, the GPU-only VPP stage and the absence of a host copy are the primary signals, and those held on every row. |
 | L5 | **VRAM readings were contaminated** on several early runs (peaks up to 7.9 GiB on an 8 GiB part when nothing should use that much); some rows show a flat 1091 MiB that is a floor, not a measurement. | VRAM is not used in any conclusion. Only same-session relative statements are made, and the clean patched rows (1682 / 1593 MiB) are quoted. |
 | L6 | **Long-clip fingerprints are bounded to 2000–3000 frames**, declared per case. | Counts, PTS sequences, keyframe sequences and output hashes cover the whole clip; only the per-frame picture comparison is windowed. |
 | L7 | **An MKV source decodes to 29 of 30 frames** under streaming `-f rawvideo`. | Both readers agree on 29, so no difference is masked; the delivered output is 30 frames. |
@@ -1062,23 +1103,30 @@ a code path where a rebase mistake is a silent frame loss.
 PATCH STATUS: READY FOR PROJECT INTEGRATION
 
   scope           18 added lines, 2 files, NVEncC 9.31 (2cb9d81), no deletions
-  applies         clean to pristine 9.31 (git apply, strict); reproduces the
-                  tested tree byte-for-byte
+  patch sha256    53084fa8bd87ccc1d5882ab01d21e7320401f7c52c85263728b976d1edfe6dfc
+  applies         clean to pristine 9.31 (git apply, strict); reverting and
+                  re-applying reproduces the built tree byte-for-byte
+  provenance      work/hwdecode2/raw/provenance.json ties the tested binary
+                  (sha256 dcf6d7a63143c777e54a749281bef7ee1dd50d61c44b14d128e66a1217c8be4b)
+                  to the patch; the suite was re-run on the rebuilt binary and
+                  reproduced every output hash
   correctness     13/13 assertions x 16 records PASS (8 cases x 2 readers)
                   frame count, PTS sequence, keyframe sequence, frame
                   fingerprint and output hash all reconciled
   regression      controls (DJI / x265 / synthetic) byte-identical before/after
                   seek + trim: 17/17 combinations identical before/after
   long run        3000 / 6000 / 10000 / full 10170 frames, no frame loss,
-                  no instability, flat memory
+                  no instability, flat memory (confirmed twice, on two builds)
   pipeline        GPU decode -> GPU VPP -> NVENC preserved; no host copy,
                   no hwdownload, no software decoder
   parity          patched --avhw output is byte-identical to --avsw on every
                   leading-picture case
 
-  NOT covered (see section 13): multi-GPU, parallel/split encode, the full
-  151-file corpus, the second defect at setPocAndFix (L16), and one
-  non-reproducible 0xC0000005 (L12).
+  9 recorded limitations (section 13), of which the ones that could bite an
+  integrator are: the reader's own input frame count can still disagree with the
+  delivered count (L16), `--frames N` is off by the leading-picture count (L9),
+  and one 0xC0000005 occurred once in six attempts and never reproduced (L12).
+  NOT covered: multi-GPU, parallel/split encode, and the full 151-file corpus.
 
   This is a READY-to-integrate patch, not a READY-to-ship binary. The build in
   section 9 is a research build (avs/vpy readers disabled, generated CUDA
@@ -1097,6 +1145,7 @@ convention, so these stay local by design.
 | `patch/0001-avhw-keep-leading-pictures.patch` | **the candidate patch** — 18 added lines, sha256 `53084fa8bd87ccc1d5882ab01d21e7320401f7c52c85263728b976d1edfe6dfc` |
 | `patch/apply_patch.py` | BOM- and CRLF-safe applier (alternative to `git apply`) |
 | `run_regression.py` / `check_regression.py` | correctness matrix + the 13 assertions |
+| `record_provenance.py` | ties the tested binary to the patch: source, patch and binary hashes, tree status |
 | `fingerprint.py` | streaming per-frame fingerprinting (never writes raw YUV) |
 | `run_seektrim.py` | seek + trim regression across both binaries |
 | `run_longrun.py` | long-run stability with memory sampling |
@@ -1111,6 +1160,9 @@ convention, so these stay local by design.
 | `raw/regression/regression-{patched,baseline}.json`, `regression-verdict.json` | correctness evidence + verdict |
 | `raw/seektrim/seektrim-patched.json` | seek/trim evidence |
 | `raw/longrun/longrun-{patched2,baseline}.json` | long-run evidence |
+| `raw/longrun/longrun-patched-final.json` | long-run confirmation on the rebuilt binary |
+| `raw/provenance.json` | patch / source / binary hashes for the tested artefact |
+| `raw/build-verify-console.txt` | console output of the rebuild from the verified sources |
 | `raw/framesem/frames-semantics.json` | `--frames` evidence |
 | `raw/matrix-{baseline,after}.json`, `raw/fixtures-{baseline,after}.json` | earlier A/B matrices |
 | `raw/trc-*.txt` | the decisive trace (`Set packet` / `input frame (dev)`) |
