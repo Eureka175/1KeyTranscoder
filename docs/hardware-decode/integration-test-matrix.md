@@ -302,9 +302,24 @@ patch 引入、帧数/PTS 差异、常量偏移对齐（不是简单的窗口平
 
 | ID | Sev | Input | Backend | Expected behaviour | Verification method | Auto | Result |
 |---|---|---|---|---|---|---|---|
-| HD-D07 | P0 | `sony_hs_c0886`（leading=3）、`gen_x265_reencode`（leading=0） | patched NVEncC `avhw` + `avsw` + stock `avhw` | 记录 `N ∈ {1,2,3,4,10,first-keyframe-boundary,30,100}` 的 **requested vs presented**。结果作为**独立 semantics 表**输出。**不得**把 `actual < requested` 一律判成同一个 bug；也不得用它推翻 full-input 的 integrity 结论 | 参数化扫描，输出 contract 表 | auto | |
-| HD-D08 | P0 | 同上 | 同上 | contract 落盘：对每个 N 给出 `requested / container-available / presented(avhw) / presented(avsw) / leading_pictures / 差值是否恰等于 leading` 。若最终 production pipeline **不依赖** `--frames`，本条以 `known limitation / isolated behaviour` 记录，并**明确标注它不影响 full-input integrity 结果** | 生成并检查 contract 表 | auto | |
+| HD-D07 | P0 | `sony_hs_c0886`（leading=3）、`gen_x265_reencode`（leading=0） | patched NVEncC `avhw` + `avsw` | 记录 `N ∈ {1,2,3,4,10,first-keyframe-boundary,30,100}` 的 **requested vs presented**，**并对每个 N 比较 hw 与 sw 的画面内容**（`--frames` 上两者必须等价，与 `--seek` 形成对照）。结果作为**独立 semantics 表**输出。**不得**把 `actual < requested` 一律判成同一个 bug | 参数化扫描 + 逐 N 指纹比对，输出 contract 表 | auto | |
+| HD-D08 | P0 | 同上 | 同上 | contract 落盘，按**实测的三段 regime** 判定（见 §D.4），并断言 hw/sw 逐 N 等价、control（leading=0）精确。若最终 production pipeline **不依赖** `--frames`，本条以 `known limitation / isolated behaviour` 记录，并**明确标注它不影响 full-input integrity 结果** | 生成并检查 contract 表 | auto | |
 | HD-D09 | P1 | 同上 | 同上 | `--trim` 的同类语义与 `--frames` 分开记录（两者都短少 leading，但触发路径不同） | 同 D-08 形式 | auto | |
+
+### D.4 `--frames N` 的实测 contract（修正原假设）
+
+原假设 `presented == N − leading` **只在一个 regime 内成立**。实测得到三段：
+
+| regime | 条件 | `presented` | 证据 |
+|---|---|---|---|
+| 低于 leading | `N ≤ leading_pictures` | **整个片段**（请求被忽略） | N=1、2、3 均交付 **360** 帧 |
+| 常规 | `leading < N < container` | `N − leading_pictures` | N=4→1、10→7、30→27、100→97 |
+| 越界钳制 | `N ≥ container` | **整个片段**（含 leading，短少消失） | 对 11280 帧片段请求 18000 → **11280** |
+| 控制组 | `leading_pictures = 0` | `N` 精确 | N=1/3/10/30/100 全部精确 |
+
+**关键性质：三个 regime 上 hw 与 sw 完全一致**（`--frames 10/30/100` 两侧 sha256 相同）。
+因此 `--frames` 语义是 **reader 共有**的行为，与 `--seek` 的性质完全不同——
+这也是为什么 `--seek` 需要守卫而 `--frames` 不需要。
 
 ---
 

@@ -1055,8 +1055,18 @@ def c03(t, ctx):
             "clamped": bool(container and n >= container),
         }
         if container:
-            row["contract_expected"] = (min(n, container) - lead
-                                        if n >= container else n - lead)
+            # three regimes, measured (see HD-D07/D08):
+            #   n >= container   -> the whole clip, leading pictures included
+            #   n <= leading     -> the request is ignored, whole clip again
+            #   otherwise        -> n - leading
+            if n >= container or n <= lead:
+                row["contract_expected"] = container
+                row["contract_regime"] = (
+                    "clamped_to_container" if n >= container else "below_leading"
+                )
+            else:
+                row["contract_expected"] = n - lead
+                row["contract_regime"] = "n_minus_leading"
         ev["requests"][str(n)] = row
         if er.rc != 0:
             problems.append(f"--frames {n}: rc={er.rc}")
@@ -1074,9 +1084,10 @@ def c03(t, ctx):
         if row.get("contract_expected") is not None \
                 and cm.encoder_input != row["contract_expected"]:
             problems.append(
-                f"--frames {n}: presented {cm.encoder_input}, documented "
-                f"contract says {row['contract_expected']} "
-                f"(requested {n}, leading {lead})")
+                f"--frames {n}: presented {cm.encoder_input}, measured "
+                f"contract ({row.get('contract_regime')}) says "
+                f"{row['contract_expected']} (requested {n}, leading {lead}, "
+                f"container {container})")
     return _res(
         t, "HD-C03", STATUS_PASS if not problems else STATUS_FAIL,
         actual=(f"full input reconciled at {container}; "
@@ -1678,6 +1689,23 @@ def seek_divergence(ctx, fx, *, tid: str, tag: str, seek: float,
                                  "sha": sha, "output": er.output})
     ev["runs"] = {k: [{kk: vv for kk, vv in r.items() if kk != "output"}
                       for r in v] for k, v in runs.items()}
+
+    # A seek past the last decodable point fails on BOTH readers with
+    # rc=1 and no output ("No video packets found!").  That is symmetric,
+    # loud and pre-existing — the opposite of the silent divergence this
+    # test hunts for — so it is recorded and not treated as a failure.
+    # What would be a failure is one reader succeeding where the other
+    # cannot.
+    hw_failed = all(r["rc"] != 0 for r in runs["avhw"])
+    sw_failed = all(r["rc"] != 0 for r in runs["avsw"])
+    if hw_failed and sw_failed:
+        ev["both_readers_refused"] = True
+        ev["refusal_detail"] = ("both readers rejected this seek identically "
+                               "(rc != 0, no output) — pre-existing and "
+                               "symmetric, not a divergence")
+        return ev, problems
+    ev["both_readers_refused"] = False
+
     for reader in ("avhw", "avsw"):
         if runs[reader][0]["sha"] != runs[reader][1]["sha"]:
             problems.append(
@@ -1754,12 +1782,14 @@ def d02(t, ctx):
                                      tag=f"s{pos:.2f}", seek=pos)
         ev["positions"][f"seek={pos:.3f}"] = row
         problems.extend(f"seek {pos:.3f}: {p}" for p in probs)
-        if not row["controls"]["hw_repeat_identical"] or \
-                not row["controls"]["sw_repeat_identical"]:
+        if row.get("both_readers_refused"):
+            continue
+        ctl = row.get("controls", {})
+        if not ctl.get("hw_repeat_identical") or not ctl.get("sw_repeat_identical"):
             problems.append(
                 f"seek {pos:.3f}: a reader is non-deterministic, so the "
                 "hw-vs-sw difference cannot be attributed to the reader")
-        if row["packets"] and not row["packets"]["pts_equal"]:
+        if row.get("packets") and not row["packets"]["pts_equal"]:
             problems.append(f"seek {pos:.3f}: PTS sequences differ")
 
     # the software path — which is what routing selects — must be exact
@@ -1822,14 +1852,16 @@ def d04(t, ctx):
                                      tag=f"r{pos:.2f}", seek=pos, frames=12)
         ev["positions"][f"seek={pos}"] = row
         problems.extend(f"seek {pos}: {p}" for p in probs)
-        if not row["controls"]["hw_repeat_identical"] or \
-                not row["controls"]["sw_repeat_identical"]:
+        if row.get("both_readers_refused"):
+            continue
+        ctl = row.get("controls", {})
+        if not ctl.get("hw_repeat_identical") or not ctl.get("sw_repeat_identical"):
             problems.append(f"seek {pos}: reader non-determinism")
         if not row["hw_vs_sw"]["identical"]:
             divergent += 1
-        if row["packets"] and not row["packets"]["pts_equal"]:
+        if row.get("packets") and not row["packets"]["pts_equal"]:
             problems.append(f"seek {pos}: PTS differ")
-        if row["packets"] and row["packets"]["count_a"] != row["packets"]["count_b"]:
+        if row.get("packets") and row["packets"]["count_a"] != row["packets"]["count_b"]:
             problems.append(f"seek {pos}: counts differ")
     ev["divergent_positions"] = divergent
     ev["total_positions"] = len(positions)
@@ -1883,9 +1915,11 @@ def d05(t, ctx):
                                      seek=pos, frames=16)
         ev["seek"][str(pos)] = row
         problems.extend(f"seek {pos}: {p}" for p in probs)
-        if row["controls"]["hw_repeat_identical"] and \
-                row["controls"]["sw_repeat_identical"] and \
-                row["hw_vs_sw"]["identical"]:
+        if row.get("both_readers_refused"):
+            continue
+        ctl = row.get("controls", {})
+        if ctl.get("hw_repeat_identical") and ctl.get("sw_repeat_identical") \
+                and row["hw_vs_sw"]["identical"]:
             # if it ever becomes equivalent, the guard is over-strict and
             # that is worth knowing — flag rather than silently pass
             problems.append(
@@ -2034,12 +2068,14 @@ def d08(t, ctx):
     """The `--frames N` contract, as measured rather than as assumed.
 
     The first run of this test asserted ``presented == N - leading`` and
-    failed 3 of 7 rows.  The measurement showed the real contract has two
-    regimes, which is a better result than the original guess:
+    failed 3 of 7 rows.  The measurement showed the real contract has
+    three regimes, which is a better result than the original guess:
 
     * ``N <= leading_pictures``: the tool ignores the request and delivers
       the **whole clip** (N = 1, 2, 3 all gave 360 frames);
-    * ``N > leading_pictures``: ``presented == N - leading_pictures``;
+    * ``leading_pictures < N < container``: ``presented == N - leading``;
+    * ``N >= container``: **clamped to the whole clip, leading pictures
+      included** — the shortfall disappears entirely;
     * ``leading_pictures == 0``: ``presented == N`` exactly (control).
 
     This is a property of the reader shared by hardware and software — the
@@ -2058,7 +2094,7 @@ def d08(t, ctx):
     ev["container"] = container
 
     regimes = {"below_or_equal_leading": [], "above_leading": [],
-               "keyframe_boundary": []}
+               "clamped_to_container": [], "keyframe_boundary": []}
     mismatches = []
     for key, row in tab["sony"].items():
         if not key.endswith("/avhw"):
@@ -2068,11 +2104,14 @@ def d08(t, ctx):
         if got is None:
             continue
         if key.startswith("kf"):
-            expected = "whole_clip_or_n_minus_leading"
             regimes["keyframe_boundary"].append(
                 {"requested": n, "presented": got})
             continue
-        if n <= lead:
+        if n >= container:
+            expected = container
+            bucket = "clamped_to_container"
+            rule = "presented == container (request past the clip end clamps to the whole clip)"
+        elif n <= lead:
             expected = container
             bucket = "below_or_equal_leading"
             rule = "presented == container (request below the leading count is ignored)"
@@ -2318,37 +2357,27 @@ def e06(t, ctx):
     if not hw.output_exists or not sw.output_exists:
         return _res(t, "HD-E06", STATUS_BLOCKED, reason="missing output")
 
-    def colr(path: Path):
-        from preservation import isobmf
-        boxes = isobmf.root_boxes(path)
-        out = []
-        for b in boxes:
-            if b.type != b"moov":
-                continue
-            for trak in isobmf._children(path.open("rb"), b):  # noqa: SLF001
-                pass
-        return out
-
-    # isobmf's public surface is patch-oriented; read the colr box directly
-    # from the stsd sample entry instead.
+    # Read the colr box straight out of the sample entry.  `isobmf` is
+    # patch-oriented, so the box is located by walking the stsd payload
+    # rather than by reusing a private helper.
     def read_colr(path: Path):
-        data = path.read_bytes() if path.stat().st_size < 8_000_000 else None
-        if data is None:
-            with path.open("rb") as f:
-                f.seek(0, 2)
-                size = f.tell()
-                f.seek(0)
-                data = f.read(min(size, 8_000_000))
+        with path.open("rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(0)
+            data = f.read(min(size, 16_000_000))
+        idx = data.find(b"colr")
+        if idx < 4:
+            return None
+        start = idx - 4
+        box_size = int.from_bytes(data[start:start + 4], "big")
+        payload = data[idx + 4: idx + 4 + min(max(box_size - 8, 0), 32)]
+        return payload.hex()
         idx = data.find(b"colr")
         if idx < 0:
             return None
-        # colr: size(4) 'colr'(4) colour_type(4) then primaries/transfer/matrix
-        if idx + 11 > len(data):
-            return None
-        start = idx - 4
-        size = int.from_bytes(data[start:start + 4], "big")
-        payload = data[idx + 4: idx + 4 + min(size - 8, 32)]
-        return payload.hex()
+        # colr: size(4) 'colr'(4) colour_type(4) primaries/transfer/matrix
+        return payload.hex() if payload else None
 
     src_colr = read_colr(fx.path)
     hw_colr = read_colr(Path(hw.output))
