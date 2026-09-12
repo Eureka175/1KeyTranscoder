@@ -116,11 +116,16 @@ F:\1KeyTranscoder\
 >
 > | 归档内容 | 位置 | 状态提示 |
 > |---|---|---|
-> | P0-A 硬件解码调研（Phase 1，16 项） | [`../olddocs/docs/hardware-decode/`](../olddocs/docs/hardware-decode/) | ⚠️ 个别文档部分过期：`README.md`/`root-cause.md` 中"丢帧在 rigaya reader layer / 确切源码行 Unconfirmed"已被 Phase 2 修正；"永不用 rigaya `--avhw`"建议已被推翻 |
+> | **★ 硬件解码最终交叉结论** | [`../olddocs/docs/hardware-decode/research-conclusion.md`](../olddocs/docs/hardware-decode/research-conclusion.md) | **进入 hardware-decode integration 前先读这一份** |
+> | **端到端基准（S9）** | [`../olddocs/docs/hardware-decode/e2e-benchmark.md`](../olddocs/docs/hardware-decode/e2e-benchmark.md) | §0.1 已观测/推断未证/未测三者分离；§8.1 集成行动指南 |
+> | **NVEncC 补丁溯源** | [`../olddocs/docs/hardware-decode/nvencc-patch.md`](../olddocs/docs/hardware-decode/nvencc-patch.md) | 集成候选；含 clean-apply 证明与集成前置条件 |
+> | **QSVEncC 补丁溯源** | [`../olddocs/docs/hardware-decode/qsvencc-patch.md`](../olddocs/docs/hardware-decode/qsvencc-patch.md) | ⚠️ 仅对 pinned 8.26 生效，非通用声明 |
+> | P0-A 硬件解码调研（Phase 1） | [`../olddocs/docs/hardware-decode/`](../olddocs/docs/hardware-decode/) | ⚠️ 个别文档部分过期：`README.md`/`root-cause.md` 中"丢帧在 rigaya reader layer / 确切源码行 Unconfirmed"已被 Phase 2 修正；"永不用 rigaya `--avhw`"建议已被推翻 |
 > | 已取代的 AV1 三份评估 + 集成报告 | [`../olddocs/docs/`](../olddocs/docs/) | ❌/⚠️ 见 [`../olddocs/README.md`](../olddocs/README.md) §3.2 |
-> | 逐份状态索引（16 项明细） | [`../olddocs/docs/_ARCHIVE-INDEX.md`](../olddocs/docs/_ARCHIVE-INDEX.md) | — |
+> | 逐份状态索引 | [`../olddocs/docs/_ARCHIVE-INDEX.md`](../olddocs/docs/_ARCHIVE-INDEX.md) | — |
 >
 > **读归档文档前先读状态标注**，否则会读到已被推翻的结论。
+> 2026-09-12：四条 research 分支已全部并入 `main`，Phase 2 文档随迁入本归档区。
 
 ## 📁 [evaluation/](evaluation/) — 评估报告（分类：评估与调研）
 
