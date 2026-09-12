@@ -77,12 +77,13 @@ Phase 1 → Phase 2 的关键修正（一句话版）：
 | 建议：永不用 rigaya `--avhw`，改走 FFmpeg `-hwaccel` | **已推翻**：patched rigaya 路径正确且 CPU 省 2.5–2.7×，是集成候选；FFmpeg 保留为独立正确性/回退路径 |
 | 硬件解码收益"不是吞吐" | **确认并量化**：收益是 **CPU 余量**，不是单任务提速（同二进制单路反而慢 ~11%） |
 
-> ⚠️ **已知的路径待办。** 上述 Phase 2 文档目前存放在四个 research 分支上
-> （`research/rigaya-avhw-source`、`rigaya-nvencc-avhw`、`rigaya-qsvencc-avhw`、
-> `hwdecode-e2e-benchmark`）。那些分支的文档里写的是
-> `docs/hardware-decode/research-conclusion.md`；本目录搬迁后该路径变为
-> `docs/archive/hardware-decode/`。**合并这些分支时需同步修正该路径引用**，
-> 否则 research-conclusion 里的交叉引用会指向不存在的位置。
+> ✅ **已解决（2026-09-12）。** 四条 research 分支已全部并入 `main`，Phase 2 文档
+> 现就在本目录（`research-conclusion.md`、`e2e-benchmark.md`、两份 `*-patch.md`
+> 等），无需再去分支上找。它们内部原有的
+> `docs/hardware-decode/research-conclusion.md` 路径在两次搬迁后已失效，
+> **正文引用请以本目录相对路径为准**。
+> 归档后的分支只留 tag：`archived/rigaya-avhw-source`、`archived/rigaya-nvencc-avhw`、
+> `archived/rigaya-qsvencc-avhw`、`archived/hwdecode-e2e-benchmark`。
 
 ---
 
