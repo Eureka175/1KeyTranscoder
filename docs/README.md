@@ -107,6 +107,7 @@ F:\1KeyTranscoder\
 
 | 文件 | 说明 |
 |---|---|
+| [`release_notes_v0.7.0.md`](release_notes_v0.7.0.md) | **v0.7.0 发布说明（Hardware Decode integration milestone · Pre-release）**：`--hw-decode off\|auto\|require`（默认 off）/ capability routing / integrity gate / fallback 与 reason codes；matrix 83/83 与回归 248/248；含边界声明、已知限制与**未完成项（Audio Drift 等）**；本版无自包含发布包 |
 | [`release_notes_v0.6.1.md`](release_notes_v0.6.1.md) | **v0.6.1 发布说明**：Channel Sync P1 / AV1 mainline / AV1 色彩保真 / 流式内存修复；含验证矩阵、实测性能与已知限制 |
 
 > 阶段验证报告的正式副本已归档在 `work/docs/` 与 `work/releases/`

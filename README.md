@@ -1,5 +1,10 @@
 # 1KeyTranscoder
 
+> **Recursive, resumable Windows batch archival transcoder** — NVENC / QSV / x265 /
+> SVT-AV1 (HEVC & AV1), byte-level Sony XAVC (rtmd/nrtm/uuid) and DJI (djmd/dbgi/tmcd)
+> metadata preservation, `--channel-sync` audio alignment, optional hardware decode
+> (`--hw-decode`, default `off`).
+
 递归、可断点续跑的 Windows 批量归档转码器，带 **Sony / DJI 双相机元数据保留**：
 - **Sony XAVC**（rtmd 数据流）：逐帧陀螺仪/镜头数据（rtmd）、镜头配置文件
   （nrtm）、厂商 uuid box（PROF/USMT）全量保留；
@@ -51,7 +56,13 @@ v4.2.0/libx265/libvmaf）+ NVEncC 9.31 + QSVEncC 8.26 + GPAC 26.02**，
 解压即用（另需 Python 3.11+ 与对应 GPU 驱动；Gyroflow 为可选消费端
 工具，请从 gyroflow.xyz 单独安装）。
 
-- **v0.6.1**（`main` 主线 · **当前正式发布** · bugfix release）：
+- **v0.7.0**（`feature/hardware-decode-integration` · **Hardware Decode integration
+  milestone** · GitHub **Pre-release**）：**源码 tag，未附自包含发布包**。硬解所需
+  patched binary 是 research build，按设计不入包——因此发布形态下 `--hw-decode
+  auto` 会以 `not_proven` 降级软解、`require` 明确失败（设计行为，非缺陷）；
+  **默认行为未变（仍 `off`）**，本版也不是 1.0.0。发布说明见
+  [docs/release_notes_v0.7.0.md](docs/release_notes_v0.7.0.md)
+- **v0.6.1**（`main` 主线 · **最新带自包含发布包** · bugfix release）：
   [1KeyTranscoder-v0.6.1-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/1KeyTranscoder-v0.6.1-win64-selfcontained.zip)
   —— 修复 `--channel-sync` 长素材内存无上限增长（10 min/4CH/48 kHz 峰值
   RSS ≤ 512 MB 已实测达标），并含 AV1 色彩元数据保真修复；发布说明见
@@ -73,6 +84,8 @@ v4.2.0/libx265/libvmaf）+ NVEncC 9.31 + QSVEncC 8.26 + GPAC 26.02**，
 > 两条线合并进 `main` 后的主线**（AV1 与 HEVC 同处一分支，共用一个入口与
 > 一套保留管线）。`v0.6.1` 是 `v0.6.0` 的缺陷修复版本，无功能新增。
 > `v0.6.1` 是 v0.6 线上**唯一带独立发布包**的版本。
+> **`v0.7.x` = hardware decode integration 线**：硬解以 `--hw-decode`
+> 显式开启（默认 `off`），`v0.7.0` 为源码 tag 预发布（未附发布包）。
 
 ## 快速开始
 
@@ -427,12 +440,14 @@ git tag -l                         # pre_S1S5 / post_S1S5 / pre_ui / post_1kt_ui
                                    # post_autotest / post_x265 / v0.4.0 / v0.4.1 / v0.4.2
                                    # post_av1 / post_av1_calib / v0.5.0 / v0.5.1
                                    # v0.6.0 (HEVC+AV1 合并主线, 含 AV1 色彩保真修复)
-                                   # v0.6.1 (channel-sync 流式内存修复, 当前发布)
+                                   # v0.6.1 (channel-sync 流式内存修复, 最新带发布包版本)
+                                   # v0.7.0 (hardware decode integration, --hw-decode 默认 off)
 git checkout backup/pre-av1-main-merge   # AV1 合并进 main 之前的状态 (回滚点)
 ```
 
 > 分支约定: `main` = **HEVC/265 + AV1 合并主线**（两条线能力同处一分支，
-> 各线最后一次发布包见上节；合并后主线的当前发布为 **`v0.6.1`**）；
+> 各线最后一次发布包见上节；合并后主线**最新带自包含发布包的版本为 `v0.6.1`**
+> （`v0.7.0` 为源码 tag 预发布，未附发布包）；
 > `av1` 分支保留为 AV1 独立线历史
 > （含 post_av1 / post_av1_calib / v0.5.0 / v0.5.1 tag）；
 > `backup/pre-av1-main-merge` = AV1 合并前的 `main` 快照。
