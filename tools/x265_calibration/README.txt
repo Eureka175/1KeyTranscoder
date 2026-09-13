@@ -13,16 +13,24 @@ anything. The zip contains (top level of the extracted folder):
     START-HERE.txt                  one-paragraph pointer
     QUICKSTART.zh-CN.txt            Chinese quick start (recommended)
     README.txt                      this file
-    x265-calibration-collector.exe  the collector (the only program to run)
+    x265-calibration-collector.exe  the collector (the program to run)
     START-COLLECTOR.bat             double-click: start it
     CHECK-INSTALL.bat               double-click: read-only self test
+    ANALYZE-DATA.bat                double-click: analysis report
+    VERIFY-PACKAGE.bat              double-click: prove every exe is standalone
     INSTALL-SCHEDULED-TASK.bat      double-click: run at boot
     UNINSTALL-SCHEDULED-TASK.bat    double-click: stop running at boot
     schema.json  collector.toml  VERSION
     PACKAGE-CONTENTS.txt            manifest: size + SHA-256 of every file
     SHA256SUMS.txt                  checksums only
     calibration/                    data directory, pre-created and empty
-    tools/                          dev-machine tools, NOT for the soak host
+    tools/                          three standalone tool executables
+
+NO PYTHON IS REQUIRED ANYWHERE. The collector and all three tools in tools/
+(x265-analyze.exe, x265-verify.exe, x265-deploy.exe) are self-contained
+executables with their own bundled runtime, so even the analysis step runs on
+the soak host. Verified with PATH stripped to system32 and bogus
+PYTHONHOME/PYTHONPATH.
 
 The three steps in short: extract -> set the two ONEXKT_* environment
 variables for the production account -> double-click START-COLLECTOR.bat.
@@ -39,7 +47,7 @@ collector does NOT optimise, tune, retry, re-encode or change anything.
 
     Production Transcoder  = authoritative executor
     Calibration Collector  = independent observer / persister
-    Analyzer (analyze.py)  = offline analysis, run on the dev machine later
+    Analyzer (x265-analyze.exe) = offline analysis, read-only
     Future session         = parameter optimisation (not this one)
 
 
@@ -64,7 +72,9 @@ Requirements on the soak host:
 
 Optional but recommended:
 
-    * `analyze.py` (development machine only — see section 8)
+    * `tools/x265-analyze.exe` — the analyzer. Also runs on the soak host
+      (it is a standalone exe), so you can inspect the dataset at any point
+      during the month without a development machine. See section 8.
 
 
 ================================================================================
@@ -267,13 +277,22 @@ or crashed collector can only ever mean "calibration data incomplete" — never
 
 
 ================================================================================
-8. AFTER THE MONTH — ANALYZER (development machine)
+8. DATASET ANALYSIS — x265-analyze.exe
 ================================================================================
-analyze.py is a development-side tool. It is NOT deployed to the soak host and
-is NOT run during the collection period.
+The analyzer ships as a standalone executable inside `tools/`, so it runs on
+the soak host with no Python, and also on the development machine. It is safe
+to run at any time, including while the collector is running: it only reads
+`samples/*.jsonl` and never writes anything except the report file you ask
+for.
 
-    python analyze.py <dataset-dir>                  console summary
-    python analyze.py <dataset-dir> --json report.json
+Easiest: double-click ANALYZE-DATA.bat (prints the report and saves
+`analysis-report.txt`).
+
+Or call the tool directly:
+
+    tools\x265-analyze.exe <dataset-dir>                  console summary
+    tools\x265-analyze.exe <dataset-dir> --json report.json
+    tools\x265-analyze.exe --version
 
 It reports sources (resolution/fps/codec/profile/bit depth/chroma/bitrate/
 duration/source class), scaling (spatial, temporal, pixel-rate factors,
@@ -283,7 +302,20 @@ rates, encode speed, output size, compression ratio), plus data-quality
 counters.
 
 It is strictly read-only: it never writes x265.json or x265_scaling.json and
-never feeds a value back into production. Standard library only, offline.
+never feeds a value back into production. Offline, standard library only.
+
+Two companion tools live beside it:
+
+    tools\x265-verify.exe --exe <some-exe> --inspect-archive
+        proves an executable is self-contained (schema bundled, no
+        site-packages inside). VERIFY-PACKAGE.bat runs it over all four.
+
+    tools\x265-deploy.exe <command>
+        deployment helper: `schedule-task` prints the exact schtasks command,
+        `offline-check` statically proves nothing in the collector can reach
+        the network, `check-package` runs a packaged exe.
+        (`package` and `make-zip` rebuild the release tree and are
+        development-checkout only; they refuse to run when frozen.)
 
 
 ================================================================================

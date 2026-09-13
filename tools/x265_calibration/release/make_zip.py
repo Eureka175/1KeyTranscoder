@@ -5,15 +5,18 @@
 Output (default):
     dist/x265-calibration-collector-v0.7.0.zip
 
-The ZIP extracts into ONE self-contained folder that runs on a Windows host
-with no Python, no pip and no network:
+The ZIP extracts into ONE self-contained folder that needs NO Python at all -
+not for collecting, not for analysis, not for verification:
 
     x265-calibration-collector/
-      QUICKSTART.zh-CN.txt          entry point (Chinese quick start)
+      START-HERE.txt                one-paragraph pointer
+      QUICKSTART.zh-CN.txt          Chinese quick start (entry point)
       README.txt                    full English deployment document
       x265-calibration-collector.exe
-      START-COLLECTOR.bat           start manually
+      START-COLLECTOR.bat           start it (foreground)
       CHECK-INSTALL.bat             read-only self test
+      ANALYZE-DATA.bat              analyze the dataset -> analysis-report.txt
+      VERIFY-PACKAGE.bat            prove every exe is self-contained
       INSTALL-SCHEDULED-TASK.bat    register at-boot task
       UNINSTALL-SCHEDULED-TASK.bat  deregister
       schema.json  collector.toml  VERSION
@@ -29,12 +32,14 @@ with no Python, no pip and no network:
       calibration/README_FIRST.txt  explains the data layout
       calibration/events/pending/README_FIRST.txt
                                     explains that files here are producer input
-      tools/analyze.py              dev-machine analyzer (not run on the host)
-      tools/verify_frozen_exe.py    dev-machine frozen-exe verifier
-      tools/deploy_helpers.py       dev-machine packaging helper
-      README-DEV.txt                says the three tools/ files are dev-side
+      tools/
+        x265-analyze.exe            offline dataset analyzer
+        x265-verify.exe             frozen-exe / package verifier
+        x265-deploy.exe             deployment helper
+        README.txt                  what the tool exes are for
 
-Standard library only, deterministic content, safe to re-run.
+Standard library only on the build side, deterministic content, safe to
+re-run.
 """
 
 from __future__ import annotations
@@ -50,13 +55,15 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 RELEASE_DIR = PROJECT_ROOT / "dist" / "x265_release"
 STAGE_ROOT = RELEASE_DIR / "_stage"
-EXE_SRC = PROJECT_ROOT / "dist" / "x265_calibration" / (
-    "x265-calibration-collector.exe"
+DIST_DIR = PROJECT_ROOT / "dist" / "x265_calibration"
+EXE_SRC = DIST_DIR / "x265-calibration-collector.exe"
+TOOL_EXES = (
+    "x265-analyze.exe",
+    "x265-verify.exe",
+    "x265-deploy.exe",
 )
 PKG_NAME = "x265-calibration-collector"
 
-# (source path, path inside the zip)
-FLAT_FILES: tuple[tuple[Path, str], ...] = ()
 _here = Path(__file__).resolve().parent
 _cal = _here.parent
 
@@ -122,22 +129,36 @@ starts again. Nothing is lost.
 """
 
 DEV_README = """\
-These three files are DEVELOPMENT-MACHINE tools. Do not use them on this host.
+These are standalone executables. Python is NOT needed - not here, not
+anywhere. Each one carries its own runtime.
 
-  analyze.py           offline analyzer for the collected dataset. Reads
-                       samples/*.jsonl and prints a summary (sources, scaling,
-                       resolved parameters, dynamic VBV, production rates).
-                       Read-only: it never writes x265.json or
-                       x265_scaling.json.
+  x265-analyze.exe   offline analyzer for the collected dataset. Reads
+                     calibration\\samples\\*.jsonl and prints a summary
+                     (sources, scaling, resolved parameters, dynamic VBV,
+                     production rates). Read-only: it never writes x265.json
+                     or x265_scaling.json and never touches the dataset.
 
-  verify_frozen_exe.py checks that the .exe is genuinely self-contained
-                       (schema bundled, no site-packages inside).
+                       x265-analyze.exe ..\\calibration
+                       x265-analyze.exe ..\\calibration --json report.json
 
-  deploy_helpers.py    packaging / deployment helper (build the release folder,
-                       print the schtasks command, static offline check).
+                     Or just double-click ANALYZE-DATA.bat in the parent
+                     folder, which does the same thing and saves the output.
 
-All three need a Python 3.8+ interpreter, which this soak host is not required
-to have. Run them on the development machine after copying the dataset back.
+  x265-verify.exe    verifies that an executable is genuinely self-contained
+                     (schema bundled inside, no site-packages dependency).
+
+                       x265-verify.exe --exe ..\\x265-calibration-collector.exe
+
+                     Or double-click VERIFY-PACKAGE.bat in the parent folder
+                     to check every exe in this package at once.
+
+  x265-deploy.exe    deployment helper: prints the exact schtasks command,
+                     runs a static offline/no-network check, and can rebuild
+                     the release folder.
+                       x265-deploy.exe --help
+
+The .bat files in the parent folder are convenience wrappers around these and
+take no arguments, which is the intended way to use them.
 """
 
 ROOT_POINTER = """\
@@ -145,6 +166,8 @@ Extract this whole folder before doing anything.
 
 If you read Chinese, start here:      QUICKSTART.zh-CN.txt
 Otherwise start here:                 README.txt
+
+Python is NOT required. Every program in this folder is standalone.
 
 Three-step summary
 ------------------
@@ -158,6 +181,7 @@ Three-step summary
 3. Double-click START-COLLECTOR.bat   (or INSTALL-SCHEDULED-TASK.bat)
 
 Then double-click CHECK-INSTALL.bat to confirm it is working.
+After the soak, double-click ANALYZE-DATA.bat to get the summary.
 """
 
 
@@ -198,15 +222,19 @@ def build_sources() -> list[tuple[Path, str]]:
     for name in (
         "START-COLLECTOR.bat",
         "CHECK-INSTALL.bat",
+        "ANALYZE-DATA.bat",
+        "VERIFY-PACKAGE.bat",
         "INSTALL-SCHEDULED-TASK.bat",
         "UNINSTALL-SCHEDULED-TASK.bat",
     ):
         add(_here / name, f"{PKG_NAME}/{name}")
 
     add(PROJECT_ROOT / "VERSION", f"{PKG_NAME}/VERSION")
-    add(_cal / "analyze.py", f"{PKG_NAME}/tools/analyze.py")
-    add(_here / "verify_frozen_exe.py", f"{PKG_NAME}/tools/verify_frozen_exe.py")
-    add(_here / "deploy_helpers.py", f"{PKG_NAME}/tools/deploy_helpers.py")
+
+    # The portable tool executables: the soak host has no Python, so nothing
+    # in this package may depend on an interpreter.
+    for name in TOOL_EXES:
+        add(DIST_DIR / name, f"{PKG_NAME}/tools/{name}")
     return pairs
 
 
@@ -232,7 +260,7 @@ def stage_package(pairs: list[tuple[Path, str]], version: str,
     (pkg / "calibration" / "events" / "pending" / "README_FIRST.txt").write_text(
         PENDING_README, encoding="utf-8", newline="\r\n"
     )
-    (pkg / "tools" / "README-DEV.txt").write_text(
+    (pkg / "tools" / "README.txt").write_text(
         DEV_README, encoding="utf-8", newline="\r\n"
     )
     (pkg / "START-HERE.txt").write_text(
@@ -250,6 +278,10 @@ def stage_package(pairs: list[tuple[Path, str]], version: str,
         (size for rel, size, _h in entries
          if rel == "x265-calibration-collector.exe"), 0
     )
+    tool_bytes = sum(
+        size for rel, size, _h in entries
+        if rel.startswith("tools/") and rel.endswith(".exe")
+    )
     lines: list[str] = []
     lines.append("=" * 78)
     lines.append("x265 calibration collector - package contents")
@@ -262,7 +294,11 @@ def stage_package(pairs: list[tuple[Path, str]], version: str,
     )
     lines.append(f"files            : {len(entries)}")
     lines.append(f"total bytes      : {sum(s for _r, s, _h in entries):,}")
-    lines.append(f"executable bytes : {exe_size:,}")
+    lines.append(f"collector bytes  : {exe_size:,}")
+    lines.append(f"tool exes bytes  : {tool_bytes:,}")
+    lines.append("")
+    lines.append("python required  : NO - every executable is standalone")
+    lines.append("network required : NO - nothing opens a socket")
     lines.append("")
     lines.append("branch           : feature/x265-calibration-collector")
     lines.append("baseline         : v0.7.0 (1a41fff)")
@@ -361,25 +397,46 @@ def main(argv: list[str] | None = None) -> int:
         exe_entry = f"{PKG_NAME}/x265-calibration-collector.exe"
         data = zf.read(exe_entry) if exe_entry in names else b""
         copied_hash = hashlib.sha256(data).hexdigest()
+        tool_hashes = {}
+        for tool in TOOL_EXES:
+            entry = f"{PKG_NAME}/tools/{tool}"
+            tool_hashes[tool] = (
+                hashlib.sha256(zf.read(entry)).hexdigest()
+                if entry in names else ""
+            )
     print(f"  entries      : {len(names)}")
     print(f"  integrity    : {'OK' if bad is None else 'CORRUPT at ' + str(bad)}")
-    print(f"  exe in zip   : {copied_hash == exe_hash} "
+    print(f"  collector    : {copied_hash == exe_hash} "
           f"({'identical' if copied_hash == exe_hash else 'MISMATCH'})")
+    for tool in TOOL_EXES:
+        expected = sha256_file(DIST_DIR / tool)
+        match = tool_hashes[tool] == expected
+        print(f"  {tool:<18}: {'identical' if match else 'MISMATCH'}")
     for required in (
         f"{PKG_NAME}/QUICKSTART.zh-CN.txt",
+        f"{PKG_NAME}/START-HERE.txt",
         f"{PKG_NAME}/START-COLLECTOR.bat",
         f"{PKG_NAME}/CHECK-INSTALL.bat",
+        f"{PKG_NAME}/ANALYZE-DATA.bat",
+        f"{PKG_NAME}/VERIFY-PACKAGE.bat",
         f"{PKG_NAME}/INSTALL-SCHEDULED-TASK.bat",
+        f"{PKG_NAME}/UNINSTALL-SCHEDULED-TASK.bat",
         f"{PKG_NAME}/schema.json",
         f"{PKG_NAME}/PACKAGE-CONTENTS.txt",
         f"{PKG_NAME}/calibration/events/pending/README_FIRST.txt",
-    ):
-        print(f"  {'present' if required in names else 'MISSING':<8}: {required}")
+        f"{PKG_NAME}/tools/README.txt",
+    ) + tuple(f"{PKG_NAME}/tools/{tool}" for tool in TOOL_EXES):
+        print(f"  {'present' if required in names else 'MISSING':<8}: "
+              f"{required.removeprefix(PKG_NAME + '/')}")
 
     if not args.keep_stage:
         shutil.rmtree(STAGE_ROOT, ignore_errors=True)
 
-    ok = bad is None and copied_hash == exe_hash
+    tools_ok = all(
+        tool_hashes[tool] == sha256_file(DIST_DIR / tool)
+        for tool in TOOL_EXES
+    )
+    ok = bad is None and copied_hash == exe_hash and tools_ok
     print()
     print("=" * 78)
     print("[ZIP OK]" if ok else "[ZIP FAILED]")

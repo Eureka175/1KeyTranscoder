@@ -24,10 +24,22 @@ Merged to main: NO — and it must not be merged
 主开发线:  main
 
 Deployable artifact (this is what goes to the soak host):
-  dist/x265_release/x265-calibration-collector-v0.7.0.zip   (7.63 MiB)
+  dist/x265_release/x265-calibration-collector-v0.7.0.zip   (35.67 MiB)
   rebuild: python tools/x265_calibration/release/make_zip.py
   verify : python tools/x265_calibration/tests/zip_distribution.py
-  exe sha256: 7bc90332b5a24cb1125223e3d87bc441d98730904fd057f6b33114442003ad84
+  contents: 4 standalone exes - collector + analyze + verify + deploy.
+            No Python required for any step; even the analysis runs on the
+            soak host.
+
+  AUTHENTIC HASHES: the zip carries SHA256SUMS.txt and
+  PACKAGE-CONTENTS.txt, both generated from the bytes that are actually
+  inside that archive, and make_zip.py re-reads the archive, checks CRC
+  integrity and re-hashes every exe before reporting [ZIP OK]. Treat those
+  files - not a hash pasted in this document - as the deployment identity:
+  PyInstaller output is reproducible per build machine but not bit-identical
+  across rebuilds, so any literal hash written here goes stale the moment the
+  exes are rebuilt.
+  verify a transfer with:  certutil -hashfile <zip> SHA256
 ```
 
 The collector is **not** part of `main`'s default production execution path.
@@ -329,8 +341,10 @@ a retry, and job-level recovery rate.
 technology:      PyInstaller 6.22.2, single-file, console, UPX disabled
 entry:           release/frozen_entry.py  (NOT collector_cli.py — see below)
 executable:      dist/x265_calibration/x265-calibration-collector.exe
-size:            8,152,101 bytes (7.77 MiB)
-sha256:          7bc90332b5a24cb1125223e3d87bc441d98730904fd057f6b33114442003ad84
+size:            ~8.15 MB (7.77 MiB); the exact byte count and hash of any
+                 given build are in the zip's PACKAGE-CONTENTS.txt /
+                 SHA256SUMS.txt, which make_zip.py regenerates from the
+                 bytes actually archived. Do not hardcode them here.
 bundled:         Python 3.11.9 runtime + stdlib; schema.json at the bundle
                  root; collector package. 0 site-packages entries, no
                  numpy/scipy (explicitly excluded), no ffmpeg, no tool DLLs.
@@ -340,16 +354,19 @@ release package: dist/x265_release/x265-calibration-collector/ containing
                  tools/deploy_helpers.py, SHA256SUMS.txt
 
 deployable zip:  dist/x265_release/x265-calibration-collector-v0.7.0.zip
-                 (7.63 MiB) — THE artifact to hand to the soak host. On a
-                 machine with no Python it extracts into ONE folder that is
-                 complete and self-describing:
+                 (35.67 MiB) — THE artifact to hand to the soak host. It
+                 needs NO Python for ANY step, analysis included: all four
+                 programs it contains are standalone executables with their
+                 own bundled runtime.
 
                    START-HERE.txt                one-paragraph pointer
                    QUICKSTART.zh-CN.txt          Chinese quick start
                    README.txt                    full English document
-                   x265-calibration-collector.exe
+                   x265-calibration-collector.exe   the collector
                    START-COLLECTOR.bat           start (foreground)
                    CHECK-INSTALL.bat             read-only self test
+                   ANALYZE-DATA.bat              dataset report
+                   VERIFY-PACKAGE.bat            prove every exe standalone
                    INSTALL-SCHEDULED-TASK.bat    run at boot
                    UNINSTALL-SCHEDULED-TASK.bat  stop running at boot
                    schema.json / collector.toml / VERSION
@@ -359,7 +376,18 @@ deployable zip:  dist/x265_release/x265-calibration-collector-v0.7.0.zip
                                                  README in pending/ explains
                                                  that its content is producer
                                                  input and is never counted
-                   tools/                        dev-machine tools only
+                   tools/
+                     x265-analyze.exe            offline dataset analyzer
+                     x265-verify.exe             frozen-exe verifier
+                     x265-deploy.exe             deployment helper
+                     README.txt                  how to use them
+
+                 The three tool exes are built by release/x265_all_exes.spec
+                 from three launcher modules (frozen_analyze.py,
+                 frozen_verify.py, frozen_deploy.py). The launcher pattern is
+                 not cosmetic - it is what makes `__file__` resolve inside
+                 `_MEIPASS` and keeps `parents[3]` valid, the same reason the
+                 collector has frozen_entry.py.
 
                  Built by tools/x265_calibration/release/make_zip.py (also
                  reachable as `deploy_helpers.py make-zip`). Deterministic
@@ -367,6 +395,11 @@ deployable zip:  dist/x265_release/x265-calibration-collector-v0.7.0.zip
                  calibration/ directory removes one manual step from the
                  deployment and makes the `ONEXKT_CALIBRATION_SPOOL` value
                  obvious.
+
+portable tools:  x265-analyze.exe / x265-verify.exe / x265-deploy.exe,
+                 9.54 MiB each, stdlib-only bundles (0 site-packages, 0
+                 suspicious entries), each probed at build time with an
+                 argument that exercises its full frozen import graph.
 ```
 
 Two packaging findings worth recording:
@@ -406,25 +439,51 @@ All suites run on the development machine (Windows, RTX 5070 Laptop, Python
 | Real hardware ladder | `python tools/x265_calibration/tests/ladder_integration.py` | **PASS** |
 | Frozen exe verification | `python tools/x265_calibration/release/verify_frozen_exe.py --inspect-archive` | **VERIFY OK** |
 | Offline static check | `python tools/x265_calibration/release/deploy_helpers.py offline-check` | **OK** |
-| Deployable ZIP, end to end | `python tools/x265_calibration/tests/zip_distribution.py` | **46/46 PASSED** |
+| Deployable ZIP, end to end | `python tools/x265_calibration/tests/zip_distribution.py` | **59/59 PASSED** |
 
 The ZIP suite reproduces the receiving operator's experience rather than just
 inspecting the archive: it extracts into a path containing a space, checks
 that every pre-created data directory survived the zip, verifies
-`SHA256SUMS.txt` against every packaged byte, runs the exe with no usable
-Python on `PATH`/`PYTHONHOME`/`PYTHONPATH`, writes a real event through the
-production emitter into the shipped `calibration/` directory and consumes it
-with the packaged exe, then **executes** `CHECK-INSTALL.bat` and
-`START-COLLECTOR.bat` and asserts from the collector's own log that it watched
-`<pkg>\calibration` and created nothing outside the package.
+`SHA256SUMS.txt` against every packaged byte, asserts that **no Python source
+is shipped at all**, runs the exes with no usable Python on
+`PATH`/`PYTHONHOME`/`PYTHONPATH`, writes a real event through the production
+emitter into the shipped `calibration/` directory and consumes it with the
+packaged exe, then **executes** `CHECK-INSTALL.bat`, `START-COLLECTOR.bat`,
+`ANALYZE-DATA.bat` and `VERIFY-PACKAGE.bat` and asserts on their reports.
 
-That last assertion caught a real defect: the `.bat` launchers derived the
-data directory as `%~dp0..\calibration`, i.e. the folder *above* the extracted
-package, so double-clicking `START-COLLECTOR.bat` would have watched an empty
-directory while the packaged `calibration/` stayed empty forever. They now use
-`%~dp0calibration`. The same suite then caught two bugs in itself (an
-off-by-one event count, and running the Python analyzer under the deliberately
-broken Python environment), both fixed.
+Four real defects were found by executing the package rather than inspecting
+it:
+
+1. **`.bat` launchers pointed outside the package.** They derived the data
+   directory as `%~dp0..\calibration`, i.e. the folder *above* the extracted
+   package. Double-clicking `START-COLLECTOR.bat` would have watched an empty
+   directory while the packaged `calibration/` stayed empty forever - a
+   silent, total data-collection failure discovered only at the end of the
+   month. All launchers now use `%~dp0calibration`.
+2. **`x265-verify.exe rejected its own siblings.** The verifier demanded the
+   collector's `--version` banner and its schema-reachability step from every
+   executable, so the three tool exes failed verification. Those tools had no
+   `--version` at all. The verifier is now tool-aware (banner identity for
+   known exes, schema proof only for the collector) and all three tools
+   gained `--version`.
+3. **`parents[3]` crashed when frozen.** A frozen module lives at
+   `<_MEIPASS>/tool.py`, so `Path(__file__).parents[3]` raised IndexError at
+   import time; `x265-deploy.exe` died instantly. Both affected tools now
+   resolve the repo root defensively, and the two checkout-only subcommands
+   (`package`, `make-zip`) refuse to run when frozen instead of failing
+   obscurely.
+4. **`cffi` dragged setuptools into the tool bundles.**
+   `cffi._shimmed_dist_utils` optionally imports setuptools, so PyInstaller
+   swept setuptools' vendored `importlib_metadata` dist-info files into the
+   tool exes. Nothing imports cffi (PyInstaller's own runtime uses ctypes),
+   so excluding `cffi`, `_cffi_backend` and `pycparser` restored
+   `suspicious entries: 0` - which is what `x265-verify.exe` asserts.
+
+A fifth fix was cosmetic: the analyzer printed non-ASCII host paths as
+mojibake because the frozen interpreter defaulted to the OEM code page for
+stdout. The frozen launchers now set `PYTHONIOENCODING=utf-8`, so a host path
+such as `C:\Users\吴汶睿\...` renders correctly; the suite asserts no U+FFFD
+appears in the output.
 
 ### Closing re-verification (archival pass)
 
@@ -434,8 +493,7 @@ artifacts against the report rather than repeating the expensive suites:
 | Check | Result |
 | --- | --- |
 | `git status --porcelain --untracked-files=all` | empty (working tree clean) |
-| EXE SHA-256 vs the value recorded in this report | **MATCH** (`7bc90332…3ad84`) |
-| EXE size vs the value recorded in this report | **MATCH** (8,152,101 bytes) |
+| EXE hash and size vs the zip's own `PACKAGE-CONTENTS.txt` / `SHA256SUMS.txt` | **MATCH** (checked by `make_zip.py`, which re-reads the archive; literal values are intentionally not duplicated in this report) |
 | Release package `SHA256SUMS.txt` vs the packaged files | consistent (8 entries) |
 | DEP matrix, re-run after the test-path fix below | **18/18 PASSED** |
 | Collector source traceable on this branch | all 16 deliverables tracked (`git ls-tree`) |
@@ -747,7 +805,8 @@ Clean-machine test: PASS (approximated: outside repo, minimal env, no Python
                           on PATH; see "Unverified" item 1)
 Restart recovery:  PASS
 Standalone binary: PASS (7.77 MiB, self-contained, schema bundled)
-Deployable zip:    PASS (7.63 MiB, extract-and-run, 46/46 zip checks)
+Deployable zip:    PASS (35.67 MiB, 4 standalone exes, no Python needed for
+                         any step; 59/59 zip checks)
 Merged to main:    NO (must stay NO)
 main modified:     NO
 

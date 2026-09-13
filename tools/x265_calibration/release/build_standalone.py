@@ -48,6 +48,17 @@ SPEC_PATH = RELEASE_DIR / "x265_calibration_collector.spec"
 ENTRY_SCRIPT = RELEASE_DIR / "frozen_entry.py"
 SCHEMA_PATH = PROJECT_ROOT / "schema.json"
 
+# The three portable tool executables (analyzer / verifier / deploy helper).
+# Built from one spec so the soak host needs no Python for ANY step, not just
+# for collecting.
+TOOL_SPEC_PATH = RELEASE_DIR / "x265_all_exes.spec"
+TOOL_EXE_NAMES = ("x265-analyze.exe", "x265-verify.exe", "x265-deploy.exe")
+TOOL_ENTRY_SCRIPTS = (
+    RELEASE_DIR / "frozen_analyze.py",
+    RELEASE_DIR / "frozen_verify.py",
+    RELEASE_DIR / "frozen_deploy.py",
+)
+
 EXE_NAME = "x265-calibration-collector.exe"
 DEFAULT_DIST_DIR = REPO_ROOT / "dist" / "x265_calibration"
 DEFAULT_WORK_DIR = REPO_ROOT / "build" / "x265_calibration"
@@ -146,6 +157,7 @@ def check_inputs() -> None:
         ("collector CLI", PROJECT_ROOT / "collector" / "collector_cli.py"),
         ("collector core", PROJECT_ROOT / "collector" / "collector_core.py"),
         ("schema.json", SCHEMA_PATH),
+        ("tool spec file", TOOL_SPEC_PATH),
     ):
         if not path.exists():
             missing.append("  - %s: %s" % (label, path))
@@ -199,10 +211,11 @@ def temp_path_is_ascii() -> tuple[bool, str]:
 # ---------------------------------------------------------------------------
 
 def run_pyinstaller(work_dir: Path, dist_dir: Path, clean: bool,
-                    log_level: str) -> None:
+                    log_level: str, spec: Path | None = None) -> None:
+    spec_path = spec or SPEC_PATH
     command = [
         sys.executable, "-m", "PyInstaller",
-        str(SPEC_PATH),
+        str(spec_path),
         "--noconfirm",
         "--distpath", str(dist_dir),
         "--workpath", str(work_dir),
@@ -212,6 +225,7 @@ def run_pyinstaller(work_dir: Path, dist_dir: Path, clean: bool,
         # --clean also wipes PyInstaller's own cache directory (CONF['cachedir']).
         command.append("--clean")
 
+    say("  spec     : %s" % spec_path.name)
     say("  cwd      : %s" % BUILD_CWD)
     say("  command  : %s" % " ".join(command))
     started = _dt.datetime.now()
@@ -259,6 +273,59 @@ def run_pyinstaller(work_dir: Path, dist_dir: Path, clean: bool,
 # ---------------------------------------------------------------------------
 # verification
 # ---------------------------------------------------------------------------
+
+def verify_tool_exe(exe_path: Path, skip: bool) -> None:
+    """Smoke-test a bundled tool exe.
+
+    Runs it with an argument that exercises the full frozen import graph
+    (including argparse) but does no work and never touches the network or the
+    filesystem. A missing hidden import shows up here rather than on the soak
+    host.
+    """
+    with exe_path.open("rb") as fh:
+        if fh.read(2) != b"MZ":
+            raise BuildError("%s is not a PE executable" % exe_path)
+    if skip:
+        return
+
+    probes = {
+        # A positional path that cannot exist: exercises the full import
+        # graph and the CLI, but the tool exits with its documented
+        # "dataset directory not found" path and writes nothing.
+        "x265-analyze.exe": (
+            ["__dsh_probe_no_such_dataset__"],
+            ("not found", "fatal"),
+        ),
+        "x265-verify.exe": (["--help"], ("usage",)),
+        "x265-deploy.exe": (["--help"], ("usage",)),
+    }
+    argv_expect = probes.get(exe_path.name)
+    if argv_expect is None:
+        return
+    argv, expect = argv_expect
+
+    try:
+        completed = subprocess.run(
+            [str(exe_path)] + argv, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=300,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise BuildError("cannot run %s: %s" % (exe_path.name, exc))
+
+    text = decode_output(completed.stdout or b"")
+    lowered = text.lower()
+    # A frozen exe that failed to import its bundle prints a traceback.
+    broken = ("traceback (most recent call last)" in lowered
+              or "modulenotfounderror" in lowered
+              or "importerror" in lowered)
+    if broken or not any(token in lowered for token in expect):
+        raise BuildError(
+            "%s failed its smoke probe (exit code %d).\n"
+            "----- exe output -----\n%s\n----------------------"
+            % (exe_path.name, completed.returncode, tail(text, 20))
+        )
+    say("  %-18s probe OK" % exe_path.name)
+
 
 def verify_exe(exe_path: Path, skip: bool) -> None:
     # The PE check is free and always worth doing.
@@ -358,6 +425,11 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="skip running the produced exe (--version / schema probe).",
     )
     parser.add_argument(
+        "--no-tools", action="store_true",
+        help="build only the collector; skip the portable tool executables "
+             "(analyzer / verifier / deploy helper).",
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["TRACE", "DEBUG", "INFO", "WARN", "DEPRECATION", "ERROR",
                  "FATAL"],
@@ -432,9 +504,28 @@ def main(argv: list[str] | None = None) -> int:
                 "PyInstaller reported success but %s does not exist." % exe_path
             )
 
+        tool_exes: list[Path] = []
+        if not args.no_tools:
+            say("-" * 72)
+            say("building the portable tool executables")
+            say("  (the soak host has no Python: the analyzer and the other")
+            say("   dev-side tools ship as standalone exes too)")
+            run_pyinstaller(work_dir, dist_dir, args.clean, args.log_level,
+                            spec=TOOL_SPEC_PATH)
+            for name in TOOL_EXE_NAMES:
+                candidate = dist_dir / name
+                if not candidate.is_file():
+                    raise BuildError(
+                        "PyInstaller reported success but the tool "
+                        "executable %s does not exist." % candidate
+                    )
+                tool_exes.append(candidate)
+
         say("-" * 72)
         say("verifying")
         verify_exe(exe_path, args.no_verify)
+        for tool in tool_exes:
+            verify_tool_exe(tool, args.no_verify)
 
     except BuildError as exc:
         say("")
@@ -452,6 +543,9 @@ def main(argv: list[str] | None = None) -> int:
     say("  size : %d bytes (%s)" % (size_bytes, human_size(size_bytes)))
     say("  built: %s" % _dt.datetime.fromtimestamp(
         exe_path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S"))
+    for tool in tool_exes:
+        size = tool.stat().st_size
+        say("  tool : %s  (%s)" % (tool, human_size(size)))
     say("=" * 72)
     return 0
 

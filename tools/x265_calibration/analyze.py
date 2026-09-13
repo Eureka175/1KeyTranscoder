@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
+ANALYZER_NAME = "x265-analyze"
 ANALYZER_VERSION = "1.0.0"
 RECORD_VERSION = 1.0
 
@@ -808,7 +809,22 @@ def render(report: dict[str, Any]) -> str:
 # CLI
 # ---------------------------------------------------------------------------
 
+def _make_console_utf8() -> None:
+    """Best-effort UTF-8 console, so non-ASCII report text is not mojibake.
+
+    The report contains an em dash and box characters; a stock Windows console
+    is cp936/cp1252 and would render them as garbage. This only affects
+    display - the JSON output and the dataset are always UTF-8.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError, ValueError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _make_console_utf8()
     parser = argparse.ArgumentParser(
         prog="analyze.py",
         description=(
@@ -818,6 +834,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("dataset",
                         help="calibration root or its samples/ directory")
+    parser.add_argument("--version", action="version",
+                        version=f"{ANALYZER_NAME} {ANALYZER_VERSION}")
     parser.add_argument("--json", metavar="PATH",
                         help="also write the full report as JSON here")
     parser.add_argument("--dataset-summary", action="store_true",

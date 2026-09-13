@@ -182,29 +182,45 @@
   6. 一个月之后怎么做
 ================================================================================
 
-  在长期那台机器上：
+  全部都在长期那台机器上做，不需要 Python、不需要开发机：
 
-    rem 1. 收尾：把因为生产被中断而没等到 job 结束的记录也落盘（会带标记）
-    x265-calibration-collector.exe --headless --drain-buffered --spool calibration
+  ┌─ 第 1 步 ────────────────────────────────────────────────────────────────┐
+  │ 收尾：把因为生产被中断而没等到 job 结束的记录也落盘（会带 incomplete 标记）│
+  │                                                                          │
+  │   x265-calibration-collector.exe --headless --drain-buffered ^            │
+  │                                   --spool calibration                     │
+  └──────────────────────────────────────────────────────────────────────────┘
 
-    rem 2. 停掉采集器（任务计划程序里停掉任务，或关掉那个窗口）
+  ┌─ 第 2 步 ────────────────────────────────────────────────────────────────┐
+  │ 出分析报告。直接双击：                                                    │
+  │                                                                          │
+  │     ANALYZE-DATA.bat                                                     │
+  │                                                                          │
+  │ 报告会打印在窗口里，同时存成 analysis-report.txt。                        │
+  │ 内容是：源分布（分辨率/FPS/编码/位深/色度/码率/时长/source class）、       │
+  │ scaling 因子、各参数实际取值（merange / rc-lookahead / gop-lookahead /    │
+  │ min-keyint / 动态 VBV）、成功率 / 失败率 / 重试率 / fallback 率 /         │
+  │ 编码速度 / 压缩比 / 数据完整度。                                          │
+  └──────────────────────────────────────────────────────────────────────────┘
 
-    rem 3. 只把这一个目录拷回开发机（要审计的话再带上 events\archive\ 和 errors\）
-    calibration\samples\
+  ┌─ 第 3 步 ────────────────────────────────────────────────────────────────┐
+  │ 停掉采集器（任务计划程序里停掉任务，或关掉那个窗口）                       │
+  └──────────────────────────────────────────────────────────────────────────┘
 
-  回到开发机之后（需要切到采集器分支）：
+  ┌─ 第 4 步 ────────────────────────────────────────────────────────────────┐
+  │ 把这些拷回开发机（要审计的话再带上 events\archive\ 和 errors\）：          │
+  │                                                                          │
+  │     calibration\samples\           <- 数据本体，最要紧的就是这个           │
+  │     analysis-report.txt            <- 顺手把报告也带回去                  │
+  └──────────────────────────────────────────────────────────────────────────┘
 
-    git switch feature/x265-calibration-collector
-    cd tools\x265_calibration
+  想在机器上再看别的，tools\ 里还有两个：
 
-    rem 体检
-    python -m collector.collector_cli --headless --validate <数据集目录>
-
-    rem 出汇总报告（人看的）
-    python analyze.py <数据集目录>
-
-    rem 出汇总报告（机器看的，给后续脚本用）
-    python analyze.py <数据集目录> --json report.json
+    tools\x265-analyze.exe  <数据集目录>                 直接调分析器
+    tools\x265-analyze.exe  <数据集目录> --json out.json 机器可读版
+    tools\x265-deploy.exe   offline-check                静态确认不碰网络
+    tools\x265-verify.exe   --exe <某个exe>              验证exe自包含
+    tools\x265-verify.exe   --help
 
   拿到报告之后，参数优化是**另一个 session、回到 main 分支上做**。
   这个分支只负责采集，不负责调参。
@@ -214,21 +230,29 @@
   7. 这个包里各个文件是干什么的
 ================================================================================
 
+  START-HERE.txt                     一段话指引（英文）
   QUICKSTART.zh-CN.txt               本文件
   README.txt                         完整英文文档（架构、事件生命周期、数据模型等）
   x265-calibration-collector.exe     采集器本体。自包含，不需要 Python
   START-COLLECTOR.bat                手动启动
-  CHECK-INSTALL.bat                  只读自检
+  CHECK-INSTALL.bat                  只读自检 -> check-report.txt
+  ANALYZE-DATA.bat                   出分析报告 -> analysis-report.txt
+  VERIFY-PACKAGE.bat                 验证每个 exe 都自包含 -> verify-report.txt
   INSTALL-SCHEDULED-TASK.bat         注册开机自启
   UNINSTALL-SCHEDULED-TASK.bat       取消开机自启
   schema.json                        事件格式定义。exe 内已自带一份，这份是备用/查阅
   collector.toml                     可选配置模板（扫描间隔、等待超时、严格模式）
   VERSION                            版本号
-  SHA256SUMS.txt                     各文件 SHA-256，用来确认拷贝完整没损坏
+  PACKAGE-CONTENTS.txt               包内每个文件的大小 + SHA-256 + 构建信息
+  SHA256SUMS.txt                     只有校验和，方便比对
   calibration\                       数据目录（samples / events / summaries / errors / state）
-  tools\analyze.py                   离线分析工具，在开发机上跑，不要在这台机器上跑
-  tools\verify_frozen_exe.py         验证 exe 自包含（开发机用）
-  tools\deploy_helpers.py            打包/部署辅助（开发机用）
+  tools\x265-analyze.exe             离线分析器（独立 exe，不需要 Python）
+  tools\x265-verify.exe              验证 exe 自包含（独立 exe，不需要 Python）
+  tools\x265-deploy.exe              部署辅助：打印计划任务命令、离线检查
+  tools\README.txt                   上面三个工具怎么用
+
+  ★ 整个包不需要 Python。四个 exe 各自带着自己的运行时。
+    目标机上没有 Python 是完全没有问题的，连分析也不用装。
 
   架构一句话：生产转码器和采集器是**两个平级的独立进程**，
   既不是谁启动谁，也没有 RPC / stdout 耦合，只通过

@@ -122,9 +122,12 @@ def main(argv: list[str] | None = None) -> int:
         "x265-calibration-collector.exe", "QUICKSTART.zh-CN.txt",
         "START-HERE.txt", "README.txt", "schema.json", "collector.toml",
         "VERSION", "SHA256SUMS.txt", "PACKAGE-CONTENTS.txt",
-        "START-COLLECTOR.bat", "CHECK-INSTALL.bat",
+        "START-COLLECTOR.bat", "CHECK-INSTALL.bat", "ANALYZE-DATA.bat",
+        "VERIFY-PACKAGE.bat",
         "INSTALL-SCHEDULED-TASK.bat", "UNINSTALL-SCHEDULED-TASK.bat",
-        "tools/analyze.py", "tools/README-DEV.txt",
+        "tools/README.txt",
+        "tools/x265-analyze.exe", "tools/x265-verify.exe",
+        "tools/x265-deploy.exe",
         "calibration/README_FIRST.txt",
         "calibration/events/pending/README_FIRST.txt",
     ):
@@ -133,6 +136,9 @@ def main(argv: list[str] | None = None) -> int:
                 "summaries", "errors", "state"):
         check(f"data dir survives zip: calibration/{rel}",
               (pkg / "calibration" / rel).is_dir())
+    py_files = [p.name for p in pkg.rglob("*.py")]
+    check("no Python source shipped: nothing in the package needs an "
+          "interpreter", not py_files, f"found={py_files or 'none'}")
 
     # --- 3. checksums ------------------------------------------------------
     sums: dict[str, str] = {}
@@ -265,17 +271,58 @@ def main(argv: list[str] | None = None) -> int:
     check("nothing was created outside the package",
           not (base / "calibration").exists())
 
-    # --- 9. bundled analyzer ----------------------------------------------
-    proc = subprocess.run(
-        [sys.executable, str(pkg / "tools" / "analyze.py"), str(calib)],
-        cwd=str(pkg), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        timeout=300,
-    )
-    out = (proc.stdout or b"").decode("utf-8", "replace")
-    check("bundled analyze.py summarizes the collected data",
-          proc.returncode == 0 and "x265 CALIBRATION DATASET SUMMARY" in out
+    # --- 8b. the frozen tool exes, still with NO Python --------------------
+    # These run under minimal_env on purpose: the soak host has no
+    # interpreter, so every tool must work without one.
+    rc, out = run_min([pkg / "tools" / "x265-analyze.exe", calib])
+    check("tools/x265-analyze.exe analyzes the dataset with no Python",
+          rc == 0 and "x265 CALIBRATION DATASET SUMMARY" in out
           and "records         : 1" in out,
+          f"rc={rc}")
+    check("analyzer output has no mojibake replacement characters",
+          "\ufffd" not in out)
+    check("analyzer JSON output works too",
+          run_min([pkg / "tools" / "x265-analyze.exe", calib,
+                   "--json", str(pkg / "analysis.json")])[0] == 0
+          and (pkg / "analysis.json").is_file())
+
+    rc, out = run_min([pkg / "tools" / "x265-verify.exe", "--exe", exe])
+    check("tools/x265-verify.exe verifies the collector exe with no Python",
+          rc == 0 and "VERIFY OK" in out, f"rc={rc}")
+
+    rc, out = run_min([pkg / "tools" / "x265-deploy.exe", "offline-check"])
+    check("tools/x265-deploy.exe runs with no Python",
+          rc == 0 and "no network-capable imports" in out, f"rc={rc}")
+
+    # --- 8c. execute ANALYZE-DATA.bat and VERIFY-PACKAGE.bat ---------------
+    proc = subprocess.run(["cmd", "/c", str(pkg / "ANALYZE-DATA.bat")],
+                          cwd=str(pkg), input=b"\r\n\r\n",
+                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          timeout=900)
+    areport = pkg / "analysis-report.txt"
+    atext = (areport.read_text(encoding="utf-8", errors="replace")
+             if areport.is_file() else "")
+    check("ANALYZE-DATA.bat runs and writes analysis-report.txt",
+          proc.returncode == 0 and areport.is_file(),
           f"rc={proc.returncode}")
+    check("analysis report contains the dataset summary",
+          "x265 CALIBRATION DATASET SUMMARY" in atext
+          and "PRODUCTION / ATTEMPTS" in atext)
+
+    proc = subprocess.run(["cmd", "/c", str(pkg / "VERIFY-PACKAGE.bat")],
+                          cwd=str(pkg), input=b"\r\n\r\n",
+                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          timeout=2400)
+    vreport = pkg / "verify-report.txt"
+    vtext = (vreport.read_text(encoding="utf-8", errors="replace")
+             if vreport.is_file() else "")
+    check("VERIFY-PACKAGE.bat runs and writes verify-report.txt",
+          proc.returncode == 0 and vreport.is_file(),
+          f"rc={proc.returncode}")
+    check("all four packaged executables verified as self-contained",
+          vtext.count("[VERIFY OK]") == 4
+          and "every executable is self-contained" in vtext,
+          f"VERIFY OK count={vtext.count('[VERIFY OK]')}")
 
     shutil.rmtree(base, ignore_errors=True)
 

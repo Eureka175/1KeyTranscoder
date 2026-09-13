@@ -33,7 +33,26 @@ import subprocess
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+def _repo_root() -> Path:
+    """Repo root when running from a checkout.
+
+    Inside a frozen bundle this file lives at ``<_MEIPASS>/deploy_helpers.py``,
+    so there is no ``parents[3]`` and indexing it raised IndexError. The
+    functions that actually need a checkout (package, make-zip) are
+    development-side only; on a deployed host they report a clear error
+    instead of crashing at import time.
+    """
+    try:
+        return Path(__file__).resolve().parents[3]
+    except IndexError:
+        return Path.cwd()
+
+
+PROJECT_ROOT = _repo_root()
+FROZEN = bool(getattr(sys, "frozen", False))
+
+TOOL_NAME = "x265-deploy"
+TOOL_VERSION = "1.0.0"
 
 RELEASE_DIR = PROJECT_ROOT / "dist" / "x265_release"
 PACKAGE_NAME = "x265-calibration-collector"
@@ -253,24 +272,47 @@ def run_deployed_check(package_dir: Path) -> int:
 
 
 def run_make_zip(extra: list[str]) -> int:
-    """Delegate to the sibling make_zip.py (it is a module, not a package)."""
-    import importlib.util
+    """Delegate to make_zip.py.
 
-    script = _here() / "make_zip.py"
-    if not script.is_file():
-        print(f"[FAIL] {script} not found next to deploy_helpers.py")
-        return 1
-    spec = importlib.util.spec_from_file_location("_cal_make_zip", script)
-    if spec is None or spec.loader is None:
-        print(f"[FAIL] cannot load {script}")
-        return 1
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    Two lookup modes, because this file runs both from a source checkout and
+    from inside a frozen executable:
+
+    * a normal import - works in a frozen bundle (PyInstaller collects
+      make_zip as a module) and whenever cwd or sys.path reaches the release
+      directory;
+    * load from the sibling path - the source-checkout case, independent of
+      cwd.
+    """
+    module = None
+    try:
+        import make_zip as module            # noqa: F811
+    except ImportError:
+        module = None
+
+    if module is None:
+        import importlib.util
+
+        script = _here() / "make_zip.py"
+        if not script.is_file():
+            print("[FAIL] make_zip is neither importable nor present at "
+                  f"{script}")
+            return 1
+        spec = importlib.util.spec_from_file_location(
+            "_cal_make_zip", script
+        )
+        if spec is None or spec.loader is None:
+            print(f"[FAIL] cannot load {script}")
+            return 1
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
     return int(module.main(extra))
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="deploy_helpers.py")
+    parser.add_argument("--version", action="version",
+                        version="%s %s" % (TOOL_NAME, TOOL_VERSION))
     sub = parser.add_subparsers(dest="command", required=True)
     pkg = sub.add_parser("package", help="build the release package directory")
     pkg.add_argument("--clean", action="store_true")
@@ -289,8 +331,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "package":
+        if FROZEN:
+            print("[FAIL] `package` rebuilds the release folder from a source "
+                  "checkout; it is not available in the frozen executable.")
+            return 2
         return build_package(clean=args.clean)
     if args.command == "make-zip":
+        if FROZEN:
+            print("[FAIL] `make-zip` rebuilds the deployable zip from a source "
+                  "checkout; it is not available in the frozen executable.")
+            return 2
         extra: list[str] = []
         if args.clean:
             extra.append("--clean")

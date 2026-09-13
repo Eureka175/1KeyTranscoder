@@ -36,8 +36,26 @@ import sys
 import tempfile
 from pathlib import Path
 
-DEFAULT_EXE = (Path(__file__).resolve().parent.parent.parent.parent
-               / "dist" / "x265_calibration" / "x265-calibration-collector.exe")
+TOOL_NAME = "x265-verify"
+TOOL_VERSION = "1.0.0"
+
+def _default_exe() -> Path:
+    """Default collector path when running from a checkout.
+
+    Inside a frozen bundle this module sits at ``<_MEIPASS>/verify_frozen_exe.py``
+    so there is no ``parents[3]``; when frozen the default resolves to
+    ``./x265-calibration-collector.exe`` next to the current directory instead
+    of crashing at import. Callers pass ``--exe`` explicitly anyway.
+    """
+    try:
+        return (Path(__file__).resolve().parent.parent.parent.parent
+                / "dist" / "x265_calibration"
+                / "x265-calibration-collector.exe")
+    except IndexError:
+        return Path.cwd() / "x265-calibration-collector.exe"
+
+
+DEFAULT_EXE = _default_exe()
 
 MAGIC = b"MEI\014\013\012\013\016"
 # PyInstaller 6.x onefile (CArchive) trailer, 88 bytes read from the END of the
@@ -243,53 +261,36 @@ def archive_report(exe: Path) -> dict:
 # checks
 # ---------------------------------------------------------------------------
 
-def verify(exe: Path, inspect_archive: bool) -> dict:
-    report: dict = {"exe": str(exe), "ok": False, "checks": {}}
+# Frozen executables this verifier understands. The collector gets the full
+# treatment (banner identity + schema reachability proof); the tool exes get
+# the identity check only, because they do not load schema.json.
+KNOWN_EXES = {
+    "x265-calibration-collector.exe": ("x265-calibration-collector", True),
+    "x265-analyze.exe": ("x265-analyze", False),
+    "x265-verify.exe": ("x265-verify", False),
+    "x265-deploy.exe": ("x265-deploy", False),
+}
 
-    if not exe.is_file():
-        raise VerifyError("exe not found: %s" % exe)
-    size = exe.stat().st_size
-    report["size_bytes"] = size
-    report["checks"]["file"] = "ok"
-    with exe.open("rb") as fh:
-        head = fh.read(2)
-        fh.seek(0)
-        digest = hashlib.sha256()
-        while True:
-            chunk = fh.read(1024 * 1024)
-            if not chunk:
-                break
-            digest.update(chunk)
-    report["sha256"] = digest.hexdigest()
-    if head != b"MZ":
-        raise VerifyError("%s is not a Windows PE executable" % exe)
-    if size < SIZE_SANITY_MIN:
-        raise VerifyError(
-            "%s is only %d bytes - that is a stub, not a working onefile build."
-            % (exe, size)
-        )
 
-    # --version ---------------------------------------------------------
-    code, out = run_exe(exe, ["--version"], exe.parent)
-    report["checks"]["version"] = {
-        "exit_code": code, "output": out.replace("\r\n", "\n").strip(),
-    }
-    if code != 0:
-        raise VerifyError("--version exited %d:\n%s" % (code, out))
-    if "x265-calibration-collector" not in out:
-        raise VerifyError("--version did not print the collector banner:\n%s" % out)
-    if "frozen: True" not in out:
-        raise VerifyError(
-            "--version did not report 'frozen: True'; the exe is either not the "
-            "frozen build or the frozen module graph is broken:\n%s" % out
-        )
+def _expected_banner(exe: Path) -> tuple[str, bool]:
+    """(banner substring that must appear in --version, needs schema proof)."""
+    known = KNOWN_EXES.get(exe.name)
+    if known is not None:
+        return known
+    # Unknown exe: still require *some* identity output, but do not demand a
+    # specific banner and do not probe schema reachability.
+    return "", False
 
-    # schema reachability from a directory that has no schema.json ---------
-    # The exe looks for schema.json next to the module, in sys._MEIPASS, in the
-    # cwd, next to the exe and next to sys.argv[0].  Running from a scratch
-    # directory that contains no schema.json - and whose parent does not either
-    # - therefore proves the *bundled* copy was found.  --status reports the
-    # resolved path as schema_source, which makes the proof explicit.
+
+def _check_schema_reachability(exe: Path, report: dict) -> None:
+    """Prove the collector loads schema.json from inside its own bundle.
+
+    The exe looks for schema.json next to the module, in sys._MEIPASS, in the
+    cwd, next to the exe and next to sys.argv[0]. Running from a scratch
+    directory that contains none of those therefore proves the *bundled* copy
+    was found. --status reports the resolved path as schema_source, which
+    makes the proof explicit.
+    """
     scratch = Path(tempfile.mkdtemp(prefix="1kt-collector-verify-"))
     try:
         if (scratch / "schema.json").exists():
@@ -306,8 +307,8 @@ def verify(exe: Path, inspect_archive: bool) -> dict:
             )
         if code2 not in (0, 5):        # EXIT_OK / EXIT_DATASET_INVALID
             raise VerifyError(
-                "--validate on an empty dataset exited %d (expected 0 or 5):\n%s"
-                % (code2, out2)
+                "--validate on an empty dataset exited %d (expected 0 or 5):"
+                "\n%s" % (code2, out2)
             )
 
         code3, out3 = run_exe(exe, ["--headless", "--status", "--spool",
@@ -347,6 +348,66 @@ def verify(exe: Path, inspect_archive: bool) -> dict:
         except OSError:
             pass
 
+
+def verify(exe: Path, inspect_archive: bool) -> dict:
+    report: dict = {"exe": str(exe), "ok": False, "checks": {}}
+
+    if not exe.is_file():
+        raise VerifyError("exe not found: %s" % exe)
+    size = exe.stat().st_size
+    report["size_bytes"] = size
+    report["checks"]["file"] = "ok"
+    with exe.open("rb") as fh:
+        head = fh.read(2)
+        fh.seek(0)
+        digest = hashlib.sha256()
+        while True:
+            chunk = fh.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    report["sha256"] = digest.hexdigest()
+    if head != b"MZ":
+        raise VerifyError("%s is not a Windows PE executable" % exe)
+    if size < SIZE_SANITY_MIN:
+        raise VerifyError(
+            "%s is only %d bytes - that is a stub, not a working onefile build."
+            % (exe, size)
+        )
+
+    # --version -----------------------------------------------------------
+    # The collector has a rich banner; the three tool exes have a plain
+    # "<name> <version>" one. Requiring the collector banner for all of them
+    # made this verifier reject its own siblings, so the expectation now
+    # depends on which executable is being checked.
+    expected_banner, identity_check = _expected_banner(exe)
+    code, out = run_exe(exe, ["--version"], exe.parent)
+    report["checks"]["version"] = {
+        "exit_code": code, "output": out.replace("\r\n", "\n").strip(),
+    }
+    if code != 0:
+        raise VerifyError("--version exited %d:\n%s" % (code, out))
+    if expected_banner and expected_banner not in out:
+        raise VerifyError(
+            "--version did not print the expected banner %r:\n%s"
+            % (expected_banner, out)
+        )
+    if identity_check:
+        if "frozen: True" not in out:
+            raise VerifyError(
+                "--version did not report 'frozen: True'; the exe is either "
+                "not the frozen build or the frozen module graph is broken:"
+                "\n%s" % out
+            )
+        # schema reachability from a directory that has no schema.json -------
+        # The collector looks for schema.json next to the module, in
+        # sys._MEIPASS, in the cwd, next to the exe and next to sys.argv[0].
+        # Running from a scratch directory that contains no schema.json - and
+        # whose parent does not either - therefore proves the *bundled* copy
+        # was found. --status reports the resolved path as schema_source,
+        # which makes the proof explicit.
+        _check_schema_reachability(exe, report)
+
     # optional: packaged module audit -------------------------------------
     if inspect_archive:
         info = archive_report(exe)
@@ -354,7 +415,10 @@ def verify(exe: Path, inspect_archive: bool) -> dict:
         if info["notes"]:
             for note in info["notes"]:
                 say("  archive: " + note)
-        if not info["has_schema_json_at_root"]:
+        # Only the collector must carry schema.json at the bundle root; the
+        # tool exes ship it as well but do not load it, so its absence is not
+        # a failure for them.
+        if identity_check and not info["has_schema_json_at_root"]:
             raise VerifyError(
                 "no schema.json at the bundle root (sys._MEIPASS); entries "
                 "ending in schema.json: %r" % (info["schema_like_entries"],)
@@ -375,11 +439,17 @@ def verify(exe: Path, inspect_archive: bool) -> dict:
     return report
 
 
+def tool_version() -> str:
+    return TOOL_VERSION
+
+
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="verify_frozen_exe.py",
-        description="Smoke-test and audit the standalone collector exe.",
+        description="Smoke-test and audit a standalone (frozen) executable.",
     )
+    parser.add_argument("--version", action="version",
+                        version="%s %s" % (TOOL_NAME, TOOL_VERSION))
     parser.add_argument("--exe", metavar="PATH", default=None,
                         help="default: %s" % DEFAULT_EXE)
     parser.add_argument("--inspect-archive", action="store_true",
