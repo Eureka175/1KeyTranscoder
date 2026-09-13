@@ -289,3 +289,117 @@ def _video_packet_count(path: Path) -> int | None:
     from .checks import output_packet_count
 
     return output_packet_count(path)
+
+
+# ---------------------------------------------------------------------------
+# long-run telemetry (HD-J05)
+# ---------------------------------------------------------------------------
+
+
+class Telemetry:
+    """Sample process RSS / CPU time and GPU utilisation while a job runs.
+
+    The matrix asks for wall clock, CPU time, peak RSS and GPU utilisation
+    on the long run, and the project has no psutil dependency, so the
+    sampling is done with the platform tools that are already present:
+    ``tasklist`` for the encoder's working set and ``nvidia-smi`` for the
+    GPU.  Sampling failures are recorded as unavailable rather than
+    silently reported as zero — a fabricated telemetry number is worse
+    than a missing one.
+    """
+
+    def __init__(self, process_name: str, interval: float = 2.0,
+                 measure_gpu: bool = True):
+        self.process_name = process_name
+        self.interval = interval
+        self.measure_gpu = measure_gpu
+        self.samples: list[dict] = []
+        self.errors: list[str] = []
+        self._stop = None
+        self._thread = None
+        self._t0 = 0.0
+
+    # -- internals ---------------------------------------------------------
+    def _sample_once(self) -> dict:
+        row: dict = {}
+        try:
+            p = subprocess.run(
+                ["tasklist", "/FI", f"IMAGENAME eq {self.process_name}",
+                 "/FO", "CSV", "/NH"],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=20)
+            for line in (p.stdout or "").splitlines():
+                if self.process_name.lower() not in line.lower():
+                    continue
+                parts = [c.strip('"') for c in line.split('","')]
+                if len(parts) >= 5:
+                    rss = parts[4].replace(",", "").replace(" K", "").strip()
+                    row["rss_kb"] = int(rss) if rss.isdigit() else None
+                    cput = parts[3].replace(",", "").strip()
+                    try:
+                        h, m, s = (cput.split(":"))
+                        row["cpu_s"] = (int(h) * 3600 + int(m) * 60
+                                        + float(s))
+                    except (ValueError, TypeError):
+                        row["cpu_s"] = None
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            self.errors.append(f"tasklist: {exc}")
+        if self.measure_gpu:
+            try:
+                g = subprocess.run(
+                    ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used",
+                     "--format=csv,noheader,nounits"],
+                    capture_output=True, text=True, encoding="utf-8",
+                    errors="replace", timeout=20)
+                first = (g.stdout or "").strip().splitlines()
+                if first:
+                    util, mem = [c.strip() for c in first[0].split(",")]
+                    row["gpu_util_pct"] = float(util)
+                    row["vram_mib"] = float(mem)
+            except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
+                self.errors.append(f"nvidia-smi: {exc}")
+        row["t"] = round(time.monotonic() - self._t0, 1)
+        return row
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self.interval):
+            try:
+                self.samples.append(self._sample_once())
+            except Exception as exc:  # noqa: BLE001
+                self.errors.append(f"sample: {exc}")
+
+    # -- context manager ---------------------------------------------------
+    def __enter__(self):
+        import threading
+
+        self._stop = threading.Event()
+        self._t0 = time.monotonic()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        if self._stop is not None:
+            self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=10)
+        return False
+
+    def summary(self) -> dict:
+        rss = [s["rss_kb"] for s in self.samples if s.get("rss_kb")]
+        cpu = [s["cpu_s"] for s in self.samples if s.get("cpu_s") is not None]
+        gpu = [s["gpu_util_pct"] for s in self.samples
+               if s.get("gpu_util_pct") is not None]
+        vram = [s["vram_mib"] for s in self.samples if s.get("vram_mib")]
+        out = {
+            "samples": len(self.samples),
+            "peak_rss_mib": round(max(rss) / 1024, 1) if rss else None,
+            "cpu_time_s": round(max(cpu) - min(cpu), 2) if len(cpu) > 1 else None,
+            "gpu_util_mean_pct": round(sum(gpu) / len(gpu), 1) if gpu else None,
+            "gpu_util_peak_pct": max(gpu) if gpu else None,
+            "vram_peak_mib": max(vram) if vram else None,
+            "errors": sorted(set(self.errors)),
+            "note": ("sampled with tasklist + nvidia-smi; null means the "
+                     "platform tool did not report it, not zero"),
+        }
+        return out

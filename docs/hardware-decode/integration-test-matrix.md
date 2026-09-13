@@ -499,7 +499,7 @@ P0 PASS / P1 PASS / P2 PASS
 
 ---
 
-## N. 结果表（执行后回填）
+## N. 结果表（由 `python -m tests.hwdecode.harness summary` 回填；逐条证据见 `work/avhw_integration/results/results.json`）
 
 > 由 `python -m tests.hwdecode.harness summary` 生成，写入
 > `work/avhw_integration/results/`，并在
@@ -507,15 +507,15 @@ P0 PASS / P1 PASS / P2 PASS
 
 | Category | Tests | PASS | FAIL | BLOCKED | SKIP | P0 status |
 |---|---|---|---|---|---|---|
-| A Toolchain | 9 | | | | | |
-| B Routing | 10 | | | | | |
-| C Frame integrity | 13 | | | | | |
-| D Seek / trim / --frames | 9 | | | | | |
-| E Preservation | 7 | | | | | |
-| F Fallback | 8 | | | | | |
-| G Feature interaction | 9 | | | | | |
-| H Resume / retry | 5 | | | | | |
-| I Concurrency | 5 | | | | | |
-| J Long-run / corpus | 6 | | | | | |
-| K Golden baseline | 2 | | | | | |
-| **Total** | **83** | | | | | |
+| A Toolchain | 9 | 9 | 0 | 0 | 0 | PASS 7/7 |
+| B Routing | 10 | 10 | 0 | 0 | 0 | PASS 8/8 |
+| C Frame integrity | 13 | 13 | 0 | 0 | 0 | PASS 11/11 |
+| D Seek / trim / --frames | 9 | 9 | 0 | 0 | 0 | PASS 7/7 |
+| E Preservation | 7 | 7 | 0 | 0 | 0 | PASS 6/6 |
+| F Fallback | 8 | 8 | 0 | 0 | 0 | PASS 8/8 |
+| G Feature interaction | 9 | 9 | 0 | 0 | 0 | PASS 6/6 |
+| H Resume / retry | 5 | 5 | 0 | 0 | 0 | PASS 5/5 |
+| I Concurrency | 5 | 5 | 0 | 0 | 0 | — |
+| J Long-run / corpus | 6 | 6 | 0 | 0 | 0 | PASS 1/1 |
+| K Golden baseline | 2 | 2 | 0 | 0 | 0 | PASS 2/2 |
+| **Total** | **83** | **83** | **0** | **0** | **0** | **P0 61/61** |

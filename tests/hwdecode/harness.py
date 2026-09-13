@@ -3108,7 +3108,7 @@ def g06(t, ctx):
     # channel-sync module must not have changed its algorithm version.
     mod = (ROOT / "core" / "channel_sync.py").read_text(encoding="utf-8")
     import re as _re
-    m = _re.search(r'ALGO_VERSION\s*=\s*"([^"]+)"', mod)
+    m = _re.search(r'"algo_version"\s*:\s*"([^"]+)"', mod)
     algo = m.group(1) if m else None
     ev = {"baseline_sha256": before, "algo_version": algo}
     problems = []
@@ -3703,6 +3703,16 @@ def i05(t, ctx):
 
 
 def _batch_scan(ctx, clips, *, tid, backend, reader, tag, fp_head=None):
+    """Encode a clip set and reconcile each result.
+
+    The expected reader identity depends on which reader was *requested*:
+    a software control run is supposed to report ``avsw``, so demanding
+    the hardware identity there would fail every control encode.
+    """
+    expected_reader = (
+        ("avcuvid" if backend == "nvenc" else "avqsv")
+        if reader == "avhw" else "avsw"
+    )
     ev, problems, done = {}, [], []
     for fx in clips:
         if not fx.path.is_file():
@@ -3714,9 +3724,11 @@ def _batch_scan(ctx, clips, *, tid, backend, reader, tag, fp_head=None):
                "output_stream": cm.output_stream,
                "decoded": cm.independent_decoded,
                "reader": er.reader_identity, "rc": er.rc, "ok": ok}
-        if er.reader_identity != ("avcuvid" if backend == "nvenc" else "avqsv"):
+        if er.reader_identity != expected_reader:
             row["reader_mismatch"] = True
-            problems.append(f"{fx.fid}: reader {er.reader_identity!r}")
+            problems.append(
+                f"{fx.fid}: reader {er.reader_identity!r}, expected "
+                f"{expected_reader!r}")
         if not ok:
             problems.append(f"{fx.fid}: " + "; ".join(reasons))
         if fp_head and ok and er.output_exists:
@@ -3735,34 +3747,55 @@ def _batch_scan(ctx, clips, *, tid, backend, reader, tag, fp_head=None):
 
 @impl("j01_short_smoke")
 def j01(t, ctx):
+    """Short smoke: at least ten cases on EVERY backend, not just one.
+
+    The matrix asks for >=10 cases per backend, so software is included as
+    the control: if the short clips passed on hardware but the software
+    reference disagreed, the smoke test would be reporting an encoder
+    problem as a hardware-decode success.
+    """
     clips = sorted(FX.real_a7m5(), key=lambda f: ctx.fact(f).container_samples or 0)
     clips = [c for c in clips if (ctx.fact(c).container_samples or 0) <= 900][:12]
     if not clips:
         return _res(t, "HD-J01", STATUS_SKIP, reason="no short real clips available")
-    ev, problems, done = _batch_scan(ctx, clips, tid="HD-J01", backend="nvenc",
-                                     reader="avhw", tag="smoke",
-                                     fp_head=24 if ctx.deep else None)
+    ev, problems = {}, []
+    for backend, reader in (("nvenc", "avhw"), ("qsv", "avhw"),
+                            ("nvenc", "avsw")):
+        e, p, d = _batch_scan(ctx, clips, tid="HD-J01", backend=backend,
+                              reader=reader, tag=f"smoke{backend}{reader}",
+                              fp_head=16 if ctx.deep else None)
+        ev[f"{backend}/{reader}"] = {"clips": d, "detail": e}
+        problems.extend(f"{backend}/{reader}: {x}" for x in p)
+    total = sum(len(v["clips"]) for v in ev.values())
     return _res(t, "HD-J01", STATUS_PASS if not problems else STATUS_FAIL,
-                actual=f"{len(done)} short real clips smoking clean on hardware decode",
+                actual=(f"{len(clips)} short real clips x 3 backend/reader "
+                        f"combinations ({total} encodes) smoking clean"),
                 reason="; ".join(problems), evidence=ev)
 
 
 @impl("j02_medium_matrix")
 def j02(t, ctx):
+    """Medium matrix: the matrix asks for 20-30 cases, on both backends."""
     clips = sorted(FX.real_a7m5(), key=lambda f: ctx.fact(f).container_samples or 0)
     clips = [c for c in clips if 900 < (ctx.fact(c).container_samples or 0) <= 3600]
-    if not ctx.deep:
-        clips = clips[:: max(1, len(clips) // 8)][:8]
     if not clips:
         clips = sorted(FX.real_a7m5(),
                        key=lambda f: ctx.fact(f).container_samples or 0)[:8]
-    if not clips:
+    want = 24 if not ctx.deep else len(clips)
+    step = max(1, len(clips) // want) if want < len(clips) else 1
+    selected = clips[::step][:want] if step > 1 else clips[:want]
+    if not selected:
         return _res(t, "HD-J02", STATUS_SKIP, reason="no medium clips available")
-    ev, problems, done = _batch_scan(ctx, clips, tid="HD-J02", backend="nvenc",
-                                     reader="avhw", tag="med",
-                                     fp_head=24 if ctx.deep else None)
+    ev, problems = {}, []
+    for backend in ("nvenc", "qsv"):
+        e, p, d = _batch_scan(ctx, selected, tid="HD-J02", backend=backend,
+                              reader="avhw", tag=f"med{backend}",
+                              fp_head=16 if ctx.deep else None)
+        ev[backend] = {"clips": d, "detail": e}
+        problems.extend(f"{backend}/{x}" for x in p)
+    total = sum(len(v["clips"]) for v in ev.values())
     return _res(t, "HD-J02", STATUS_PASS if not problems else STATUS_FAIL,
-                actual=f"{len(done)} medium clips validated",
+                actual=f"{len(selected)} medium clips x 2 backends ({total} encodes)",
                 reason="; ".join(problems), evidence=ev)
 
 
@@ -3812,38 +3845,50 @@ def j04(t, ctx):
 
 @impl("j05_long_run")
 def j05(t, ctx):
+    """A continuous full-input run on the longest clip available.
+
+    Full input, not a bounded request: the integrity claim for a long run
+    is ``delivered == container``, and a frame-bounded request would move
+    the reference to ``N - leading`` and measure something else. The
+    earlier version capped the request and then reconciled against the
+    whole container, which could only ever report a mismatch.
+    """
     fx = FX.LONG_A if hasattr(FX, "LONG_A") else None
     if fx is None:
-        cands = FX.long_inputs()
-        cands = [c for c in cands if c.path.is_file()
-                 and c.fid != "long_cs_audio"]
+        cands = [c for c in FX.long_inputs()
+                 if c.path.is_file() and c.fid != "long_cs_audio"]
+        if not cands:
+            cands = [f for f in FX.real_field() if "stress" in f.group]
         fx = cands[0] if cands else None
     skip = _require_fixture(fx, "HD-J05", ctx)
     if skip:
         return skip
     facts = ctx.fact(fx)
     frames = facts.container_samples
-    if not ctx.deep:
-        frames = min(frames or 3000, 4000)
+
     t0 = time.monotonic()
-    er, cm = do_encode(ctx, tid="HD-J05", fx=fx, backend="nvenc", reader="avhw",
-                       tag="long", frames=frames)
+    with runners.Telemetry("NVEncC64.exe", interval=3.0) as tel:
+        er, cm = do_encode(ctx, tid="HD-J05", fx=fx, backend="nvenc",
+                           reader="avhw", tag="long")
     wall = time.monotonic() - t0
+    telemetry = tel.summary()
     ok, reasons = checks.reconcile(cm)
     out = Path(er.output)
     ev = {
         "fixture": fx.fid, "container": cm.container_expected,
-        "requested": frames, "encoded": cm.encoder_input,
+        "encoded": cm.encoder_input,
         "output_stream": cm.output_stream,
         "independent_decoded": cm.independent_decoded,
+        "independent_decoded_alt": cm.independent_decoded_alt,
         "reader": er.reader_identity, "rc": er.rc,
         "wall_clock_s": round(wall, 2),
         "fps": round((cm.encoder_input or 0) / wall, 2) if wall else None,
         "final_sha256": checks.sha256_file(out) if out.is_file() else None,
         "reconcile_ok": ok, "reasons": reasons,
-        "telemetry_note": ("wall clock and fps are from a laptop host with "
-                           "documented drift; absolute values are not "
-                           "comparable across sessions"),
+        "telemetry": telemetry,
+        "telemetry_note": ("wall clock and fps come from a laptop host with "
+                           "documented run-to-run drift; absolute values are "
+                           "not comparable across sessions"),
     }
     problems = []
     if er.rc != 0:
@@ -3853,25 +3898,37 @@ def j05(t, ctx):
     if not ok:
         problems.append("long run did not reconcile: " + "; ".join(reasons))
     return _res(t, "HD-J05", STATUS_PASS if not problems else STATUS_FAIL,
-                actual=f"{cm.encoder_input} frames in {wall:.0f}s "
-                       f"({ev['fps']} fps), integrity "
-                       f"{'ok' if ok else 'FAILED'}",
+                actual=(f"{cm.encoder_input}/{frames} frames in {wall:.0f}s "
+                        f"({ev['fps']} fps), integrity "
+                        f"{'ok' if ok else 'FAILED'}, peak RSS "
+                        f"{telemetry.get('peak_rss_mib')} MiB"),
                 reason="; ".join(problems), evidence=ev)
 
 
 @impl("j06_summary_gate")
 def j06(t, ctx):
-    results = load_results()
+    """The final gate, computed over every test except itself.
+
+    A gate that includes its own previous verdict is self-referential: one
+    failure poisons every later summary, so the report keeps claiming
+    BLOCKED after the underlying test has been fixed and re-run. The
+    gate's own result is not evidence about the system, so it is excluded.
+    """
+    results = [r for r in load_results() if r["test_id"] != "HD-J06"]
     if not results:
         return _res(t, "HD-J06", STATUS_BLOCKED,
                     reason="no results recorded yet")
     summary = summarise(results)
     gate = summary["gate"]
-    ev = {"summary": summary}
+    ev = {"summary": summary,
+          "excluded_from_gate": ["HD-J06 (self)"],
+          "note": ("the gate judges the other tests; its own verdict is "
+                   "recorded but never fed back into the summary")}
     status = STATUS_PASS if gate["final_status"] == "READY FOR REVIEW" else STATUS_FAIL
     return _res(
         t, "HD-J06", status,
-        actual=(f"P0 PASS {gate['p0_pass']}/{gate['p0_total']}; final status "
+        actual=(f"P0 PASS {gate['p0_pass']}/{gate['p0_total']}; "
+                f"{summary['PASS']}/{summary['total']} tests pass; final status "
                 f"{gate['final_status']}"),
         reason="; ".join(gate["blockers"]) if gate["blockers"] else "",
         evidence=ev,
@@ -3938,7 +3995,13 @@ def k02(t, ctx):
         return _res(t, "HD-K02", STATUS_BLOCKED,
                     reason="no baseline present (run HD-K01 first)")
     ev, problems, checked = {}, [], 0
+    # `_`-prefixed files are reports *about* the baseline (this test writes
+    # its own `_stability.json` into the same directory), not baseline
+    # entries.  Without the filter the second run tries to re-derive the
+    # stability report as if it were a fixture.
     for p in sorted(BASELINE.glob("*.json")):
+        if p.name.startswith("_"):
+            continue
         stored = json.loads(p.read_text(encoding="utf-8"))
         fx = FX.by_id(stored["fixture"])
         if fx is None or not fx.path.is_file():

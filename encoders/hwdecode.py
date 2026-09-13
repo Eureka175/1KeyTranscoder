@@ -277,9 +277,15 @@ def classify_reader_failure(
         0xC0000139,  # entry point not found
     ):
         return R_STARTUP_FAILED, f"loader failure rc=0x{rc & 0xFFFFFFFF:08X}"
-    if len(probe) < 40:
+    if not probe:
+        # A real rigaya run always prints a banner (version, OS, CPU, GPU)
+        # before it can fail, so a *completely* empty log means the process
+        # never reached main.  The test is "empty", deliberately not "short":
+        # an earlier version used a length threshold and swallowed genuine
+        # one-line diagnostics such as "Invalid Device Id = 1" as startup
+        # failures.
         return R_STARTUP_FAILED, (
-            f"no usable tool output (rc={rc}); the process did not start"
+            f"no tool output at all (rc={rc}); the process did not start"
         )
 
     if "unable to decode by qsv" in low or "unable to decode by" in low:
