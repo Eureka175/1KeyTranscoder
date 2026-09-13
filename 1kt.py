@@ -23,6 +23,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,28 @@ from core.batch_hw import (
     run_multihw_pool,
     load_retry_list,
     record_failure,
+)
+from core.calibration_events import (
+    KIND_PRIMARY,
+    STAGE_COMMIT,
+    STAGE_ENCODE,
+    STAGE_PROBE,
+    STAGE_STARTUP,
+    STAGE_VERIFICATION,
+    STAGE_UNKNOWN,
+    VERIFY_FAILED,
+    VERIFY_NOT_RUN,
+    VERIFY_PASSED,
+    VERIFY_SKIPPED,
+    attempt_failed as cal_attempt_failed,
+    attempt_succeeded as cal_attempt_succeeded,
+    begin_attempt as cal_begin_attempt,
+    begin_job as cal_begin_job,
+    end_job as cal_end_job,
+    hash_config as cal_hash_config,
+    parse_tool_versions as cal_parse_tool_versions,
+    setup as cal_setup,
+    utc_now_iso as cal_utc_now_iso,
 )
 from core.config import (
     find_executable,
@@ -277,6 +300,7 @@ def log_encode_header(
     engine,
     effective_params: dict[str, Any],
     cmd: list[str],
+    observation: Any = None,
 ) -> None:
     from core.logging_utils import format_mb
 
@@ -333,6 +357,23 @@ def log_encode_header(
         "EFFECTIVE_X265 | %s",
         json.dumps(effective_params, ensure_ascii=False, sort_keys=True),
     )
+    if observation is not None:
+        # Calibration observation only: the exact command line that was
+        # built (including the real -x265-params string) plus the source
+        # facts it was built from. Nothing is recalculated.
+        try:
+            params, pix_fmt = _extract_encode_args(cmd)
+            observation.cmd = subprocess.list2cmdline(cmd)
+            observation.x265_params = params
+            observation.pix_fmt = pix_fmt
+            if not observation.verification:
+                observation.verification = {
+                    "status": VERIFY_SKIPPED,
+                    "checks": [],
+                    "notes": "verification not reached yet",
+                }
+        except Exception:
+            pass
 
 
 def encode_one(
@@ -359,6 +400,7 @@ def encode_one(
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
+    observation: Any = None,
 ) -> str:
     """Classic single-pass (x265/svtav1 software backends). At
     check_level='full' the PSNR/SSIM sample gates delivery; with
@@ -377,33 +419,45 @@ def encode_one(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
         prepared=prepared, engine=engine,
         effective_params=effective_params, cmd=cmd,
+        observation=observation,
     )
     if dry_run:
         file_logger.info("DRY-RUN | no encode performed.")
-        return "dry-run"
+        return ENCODE_DRY
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg_log = part_dst.with_name(part_dst.name + ".ffmpeg.log")
     return_code, elapsed = run_ffmpeg(
         cmd, ffmpeg_log, source_summary["total_frames"], file_logger
     )
+    if observation is not None:
+        observation.exit_code = return_code
     if return_code is None:
         logger.warning("[INTERRUPTED/EXEC-FAIL] %s", src)
         safe_unlink(part_dst)
-        return "failed"
+        return _failure_result(
+            STAGE_STARTUP, "ffmpeg interrupted or failed to start"
+        )
     if return_code != 0:
         logger.error("[FAIL] return=%d | elapsed=%.3f sec | %s",
                      return_code, elapsed, src)
         file_logger.error("FAILED | return=%d | elapsed=%.3f sec",
                           return_code, elapsed)
         safe_unlink(part_dst)
-        return "failed"
+        return _failure_result(
+            STAGE_ENCODE, f"ffmpeg exited with rc={return_code}",
+            return_code,
+        )
     if not part_dst.is_file() or part_dst.stat().st_size <= 0:
         logger.error("[FAIL] ffmpeg returned 0 but output is missing/empty | %s",
                      src)
         file_logger.error("FAILED | ffmpeg returned 0 but output missing/empty")
         safe_unlink(part_dst)
-        return "failed"
+        return _failure_result(
+            STAGE_ENCODE,
+            "ffmpeg returned 0 but the output is missing/empty",
+            return_code,
+        )
 
     # PSNR/SSIM quality sample (check=full) gates delivery
     if check_level == "full":
@@ -423,7 +477,40 @@ def encode_one(
             logger.error("[FAIL] quality sample | %s | %s", src, q["detail"])
             file_logger.error("QUALITY SAMPLE FAILED | %s", q["detail"])
             safe_unlink(part_dst)
-            return "failed"
+            if observation is not None:
+                observation.verification = {
+                    "status": VERIFY_FAILED,
+                    "checks": ["psnr_ssim_sample"],
+                    "detail": str(q.get("detail", "")),
+                }
+            return _failure_result(
+                STAGE_VERIFICATION,
+                f"quality sample failed: {q.get('detail', '')}",
+                return_code,
+            )
+        if observation is not None:
+            observation.verification = {
+                "status": VERIFY_PASSED,
+                "checks": [
+                    "encoder_exit_code_0",
+                    "output_file_present_non_empty",
+                    "psnr_ssim_sample",
+                ],
+                "detail": str(q.get("detail", "")),
+                "quality": dict(q),
+            }
+    elif observation is not None:
+        observation.verification = {
+            "status": VERIFY_PASSED,
+            "checks": [
+                "encoder_exit_code_0",
+                "output_file_present_non_empty",
+            ],
+            "notes": (
+                f"check level '{check_level}': no sample-level quality "
+                "gate configured"
+            ),
+        }
 
     # 自动延时补偿 (经典路径): 修正后的音频轨替换拷贝音频
     if channel_sync:
@@ -476,9 +563,11 @@ def encode_one(
     except OSError as exc:
         logger.error("[RENAME-FAIL] %s -> %s | %s", part_dst, dst, exc)
         file_logger.exception("RENAME FAILED | elapsed=%.3f sec", elapsed)
-        return "failed"
+        return _failure_result(
+            STAGE_COMMIT, f"output commit failed: {exc}", return_code
+        )
 
-    postprobe_and_log(
+    post_status, output_summary, _post_error = postprobe_and_log(
         src=src, dst=dst, preset=preset, elapsed=elapsed,
         source_summary=source_summary, ffprobe=ffprobe,
         postprobe_csv=postprobe_csv,
@@ -486,7 +575,20 @@ def encode_one(
         logger=logger, file_logger=file_logger,
     )
     safe_unlink(ffmpeg_log)
-    return "done"
+    if observation is not None:
+        fields = _output_fields_from_probe(dst, output_summary)
+        fields["postprobe_status"] = post_status
+        source_size = source_summary["source_size_bytes"]
+        out_size = fields.get("output_size")
+        if source_size and out_size:
+            fields["compression_ratio"] = round(out_size / source_size, 9)
+        if elapsed > 0:
+            frames = output_summary.get("total_frames", 0)
+            if frames:
+                fields["encode_fps"] = round(frames / elapsed, 6)
+        fields["source_size_bytes"] = source_size
+        observation.output = fields
+    return ENCODE_OK
 
 
 def encode_one_sony(
@@ -514,6 +616,7 @@ def encode_one_sony(
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
+    observation: Any = None,
 ) -> str:
     """Sony preservation path (rtmd) for ffmpeg software backends
     (x265 / svtav1; --check levels apply like on hardware backends).
@@ -538,13 +641,14 @@ def encode_one_sony(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
         prepared=prepared, engine=engine,
         effective_params=effective_params, cmd=cmd,
+        observation=observation,
     )
     logger.info("[PRESERVE] Sony rtmd source -> preservation pipeline")
     file_logger.info("PRESERVATION | sony | work_dir=%s", work_dir)
 
     if dry_run:
         file_logger.info("DRY-RUN | no encode performed.")
-        return "dry-run"
+        return ENCODE_DRY
 
     started = time.monotonic()
 
@@ -554,6 +658,8 @@ def encode_one_sony(
         rc, _ = run_ffmpeg(
             cmd, raw_log, source_summary["total_frames"], file_logger
         )
+        if observation is not None:
+            observation.exit_code = rc
         if rc is None:
             raise RuntimeError("video encode interrupted/failed to run")
         if rc != 0:
@@ -642,7 +748,11 @@ def encode_one_sony(
     except Exception as exc:
         logger.error("[FAIL] preservation pipeline | %s | %s", src, exc)
         file_logger.exception("PRESERVATION PIPELINE FAILED")
-        return "failed"
+        return _failure_result(
+            STAGE_ENCODE,
+            f"preservation pipeline failed: {type(exc).__name__}: {exc}",
+            observation.exit_code if observation is not None else None,
+        )
 
     elapsed = time.monotonic() - started
     gyro = report.get("gyroflow")
@@ -658,12 +768,35 @@ def encode_one_sony(
             report.get("critical_missing"),
             report.get("critical_modified"),
         )
-        return "failed"
+        if observation is not None:
+            observation.verification = {
+                "status": VERIFY_FAILED,
+                "checks": ["sony_structural_preservation"],
+                "critical_missing": list(
+                    report.get("critical_missing") or []
+                ),
+                "critical_modified": list(
+                    report.get("critical_modified") or []
+                ),
+            }
+        return _failure_result(
+            STAGE_VERIFICATION, "structural preservation validation failed",
+            observation.exit_code if observation is not None else None,
+        )
     if gyro is not None and gyro.get("status") != "PASS":
         logger.error("[FAIL] Gyroflow consumer validation | %s | %s",
                      src, gyro.get("detail"))
         file_logger.error("GYROFLOW VALIDATION FAILED | %s", gyro.get("detail"))
-        return "failed"
+        if observation is not None:
+            observation.verification = {
+                "status": VERIFY_FAILED,
+                "checks": ["gyroflow_consumer_validation"],
+                "detail": str(gyro.get("detail", "")),
+            }
+        return _failure_result(
+            STAGE_VERIFICATION, "gyroflow consumer validation failed",
+            observation.exit_code if observation is not None else None,
+        )
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     final = work_dir / "final" / "output.mov"
@@ -673,7 +806,20 @@ def encode_one_sony(
     except OSError as exc:
         logger.error("[RENAME-FAIL] %s -> %s | %s", final, dst, exc)
         file_logger.exception("RENAME FAILED | elapsed=%.3f sec", elapsed)
-        return "failed"
+        return _failure_result(
+            STAGE_COMMIT, f"output commit failed: {exc}",
+            observation.exit_code if observation is not None else None,
+        )
+    if observation is not None and not observation.verification:
+        observation.verification = {
+            "status": VERIFY_PASSED,
+            "checks": [
+                "frame_count_and_fps_match_source",
+                "sony_structural_preservation",
+                "gyroflow_consumer_validation",
+            ],
+            "quality": report.get("quality"),
+        }
 
     s = report["summary"]
     logger.info(
@@ -694,14 +840,23 @@ def encode_one_sony(
             ensure_ascii=False,
         ),
     )
-    postprobe_and_log(
+    post_status, output_summary, _post_error = postprobe_and_log(
         src=src, dst=dst, preset=preset, elapsed=elapsed,
         source_summary=source_summary, ffprobe=ffprobe,
         postprobe_csv=postprobe_csv,
         postprobe_stream_csv=postprobe_stream_csv,
         logger=logger, file_logger=file_logger,
     )
-    return "done"
+    if observation is not None:
+        observation.output = _output_fields_from_probe(dst, output_summary)
+        observation.output["postprobe_status"] = post_status
+        observation.output["preservation"] = {
+            "kind": "sony",
+            "summary": report.get("summary"),
+            "structural_success": report.get("structural_success"),
+            "gyroflow": gyro,
+        }
+    return ENCODE_OK
 
 
 def encode_one_dji_x265(
@@ -729,6 +884,7 @@ def encode_one_dji_x265(
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
+    observation: Any = None,
 ) -> str:
     """DJI preservation path for ffmpeg software backends (x265/svtav1).
 
@@ -756,6 +912,7 @@ def encode_one_dji_x265(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
         prepared=prepared, engine=engine,
         effective_params=effective_params, cmd=cmd,
+        observation=observation,
     )
     file_logger.info(
         "POLICY | DJI source (djmd): %s 保留管线 "
@@ -769,7 +926,7 @@ def encode_one_dji_x265(
 
     if dry_run:
         file_logger.info("DRY-RUN | no encode performed.")
-        return "dry-run"
+        return ENCODE_DRY
 
     started = time.monotonic()
 
@@ -783,6 +940,8 @@ def encode_one_dji_x265(
         rc, _ = run_ffmpeg(
             cmd, raw_log, source_summary["total_frames"], file_logger
         )
+        if observation is not None:
+            observation.exit_code = rc
         if rc is None or rc != 0:
             raise RuntimeError(f"video encode failed (rc={rc})")
         if not encoded_mov.is_file() or encoded_mov.stat().st_size <= 0:
@@ -848,7 +1007,11 @@ def encode_one_dji_x265(
     except Exception as exc:
         logger.error("[FAIL] dji x265 pipeline | %s | %s", src, exc)
         file_logger.exception("DJI X265 PIPELINE FAILED")
-        return "failed"
+        return _failure_result(
+            STAGE_ENCODE,
+            f"dji preservation pipeline failed: {type(exc).__name__}: {exc}",
+            observation.exit_code if observation is not None else None,
+        )
 
     if not report.get("structural_success"):
         logger.error(
@@ -861,7 +1024,21 @@ def encode_one_dji_x265(
             "DJI STRUCTURAL VALIDATION FAILED | missing=%s | modified=%s",
             report.get("critical_missing"), report.get("critical_modified"),
         )
-        return "failed"
+        if observation is not None:
+            observation.verification = {
+                "status": VERIFY_FAILED,
+                "checks": ["dji_structural_preservation"],
+                "critical_missing": list(
+                    report.get("critical_missing") or []
+                ),
+                "critical_modified": list(
+                    report.get("critical_modified") or []
+                ),
+            }
+        return _failure_result(
+            STAGE_VERIFICATION, "dji structural validation failed",
+            observation.exit_code if observation is not None else None,
+        )
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     final = work_dir / "final" / "output.mov"
@@ -874,7 +1051,19 @@ def encode_one_dji_x265(
             "RENAME FAILED | elapsed=%.3f sec",
             time.monotonic() - started,
         )
-        return "failed"
+        return _failure_result(
+            STAGE_COMMIT, f"output commit failed: {exc}",
+            observation.exit_code if observation is not None else None,
+        )
+    if observation is not None and not observation.verification:
+        observation.verification = {
+            "status": VERIFY_PASSED,
+            "checks": [
+                "frame_count_and_fps_match_source",
+                "dji_structural_preservation",
+            ],
+            "quality": report.get("quality"),
+        }
 
     elapsed = time.monotonic() - started
     s = report["summary"]
@@ -898,14 +1087,455 @@ def encode_one_dji_x265(
             ensure_ascii=False,
         ),
     )
-    postprobe_and_log(
+    post_status, output_summary, _post_error = postprobe_and_log(
         src=src, dst=dst, preset=preset, elapsed=elapsed,
         source_summary=source_summary, ffprobe=ffprobe,
         postprobe_csv=postprobe_csv,
         postprobe_stream_csv=postprobe_stream_csv,
         logger=logger, file_logger=file_logger,
     )
-    return "done"
+    if observation is not None:
+        observation.output = _output_fields_from_probe(dst, output_summary)
+        observation.output["postprobe_status"] = post_status
+        observation.output["preservation_summary"] = s
+    return ENCODE_OK
+
+
+# ---------------------------------------------------------------------------
+# x265 calibration collector bridge (OBSERVER ONLY)
+# ---------------------------------------------------------------------------
+# Everything below only OBSERVES and RECORDS what production already
+# computed and already decided. It never changes a parameter, a preset,
+# a scaling value, an output path or a retry decision, and a telemetry
+# failure can only ever result in incomplete calibration data — never in
+# a failed encode. Disabled unless ONEXKT_CALIBRATION=1 is set (see
+# tools/x265_calibration/README.txt).
+
+ENCODE_OK = "done"
+ENCODE_DRY = "dry-run"
+ENCODE_FAILED = "failed"
+
+
+class JobRun:
+    """Mutable per-job observation record shared with the encode call."""
+
+    __slots__ = ("attempt_id", "attempt_number", "started", "exit_code",
+                 "verification", "output", "cmd", "tool_versions",
+                 "x265_params", "pix_fmt", "attempt_started",
+                 "attempt_finished")
+
+    def __init__(self) -> None:
+        self.attempt_id = ""
+        self.attempt_number = 0
+        self.started = time.monotonic()
+        self.exit_code: int | None = None
+        self.verification: dict[str, Any] = {}
+        self.output: dict[str, Any] = {}
+        self.cmd = ""
+        self.tool_versions: dict[str, Any] = {}
+        self.x265_params = ""
+        self.pix_fmt = ""
+        self.attempt_started = False
+        self.attempt_finished = False
+
+
+def _attempt_extra(job: Any) -> dict:
+    """Attempt-level extras observed from production's own command line."""
+    extra: dict[str, Any] = {}
+    if not job:
+        return extra
+    if job.cmd:
+        extra["command"] = job.cmd
+    if job.x265_params:
+        extra["actual_x265_params"] = job.x265_params
+    if job.pix_fmt:
+        extra["pix_fmt"] = job.pix_fmt
+    return extra
+
+
+def _telemetry_attempt_broken(job: Any) -> bool:
+    """True when an attempt started but no terminal event could be written.
+
+    Recorded as ``unknown`` rather than FAILED: the collector must never
+    present a calibration gap as a production failure.
+    """
+    if not job or not getattr(job, "attempt_started", False):
+        return False
+    return not getattr(job, "attempt_finished", False)
+
+
+def _relative_source_path(src: Path, input_root: Path | None) -> str:
+    """Relative path for the calibration dataset (basename fallback)."""
+    if input_root is not None:
+        try:
+            return str(src.relative_to(input_root))
+        except ValueError:
+            pass
+    return src.name
+
+
+def _failure_result(stage: str, reason: str, rc: int | None = None) -> dict:
+    return {
+        "status": ENCODE_FAILED,
+        "stage": stage,
+        "reason": reason,
+        "return_code": rc,
+    }
+
+
+def _result_status(result: Any) -> str:
+    if isinstance(result, dict):
+        return str(result.get("status") or ENCODE_FAILED)
+    return str(result)
+
+
+def _result_field(result: Any, key: str, default: Any = None) -> Any:
+    if isinstance(result, dict):
+        return result.get(key, default)
+    return default
+
+
+def _verification_result(job: Any) -> dict:
+    """What production itself verified before accepting the output."""
+    if job.verification:
+        return dict(job.verification)
+    return {
+        "status": VERIFY_PASSED,
+        "checks": ["encoder_exit_code_0", "output_file_present_non_empty"],
+        "notes": "per-file probe/quality checks not recorded",
+    }
+
+
+def _output_size(path: Path) -> int | None:
+    try:
+        return int(path.stat().st_size)
+    except OSError:
+        return None
+
+
+def _output_fields_from_probe(dst: Path, summary: dict) -> dict:
+    """Output facts read from production's own post-probe — no re-probing."""
+    if not summary:
+        return {}
+    fields: dict[str, Any] = {}
+    try:
+        fields["output_duration"] = round(float(summary.get("duration", 0.0)), 6)
+    except (TypeError, ValueError):
+        pass
+    try:
+        fields["output_width"] = int(summary.get("width", 0))
+        fields["output_height"] = int(summary.get("height", 0))
+    except (TypeError, ValueError):
+        pass
+    try:
+        fields["output_video_bitrate"] = round(
+            float(summary.get("video_bitrate_kbps", 0.0)), 3
+        )
+    except (TypeError, ValueError):
+        pass
+    try:
+        fields["output_frame_count"] = int(summary.get("total_frames", 0))
+    except (TypeError, ValueError):
+        pass
+    try:
+        fields["output_fps"] = float(summary.get("fps", 0.0))
+    except (TypeError, ValueError):
+        pass
+    for key, src_key in (
+        ("output_pix_fmt", "pix_fmt"),
+        ("output_codec", "codec"),
+        ("output_profile", "profile"),
+    ):
+        value = summary.get(src_key)
+        if value:
+            fields[key] = str(value)
+    size = summary.get("source_size_bytes")
+    if size:
+        fields["output_size"] = int(size)
+    fields["output_path"] = str(dst)
+    return fields
+
+
+def _extract_encode_args(cmd: list[str]) -> tuple[str, str]:
+    """The literal -x265-params string and -pix_fmt from the built argv.
+
+    Read back from production's own command line: the dataset therefore
+    contains exactly what was handed to the encoder, not a re-serialized
+    approximation.
+    """
+    params = ""
+    pix_fmt = ""
+    for index, value in enumerate(cmd):
+        if value in ("-x265-params", "-svtav1-params") and index + 1 < len(cmd):
+            params = cmd[index + 1]
+        elif value == "-pix_fmt" and index + 1 < len(cmd):
+            pix_fmt = cmd[index + 1]
+    return params, pix_fmt
+
+
+def _tool_versions(cmd_text: str, ffmpeg: Path) -> dict:
+    """Best-effort ffmpeg / libx265 versions (never raises)."""
+    try:
+        from core.calibration_events import tool_versions_for
+
+        return tool_versions_for(ffmpeg)
+    except Exception:
+        return {}
+
+
+def run_x265_job(
+    *,
+    src: Path,
+    dst: Path,
+    part_dst: Path,
+    preset: str,
+    profile: dict[str, Any],
+    requested: list,
+    multiple_presets: bool,
+    backend,
+    classifier,
+    engine,
+    requested_encoder: str,
+    input_root: Path,
+    output_root: Path,
+    logs_root: Path,
+    config_path: Path,
+    scaling_path: Path | None,
+    check_level: str,
+    ffmpeg: Path,
+    ffprobe: Path,
+    preprobe_csv: Path,
+    preprobe_stream_csv: Path,
+    scaling_csv: Path,
+    postprobe_csv: Path,
+    postprobe_stream_csv: Path,
+    quality_opts: dict[str, Any] | None,
+    quality_csv: Path | None,
+    failed_path: Path,
+    work_root: Path,
+    file_log: Path,
+    gpac: Any,
+    gyroflow: Path | None,
+    channel_sync_enabled: bool,
+    channel_sync_opts: dict[str, Any] | None,
+    run_encode,
+    logger: logging.Logger,
+    file_logger: logging.Logger,
+    dry_run: bool,
+) -> str:
+    """One (source, preset) job: probe -> classify -> scale -> encode,
+    with the calibration job/attempt lifecycle observed around it.
+
+    ``run_encode`` is production's unmodified per-source encoder call
+    (encode_one / encode_one_sony / encode_one_dji_x265), invoked once as
+    a single attempt.
+    """
+    prepared = None
+    try:
+        prepared = prepare_source(
+            src=src, preset=preset, ffprobe=ffprobe,
+            preprobe_csv=preprobe_csv,
+            preprobe_stream_csv=preprobe_stream_csv,
+            scaling_csv=scaling_csv, profile=profile,
+            classifier=classifier, engine=engine,
+            backend=backend, file_logger=file_logger,
+        )
+    except Exception as exc:
+        logger.error("[PROBE-FAIL] %s | %s", src, exc)
+        file_logger.error("PREPROBE FAILED | %s", exc)
+        record_failure(
+            failed_path,
+            source=src, preset=preset,
+            backend_name=backend.name,
+            stage="probe", error=str(exc),
+            log_path=str(file_log),
+        )
+        # Proof that the job existed even though it never reached an
+        # encode attempt (probe_failed is not an attempt failure).
+        cal_begin_job(
+            job_id=job_id_for(src),
+            source=src,
+            relative_path=_relative_source_path(src, input_root),
+            requested_preset=preset,
+            requested_encoder=requested_encoder,
+            input_root=input_root,
+            output_root=output_root,
+            logs_root=logs_root,
+            check_level=check_level,
+        )
+        cal_end_job(
+            failure_stage=STAGE_PROBE,
+            failure_reason=str(exc)[:500],
+            error_summary=str(exc),
+        )
+        return ENCODE_FAILED
+
+    job = JobRun()
+    source_summary = prepared.summary
+    _emit_job_started(
+        src=src, dst=dst, preset=preset, profile=profile, prepared=prepared,
+        requested=requested, requests_multiple=multiple_presets,
+        requested_encoder=requested_encoder, input_root=input_root,
+        output_root=output_root, logs_root=logs_root,
+        config_path=config_path, scaling_path=scaling_path,
+        check_level=check_level, dry_run=dry_run, ffmpeg=ffmpeg,
+        observation=job,
+    )
+
+    attempt = cal_begin_attempt(
+        backend=backend.name,
+        preset=preset,
+        kind=KIND_PRIMARY,
+        crf=profile.get("crf"),
+        encoder_format="software",
+        reader="ffmpeg",
+        inherit_context=True,
+        source_info=prepared.src_info,
+        classification=prepared.classification,
+        effective=prepared.effective,
+    )
+    job.started = time.monotonic()
+    if attempt is not None:
+        job.attempt_id = attempt.attempt_id
+        job.attempt_number = attempt.attempt_number
+        job.attempt_started = True
+
+    result: Any
+    try:
+        result = run_encode(prepared, job)
+    except Exception as exc:
+        logger.error("[FAIL] encode raised | %s | %s", src, exc)
+        file_logger.exception("ENCODE RAISED")
+        result = _failure_result(STAGE_ENCODE, f"{type(exc).__name__}: {exc}")
+    status = _result_status(result)
+
+    if status == ENCODE_OK:
+        if cal_attempt_succeeded(
+            exit_code=job.exit_code if job.exit_code is not None else 0,
+            verification=_verification_result(job),
+            output=job.output,
+            tool_versions=job.tool_versions,
+            extra=_attempt_extra(job),
+        ):
+            job.attempt_finished = True
+        cal_end_job(
+            accepted_attempt_number=job.attempt_number or None,
+            output=job.output,
+        )
+        return ENCODE_OK
+
+    if status == ENCODE_DRY:
+        if cal_attempt_failed(
+            failure_stage=STAGE_UNKNOWN,
+            failure_reason="dry-run: no encode attempt was started",
+            verification_status=VERIFY_NOT_RUN,
+            output_exists=False,
+            extra={"dry_run": True},
+        ):
+            job.attempt_finished = True
+        cal_end_job(
+            failure_stage=STAGE_UNKNOWN,
+            failure_reason="dry-run: no encode attempt was started",
+        )
+        return ENCODE_DRY
+
+    stage = str(_result_field(result, "stage", "") or STAGE_ENCODE)
+    reason = str(_result_field(result, "reason", "") or "production failed")
+    rc = _result_field(result, "return_code")
+    out_size = _output_size(dst)
+    if cal_attempt_failed(
+        failure_stage=stage,
+        failure_reason=reason[:500],
+        exit_code=rc if isinstance(rc, int) else None,
+        output_exists=bool(out_size and out_size > 0),
+        output_size=out_size,
+        output_path=dst,
+        verification_status=str(
+            _result_field(result, "verification_status", VERIFY_NOT_RUN)
+        ),
+        error_summary=reason,
+        extra=_attempt_extra(job),
+    ):
+        job.attempt_finished = True
+    if _telemetry_attempt_broken(job):
+        # The attempt happened but telemetry lost it: surface the gap as
+        # unknown instead of reporting a production failure.
+        cal_end_job(
+            failure_stage=STAGE_UNKNOWN,
+            failure_reason=(
+                "telemetry failure: no terminal attempt event was written"
+            ),
+            error_summary=reason,
+        )
+    else:
+        cal_end_job(
+            failure_stage=stage,
+            failure_reason=reason[:500],
+            exit_code=rc if isinstance(rc, int) else None,
+            error_summary=reason,
+        )
+    return ENCODE_FAILED
+
+
+def _emit_job_started(
+    *,
+    src: Path,
+    dst: Path,
+    preset: str,
+    profile: dict[str, Any],
+    prepared: Prepared,
+    requested: list,
+    requests_multiple: bool,
+    requested_encoder: str,
+    input_root: Path,
+    output_root: Path,
+    logs_root: Path,
+    config_path: Path,
+    scaling_path: Path | None,
+    check_level: str,
+    dry_run: bool,
+    ffmpeg: Path,
+    observation: Any = None,
+) -> None:
+    """job_started carries the full production-computed snapshot.
+
+    Tool versions are probed once per process here — before the encode
+    starts, never during it.
+    """
+    if observation is not None:
+        try:
+            from core.calibration_events import (
+                probe_libx265_version,
+                tool_versions_for,
+            )
+
+            observation.tool_versions = tool_versions_for(ffmpeg)
+            libx265 = probe_libx265_version(ffmpeg)
+            if libx265:
+                observation.tool_versions["libx265"] = libx265
+        except Exception:
+            observation.tool_versions = {}
+    cal_begin_job(
+        job_id=job_id_for(src),
+        source=src,
+        relative_path=_relative_source_path(src, input_root),
+        requested_preset=preset,
+        requested_encoder=requested_encoder,
+        source_info=prepared.src_info,
+        classification=prepared.classification,
+        effective=prepared.effective,
+        preset=preset,
+        crf=profile.get("crf"),
+        config_hash=cal_hash_config(config_path),
+        scaling_config_hash=cal_hash_config(scaling_path),
+        output_path=dst,
+        input_root=input_root,
+        output_root=output_root,
+        logs_root=logs_root,
+        check_level=check_level,
+        presets=[p for p in requested] if requests_multiple else None,
+        extra={"dry_run": bool(dry_run)},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1709,6 +2339,21 @@ def main() -> int:
     logger.info("Keep work dirs: %s", args.keep_work)
     logger.info("============================================================")
 
+    # Calibration collector (observer only; no-op unless the operator
+    # enabled it). A failed setup never affects production.
+    try:
+        calib_on = cal_setup(
+            spool=None,
+            project_version=version_string(),
+            dry_run=bool(args.dry_run),
+        )
+        logger.info(
+            "Calibration events: %s",
+            "ENABLED" if calib_on else "disabled",
+        )
+    except Exception as exc:
+        logger.warning("Calibration setup skipped | %s", exc)
+
     counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0}
 
     for preset in requested:
@@ -1717,7 +2362,8 @@ def main() -> int:
 
         if not is_hardware:
             # x265 path (sequential; failure records + dashboard status
-            # mirror the hardware path)
+            # mirror the hardware path). The calibration collector
+            # observes around this unchanged call sequence.
             for src in sources:
                 dst = output_path_for(
                     src, input_root, output_root, preset, multiple_presets
@@ -1740,101 +2386,101 @@ def main() -> int:
                     if status is not None:
                         status.finish(src, "skipped")
                     continue
-                try:
-                    prepared = prepare_source(
-                        src=src, preset=preset, ffprobe=ffprobe,
-                        preprobe_csv=preprobe_csv,
-                        preprobe_stream_csv=preprobe_stream_csv,
-                        scaling_csv=scaling_csv, profile=profile,
-                        classifier=classifier, engine=engine,
-                        backend=backend, file_logger=file_logger,
+
+                def _encode_run(
+                    prepared,
+                    job,
+                    *,
+                    _src=src, _dst=dst, _part_dst=part_dst,
+                    _file_log=file_log,
+                ) -> str:
+                    codec = (
+                        "av1" if getattr(backend, "name", "") == "svtav1"
+                        else "hevc"
                     )
-                except Exception as exc:
-                    logger.error("[PROBE-FAIL] %s | %s", src, exc)
-                    file_logger.error("PREPROBE FAILED | %s", exc)
-                    record_failure(
-                        failed_path,
-                        source=src, preset=preset,
-                        backend_name=backend.name,
-                        stage="probe", error=str(exc),
-                        log_path=str(file_log),
+                    video_entry = "av01" if codec == "av1" else "hvc1"
+                    if (
+                        codec == "av1"
+                        and prepared.src_info.chroma
+                        not in ("4:2:0", "mono", "")
+                    ):
+                        logger.warning(
+                            "[WARNING] %s | AV1 统一输出 4:2:0: 源色度 %s "
+                            "降采样为 4:2:0 (SVT-AV1 420 策略)",
+                            _src.name, prepared.src_info.chroma,
+                        )
+                        file_logger.warning(
+                            "CHROMA_DOWNGRADE | av1 420 policy: source chroma "
+                            "%s -> 4:2:0", prepared.src_info.chroma,
+                        )
+                    quality_csv = (
+                        logs_root / "quality_samples.csv"
+                        if args.check == "full" else None
                     )
-                    counters["failed"] += 1
-                    if status is not None:
-                        status.finish(src, "failed")
-                    continue
-                codec = "av1" if getattr(backend, "name", "") == "svtav1" else "hevc"
-                video_entry = "av01" if codec == "av1" else "hvc1"
-                if (
-                    codec == "av1"
-                    and prepared.src_info.chroma not in ("4:2:0", "mono", "")
-                ):
-                    logger.warning(
-                        "[WARNING] %s | AV1 统一输出 4:2:0: 源色度 %s 降采样"
-                        "为 4:2:0 (SVT-AV1 420 策略)",
-                        src.name, prepared.src_info.chroma,
+                    common = {
+                        "src": _src, "dst": _dst, "prepared": prepared,
+                        "profile": profile, "preset": preset,
+                        "backend": backend, "engine": engine,
+                        "ffmpeg": ffmpeg, "ffprobe": ffprobe,
+                        "postprobe_csv": postprobe_csv,
+                        "postprobe_stream_csv": postprobe_stream_csv,
+                        "gpac": gpac,
+                        "check_level": args.check,
+                        "quality_opts": quality_opts,
+                        "quality_csv": quality_csv,
+                        "channel_sync": channel_sync_enabled,
+                        "channel_sync_opts": channel_sync_opts,
+                        "logger": logger, "file_logger": file_logger,
+                        "dry_run": args.dry_run,
+                        "observation": job,
+                    }
+                    is_rtmd = any(
+                        st.get("codec_type") == "data"
+                        and st.get("codec_tag_string") == "rtmd"
+                        for st in prepared.streams
                     )
-                    file_logger.warning(
-                        "CHROMA_DOWNGRADE | av1 420 policy: source chroma "
-                        "%s -> 4:2:0", prepared.src_info.chroma,
+                    if is_rtmd or is_dji_source(prepared.streams):
+                        preserve = {
+                            "gyroflow": gyroflow, "work_root": work_root,
+                        }
+                        if is_rtmd:
+                            return encode_one_sony(
+                                codec=codec, video_entry=video_entry,
+                                **common, **preserve,
+                            )
+                        return encode_one_dji_x265(
+                            video_entry=video_entry, **common, **preserve,
+                        )
+                    return encode_one(
+                        part_dst=_part_dst,
+                        work_dir=work_root / job_id_for(_src),
+                        **common,
                     )
-                quality_csv = (
-                    logs_root / "quality_samples.csv"
-                    if args.check == "full" else None
+
+                result = run_x265_job(
+                    src=src, dst=dst, part_dst=part_dst, preset=preset,
+                    profile=profile, requested=requested,
+                    multiple_presets=multiple_presets, backend=backend,
+                    classifier=classifier, engine=engine,
+                    requested_encoder=encoder_name,
+                    input_root=input_root, output_root=output_root,
+                    logs_root=logs_root, config_path=config_path,
+                    scaling_path=scaling_path, check_level=args.check,
+                    ffmpeg=ffmpeg, ffprobe=ffprobe,
+                    preprobe_csv=preprobe_csv,
+                    preprobe_stream_csv=preprobe_stream_csv,
+                    scaling_csv=scaling_csv,
+                    postprobe_csv=postprobe_csv,
+                    postprobe_stream_csv=postprobe_stream_csv,
+                    quality_opts=quality_opts, quality_csv=None,
+                    failed_path=failed_path, work_root=work_root,
+                    file_log=file_log, gpac=gpac, gyroflow=gyroflow,
+                    channel_sync_enabled=channel_sync_enabled,
+                    channel_sync_opts=channel_sync_opts,
+                    run_encode=_encode_run,
+                    logger=logger, file_logger=file_logger,
+                    dry_run=args.dry_run,
                 )
-                if any(
-                    st.get("codec_type") == "data"
-                    and st.get("codec_tag_string") == "rtmd"
-                    for st in prepared.streams
-                ):
-                    result = encode_one_sony(
-                        src=src, dst=dst, prepared=prepared, profile=profile,
-                        preset=preset, backend=backend, engine=engine,
-                        ffmpeg=ffmpeg, ffprobe=ffprobe,
-                        postprobe_csv=postprobe_csv,
-                        postprobe_stream_csv=postprobe_stream_csv,
-                        gpac=gpac, gyroflow=gyroflow, work_root=work_root,
-                        check_level=args.check, codec=codec,
-                        quality_opts=quality_opts,
-                        quality_csv=quality_csv,
-                        channel_sync=channel_sync_enabled,
-                        channel_sync_opts=channel_sync_opts,
-                        logger=logger, file_logger=file_logger,
-                        dry_run=args.dry_run,
-                    )
-                elif is_dji_source(prepared.streams):
-                    result = encode_one_dji_x265(
-                        src=src, dst=dst, prepared=prepared, profile=profile,
-                        preset=preset, backend=backend, engine=engine,
-                        ffmpeg=ffmpeg, ffprobe=ffprobe,
-                        postprobe_csv=postprobe_csv,
-                        postprobe_stream_csv=postprobe_stream_csv,
-                        gpac=gpac, gyroflow=gyroflow, work_root=work_root,
-                        check_level=args.check, video_entry=video_entry,
-                        quality_opts=quality_opts,
-                        quality_csv=quality_csv,
-                        channel_sync=channel_sync_enabled,
-                        channel_sync_opts=channel_sync_opts,
-                        logger=logger, file_logger=file_logger,
-                        dry_run=args.dry_run,
-                    )
-                else:
-                    result = encode_one(
-                        src=src, dst=dst, part_dst=part_dst,
-                        prepared=prepared, ffmpeg=ffmpeg, ffprobe=ffprobe,
-                        postprobe_csv=postprobe_csv,
-                        postprobe_stream_csv=postprobe_stream_csv,
-                        profile=profile, preset=preset, backend=backend,
-                        engine=engine, check_level=args.check,
-                        quality_opts=quality_opts,
-                        quality_csv=quality_csv,
-                        channel_sync=channel_sync_enabled,
-                        channel_sync_opts=channel_sync_opts,
-                        gpac=gpac,
-                        work_dir=work_root / job_id_for(src),
-                        logger=logger,
-                        file_logger=file_logger, dry_run=args.dry_run,
-                    )
                 if result == "failed":
                     record_failure(
                         failed_path,

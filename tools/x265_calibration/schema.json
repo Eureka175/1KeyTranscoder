@@ -1,0 +1,370 @@
+{
+  "schema_name": "1KeyTranscoder x265 calibration event",
+  "event_schema_version": "1.0",
+  "record_schema_version": "1.0",
+  "description": "Wire contract between the Production Transcoder (producer) and the Calibration Collector (independent consumer). One file = one event. Events are written atomically into events/pending/ and are immutable once written. The Collector validates against this file, then persists attempt-level immutable calibration records into samples/YYYY-MM-DD.jsonl.",
+  "producer": {
+    "module": "core.calibration_events",
+    "write_policy": "best effort; a failed write MUST NOT change any production outcome",
+    "atomic_write": [
+      "create events/pending/.<event_id>.json.tmp",
+      "write full payload",
+      "flush + fsync",
+      "close",
+      "os.replace() -> events/pending/<event_id>.json"
+    ]
+  },
+
+  "event_id_rule": "unique per event; '<UTC timestamp>-<job>-<attempt or ->-<type>-<serial>-<random>'; ASCII, no path separators",
+  "timestamp_rule": "UTC ISO-8601 with 'Z' suffix, e.g. 2026-01-31T04:15:09.123Z; all *_time fields use the same format",
+
+  "event_types": [
+    "job_started",
+    "attempt_started",
+    "attempt_succeeded",
+    "attempt_failed",
+    "job_succeeded",
+    "job_failed"
+  ],
+
+  "envelope": {
+    "_comment": "Fields present on every event, at the top level.",
+    "required": {
+      "schema_version": "string",
+      "event_id": "string",
+      "timestamp": "string",
+      "event_type": "string",
+      "job_id": "string"
+    },
+    "optional": {
+      "attempt_id": "string",
+      "attempt_number": "integer",
+      "producer": "string",
+      "project_version": "string",
+      "host": "string",
+      "pid": "integer"
+    },
+    "forbidden": []
+  },
+
+  "payloads": {
+    "job_started": {
+      "_comment": "Proof that production began processing a source. Written before any encode work.",
+      "required": {
+        "source_id": "string",
+        "source_path": "string",
+        "relative_path": "string",
+        "source_sha256": "string",
+        "start_time": "string",
+        "requested_preset": "string",
+        "requested_encoder": "string"
+      },
+      "optional": {
+        "source_size_bytes": "integer",
+        "output_path": "string",
+        "presets": "array",
+        "input_root": "string",
+        "output_root": "string",
+        "logs_root": "string",
+        "check_level": "string",
+        "dry_run": "boolean",
+        "run_id": "string",
+        "source_info": "object",
+        "classification": "object",
+        "scaling_context": "object",
+        "effective_params": "object",
+        "effective_params_audit": "object",
+        "actual_x265_params": "string",
+        "preset": "string",
+        "crf": "number",
+        "config_hash": "string",
+        "scaling_config_hash": "string",
+        "probe_error": "string"
+      }
+    },
+
+    "attempt_started": {
+      "_comment": "One real encode attempt. attempt_number is 1-based within a job and strictly increasing. Several attempts may exist for one job (retry / hardware-decode fallback), each with its own attempt_id.",
+      "required": {
+        "attempt_number": "integer",
+        "backend": "string",
+        "preset": "string",
+        "start_time": "string"
+      },
+      "optional": {
+        "config_hash": "string",
+        "scaling_config_hash": "string",
+        "attempt_kind": "string",
+        "parent_attempt_id": "string",
+        "retry_of_attempt_id": "string",
+        "trigger": "string",
+        "source_size_bytes": "integer",
+        "codec": "string",
+        "chroma": "string",
+        "bit_depth": "integer",
+        "reader": "string",
+        "encoder_format": "string",
+        "command": "string",
+        "source_info": "object",
+        "classification": "object",
+        "scaling_context": "object",
+        "effective_params": "object",
+        "effective_params_audit": "object",
+        "actual_x265_params": "string",
+        "crf": "number",
+        "pix_fmt": "string",
+        "warnings": "array"
+      }
+    },
+
+    "attempt_succeeded": {
+      "_comment": "Production accepted this attempt: encoder success AND production output verification passed AND output committed. Never written on rc=0 alone.",
+      "required": {
+        "attempt_number": "integer",
+        "backend": "string",
+        "status": "string",
+        "end_time": "string",
+        "exit_code": "integer",
+        "verification_result": "object"
+      },
+      "optional": {
+        "attempt_kind": "string",
+        "start_time": "string",
+        "wall_time_sec": "number",
+        "output_path": "string",
+        "output_size": "integer",
+        "output_duration": "number",
+        "output_width": "integer",
+        "output_height": "integer",
+        "output_video_bitrate": "number",
+        "output_frame_count": "integer",
+        "output_fps": "number",
+        "output_pix_fmt": "string",
+        "output_codec": "string",
+        "output_profile": "string",
+        "postprobe_status": "string",
+        "source_size_bytes": "integer",
+        "compression_ratio": "number",
+        "encode_fps": "number",
+        "verification_status": "string",
+        "ffmpeg_version": "string",
+        "libx265_version": "string",
+        "tool_versions": "object",
+        "encoder_format": "string",
+        "reader": "string",
+        "chroma": "string",
+        "bit_depth": "integer",
+        "command": "string",
+        "warnings": "array",
+        "preservation": "object",
+        "source_info": "object",
+        "classification": "object",
+        "scaling_context": "object",
+        "effective_params": "object",
+        "effective_params_audit": "object",
+        "actual_x265_params": "string",
+        "retry_of_attempt_id": "string",
+        "parent_attempt_id": "string",
+        "trigger": "string",
+        "preset": "string",
+        "crf": "number",
+        "pix_fmt": "string"
+      }
+    },
+
+    "attempt_failed": {
+      "_comment": "Retained forever: a later successful retry NEVER overwrites or removes this record.",
+      "required": {
+        "attempt_number": "integer",
+        "backend": "string",
+        "status": "string",
+        "end_time": "string",
+        "failure_stage": "string",
+        "failure_reason": "string",
+        "output_exists": "boolean",
+        "verification_status": "string"
+      },
+      "optional": {
+        "attempt_kind": "string",
+        "start_time": "string",
+        "wall_time_sec": "number",
+        "exit_code": "integer",
+        "output_path": "string",
+        "output_size": "integer",
+        "error_summary": "string",
+        "tool_versions": "object",
+        "encoder_format": "string",
+        "reader": "string",
+        "chroma": "string",
+        "bit_depth": "integer",
+        "command": "string",
+        "warnings": "array",
+        "dry_run": "boolean",
+        "source_info": "object",
+        "classification": "object",
+        "scaling_context": "object",
+        "effective_params": "object",
+        "effective_params_audit": "object",
+        "actual_x265_params": "string",
+        "retry_of_attempt_id": "string",
+        "parent_attempt_id": "string",
+        "trigger": "string",
+        "preset": "string",
+        "crf": "number",
+        "pix_fmt": "string"
+      }
+    },
+
+    "job_succeeded": {
+      "_comment": "Final job state SUCCESS: at least one attempt has attempt_succeeded and its output was accepted by production.",
+      "required": {
+        "status": "string",
+        "end_time": "string",
+        "accepted_attempt_id": "string",
+        "accepted_attempt_number": "integer"
+      },
+      "optional": {
+        "start_time": "string",
+        "wall_time_sec": "number",
+        "attempt_count": "integer",
+        "failed_attempt_count": "integer",
+        "output_path": "string",
+        "output_size": "integer",
+        "output_duration": "number",
+        "output_width": "integer",
+        "output_height": "integer",
+        "output_video_bitrate": "number",
+        "output_frame_count": "integer",
+        "output_fps": "number",
+        "output_pix_fmt": "string",
+        "output_codec": "string",
+        "output_profile": "string",
+        "postprobe_status": "string",
+        "source_size_bytes": "integer",
+        "compression_ratio": "number",
+        "encode_fps": "number",
+        "preservation": "object",
+        "requested_preset": "string",
+        "requested_encoder": "string",
+        "source_info": "object",
+        "classification": "object",
+        "scaling_context": "object",
+        "effective_params": "object",
+        "effective_params_audit": "object",
+        "actual_x265_params": "string",
+        "preset": "string",
+        "crf": "number"
+      }
+    },
+
+    "job_failed": {
+      "_comment": "Final job state FAILED: every attempt of this job failed (or no attempt could start).",
+      "required": {
+        "status": "string",
+        "end_time": "string"
+      },
+      "optional": {
+        "start_time": "string",
+        "wall_time_sec": "number",
+        "attempt_count": "integer",
+        "failed_attempt_count": "integer",
+        "failure_stage": "string",
+        "failure_reason": "string",
+        "exit_code": "integer",
+        "error_summary": "string",
+        "requested_preset": "string",
+        "requested_encoder": "string",
+        "source_info": "object",
+        "classification": "object",
+        "scaling_context": "object",
+        "effective_params": "object",
+        "actual_x265_params": "string",
+        "preset": "string",
+        "crf": "number"
+      }
+    }
+  },
+
+  "enums": {
+    "event_type": [
+      "job_started",
+      "attempt_started",
+      "attempt_succeeded",
+      "attempt_failed",
+      "job_succeeded",
+      "job_failed"
+    ],
+    "job_status": ["SUCCESS", "FAILED"],
+    "attempt_status": ["SUCCEEDED", "FAILED"],
+    "failure_stage": [
+      "startup_failed",
+      "encode_failed",
+      "verification_failed",
+      "output_commit_failed",
+      "probe_failed",
+      "unknown"
+    ],
+    "verification_status": [
+      "passed",
+      "failed",
+      "skipped",
+      "not_run",
+      "unknown"
+    ],
+    "attempt_kind": [
+      "primary",
+      "retry",
+      "fallback",
+      "downgrade",
+      "software_fallback",
+      "hardware_decode_fallback",
+      "reader_fallback",
+      "unknown"
+    ]
+  },
+
+  "validation": {
+    "_comment": "Semantics the Collector enforces on top of shape checks.",
+    "rules": [
+      "unknown_top_level_fields: warn",
+      "unknown_payload_fields: warn",
+      "missing_required: reject",
+      "type_mismatch: reject",
+      "event_type_not_in_enum: reject",
+      "failure_stage_not_in_enum: reject",
+      "verification_status_not_in_enum: reject",
+      "attempt_number_must_be_positive_integer: reject",
+      "job_succeeded_requires_accepted_attempt_number: reject",
+      "duplicate_event_id: skip (idempotent)",
+      "partial_or_unparsable_file: quarantine to events/failed/, never counted",
+      "tmp_file_in_pending: ignored (atomic write in progress)"
+    ],
+    "immutability": [
+      "attempt_failed is never replaced by a later attempt outcome",
+      "attempt_succeeded is never written for an attempt that already has attempt_failed",
+      "the Collector never rewrites a persisted JSONL line"
+    ]
+  },
+
+  "record_completeness": {
+    "_comment": "A persisted calibration record is COMPLETE when all of these are present non-empty; otherwise the Collector stores it with completeness flags instead of inventing values.",
+    "required": [
+      "project_version",
+      "job_id",
+      "attempt_id",
+      "attempt_number",
+      "source_id",
+      "source_path",
+      "source_info",
+      "classification",
+      "scaling_context",
+      "effective_params",
+      "actual_x265_params",
+      "start_time",
+      "end_time",
+      "wall_time_sec",
+      "status",
+      "verification_result"
+    ]
+  }
+}

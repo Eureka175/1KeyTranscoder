@@ -2,6 +2,11 @@
 
 Extracted from the main program so hardware and x265 paths report
 identically.
+
+The returned ``output_summary`` is the raw ffprobe dict of the FINAL
+committed output. It is also the source of the calibration collector's
+``attempt_succeeded`` output facts (duration / resolution / bitrate /
+frame count) — the Collector never re-probes and never recomputes them.
 """
 
 from __future__ import annotations
@@ -33,7 +38,13 @@ def postprobe_and_log(
     postprobe_stream_csv: Path,
     logger: logging.Logger,
     file_logger: logging.Logger,
-) -> str:
+) -> tuple[str, dict[str, Any], str]:
+    """Post-probe the delivered output, append CSV rows.
+
+    Returns ``(status, output_summary, error_text)``: status is "done"
+    when the output probed successfully, "done_postprobe_failed"
+    otherwise (which never fails the encode — it is the pre-existing
+    production semantics)."""
     post_status = "done"
     error_text = ""
 
@@ -152,4 +163,4 @@ def postprobe_and_log(
             ],
         )
 
-    return post_status
+    return post_status, output_summary, error_text

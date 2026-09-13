@@ -1,0 +1,36 @@
+# x265 calibration collector configuration.
+#
+# Every value here is OPTIONAL: the collector runs with sane defaults when this
+# file is absent, and explicit command line arguments always win. Copy this
+# file next to x265-calibration-collector.exe (or into the working directory)
+# and edit it for a long soak deployment.
+
+[collector]
+
+# Where the calibration data lives. This must match the production side's
+# ONEXKT_CALIBRATION_SPOOL value, otherwise the collector would watch an empty
+# directory and the dataset would stay empty.
+#
+# Windows path separators must be doubled inside a TOML basic string, or use a
+# literal string in single quotes as below.
+root = 'D:\1kt\calibration'
+
+# Seconds between scans of events/pending/. 2 s costs nothing (a directory
+# listing plus reads of the few new files) and keeps the dataset current.
+poll_interval_sec = 2
+
+# Seconds to wait for a job's final event (job_succeeded / job_failed) before
+# the job's attempts are persisted anyway, flagged
+# "completeness.job_finished_seen = false". 900 s covers very long encodes;
+# set 0 to persist immediately without waiting for the job join.
+job_final_timeout_sec = 900
+
+# Treat schema warnings (unknown fields, e.g. emitted by a newer production
+# build) as validation errors. Leave false for a month-long soak: unknown
+# fields are recorded and warned about, never used to drop an event.
+strict = false
+
+# Path to the event schema. Leave empty to let the executable use the copy
+# bundled inside it (recommended: nothing to keep in sync). Only set this to
+# override the contract without rebuilding the executable.
+# schema = 'D:\1kt\collector\schema.json'

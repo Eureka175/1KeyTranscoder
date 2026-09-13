@@ -29,7 +29,13 @@ __pycache__/
 
 # Local test media
 testsets/
-tools/
+
+# Tool drop: third-party binaries/toolchains are NOT tracked (large, licensed
+# separately, re-downloadable), but tools/x265_calibration IS project source.
+# Git cannot re-include a path whose parent directory is excluded, so the
+# exclusions are listed per item instead of ignoring tools/ wholesale.
+tools/*
+!tools/x265_calibration/
 
 # Forensic reports / generated inspection logs
 metadata_forensics/
@@ -39,6 +45,9 @@ work/
 
 # Release build output (staging tree + archive + manifest)
 dist/
+
+# PyInstaller work directory
+build/
 
 # Third-party source checkouts / toolchains used as build inputs by the research
 # experiment line: rigaya/NVEnc + rigaya/QSVEnc pinned checkouts, CUDA

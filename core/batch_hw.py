@@ -32,6 +32,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -106,6 +107,288 @@ READER_IDENTITY: dict[str, dict[str, str]] = {
 # legitimate case; more than one means the software path is also failing
 # and the ladder must terminate rather than loop.
 MAX_HW_DECODE_FALLBACKS = 1
+
+
+# ---------------------------------------------------------------------------
+# calibration observation (hardware backends) — see core.calibration_events
+# ---------------------------------------------------------------------------
+
+# Recorded instead of a scaling context on backends that do not run the
+# scaling engine (rigaya NVEncC/QSVEncC paths). It is an explicit marker,
+# not a value: the Collector stores what production reported, and the
+# analyzer can tell "hardware has no scaling context" from "missing data".
+SCALING_NOT_APPLICABLE = {
+    "status": "not_applicable",
+    "reason": (
+        "hardware backend (NVEncC/QSVEncC): the x265/svtav1 scaling engine "
+        "does not run on this path; no scaling values were used"
+    ),
+}
+
+# Classification is still computed and recorded on hardware paths because
+# it is metadata-only, cheap and part of the source-efficiency dataset.
+_CLASSIFIER_LOCK = threading.Lock()
+_CLASSIFIER_CACHE: dict[str, Any] = {"config": None, "obj": None}
+
+
+def _classification_for(src_info: SourceInfo) -> tuple[Any, Any, str]:
+    """(classification, scaling_config, error) — never raises.
+
+    Uses the project's own SourceClassifier with the production scaling
+    config, so the recorded class is production's own classification and
+    not a collector-side reinvention.
+    """
+    try:
+        from core.config import load_scaling_config, resolve_config_file
+    except Exception as exc:                      # pragma: no cover
+        return None, None, f"config imports unavailable: {exc}"
+    try:
+        with _CLASSIFIER_LOCK:
+            config = _CLASSIFIER_CACHE.get("config")
+            classifier = _CLASSIFIER_CACHE.get("obj")
+            if config is None or classifier is None:
+                script_dir = Path(__file__).resolve().parent.parent
+                path = resolve_config_file(
+                    script_dir, None, "x265_scaling.json"
+                )
+                config = load_scaling_config(path)
+                from core.source_classifier import SourceClassifier
+
+                classifier = SourceClassifier(config)
+                _CLASSIFIER_CACHE["config"] = config
+                _CLASSIFIER_CACHE["obj"] = classifier
+        return classifier.classify(src_info), config, ""
+    except Exception as exc:
+        return None, None, f"classification failed: {exc}"
+
+
+def _calibration_enabled() -> bool:
+    """True only when the operator explicitly enabled the collector."""
+    try:
+        from core.calibration_events import is_enabled
+
+        return bool(is_enabled())
+    except Exception:                             # pragma: no cover
+        return False
+
+
+def _relative_path_text(src: Path, input_root: Path | None) -> str:
+    if input_root is not None:
+        try:
+            return str(Path(src).relative_to(input_root))
+        except (ValueError, OSError):
+            pass
+    return Path(src).name
+
+
+def telemetry_begin_job(
+    *,
+    src: Path,
+    dst: Path,
+    preset: str,
+    profile: dict[str, Any],
+    backend: str,
+    src_info: SourceInfo,
+    classification: Any,
+    input_root: Path,
+    output_root: Path,
+    logs_root: Path,
+    config_path: Any,
+    ffmpeg: Any,
+    check_level: str,
+    dry_run: bool,
+    rel_path: str,
+) -> dict[str, Any] | None:
+    """Open one calibration job for a hardware file (best effort).
+
+    Returns the telemetry handle passed down to the encode attempt hooks,
+    or None when the emitter is disabled.
+    """
+    from core.calibration_events import (
+        begin_job, hash_config, is_enabled,
+    )
+
+    if not is_enabled():
+        return None
+    handle = {
+        "job_id": job_id_for(src),
+        "source": Path(src),
+        "backend": backend,
+        "classification_error": "",
+    }
+    try:
+        begin_job(
+            job_id=handle["job_id"],
+            source=src,
+            relative_path=rel_path,
+            requested_preset=preset,
+            requested_encoder=backend,
+            source_info=src_info,
+            classification=classification,
+            preset=preset,
+            crf=profile.get("crf"),
+            effective_params=_profile_params_snapshot(profile),
+            scaling_context=dict(SCALING_NOT_APPLICABLE),
+            config_hash=hash_config(config_path) if config_path else "",
+            output_path=dst,
+            input_root=input_root,
+            output_root=output_root,
+            logs_root=logs_root,
+            check_level=check_level,
+            extra={"dry_run": bool(dry_run)},
+        )
+    except Exception as exc:                      # pragma: no cover
+        _calibration_warn("begin job", exc)
+        handle["classification_error"] = str(exc)
+    return handle
+
+
+def telemetry_end_job(
+    telemetry: dict[str, Any] | None,
+    *,
+    result: str,
+    failure_stage: str = "",
+    failure_reason: str = "",
+    accepted_attempt_number: int | None = None,
+    output: dict[str, Any] | None = None,
+    error_summary: str = "",
+) -> None:
+    """Close the hardware job with production's own outcome (best effort)."""
+    if telemetry is None:
+        return
+    try:
+        from core.calibration_events import end_job
+
+        if result == "done":
+            end_job(
+                accepted_attempt_number=accepted_attempt_number,
+                output=output or {},
+            )
+        else:
+            end_job(
+                failure_stage=failure_stage or "encode_failed",
+                failure_reason=str(failure_reason or "hardware encode failed"),
+                error_summary=str(error_summary or failure_reason),
+            )
+    except Exception as exc:                      # pragma: no cover
+        _calibration_warn("end job", exc)
+
+
+def _profile_params_snapshot(profile: dict[str, Any]) -> dict[str, Any]:
+    """The hardware profile values actually handed to the encoder.
+
+    Reported verbatim (JSON-safe scalars only). This is what production
+    used on this backend — it is never recomputed or adapted.
+    """
+    out: dict[str, Any] = {}
+    for key, value in (profile or {}).items():
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            out[str(key)] = value
+    return out
+
+
+def telemetry_begin_attempt(
+    telemetry: dict[str, Any],
+    *,
+    backend: str,
+    preset: str,
+    kind: str,
+    trigger: str,
+    command: str,
+    encoder_format: str,
+    reader: str,
+    crf: Any,
+    profile: dict[str, Any],
+) -> None:
+    """Open one attempt event for a real hardware tool run (best effort)."""
+    try:
+        from core.calibration_events import begin_attempt
+
+        effective = _profile_params_snapshot(profile)
+        effective["encoder_format"] = str(encoder_format)
+        begin_attempt(
+            backend=backend,
+            preset=str(preset or ""),
+            kind=str(kind or "primary"),
+            trigger=str(trigger or ""),
+            command=str(command or ""),
+            encoder_format=str(encoder_format or ""),
+            reader=str(reader or ""),
+            crf=crf,
+            effective_params=effective,
+            extra={
+                # Same explicit marker policy as the scaling context: the
+                # hardware backends are not driven by an -x265-params
+                # string, and saying so beats an empty field.
+                "actual_x265_params": (
+                    "not_applicable: hardware backend "
+                    f"({backend}) takes its parameters on the tool command "
+                    "line, not through -x265-params"
+                ),
+            },
+        )
+    except Exception as exc:                      # pragma: no cover
+        _calibration_warn("begin attempt", exc)
+
+
+def telemetry_end_attempt(
+    telemetry: dict[str, Any],
+    *,
+    ok: bool,
+    exit_code: int | None,
+    failure_stage: str = "",
+    failure_reason: str = "",
+    verification: dict[str, Any] | None = None,
+    output: dict[str, Any] | None = None,
+    error_summary: str = "",
+    output_exists: bool = False,
+    output_size: int | None = None,
+    output_path: Any = None,
+    warnings: list[str] | None = None,
+) -> None:
+    """Close the open attempt with production's own verdict (best effort)."""
+    try:
+        from core.calibration_events import (
+            VERIFY_NOT_RUN, attempt_failed, attempt_succeeded,
+        )
+
+        if ok:
+            attempt_succeeded(
+                exit_code=int(exit_code or 0),
+                verification=verification or {"status": "passed"},
+                output=output or {},
+                warnings=warnings,
+            )
+        else:
+            attempt_failed(
+                failure_stage=failure_stage or "encode_failed",
+                failure_reason=str(failure_reason or "hardware encode failed"),
+                exit_code=exit_code,
+                output_exists=bool(output_exists),
+                output_size=output_size,
+                output_path=output_path,
+                verification_status=str(
+                    (verification or {}).get("status") or VERIFY_NOT_RUN
+                ),
+                error_summary=str(error_summary or failure_reason),
+                warnings=warnings,
+            )
+    except Exception as exc:                      # pragma: no cover
+        _calibration_warn("end attempt", exc)
+
+
+def _calibration_warn(context: str, exc: BaseException) -> None:
+    """Telemetry failure: logged, never raised into production."""
+    try:
+        import logging as _logging
+
+        _logging.getLogger("x265_archive.calibration").warning(
+            "[CALIBRATION] telemetry failure during %s: %s: %s "
+            "(production continues; calibration data incomplete)",
+            context, type(exc).__name__, exc,
+        )
+    except Exception:                             # pragma: no cover
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -328,8 +611,14 @@ def hw_encode_with_fallback(
     hw_decode: str = HW_DECODE_OFF,
     hw_decode_memo: dict | None = None,
     seek_requested: bool = False,
+    calibration: dict | None = None,
 ) -> tuple[list[str], tuple[str, int], float]:
     """Automatic three-tier downgrade ladder (NO prompt window).
+
+    ``calibration`` is an observation-only hook (see
+    core.calibration_events): when the operator enabled the collector,
+    every real tool run becomes its own attempt event, so a downgrade or
+    decode fallback never overwrites the attempt that failed before it.
 
     Capability-driven downgrades happen silently up front (WARNING);
     runtime failures run the ladder automatically with a WARNING per
@@ -402,6 +691,11 @@ def hw_encode_with_fallback(
     stripped = False
     rung_idx = 0
     color = src_info.color
+    # Calibration observation (no-op unless enabled): every real tool run
+    # is one attempt, so a downgrade or hardware-decode fallback shows up
+    # as its own immutable attempt instead of overwriting the failed one.
+    attempt_number = 0
+    telemetry = calibration if isinstance(calibration, dict) else None
     while rung_idx < len(rungs):
         c, d = rungs[rung_idx]
         cmd, skipped, color_notes = backend.command(
@@ -428,6 +722,33 @@ def hw_encode_with_fallback(
                 raw_log.unlink()
         except OSError:
             pass
+
+        if telemetry is not None:
+            attempt_number += 1
+            kind = "primary" if rung_idx == 0 else "downgrade"
+            trigger = ""
+            if rung_idx > 0:
+                trigger = f"downgrade ladder rung {rung_idx + 1}/" \
+                          f"{len(rungs)} ({rungs[rung_idx - 1][0]}/" \
+                          f"{rungs[rung_idx - 1][1]} -> {c}/{d})"
+            if stripped:
+                kind = "reader_fallback"
+                trigger = (
+                    f"reader fallback after MP4Box strip ({cur_input})"
+                )
+            telemetry_begin_attempt(
+                telemetry,
+                backend=backend.name,
+                preset=str(profile.get("preset") or ""),
+                kind=kind,
+                trigger=trigger,
+                command=subprocess.list2cmdline(cmd),
+                encoder_format=f"{c}/{d}",
+                reader=reader,
+                crf=profile.get("crf"),
+                profile=profile,
+            )
+
         rc, elapsed = run_hw_tool(
             cmd, raw_log, total_frames, label, progress=show_progress
         )
@@ -453,6 +774,29 @@ def hw_encode_with_fallback(
             if not verdict.ok:
                 _cls, _detail = classify_reader_failure(log_text)
                 reason = verdict.reason
+                if telemetry is not None:
+                    telemetry_end_attempt(
+                        telemetry, ok=False, exit_code=rc,
+                        failure_stage="verification_failed",
+                        failure_reason=(
+                            f"hardware decode integrity gate failed: "
+                            f"{reason}: {verdict.detail}"
+                        ),
+                        verification={
+                            "status": "failed",
+                            "checks": ["hardware_decode_integrity"],
+                            "reason": reason,
+                            "detail": verdict.detail,
+                        },
+                        error_summary=str(verdict.detail),
+                        output_exists=output.is_file(),
+                        output_size=(
+                            output.stat().st_size
+                            if output.is_file() else None
+                        ),
+                        output_path=output,
+                        warnings=list(warnings),
+                    )
                 emit_warning(
                     logger,
                     file_logger,
@@ -486,6 +830,7 @@ def hw_encode_with_fallback(
                 continue
 
         ok = False
+        frame_note = ""
         if rc == 0 and output.is_file() and output.stat().st_size > 0:
             if do_frame_check:
                 try:
@@ -496,17 +841,20 @@ def hw_encode_with_fallback(
                     ):
                         ok = True
                     else:
+                        frame_note = (
+                            f"1:1 check failed ({frames}/{src_frames}, "
+                            f"{fps}/{src_fps})"
+                        )
                         emit_warning(
                             logger,
                             file_logger,
-                            f"1:1 check failed ({frames}/{src_frames}, "
-                            f"{fps}/{src_fps}) — treated as format "
-                            "failure",
+                            f"{frame_note} — treated as format failure",
                             warnings,
                         )
                 except Exception as exc:
+                    frame_note = f"1:1 check error: {exc}"
                     emit_warning(
-                        logger, file_logger, f"1:1 check error: {exc}",
+                        logger, file_logger, frame_note,
                         warnings,
                     )
             else:
@@ -517,12 +865,60 @@ def hw_encode_with_fallback(
                     "HWDEC_SUMMARY | fallbacks=%d discarded=%s",
                     hw_fallbacks, " | ".join(discarded),
                 )
+            if telemetry is not None:
+                out_size = None
+                try:
+                    out_size = int(output.stat().st_size)
+                except OSError:
+                    out_size = None
+                telemetry_end_attempt(
+                    telemetry, ok=True, exit_code=int(rc or 0),
+                    verification={
+                        "status": "passed",
+                        "checks": (
+                            ["encoder_exit_code_0",
+                             "output_file_present_non_empty",
+                             "frame_count_and_fps_match_source"]
+                            if do_frame_check else
+                            ["encoder_exit_code_0",
+                             "output_file_present_non_empty"]
+                        ),
+                        "encoder_format": f"{c}/{d}",
+                        "reader": reader,
+                        "hardware_decode_fallbacks": hw_fallbacks,
+                        "discarded_hardware_results": list(discarded),
+                    },
+                    output={
+                        "output_path": str(output),
+                        "output_size": out_size,
+                        "encode_fps": _last_encode_fps(raw_log),
+                    },
+                    warnings=list(warnings),
+                )
             return warnings, (c, d), _last_encode_fps(raw_log)
 
         tail = read_log_tail(raw_log)
         cls = "format" if rc == 0 else classify_failure(tail)
 
         if cls == "reader" and not stripped and gpac is not None:
+            if telemetry is not None:
+                telemetry_end_attempt(
+                    telemetry, ok=False, exit_code=rc,
+                    failure_stage="encode_failed",
+                    failure_reason=(
+                        "encoder reader failure — production falls back to "
+                        "the MP4Box strip reader"
+                    ),
+                    error_summary=tail[-4000:],
+                    output_exists=(
+                        output.is_file() and output.stat().st_size > 0
+                    ),
+                    output_size=(
+                        output.stat().st_size if output.is_file() else None
+                    ),
+                    output_path=output,
+                    warnings=list(warnings),
+                )
             try:
                 cur_input = strip_video_audio(
                     gpac, source, work_dir, audio_copy
@@ -545,21 +941,92 @@ def hw_encode_with_fallback(
                 )
 
         if cls == "environment":
+            if telemetry is not None:
+                telemetry_end_attempt(
+                    telemetry, ok=False, exit_code=rc,
+                    failure_stage="startup_failed",
+                    failure_reason=(
+                        "environment failure (no downgrade retry): "
+                        + tail[-300:]
+                    ),
+                    error_summary=tail[-4000:],
+                    output_exists=(
+                        output.is_file() and output.stat().st_size > 0
+                    ),
+                    output_size=(
+                        output.stat().st_size if output.is_file() else None
+                    ),
+                    output_path=output,
+                    warnings=list(warnings),
+                )
             raise RuntimeError(
                 f"[FATAL] environment failure (no downgrade retry): "
                 f"{tail[-400:]}"
             )
 
         # format-class failure -> next rung (automatic, no prompt)
-        if rung_idx == len(rungs) - 1:
-            raise RuntimeError(
-                f"[FATAL] all format rungs failed; last log:\n"
-                f"{tail[-500:]}"
-            )
-        if no_downgrade:
+        if rung_idx == len(rungs) - 1 or no_downgrade:
+            if telemetry is not None:
+                telemetry_end_attempt(
+                    telemetry, ok=False, exit_code=rc,
+                    failure_stage=(
+                        "verification_failed" if frame_note
+                        else "encode_failed"
+                    ),
+                    failure_reason=(
+                        frame_note or
+                        f"encoder rc={rc} ({cls} failure, no rung left)"
+                    ),
+                    verification=(
+                        {"status": "failed",
+                         "checks": ["frame_count_and_fps_match_source"],
+                         "detail": frame_note}
+                        if frame_note else None
+                    ),
+                    error_summary=tail[-4000:],
+                    output_exists=(
+                        output.is_file() and output.stat().st_size > 0
+                    ),
+                    output_size=(
+                        output.stat().st_size if output.is_file() else None
+                    ),
+                    output_path=output,
+                    warnings=list(warnings),
+                )
+            if rung_idx == len(rungs) - 1:
+                raise RuntimeError(
+                    f"[FATAL] all format rungs failed; last log:\n"
+                    f"{tail[-500:]}"
+                )
             raise RuntimeError(
                 "[FATAL] runtime encode failure and --no-downgrade "
                 "is set; no retry"
+            )
+        if telemetry is not None:
+            telemetry_end_attempt(
+                telemetry, ok=False, exit_code=rc,
+                failure_stage=(
+                    "verification_failed" if frame_note else "encode_failed"
+                ),
+                failure_reason=(
+                    frame_note or
+                    f"encoder rc={rc} ({cls} failure) -> downgrade retry"
+                ),
+                verification=(
+                    {"status": "failed",
+                     "checks": ["frame_count_and_fps_match_source"],
+                     "detail": frame_note}
+                    if frame_note else None
+                ),
+                error_summary=tail[-4000:],
+                output_exists=(
+                    output.is_file() and output.stat().st_size > 0
+                ),
+                output_size=(
+                    output.stat().st_size if output.is_file() else None
+                ),
+                output_path=output,
+                warnings=list(warnings),
             )
         emit_warning(
             logger,
@@ -807,6 +1274,7 @@ def encode_one_sony_hw(
     status_cb: StatusCb | None = None,
     show_progress: bool = True,
     throughput_cb: Callable[[float], None] | None = None,
+    calibration: dict | None = None,
 ) -> str:
     """Sony preservation path with a rigaya hardware encoder."""
     work_dir = work_root / job_id_for(src)
@@ -860,6 +1328,7 @@ def encode_one_sony_hw(
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
+            calibration=calibration,
         )
         warnings.extend(enc_warnings)
         file_logger.info("ENCODE_FORMAT | %s/%s", used[0], used[1])
@@ -1045,6 +1514,7 @@ def encode_one_hw_classic(
     status_cb: StatusCb | None = None,
     show_progress: bool = True,
     throughput_cb: Callable[[float], None] | None = None,
+    calibration: dict | None = None,
 ) -> str:
     """Non-Sony material: video + audio only, single-tool single pass.
     At check_level='full' the PSNR/SSIM sample gates delivery (FAIL
@@ -1095,6 +1565,7 @@ def encode_one_hw_classic(
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
+            calibration=calibration,
         )
     except Exception as exc:
         logger.error("[FAIL] hardware encode | %s | %s", src, exc)
@@ -1239,6 +1710,7 @@ def encode_one_dji_hw(
     status_cb: StatusCb | None = None,
     show_progress: bool = True,
     throughput_cb: Callable[[float], None] | None = None,
+    calibration: dict | None = None,
 ) -> str:
     """DJI preservation path (Osmo Action / drones).
 
@@ -1309,6 +1781,7 @@ def encode_one_dji_hw(
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
+            calibration=calibration,
         )
         warnings.extend(enc_warnings)
         file_logger.info("ENCODE_FORMAT | %s/%s", used[0], used[1])
@@ -1674,6 +2147,30 @@ def process_file_hw(
         else None
     )
 
+    # --- calibration job scope (observer only, best effort) -------------
+    classification = None
+    if _calibration_enabled():
+        classification, _scaling, class_error = _classification_for(src_info)
+        if class_error:
+            _calibration_warn("classification", RuntimeError(class_error))
+    telemetry = telemetry_begin_job(
+        src=src,
+        dst=dst,
+        preset=ctx.preset,
+        profile=ctx.profile,
+        backend=backend.name,
+        src_info=src_info,
+        classification=classification,
+        input_root=ctx.input_root,
+        output_root=ctx.output_root,
+        logs_root=ctx.logs_root,
+        config_path=None,
+        ffmpeg=ctx.ffmpeg,
+        check_level=ctx.check_level,
+        dry_run=ctx.dry_run,
+        rel_path=_relative_path_text(src, ctx.input_root),
+    )
+
     if is_sony_source(source_streams):
         result = encode_one_sony_hw(
             src=src,
@@ -1709,6 +2206,7 @@ def process_file_hw(
             throughput_cb=lambda fps: ctx.throughput.append(
                 (backend.name, fps)
             ),
+            calibration=telemetry,
         )
     elif is_dji_source(source_streams):
         result = encode_one_dji_hw(
@@ -1745,6 +2243,7 @@ def process_file_hw(
             throughput_cb=lambda fps: ctx.throughput.append(
                 (backend.name, fps)
             ),
+            calibration=telemetry,
         )
     else:
         result = encode_one_hw_classic(
@@ -1778,6 +2277,7 @@ def process_file_hw(
             throughput_cb=lambda fps: ctx.throughput.append(
                 (backend.name, fps)
             ),
+            calibration=telemetry,
         )
 
     if result == "failed" and ctx.failed_path is not None:
@@ -1786,6 +2286,17 @@ def process_file_hw(
             source=src, preset=ctx.preset, backend_name=backend.name,
             stage="encode", error="see per-file log",
             log_path=str(file_log),
+        )
+    if telemetry is not None:
+        telemetry_end_job(
+            telemetry,
+            result=result,
+            failure_stage="encode_failed" if result == "failed" else "",
+            failure_reason=(
+                "hardware encode failed (see the per-file log)"
+                if result == "failed" else ""
+            ),
+            output={"output_path": str(dst)} if result == "done" else None,
         )
     if ctx.status is not None:
         ctx.status.finish(src, result)
