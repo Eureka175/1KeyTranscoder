@@ -390,8 +390,9 @@ olddocs/                 历史档案存档（各阶段代码快照 / 被取代�
 ## 许可证
 
 **GNU Lesser General Public License v3.0 或更高版本（LGPL-3.0-or-later）**，
-全部开源。许可证原文：[`LICENSE`](LICENSE)（LGPL-3.0）；本许可证所并入引用的
-GNU GPL v3 全文见 [`COPYING`](COPYING)。
+全部开源。许可文本：[`LICENSE`](LICENSE)（GNU LGPL v3 正文）+
+[`licenses/GPL-3.0.txt`](licenses/GPL-3.0.txt)（LGPL-3.0 并入引用的 GNU GPL v3
+全文）；版权与 SPDX 标识见 [`NOTICE`](NOTICE)。本仓库未使用 MIT 或其他许可。
 
 > 第三方工具（NVEncC/QSVEncC、GPAC、ffmpeg、Gyroflow）以独立可执行文件
 > 形式调用，各按其自身许可证分发，不并入本项目。

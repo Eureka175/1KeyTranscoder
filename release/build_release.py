@@ -17,7 +17,8 @@ Package layout = repository layout minus development artefacts, because
         <encoder + scaling profile>.json
         tools/ffmpeg.exe  tools/ffprobe.exe
         tools/NVEncC_9.31_x64/  tools/QSVEncC_8.26_x64/  tools/GPAC/
-        README.md  LICENSE  COPYING  VERSION  release-manifest.json
+        README.md  LICENSE  NOTICE  VERSION  release-manifest.json
+        licenses/GPL-3.0.txt
 
 Deliberately NOT packaged (development-only, see ALLOWLIST below):
 `.git/`, `work/`, `testsets/`, `docs/`, `olddocs/`, `logs/`,
@@ -58,7 +59,8 @@ TOP_FILES = (
     "start.bat",
     "README.md",
     "LICENSE",
-    "COPYING",
+    "NOTICE",
+    "licenses/GPL-3.0.txt",
     "VERSION",
 )
 TOP_DIRS = ("core", "encoders", "preservation", "tests")
