@@ -23,8 +23,9 @@
 | | |
 |---|---|
 | Branch | `feature/hardware-decode-integration` |
-| Base | `main` @ `b3245b7` |
-| Commit range | `da27e28` → HEAD |
+| Base | `main` @ `b3245b7`（**main 未被修改**） |
+| Commits | `da27e28` … `5e83d35`（8 个分阶段 commit） |
+| 附加 | 分支上还有仓库所有者自己的 docs commit `17ab8a7`（tools/ 不可丢失性），非本 session 产出 |
 | 机器 | Windows 11 · Core Ultra 9 285H · RTX 5070 Laptop 8 GB (driver 616.56) · Arc 140T (32.0.101.8974) |
 | 工具链 | FFmpeg 9.0.1 · GPAC 26.02 · NVEncC 9.31 patched · QSVEncC 8.26 patched |
 | 默认后端行为 | **未改变**：`--hw-decode off` 是默认，argv 与 v0.6.2 逐 token 相同 |
@@ -290,7 +291,8 @@ final regression 的价值在这里体现得最直接：它把**本 session 自�
 
 ```text
 Branch:        feature/hardware-decode-integration
-Commit range:  da27e28 -> HEAD
+Base:          main @ b3245b7   (main 未被本 session 修改)
+Commits:       da27e28 .. 5e83d35   （8 个 commit，分阶段）
 
 Test Matrix:
     Total:     83
