@@ -1174,6 +1174,20 @@ def _relative_source_path(src: Path, input_root: Path | None) -> str:
     return src.name
 
 
+def _calibration_job_id(src: Path, preset: str) -> str:
+    """Calibration job identity for one (source, preset) job.
+
+    ``--preset all`` encodes the SAME source once per preset, and each of
+    those is a separate job with its own attempts. The production job id
+    (source-derived, see core.paths.job_id_for) would collide across
+    presets, and the collector's uniqueness check would then treat the
+    four runs as one attempt and drop three of them. Qualifying the id
+    with the preset keeps every attempt distinguishable while remaining
+    stable and human-readable.
+    """
+    return f"{job_id_for(src)}-{preset.upper()}"
+
+
 def _failure_result(stage: str, reason: str, rc: int | None = None) -> dict:
     return {
         "status": ENCODE_FAILED,
@@ -1353,7 +1367,7 @@ def run_x265_job(
         # Proof that the job existed even though it never reached an
         # encode attempt (probe_failed is not an attempt failure).
         cal_begin_job(
-            job_id=job_id_for(src),
+            job_id=_calibration_job_id(src, preset),
             source=src,
             relative_path=_relative_source_path(src, input_root),
             requested_preset=preset,
@@ -1373,6 +1387,7 @@ def run_x265_job(
     job = JobRun()
     source_summary = prepared.summary
     _emit_job_started(
+        job_id=_calibration_job_id(src, preset),
         src=src, dst=dst, preset=preset, profile=profile, prepared=prepared,
         requested=requested, requests_multiple=multiple_presets,
         requested_encoder=requested_encoder, input_root=input_root,
@@ -1479,6 +1494,7 @@ def run_x265_job(
 
 def _emit_job_started(
     *,
+    job_id: str,
     src: Path,
     dst: Path,
     preset: str,
@@ -1516,7 +1532,7 @@ def _emit_job_started(
         except Exception:
             observation.tool_versions = {}
     cal_begin_job(
-        job_id=job_id_for(src),
+        job_id=job_id,
         source=src,
         relative_path=_relative_source_path(src, input_root),
         requested_preset=preset,

@@ -1563,11 +1563,19 @@ class Collector:
         attempt_id = str(record.get("attempt_id") or "")
         finished_id = str(record.get("attempt_finished_event_id") or "")
         if attempt_id and attempt_id in self.attempt_ids:
+            # Rare by construction: attempt ids are unique per
+            # (job_id, attempt_number) and a job id is unique per
+            # (source, preset). If it does happen, a producer emitted two
+            # different attempts under one id — loud, never silent.
             self.counters.records_skipped_duplicate += 1
             self.log(
-                "info",
-                f"attempt {attempt_id} already persisted — skipping "
-                "(idempotent)",
+                "error",
+                f"DUPLICATE attempt_id {attempt_id} in "
+                f"job {record.get('job_id')} (preset "
+                f"{record.get('preset')!r}, backend "
+                f"{record.get('backend')!r}) — the existing record was kept "
+                "and this one was NOT persisted; the producer must give "
+                "each attempt a unique id",
             )
             self._mark_persisted(record)
             return False
