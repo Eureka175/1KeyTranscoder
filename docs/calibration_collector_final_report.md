@@ -55,18 +55,41 @@ data yet; see §13 "Unverified / residual risk".
 
 ### Note on divergence from current `main`
 
-This branch was cut from `1a41fff` (v0.7.0). Local `main` has since advanced
-to `62c5504` with two **licensing-only** commits
-(`015bee8`, `62c5504`: `LICENSE` / `COPYING` / `NOTICE` /
-`licenses/GPL-3.0.txt` / `README.md` / `docs/README.md` /
-`release/*.py`). `main` therefore does not carry the collector, and this
-branch does not carry the licence reorganisation.
+The three lines forked from **`b3245b7`** ("docs: 记录分支归档约定"),
+which is `main`'s current tip-minus-two:
 
-That divergence is intentional and harmless: the collector never reads the
-project's licence files, and the soak host receives only the standalone
-release package, not a checkout. **Do not merge this branch into `main` to
-"pick up" the licensing work.** If the collector is ever revived for new
-development, rebase it onto the then-current `main` *at that time*.
+```
+                          b3245b7  (main's ancestor)
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+   main (62c5504)    feature/hardware-      feature/x265-calibration-
+                     decode-integration     collector (1294a44)
+                     (ca72e09)              = v0.7.0 + calibration
+   = b3245b7 + 2 licensing commits
+```
+
+| Direction | Content |
+| --- | --- |
+| `main` has, this branch does not | 2 commits, licensing reorganisation only: `015bee8`, `62c5504` (`LICENSE`, `NOTICE`, `licenses/GPL-3.0.txt`, `README.md`, `docs/README.md`, `release/build_release.py`, `release/verify_package.py`) |
+| This branch has, `main` does not | **12 commits**: the 10-commit v0.7.0 / hardware-decode line (`17ab8a7` … `1a41fff`, 47 files / ~20k insertions) **plus** this session's 3 calibration commits |
+
+Two consequences that matter for archival:
+
+1. **`main` is still on `VERSION` 0.6.2**, and v0.7.0 is *not yet merged into
+   `main`*. This branch is therefore based on the released v0.7.0 tag, which
+   currently lives only on `feature/hardware-decode-integration` and here.
+   That is correct and intended for a soak host — it runs the released
+   version — but it means **neither v0.7.0 nor the collector is in `main`
+   yet**.
+2. **Do not merge this branch into `main`.** Doing so would drag the whole
+   hardware-decode line into `main` as a side effect of "archiving the
+   collector", which is exactly what this task forbids. The collector is not
+   a delivery vehicle for unrelated work.
+
+If the collector is ever revived for new development, rebase it onto the
+then-current `main` at that time — and decide the v0.7.0/hwdecode merge
+question separately, on its own merits.
 
 ---
 
@@ -83,6 +106,8 @@ Commit range:  1a41fff (v0.7.0 "chore(release): bump version to 0.7.0")
                5e850ff  fix(calibration): unique job identity per
                         (source, preset); log duplicate attempt ids as errors
 Baseline tag:  1a41fff == VERSION 0.7.0 (== refs/tags/v0.7.0)
+                NB: main is still at VERSION 0.6.2 and does not yet contain
+                v0.7.0 — see "Note on divergence from current main" in §0
 Merged to main: NO (deliberately out of scope for this session)
 Push state:    local only; origin has main + feature/hardware-decode-integration
 ```
@@ -360,7 +385,8 @@ artifacts against the report rather than repeating the expensive suites:
 | DEP matrix, re-run after the test-path fix below | **18/18 PASSED** |
 | Collector source traceable on this branch | all 16 deliverables tracked (`git ls-tree`) |
 | `docs/calibration_collector_final_report.md` present | yes (tracked) |
-| Branch history linear, no merge commits, no unrelated changes | yes (2 non-merge commits, 22 files, all calibration-related) |
+| Branch history linear, no merge commits, no unrelated changes | yes (3 non-merge commits; the 22 files changed since `1a41fff` are calibration-only) |
+| `main` untouched by this task | yes — `main` still `62c5504`, not an ancestor of this branch, contains none of these commits |
 
 One leak was fixed in this pass: `tests/dep_matrix.py` wrote its clean-machine
 encode output into `dist/x265_calibration/_dep_corpus/`. `dist/` is gitignored
