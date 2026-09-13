@@ -33,7 +33,8 @@ F:\1KeyTranscoder\
 ├── watchfolder.py          轮询批处理入口（转调 1kt.py）
 ├── start.bat               双击启动
 ├── VERSION                 版本号唯一来源（0.6.2）
-├── LICENSE                 LGPL-3.0-or-later
+├── LICENSE                 LGPL-3.0-or-later（正文；GPL-3.0 全文见 COPYING）
+├── COPYING                 GNU GPL v3 全文（LGPL-3.0 并入引用）
 │
 ├── core/                   ★ 运行时核心（19 个 .py）：config / probe / postprobe /
 │                             paths / scaling / source_classifier / batch_hw /
@@ -73,7 +74,7 @@ F:\1KeyTranscoder\
 
 | 目录 / 文件 | 入包 | 说明 |
 |---|---|---|
-| `1kt.py` `watchfolder.py` `start.bat` `README.md` `LICENSE` `VERSION` | ✅ | 必需条目（缺失即拒绝构建） |
+| `1kt.py` `watchfolder.py` `start.bat` `README.md` `LICENSE` `COPYING` `VERSION` | ✅ | 必需条目（缺失即拒绝构建） |
 | `core/` `encoders/` `preservation/` `tests/` | ✅ | 全部 `.py`（排除 `__pycache__`/.pyc） |
 | `*.json`（档位配置） | ✅ | `TOP_GLOBS = ("*.json",)` |
 | `tools/`（ffmpeg / NVEncC / QSVEncC / GPAC） | ✅ | 仅 `TOOL_FILES` + `TOOL_DIRS` 白名单；**`tools/VCEEncC_9.12_x64` 不入包** |

@@ -32,6 +32,7 @@ REQUIRED_ENTRIES = (
     "VERSION",
     "README.md",
     "LICENSE",
+    "COPYING",
     "release-manifest.json",
     "core/version.py",
     "encoders",
