@@ -3,6 +3,31 @@ x265 CALIBRATION COLLECTOR — DEPLOYMENT README
 1KeyTranscoder v0.7.0 / feature/x265-calibration-collector
 ================================================================================
 
+IF YOU READ CHINESE, START WITH QUICKSTART.zh-CN.txt INSTEAD.
+It is the shorter, task-oriented entry point. This file is the complete
+reference: architecture, event lifecycle, data model, troubleshooting.
+
+IF YOU RECEIVED THIS AS A ZIP: extract the WHOLE folder before running
+anything. The zip contains (top level of the extracted folder):
+
+    START-HERE.txt                  one-paragraph pointer
+    QUICKSTART.zh-CN.txt            Chinese quick start (recommended)
+    README.txt                      this file
+    x265-calibration-collector.exe  the collector (the only program to run)
+    START-COLLECTOR.bat             double-click: start it
+    CHECK-INSTALL.bat               double-click: read-only self test
+    INSTALL-SCHEDULED-TASK.bat      double-click: run at boot
+    UNINSTALL-SCHEDULED-TASK.bat    double-click: stop running at boot
+    schema.json  collector.toml  VERSION
+    PACKAGE-CONTENTS.txt            manifest: size + SHA-256 of every file
+    SHA256SUMS.txt                  checksums only
+    calibration/                    data directory, pre-created and empty
+    tools/                          dev-machine tools, NOT for the soak host
+
+The three steps in short: extract -> set the two ONEXKT_* environment
+variables for the production account -> double-click START-COLLECTOR.bat.
+Sections 2 and 3 below are the detailed version of that.
+
 WHAT THIS IS
 ------------
 An offline, headless, standalone data collector that records what the

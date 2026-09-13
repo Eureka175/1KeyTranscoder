@@ -17,10 +17,17 @@ ARCHIVED FOR LONG-TERM SOAK
 Branch:    feature/x265-calibration-collector
 Purpose:   offline long-term calibration data collection
 Baseline:  v0.7.0 / 1a41fff
-HEAD:      5e850ff  (08f75eb, 5e850ff on top of 1a41fff)
+HEAD:      2813fcb  (08f75eb, 5e850ff, 1294a44, 2813fcb
+                     on top of 1a41fff)
 Status:    READY FOR 1-MONTH SOAK
 Merged to main: NO — and it must not be merged
 主开发线:  main
+
+Deployable artifact (this is what goes to the soak host):
+  dist/x265_release/x265-calibration-collector-v0.7.0.zip   (7.63 MiB)
+  rebuild: python tools/x265_calibration/release/make_zip.py
+  verify : python tools/x265_calibration/tests/zip_distribution.py
+  exe sha256: 7bc90332b5a24cb1125223e3d87bc441d98730904fd057f6b33114442003ad84
 ```
 
 The collector is **not** part of `main`'s default production execution path.
@@ -331,6 +338,35 @@ release package: dist/x265_release/x265-calibration-collector/ containing
                  the exe, README.txt, schema.json, collector.toml, VERSION,
                  tools/analyze.py, tools/verify_frozen_exe.py,
                  tools/deploy_helpers.py, SHA256SUMS.txt
+
+deployable zip:  dist/x265_release/x265-calibration-collector-v0.7.0.zip
+                 (7.63 MiB) — THE artifact to hand to the soak host. On a
+                 machine with no Python it extracts into ONE folder that is
+                 complete and self-describing:
+
+                   START-HERE.txt                one-paragraph pointer
+                   QUICKSTART.zh-CN.txt          Chinese quick start
+                   README.txt                    full English document
+                   x265-calibration-collector.exe
+                   START-COLLECTOR.bat           start (foreground)
+                   CHECK-INSTALL.bat             read-only self test
+                   INSTALL-SCHEDULED-TASK.bat    run at boot
+                   UNINSTALL-SCHEDULED-TASK.bat  stop running at boot
+                   schema.json / collector.toml / VERSION
+                   PACKAGE-CONTENTS.txt          size + SHA-256 of every file
+                   SHA256SUMS.txt
+                   calibration/                  data dir, pre-created empty,
+                                                 README in pending/ explains
+                                                 that its content is producer
+                                                 input and is never counted
+                   tools/                        dev-machine tools only
+
+                 Built by tools/x265_calibration/release/make_zip.py (also
+                 reachable as `deploy_helpers.py make-zip`). Deterministic
+                 content, fixed timestamps, DEFLATE. The pre-created
+                 calibration/ directory removes one manual step from the
+                 deployment and makes the `ONEXKT_CALIBRATION_SPOOL` value
+                 obvious.
 ```
 
 Two packaging findings worth recording:
@@ -370,6 +406,25 @@ All suites run on the development machine (Windows, RTX 5070 Laptop, Python
 | Real hardware ladder | `python tools/x265_calibration/tests/ladder_integration.py` | **PASS** |
 | Frozen exe verification | `python tools/x265_calibration/release/verify_frozen_exe.py --inspect-archive` | **VERIFY OK** |
 | Offline static check | `python tools/x265_calibration/release/deploy_helpers.py offline-check` | **OK** |
+| Deployable ZIP, end to end | `python tools/x265_calibration/tests/zip_distribution.py` | **46/46 PASSED** |
+
+The ZIP suite reproduces the receiving operator's experience rather than just
+inspecting the archive: it extracts into a path containing a space, checks
+that every pre-created data directory survived the zip, verifies
+`SHA256SUMS.txt` against every packaged byte, runs the exe with no usable
+Python on `PATH`/`PYTHONHOME`/`PYTHONPATH`, writes a real event through the
+production emitter into the shipped `calibration/` directory and consumes it
+with the packaged exe, then **executes** `CHECK-INSTALL.bat` and
+`START-COLLECTOR.bat` and asserts from the collector's own log that it watched
+`<pkg>\calibration` and created nothing outside the package.
+
+That last assertion caught a real defect: the `.bat` launchers derived the
+data directory as `%~dp0..\calibration`, i.e. the folder *above* the extracted
+package, so double-clicking `START-COLLECTOR.bat` would have watched an empty
+directory while the packaged `calibration/` stayed empty forever. They now use
+`%~dp0calibration`. The same suite then caught two bugs in itself (an
+off-by-one event count, and running the Python analyzer under the deliberately
+broken Python environment), both fixed.
 
 ### Closing re-verification (archival pass)
 
@@ -684,14 +739,15 @@ scope (they touch `main` or the network):
 
 ```
 Branch:            feature/x265-calibration-collector
-HEAD:              5e850ff
-Commit range:      1a41fff .. 5e850ff
+HEAD:              2813fcb
+Commit range:      1a41fff .. 2813fcb
 Offline:           PASS
 Headless:          PASS
 Clean-machine test: PASS (approximated: outside repo, minimal env, no Python
                           on PATH; see "Unverified" item 1)
 Restart recovery:  PASS
 Standalone binary: PASS (7.77 MiB, self-contained, schema bundled)
+Deployable zip:    PASS (7.63 MiB, extract-and-run, 46/46 zip checks)
 Merged to main:    NO (must stay NO)
 main modified:     NO
 

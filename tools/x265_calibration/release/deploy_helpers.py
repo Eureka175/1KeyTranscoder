@@ -1,13 +1,25 @@
 """Deployment helpers for the x265 calibration collector (dev-machine side).
 
     python tools/x265_calibration/release/deploy_helpers.py package
-        -> dist/x265_release/x265-calibration-collector/ (what you copy)
+        -> dist/x265_release/x265-calibration-collector/ (staging folder)
+
+    python tools/x265_calibration/release/deploy_helpers.py make-zip
+        -> dist/x265_release/x265-calibration-collector-v<version>.zip
+           THE deliverable: one folder, extract-and-run on the soak host.
+           Delegates to release/make_zip.py.
 
     python tools/x265_calibration/release/deploy_helpers.py install-dir D:\\1kt\\collector
         -> writes the scheduled-task install script + start.bat into a folder
+           (superseded by the .bat files already inside the zip)
 
     python tools/x265_calibration/release/deploy_helpers.py schedule-task
         -> prints the schtasks.exe command (does NOT execute it)
+
+    python tools/x265_calibration/release/deploy_helpers.py offline-check
+        -> static check: nothing in the collector can reach the network
+
+    python tools/x265_calibration/release/deploy_helpers.py check-package [DIR]
+        -> runs the packaged exe in the given (or staged) folder
 
 Standard library only. Nothing here runs during the soak.
 """
@@ -240,11 +252,33 @@ def run_deployed_check(package_dir: Path) -> int:
         shutil.rmtree(scratch, ignore_errors=True)
 
 
+def run_make_zip(extra: list[str]) -> int:
+    """Delegate to the sibling make_zip.py (it is a module, not a package)."""
+    import importlib.util
+
+    script = _here() / "make_zip.py"
+    if not script.is_file():
+        print(f"[FAIL] {script} not found next to deploy_helpers.py")
+        return 1
+    spec = importlib.util.spec_from_file_location("_cal_make_zip", script)
+    if spec is None or spec.loader is None:
+        print(f"[FAIL] cannot load {script}")
+        return 1
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return int(module.main(extra))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="deploy_helpers.py")
     sub = parser.add_subparsers(dest="command", required=True)
     pkg = sub.add_parser("package", help="build the release package directory")
     pkg.add_argument("--clean", action="store_true")
+    mz = sub.add_parser("make-zip",
+                        help="build the deployable extract-and-run zip")
+    mz.add_argument("--clean", action="store_true")
+    mz.add_argument("--out", type=Path, default=None)
+    mz.add_argument("--keep-stage", action="store_true")
     inst = sub.add_parser("install-dir", help="write deployment scripts")
     inst.add_argument("directory", type=Path)
     sub.add_parser("schedule-task", help="print the schtasks command")
@@ -256,6 +290,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "package":
         return build_package(clean=args.clean)
+    if args.command == "make-zip":
+        extra: list[str] = []
+        if args.clean:
+            extra.append("--clean")
+        if args.keep_stage:
+            extra.append("--keep-stage")
+        if args.out is not None:
+            extra += ["--out", str(args.out)]
+        return run_make_zip(extra)
     if args.command == "install-dir":
         return write_install_scripts(args.directory)
     if args.command == "schedule-task":
