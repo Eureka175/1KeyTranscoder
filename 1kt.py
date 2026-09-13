@@ -1755,7 +1755,17 @@ def parse_args() -> argparse.Namespace:
 
 
 def spawn_dashboard(json_path: Path, script_dir: Path):
-    """Open the nvidia-smi style dashboard in a separate console."""
+    """Open the nvidia-smi style dashboard in a separate console.
+
+    Only meaningful in a source checkout: it re-invokes this project via
+    `sys.executable -m core.dashboard_ui`. In a frozen build
+    `sys.executable` is the frozen binary itself, which has no
+    `-m core.dashboard_ui` mode, so the dashboard is skipped instead of
+    spawning a child process that would fail immediately. A frozen build is
+    run headless by definition.
+    """
+    if getattr(sys, "frozen", False):
+        return None
     try:
         return subprocess.Popen(
             [sys.executable, "-m", "core.dashboard_ui", str(json_path)],

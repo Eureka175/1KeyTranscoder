@@ -400,6 +400,35 @@ portable tools:  x265-analyze.exe / x265-verify.exe / x265-deploy.exe,
                  9.54 MiB each, stdlib-only bundles (0 site-packages, 0
                  suspicious entries), each probed at build time with an
                  argument that exercises its full frozen import graph.
+
+portable x265 test bundle (the "drop media and walk away" artefact):
+                 dist/x265_portable/1KT-x265-portable.zip  (~369 MiB, from
+                 ~723 MiB uncompressed). This is the whole test environment:
+
+                   RUN-TEST.bat          start transcoder watcher + collector
+                   CHECK-TEST.bat        read-only health check
+                   ANALYZE-DATA.bat      calibration report
+                   COLLECT-RESULTS.bat   package everything for hand-over
+                   README-FIRST.txt      one page, Chinese + English
+                   bin/1kt.exe           the REAL production transcoder
+                   bin/1kt-watch.exe     polls input/, runs 1kt per pass
+                   bin/x265-calibration-collector.exe
+                   tools/ffmpeg.exe, tools/ffprobe.exe, tools/GPAC/
+                   tools/x265-{analyze,verify,deploy}.exe
+                   config/x265.json, config/x265_scaling.json
+                   input/  output/  calibration/  logs/  work/
+
+                 The operator drops media into input/, double-clicks
+                 RUN-TEST.bat, and gets transcoded output plus calibration
+                 records with no Python and no installed tools anywhere.
+                 NVEncC/QSVEncC/avhw are deliberately NOT bundled: this
+                 bundle is x265-only, which removes ~1.8 GB.
+
+                 Built by release/make_portable.py, which needs the frozen
+                 executables from release/build_standalone.py first. The
+                 transcoder is the production 1kt.py frozen as bin/1kt.exe
+                 (numpy and scipy ARE bundled: core/sync_estimate.py and the
+                 channel-sync modules need them).
 ```
 
 Two packaging findings worth recording:
