@@ -9,16 +9,82 @@ production encode.
 
 ---
 
+## 0. Archive Status
+
+```
+ARCHIVED FOR LONG-TERM SOAK
+
+Branch:    feature/x265-calibration-collector
+Purpose:   offline long-term calibration data collection
+Baseline:  v0.7.0 / 1a41fff
+HEAD:      5e850ff  (08f75eb, 5e850ff on top of 1a41fff)
+Status:    READY FOR 1-MONTH SOAK
+Merged to main: NO — and it must not be merged
+主开发线:  main
+```
+
+The collector is **not** part of `main`'s default production execution path.
+It is an opt-in research/experiment tool that lives only on this branch.
+
+| Boundary | Rule |
+| --- | --- |
+| Process model | Collector and Production Transcoder are two **independent sibling processes**. Neither launches the other. |
+| Control | The collector does **not** participate in any production decision. |
+| Retry | The collector does **not** retry. Retry belongs entirely to production. |
+| Transcoding | The collector does **not** transcode, decode, or run ffmpeg/x265. |
+| Failure isolation | A collector failure **must not block production**. A missing, crashed or disk-full collector can only ever mean "calibration data incomplete". |
+| Data path | The collector only **consumes the filesystem spool** and writes `samples/`. It never writes back to production. |
+
+**One-month intent.** The dataset collected by this branch will be brought
+back to `main` after the soak and used for the *next* session's x265
+parameter / scaling work (`x265_scaling.json`, source classification, scaling
+ratios, scaling caps, dynamic VBV, `merange`, lookahead, and parameter
+behaviour across resolution / FPS / bitrate). No optimization is done here.
+
+**This branch is not the 1.0.0 development line.** New features, Audio Drift
+and all 1.0.0 mainline work continue on `main`. This branch is frozen and is
+only used for:
+
+1. the 1-month offline real-data soak,
+2. calibration data analysis,
+3. fixing a **blocking** collector defect if one appears during the soak.
+
+**Status wording.** `READY FOR 1-MONTH SOAK` is deliberately **not**
+`production ready`. Nothing here has been exercised for a month on real
+data yet; see §13 "Unverified / residual risk".
+
+### Note on divergence from current `main`
+
+This branch was cut from `1a41fff` (v0.7.0). Local `main` has since advanced
+to `62c5504` with two **licensing-only** commits
+(`015bee8`, `62c5504`: `LICENSE` / `COPYING` / `NOTICE` /
+`licenses/GPL-3.0.txt` / `README.md` / `docs/README.md` /
+`release/*.py`). `main` therefore does not carry the collector, and this
+branch does not carry the licence reorganisation.
+
+That divergence is intentional and harmless: the collector never reads the
+project's licence files, and the soak host receives only the standalone
+release package, not a checkout. **Do not merge this branch into `main` to
+"pick up" the licensing work.** If the collector is ever revived for new
+development, rebase it onto the then-current `main` *at that time*.
+
+---
+
 ## 1. Branch and commit range
 
 ```
 Branch:        feature/x265-calibration-collector   (from v0.7.0, NOT main,
                NOT feature/hardware-decode-integration)
 Commit range:  1a41fff (v0.7.0 "chore(release): bump version to 0.7.0")
-               .. 08f75eb (feat(calibration): offline x265 calibration
-                            collector + standalone exe)
-Baseline tag:  1a41fff == VERSION 0.7.0
+               .. 5e850ff (fix(calibration): unique job identity per
+                            (source, preset))
+               08f75eb  feat(calibration): offline x265 calibration
+                        collector + standalone exe
+               5e850ff  fix(calibration): unique job identity per
+                        (source, preset); log duplicate attempt ids as errors
+Baseline tag:  1a41fff == VERSION 0.7.0 (== refs/tags/v0.7.0)
 Merged to main: NO (deliberately out of scope for this session)
+Push state:    local only; origin has main + feature/hardware-decode-integration
 ```
 
 Changed this session (21 files, +9923/-125):
@@ -280,6 +346,28 @@ All suites run on the development machine (Windows, RTX 5070 Laptop, Python
 | Frozen exe verification | `python tools/x265_calibration/release/verify_frozen_exe.py --inspect-archive` | **VERIFY OK** |
 | Offline static check | `python tools/x265_calibration/release/deploy_helpers.py offline-check` | **OK** |
 
+### Closing re-verification (archival pass)
+
+The archival pass re-ran only what changed, and re-checked the recorded
+artifacts against the report rather than repeating the expensive suites:
+
+| Check | Result |
+| --- | --- |
+| `git status --porcelain --untracked-files=all` | empty (working tree clean) |
+| EXE SHA-256 vs the value recorded in this report | **MATCH** (`7bc90332…3ad84`) |
+| EXE size vs the value recorded in this report | **MATCH** (8,152,101 bytes) |
+| Release package `SHA256SUMS.txt` vs the packaged files | consistent (8 entries) |
+| DEP matrix, re-run after the test-path fix below | **18/18 PASSED** |
+| Collector source traceable on this branch | all 16 deliverables tracked (`git ls-tree`) |
+| `docs/calibration_collector_final_report.md` present | yes (tracked) |
+| Branch history linear, no merge commits, no unrelated changes | yes (2 non-merge commits, 22 files, all calibration-related) |
+
+One leak was fixed in this pass: `tests/dep_matrix.py` wrote its clean-machine
+encode output into `dist/x265_calibration/_dep_corpus/`. `dist/` is gitignored
+so it never reached a commit, but a test must not deposit output in the
+release directory. It now writes under `work/clean_machine_out/`, and the
+stray directory was removed. The release package contents were not affected.
+
 ### DEP matrix detail
 
 | ID | Requirement | Result | Evidence |
@@ -528,17 +616,58 @@ audited — for one month of production, with the failed attempts intact.
 
 ---
 
-## 15. Final
+## 15. Archival: tag recommendation (NOT created — decision left to the maintainer)
+
+This branch was **not** tagged. The reason is a namespace conflict with the
+project's own documented convention, so the decision is recorded here instead
+of being taken unilaterally.
+
+The project's archive convention (`b3245b7`, `olddocs/README.md` §5) defines
+`archived/*` as **annotated tags for branches that were merged into `main`
+and then deleted** — the tag is the only remainder of that line
+(`archived/rigaya-nvencc-avhw`, `archived/hwdecode-e2e-benchmark`,
+`archived/av1`, …). Every one of those tags means *"merged and retired"*.
+
+`feature/x265-calibration-collector` is the opposite case: it is
+**deliberately not merged**, is **not deleted**, and stays **live** for a
+month. Reusing `archived/*` here would state something false ("merged"), and
+inventing a new namespace (`soak/*`, `frozen/*`) would create new version
+semantics that this task was told not to invent.
+
+**Recommendation for the maintainer** — pick one when the moment is right:
+
+| Option | When it fits | Effect |
+| --- | --- | --- |
+| **Do nothing** (current state) | If the branch simply stays and gets pushed — enough for reproducibility, since the branch ref *is* the marker. | none |
+| `git tag -a soak/x265-calibration-collector-2026-09 <HEAD>` | If a machine-readable "frozen soak point" is wanted without claiming merge. | new namespace: explicitly *not* `archived/*`, so the "merged" meaning stays intact |
+| `git tag -a archived/x265-calibration-collector <HEAD>` **after** the soak, if the branch is then merged-and-retired | Only once the branch truly reaches the end state the `archived/*` tags describe. | consistent with the existing convention |
+
+Two mechanical steps remain for the maintainer, both outside this task's
+scope (they touch `main` or the network):
+
+1. **Push the branch** — it is currently local only; `origin` has only `main`
+   and `feature/hardware-decode-integration`. Pushing is what makes the
+   1-month experiment reproducible from a fresh clone. It is not required for
+   the offline host, which only receives the release package.
+2. **Record the tag table** in `olddocs/README.md` §5 if a tag is created,
+   per that file's own instructions.
+
+---
+
+## 16. Final
 
 ```
 Branch:            feature/x265-calibration-collector
-Commit range:      1a41fff .. 08f75eb
+HEAD:              5e850ff
+Commit range:      1a41fff .. 5e850ff
 Offline:           PASS
 Headless:          PASS
 Clean-machine test: PASS (approximated: outside repo, minimal env, no Python
                           on PATH; see "Unverified" item 1)
 Restart recovery:  PASS
 Standalone binary: PASS (7.77 MiB, self-contained, schema bundled)
+Merged to main:    NO (must stay NO)
+main modified:     NO
 
-Final:             READY FOR 1-MONTH SOAK
+Final:             ARCHIVED / READY FOR 1-MONTH SOAK
 ```

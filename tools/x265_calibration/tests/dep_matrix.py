@@ -530,7 +530,9 @@ def test_standalone(exe: Path, corpus_dir: Path,
     }
     real_spool = WORK / "spool_clean_machine"
     fresh(real_spool)
-    produced = PROJECT / "dist" / "x265_calibration" / "_dep_corpus"
+    # Encode into the test work area, never into dist/: dist/ holds the
+    # release artifacts and must not collect test output.
+    produced = WORK / "clean_machine_out"
     fresh(produced)
     transcode(corpus_dir, produced, real_spool)
     env["PATH"] = r"C:\Windows\system32;C:\Windows"
