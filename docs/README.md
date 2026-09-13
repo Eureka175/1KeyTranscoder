@@ -33,7 +33,7 @@ F:\1KeyTranscoder\
 ├── 1kt.py                  主入口（CLI + 编排；硬件批量逻辑在 core/batch_hw.py）
 ├── watchfolder.py          轮询批处理入口（转调 1kt.py）
 ├── start.bat               双击启动
-├── VERSION                 版本号唯一来源（0.6.2）
+├── VERSION                 版本号唯一来源（0.7.0）
 ├── LICENSE                 LGPL-3.0-or-later
 │
 ├── core/                   ★ 运行时核心（19 个 .py）：config / probe / postprobe /

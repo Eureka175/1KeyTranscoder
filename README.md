@@ -12,7 +12,8 @@
 （v0.6.2 起；加 `--no-hw-autoselect` 可固定为 x265，即 v0.6.1 及更早的行为）。
 注意 `--config` 里的 `encoder` 字段与 `--encoder` **二者不一致时直接报错**，
 不会静默取舍。
-**当前版本 `v0.6.2`**（HEVC/265 与 AV1 合并主线）。
+**当前版本 `v0.7.0`**（Hardware Decode integration milestone：硬件解码已接入，
+但 `--hw-decode` 默认仍为 `off`；HEVC/265 与 AV1 合并主线）。
 **主入口：`1kt.py`。**
 
 > 📚 文档索引见 [docs/README.md](docs/README.md)；**代码实际怎么跑见
