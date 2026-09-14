@@ -864,7 +864,7 @@ compressor / limiter / AGC。增益必须有限且非负（负增益 → `audio_
 | 测试面 | 套件 | 结果 |
 |---|---|---|
 | gain 标度 / N→1 / 相消 / overflow / policy / 多 bus / 短 source / offset / 校验 / JSON | `audio mix v0.7.1` | 19 断言全通过 |
-| 混音 chunk invariance + 图等价 + 传输层无关 | `audio mix invariance v0.7.1` | 4 断言全通过 |
+| 混音 chunk invariance + 图等价 + 传输层无关 | `audio mix invariance v0.7.1` | 5 断言全通过 |
 | 真实 A7M5 + 外挂 4CH WAV 多来源混音 | `audio mix v0.7.1`（L3） | 6 断言全通过 |
 | 全量 L1 | `--level unit` | **388 PASS / 0 FAIL** |
 | 全量 L3 | `--level full` | **507 PASS / 0 FAIL**（unit 388 + toolchain 16 + full 103） |
