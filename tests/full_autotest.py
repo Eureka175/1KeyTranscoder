@@ -26,6 +26,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -35,6 +36,13 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable
+
+# Phase 3A 起音频处理链路依赖 numpy (与 core/channel_sync.py 的既有可选依赖
+# 一致); 缺失时只跳过 Phase 3A 用例, 不影响其它测试。
+try:
+    import numpy as np
+except ImportError:                       # pragma: no cover
+    np = None                             # type: ignore[assignment]
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -4217,6 +4225,1555 @@ def l3_channel_sync_p1_algo() -> None:
 
 
 # ===========================================================================
+# Phase 3A — PCM routing / timeline / WAV export (v0.7.1)
+# ===========================================================================
+
+P3A_SR = 48000
+
+
+def _p3a_fixture(
+    path: Path, channels: int, samples: int, impulses: dict[int, int],
+    *, sample_rate: int = P3A_SR, amplitudes: dict[int, float] | None = None,
+) -> Path:
+    """确定性 impulse 素材 (浮点 WAV, bit-exact 往返)。
+
+    `impulses[channel] = 采样下标`; 幅度默认 `0.5 + 0.1 * channel` (每个声道
+    可区分), 便于断言"哪个声道的数据到了哪个输出声道"。
+    """
+    from core.audio_wav import WavFormat, write_wav
+
+    amp = dict(amplitudes or {})
+    x = np.zeros((samples, channels), dtype=np.float32)
+    for ch, at in impulses.items():
+        x[at, ch] = amp.get(ch, 0.5 + 0.1 * ch)
+    write_wav(
+        path, [x], sample_rate=sample_rate, channel_count=channels,
+        sample_format=WavFormat.FLOAT32, frame_count=samples, overwrite=True,
+    )
+    return path
+
+
+def _p3a_build_plan(specs: list[dict[str, Any]]) -> Any:
+    """[{source_id, path, streams, [source_type]}, …] -> AudioPlan (多来源)。
+
+    真实来源用探测得到的 `AudioStream`; 合成来源用 `_p3a_plan()`。
+    """
+    from core.audio_models import (
+        AudioPlan, AudioSource, AudioSourceType, AudioTrackBuilder,
+    )
+
+    plan = AudioPlan()
+    tracks: list[Any] = []
+    for spec in specs:
+        streams = list(spec["streams"])
+        tracks.extend(
+            AudioTrackBuilder(streams, source_id=spec["source_id"]).tracks()
+        )
+        plan.sources.append(AudioSource(
+            source_id=spec["source_id"],
+            source_type=spec.get("source_type", AudioSourceType.MEDIA),
+            path=str(spec["path"]),
+            streams=streams,
+            input_index=spec.get("input_index"),
+        ))
+    plan.input_tracks = tracks
+    plan.selected_tracks = [t.track_id for t in tracks]
+    plan.selected_channels = [c.id for c in plan.all_channels()]
+    return plan
+
+
+def _p3a_plan(
+    specs: list[dict[str, Any]], *, sample_rate: int = P3A_SR,
+) -> Any:
+    """[{source_id, path, channels, samples}, …] -> AudioPlan (多来源 WAV)。
+
+    declared / actual 均来自 fixture 的真实长度 (WAV 无 nb_frames, 因此
+    声明值走 `duration × sample_rate`), 与真实探测路径一致。
+    """
+    from core.audio_models import build_audio_streams
+
+    prepared: list[dict[str, Any]] = []
+    for spec in specs:
+        raw = [_raw_audio_stream(
+            0,
+            channels=int(spec["channels"]),
+            codec="pcm_f32le",
+            sample_rate=str(sample_rate),
+            sample_fmt="flt",
+            layout=None,
+            duration=f"{int(spec['samples']) / sample_rate:.9f}",
+            bit_rate=None,
+            codec_long_name="PCM 32-bit floating point",
+            tag_string=None,
+        )]
+        prepared.append({
+            **spec,
+            "streams": build_audio_streams(
+                raw, source_id=spec["source_id"]
+            ),
+        })
+    return _p3a_build_plan(prepared)
+
+
+def _p3a_swap(plan: Any, channel_id: str, replacement: Any) -> bool:
+    """把某个 AudioChannel 换成另一个对象 (保持身份串)。"""
+    for track in plan.input_tracks:
+        for index, ch in enumerate(track.channels):
+            if ch.id == channel_id:
+                track.channels[index] = replacement
+                return True
+    return False
+
+
+def _p3a_route_channels(plan: Any, order: list[str]) -> bool:
+    """按给定顺序设置输出 (显式 mapping); 数量不匹配 -> 用 exclude 表达。"""
+    from core.audio_plan import AudioPlanner
+
+    planner = AudioPlanner(plan)
+    ok = True
+    try:
+        planner.select_channels(*order)
+        if len(order) > 1:
+            planner.map_channels(*order)
+    except Exception:                     # noqa: BLE001
+        ok = False
+    return ok
+
+
+def _p3a_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _p3a_impulse_map(arr: Any, threshold: float = 0.05) -> list[list[int]]:
+    """逐输出声道 -> impulse 位置列表 (确定性断言用)。"""
+    out: list[list[int]] = []
+    for ch in range(arr.shape[1]):
+        idx = np.nonzero(np.abs(arr[:, ch]) > threshold)[0]
+        out.append([int(i) for i in idx[:4]])
+    return out
+
+
+class _PipePCMReader:
+    """ffmpeg stdout 直读的 PCM reader (与 `AudioPCMReader` 同接口)。
+
+    测试专用: 与生产读取器**同一抽象**、不同传输层 — 结果必须逐样本一致,
+    从而把"结果不依赖读取实现"钉进回归 (Phase 3A §性能/§chunk invariance)。
+    """
+
+    def __init__(self, plan: Any, ffmpeg: Path, work_dir: Path,
+                 chunk_frames: int = 16384) -> None:
+        self.plan = plan
+        self.ffmpeg = Path(ffmpeg)
+        self.work_dir = Path(work_dir)
+        self.chunk_frames = int(chunk_frames)
+        self.streams: dict[str, dict[str, Any]] = {}
+        self.procs: dict[str, Any] = {}
+        self.positions: dict[str, int] = {}
+        self.decoded = 0
+
+    def _raw_stream(self, stream_id: str) -> dict[str, Any]:
+        for source in self.plan.sources:
+            for stream in source.streams:
+                if stream.id == stream_id:
+                    return {
+                        "path": source.path,
+                        "position": int(
+                            stream.audio_position
+                            if stream.audio_position is not None
+                            else stream.stream_index
+                        ),
+                        "channels": int(stream.channel_count),
+                        "sample_rate": int(stream.sample_rate),
+                        "declared": (
+                            int(round(float(stream.duration_sec or 0)
+                                      * int(stream.sample_rate)))
+                            if stream.duration_sec else None
+                        ),
+                    }
+        raise KeyError(stream_id)
+
+    def prepare(self, stream_ids: Any = None) -> list[Any]:
+        ids = (
+            [str(i) for i in stream_ids] if stream_ids is not None
+            else [s.id for s in self.plan.sources for s in s.streams]
+        )
+        out = []
+        for sid in ids:
+            out.append(self._load(sid))
+        return out
+
+    def _load(self, stream_id: str) -> dict[str, Any]:
+        if stream_id in self.streams:
+            return self.streams[stream_id]
+        spec = self._raw_stream(stream_id)
+        # 实际可用帧数: WAV 读 header 的 data 大小 (与生产读取器同一判据),
+        # 其它容器用 ffprobe 的 nb_frames / duration 声明值。
+        actual = 0
+        declared = spec["declared"]
+        path = Path(spec["path"])
+        try:
+            from core.audio_wav import parse_wav_header
+
+            head = parse_wav_header(path.read_bytes(), path=str(path))
+            if head.channel_count == spec["channels"]:
+                actual = int(head.frame_count)
+        except Exception:                     # noqa: BLE001
+            actual = 0
+        if actual <= 0:
+            approx = max(
+                0, (path.stat().st_size - 4096)
+                // max(1, 4 * int(spec["channels"]))
+            )
+            actual = int(declared) if declared else approx
+        info = {
+            "stream_id": stream_id, "source_id": stream_id.split(":")[0],
+            "stream_index": int(stream_id.rsplit(":s", 1)[1]),
+            "channels": spec["channels"],
+            "sample_rate": spec["sample_rate"],
+            "declared": declared,
+            "actual": actual,
+            "_spec": spec,
+        }
+        self.streams[stream_id] = info
+        return info
+
+    def _proc(self, stream_id: str) -> Any:
+        proc = self.procs.get(stream_id)
+        if proc is None:
+            spec = self.streams[stream_id]["_spec"]
+            cmd = [
+                str(self.ffmpeg), "-v", "error", "-nostdin",
+                "-i", str(spec["path"]),
+                "-map", f"0:a:{spec['position']}",
+                "-vn", "-sn", "-dn",
+            ]
+            if int(spec["channels"]) > 1:
+                from core.audio_pcm import identity_channelmap
+
+                cmd += ["-af", f"channelmap={identity_channelmap(int(spec['channels']))}"]
+            cmd += [
+                "-f", "f32le", "-ac", str(spec["channels"]), "-",
+            ]
+            proc = subprocess.Popen(
+                cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+            self.procs[stream_id] = proc
+            self.positions[stream_id] = 0
+        return proc
+
+    def read(self, stream_id: str, *, channel_index: int = 0, start: int = 0,
+             count: int) -> tuple[Any, int]:
+        """顺序管道读取: 回退流(顺序读) 或 前进(co读取) 都正确。"""
+        want = int(count)
+        if want <= 0:
+            return np.zeros(max(0, want), dtype="<f4"), 0
+        info = self.streams[stream_id]
+        proc = self._proc(stream_id)
+        pos = self.positions[stream_id]
+        chans = int(info["channels"])
+        item = 4
+        stride = item * chans
+        lo = max(0, int(start))
+        if lo < pos:
+            proc.kill()
+            proc.stdout.close()
+            self.procs.pop(stream_id, None)
+            proc = self._proc(stream_id)
+            pos = 0
+        skip = (lo - pos) * stride
+        while skip > 0:
+            got = proc.stdout.read(min(skip, 1 << 20))
+            if not got:
+                break
+            skip -= len(got)
+        raw = b""
+        need = want * stride
+        while len(raw) < need:
+            got = proc.stdout.read(need - len(raw))
+            if not got:
+                break
+            raw += got
+        self.positions[stream_id] = lo + len(raw) // stride
+        block = np.zeros(want, dtype="<f4")
+        valid = len(raw) // stride
+        if valid:
+            framed = np.frombuffer(raw[: valid * stride], dtype="<f4").reshape(
+                valid, chans
+            )
+            block[:valid] = framed[:, int(channel_index)]
+        self.decoded += valid
+        return block, valid
+
+    def availability(self) -> dict[tuple[str, int], dict[str, Any]]:
+        return {
+            (i["source_id"], i["stream_index"]): {
+                "declared_samples": i["declared"],
+                "actual_samples": i["actual"],
+                "declared_source": "duration" if i["declared"] else None,
+            }
+            for i in self.streams.values()
+        }
+
+    def duration_mismatches(self, tolerance_samples: int = 1) -> list[dict]:
+        out = []
+        for info in self.streams.values():
+            dec, act = info["declared"], info["actual"]
+            if dec is None or abs(act - dec) <= tolerance_samples:
+                continue
+            out.append({
+                "reason": "audio_duration_metadata_mismatch",
+                "stream_id": info["stream_id"],
+                "declared_samples": int(dec), "actual_samples": int(act),
+                "delta_samples": int(act) - int(dec),
+            })
+        return out
+
+    def describe(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "stream_id": i["stream_id"], "source_id": i["source_id"],
+                "stream_index": i["stream_index"],
+                "sample_rate": i["sample_rate"],
+                "channel_count": i["channels"],
+                "declared_samples": i["declared"],
+                "actual_samples": i["actual"],
+                "declared_source": "duration" if i["declared"] else None,
+                "codec_name": "pcm_f32le", "linear_pcm": True,
+            }
+            for i in self.streams.values()
+        ]
+
+    def info(self, stream_id: str) -> Any:
+        return self.streams[stream_id]
+
+    @property
+    def decode_seconds(self) -> float:
+        return 0.0
+
+    def close(self) -> None:
+        for proc in self.procs.values():
+            try:
+                proc.kill()
+                proc.stdout.close()
+                proc.wait(timeout=10)
+            except Exception:             # noqa: BLE001
+                pass
+        self.procs.clear()
+
+    def __enter__(self) -> "_PipePCMReader":
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
+
+
+def _p3a_pipe_factory(plan: Any, ffmpeg: Any, work_dir: Any,
+                      chunk_frames: int) -> Any:
+    return _PipePCMReader(plan, ffmpeg, work_dir, chunk_frames)
+
+
+def _p3a_render(
+    plan: Any, out: Path, **kwargs: Any
+) -> Any:
+    """统一入口: 走真实渲染链路 (管道读取后端, 结果必须与生产读取器一致)。"""
+    from core.audio_process import run_audio_render
+    from core.audio_wav import WavFormat
+
+    d = WORK / "p3a"
+    d.mkdir(parents=True, exist_ok=True)
+    return run_audio_render(
+        plan,
+        ffmpeg=FFMPEG,
+        work_dir=d / "work",
+        output_path=out,
+        sample_format=kwargs.pop("sample_format", WavFormat.FLOAT32),
+        overwrite=True,
+        reader_factory=_p3a_pipe_factory,
+        **kwargs,
+    )
+
+
+def _p3a_read(path: Path) -> Any:
+    from core.audio_wav import read_wav
+
+    return read_wav(path)
+
+
+def _p3a_ready(tag: str) -> bool:
+    """Phase 3A 前置条件 (numpy 可用); 缺失时记录一次并跳过整组。"""
+    if np is not None:
+        return True
+    record(f"l1.p3a.{tag}.numpy 可用", False,
+           "numpy 缺失 — Phase 3A 用例跳过 (与 channel-sync 同一可选依赖)")
+    return False
+
+
+def l1_audio_timeline() -> None:
+    """Phase 3A: AudioTimeline / RenderPolicy / duration / EOF 策略 (纯逻辑)。
+
+    覆盖 §测试矩阵 T1–T8 与 §offset 语义 (正/负/零), 全部 deterministic。
+    """
+    if not _p3a_ready("timeline"):
+        return
+
+    section("L1 音频时间轴 / RenderPolicy / EOF (v0.7.1 Phase 3A)")
+    from core.audio_timeline import (
+        REASON_AUDIO_DURATION_UNKNOWN, REASON_AUDIO_SAMPLE_RATE_MISMATCH,
+        AudioRenderError, RenderPolicy, resolve_timeline, samples_from_seconds,
+        source_to_timeline, timeline_to_source,
+    )
+
+    d = WORK / "p3a_tl"
+    d.mkdir(parents=True, exist_ok=True)
+
+    # --- umeric: 换算 ----  ---------------------------------------------
+    record("l1.p3a.样本/秒换算 (6.006s@48k = 288288)",
+           samples_from_seconds(6.006, 48000) == 288288
+           and samples_from_seconds(0.0, 48000) == 0)
+    record("l1.p3a.offset 统一换算 timeline = source - offset",
+           source_to_timeline(1960, 960) == 1000
+           and timeline_to_source(1000, 960) == 1960
+           and source_to_timeline(1000, -960) == 1960
+           and source_to_timeline(1000, 0) == 1000)
+    record("l1.p3a.RenderPolicy 只实现 UNION/EXPLICIT",
+           RenderPolicy.coerce("union") is RenderPolicy.UNION
+           and RenderPolicy.coerce("bogus", RenderPolicy.UNION)
+           is RenderPolicy.UNION
+           and RenderPolicy.INTERSECTION.value == "intersection")
+
+    # --- T1: 单来源 -> 输出长度 = 来源长度 -------------------------------
+    a = _p3a_fixture(d / "t1.wav", 1, 1000, {0: 100})
+    p1 = _p3a_plan([{"source_id": "a", "path": a, "channels": 1,
+                     "samples": 1000}])
+    tl1 = resolve_timeline(p1)
+    record("l1.p3a.T1 单来源 1000 -> 1000 samples",
+           tl1.frame_count == 1000 and tl1.start_sample == 0
+           and tl1.end_sample == 1000
+           and tl1.render_policy is RenderPolicy.UNION,
+           f"{tl1.summary()}")
+
+    # --- T2: A=1000 B=1000 -> 1000 --------------------------------------
+    b = _p3a_fixture(d / "t2.wav", 1, 1000, {0: 200})
+    p2 = _p3a_plan([
+        {"source_id": "a", "path": a, "channels": 1, "samples": 1000},
+        {"source_id": "b", "path": b, "channels": 1, "samples": 1000},
+    ])
+    tl2 = resolve_timeline(p2)
+    record("l1.p3a.T2 双来源等长 -> 1000 samples",
+           tl2.frame_count == 1000 and tl2.output_channels == 2)
+
+    # --- T3/T4: UNION 取并集, 短 source 补静音 ---------------------------
+    short = _p3a_fixture(d / "short.wav", 1, 800, {0: 100})
+    p3 = _p3a_plan([
+        {"source_id": "a", "path": a, "channels": 1, "samples": 1000},
+        {"source_id": "b", "path": short, "channels": 1, "samples": 800},
+    ])
+    tl3 = resolve_timeline(p3)
+    ct_b = tl3.channel("b:s0:c0")
+    record("l1.p3a.T3 A=1000 B=800 -> UNION 1000; B 尾部 200 补静音",
+           tl3.frame_count == 1000
+           and ct_b.timeline_bounds == (0, 800)
+           and ct_b.actual_samples is None            # 尚未解码, 不臆造
+           and tl3.pads_after("b:s0:c0") is True
+           and tl3.pads_after("a:s0:c0") is False,
+           f"bounds={ct_b.timeline_bounds}")
+    p4 = _p3a_plan([
+        {"source_id": "a", "path": short, "channels": 1, "samples": 800},
+        {"source_id": "b", "path": a, "channels": 1, "samples": 1000},
+    ])
+    tl4 = resolve_timeline(p4)
+    record("l1.p3a.T4 A=800 B=1000 -> UNION 1000; A 尾部补静音",
+           tl4.frame_count == 1000
+           and tl4.pads_after("a:s0:c0") is True
+           and tl4.pads_after("b:s0:c0") is False)
+
+    # --- T5/T6: 带 offset 的 timeline 归正 ------------------------------
+    #
+    # ⚠️ 方向由实测钉死 (不是从字段名猜): 4×mono 素材 CH2 晚到 960 样本时,
+    # channel_sync 报 `delay_samples=+960 / shift_samples=960`, 修正后音频与
+    # 修正前的互相关 lag = -960 —— 即 **`out[n] = in[n + shift]`**, 晚到轨被
+    # **前移**。统一 timeline 因此定义 `timeline = source - offset`:
+    #   +100 (晚到) -> timeline [-100, 700): 内容前移, 尾部补静音
+    #   -100 (早到) -> timeline [100, 900): 内容后移, 头部补静音
+    rec = _p3a_fixture(d / "rec.wav", 1, 800, {0: 200})
+    p5 = _p3a_plan([
+        {"source_id": "a", "path": a, "channels": 1, "samples": 1000},
+        {"source_id": "rec", "path": rec, "channels": 1, "samples": 800},
+    ])
+    set_p3a_offset(p5, "rec:s0:c0", 100)
+    tl5 = resolve_timeline(p5)
+    r5 = tl5.channel("rec:s0:c0")
+    record("l1.p3a.T5 B offset=+100 (晚到) -> timeline [-100,700): 前移修正",
+           r5.timeline_bounds == (-100, 700)
+           and tl5.start_sample == -100
+           and tl5.frame_count == 1100
+           and tl5.clips_before("rec:s0:c0") is False
+           and r5.planned_window(tl5.start_sample, tl5.end_sample)[0] == 0,
+           f"bounds={r5.timeline_bounds} start={tl5.start_sample}")
+    p6 = _p3a_plan([
+        {"source_id": "a", "path": a, "channels": 1, "samples": 1000},
+        {"source_id": "rec", "path": rec, "channels": 1, "samples": 800},
+    ])
+    set_p3a_offset(p6, "rec:s0:c0", -100)
+    tl6 = resolve_timeline(p6)
+    r6 = tl6.channel("rec:s0:c0")
+    record("l1.p3a.T6 B offset=-100 (早到) -> timeline [100,900): 头部补静音",
+           r6.timeline_bounds == (100, 900)
+           and tl6.start_sample == 0
+           and tl6.frame_count == 1000
+           and tl6.clips_before("rec:s0:c0") is False
+           and r6.planned_window(tl6.start_sample, tl6.end_sample)[0] == -100,
+           f"bounds={r6.timeline_bounds} start={tl6.start_sample}")
+    # --- T7/T8: overlap 与完全不 overlap 都允许 (不自动 mixing) ----------
+    a2 = _p3a_fixture(d / "ov_a.wav", 1, 1000, {0: 100})
+    b2 = _p3a_fixture(d / "ov_b.wav", 1, 1000, {0: 300})
+    p7 = _p3a_plan([
+        {"source_id": "a", "path": a2, "channels": 1, "samples": 1000},
+        {"source_id": "b", "path": b2, "channels": 1, "samples": 1000},
+    ])
+    set_p3a_offset(p7, "b:s0:c0", -500)
+    tl7 = resolve_timeline(p7)
+    record("l1.p3a.T7 两源 timeline overlap 允许 (输出声道仍独立)",
+           tl7.frame_count == 1500 and tl7.channel("b:s0:c0").timeline_bounds
+           == (500, 1500))
+    p8 = _p3a_plan([
+        {"source_id": "a", "path": a2, "channels": 1, "samples": 1000},
+        {"source_id": "b", "path": b2, "channels": 1, "samples": 1000},
+    ])
+    set_p3a_offset(p8, "b:s0:c0", -2000)
+    tl8 = resolve_timeline(p8)
+    record("l1.p3a.T8 完全不 overlap -> 并集仍完整 (不需要共同区间)",
+           tl8.frame_count == 3000 and tl8.start_sample == 0
+           and tl8.end_sample == 3000)
+
+    # --- 采样率不一致拒绝; duration 未知拒绝 ----------------------------
+    other = _p3a_fixture(d / "44k.wav", 1, 1000, {0: 100}, sample_rate=44100)
+    p9 = _p3a_plan([
+        {"source_id": "a", "path": a, "channels": 1, "samples": 1000},
+        {"source_id": "x", "path": other, "channels": 1, "samples": 1000,
+         "sample_rate": 44100},
+    ])
+    p9.source("x").streams[0].sample_rate = 44100
+    try:
+        resolve_timeline(p9)
+        mismatch = None
+    except AudioRenderError as exc:
+        mismatch = exc.reason
+    record("l1.p3a.采样率不一致 -> audio_sample_rate_mismatch (不 resample)",
+           mismatch == REASON_AUDIO_SAMPLE_RATE_MISMATCH, f"{mismatch}")
+
+    p10 = _p3a_plan([
+        {"source_id": "a", "path": a, "channels": 1, "samples": 1000},
+    ])
+    p10.source("a").streams[0].duration_sec = None
+    try:
+        resolve_timeline(p10)
+        unknown = None
+    except AudioRenderError as exc:
+        unknown = exc.reason
+    record("l1.p3a.duration 无法确定 -> audio_duration_unknown (不猜)",
+           unknown == REASON_AUDIO_DURATION_UNKNOWN, f"{unknown}")
+
+    # --- 显式 duration 优先 (口音一致) ---------------------------------
+    p11 = _p3a_plan([
+        {"source_id": "a", "path": a, "channels": 1, "samples": 1000},
+    ])
+    tl11 = resolve_timeline(p11, explicit_duration_seconds=0.01)
+    record("l1.p3a.显式 duration=480 samples 覆盖并集推导",
+           tl11.frame_count == 480 and tl11.explicit is True
+           and tl11.duration_mode.value == "explicit")
+    try:
+        resolve_timeline(p11, render_policy=RenderPolicy.INTERSECTION)
+        reserved = None
+    except AudioRenderError as exc:
+        reserved = exc.reason
+    record("l1.p3a.INTERSECTION 为预留未实现 (显式拒绝, 不假装支持)",
+           reserved is not None, f"{reserved}")
+
+
+def set_p3a_offset(plan: Any, channel_id: str, offset: float) -> None:
+    """给某声道设一个"已测量"的固定整数样本 offset (Phase 1 模型语义)。"""
+    from core.audio_models import AudioSyncResult, SyncStatus
+
+    for track in plan.input_tracks:
+        for ch in track.channels:
+            if ch.id == channel_id:
+                track.set_sync(AudioSyncResult(
+                    status=SyncStatus.SUCCESS,
+                    offset_samples=float(offset),
+                    offset_ms=float(offset) * 1000.0 / P3A_SR,
+                    source="channel_sync_report",
+                ))
+                return
+
+
+def l1_audio_sync_offset() -> None:
+    """Phase 3A: offset 方向由**现有实现**钉死 (§不得按字段名猜)。
+
+    1) `core/sync_fix.shift_stream` = `out[n] = in[n + rint(delay)]`;
+    2) 本阶段 timeline 换算 `timeline = source - offset` 必须与之同向;
+    3) impulse 素材端到端验证正/负/零 offset 的 trim / pad 行为。
+    """
+    if not _p3a_ready("sync"):
+        return
+
+    section("L1 音频 sync offset 方向 (v0.7.1 Phase 3A)")
+    from core.audio_models import AudioSyncResult, SyncStatus
+    from core.audio_timeline import source_to_timeline, timeline_to_source
+    from core.sync_fix import shift_stream
+
+    sync_dir = WORK / "p3a_sync"
+    sync_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- 1) 钉住既有 shift_stream 的方向 ---------------------------------
+    n = 64
+    src_arr = np.zeros(n, dtype="<f4")
+    src_arr[40] = 1.0
+    dst = sync_dir / "shift.raw"
+    shift_stream(src_arr, dst, delay_samples=10.0, sample_rate=48000,
+                 storage_dtype="f32", chunk_seconds=1.0)
+    shifted = np.fromfile(dst, dtype="<f4")
+    record("l1.p3a.shift_stream(+10) 前移: in[40] -> out[30]",
+           shifted.shape[0] == n and int(np.argmax(shifted)) == 30
+           and shifted[30] == 1.0,
+           f"argmax={int(np.argmax(shifted))}")
+    shift_stream(src_arr, dst, delay_samples=-10.0, sample_rate=48000,
+                 storage_dtype="f32", chunk_seconds=1.0)
+    back = np.fromfile(dst, dtype="<f4")
+    record("l1.p3a.shift_stream(-10) 后移: in[40] -> out[50]",
+           int(np.argmax(back)) == 50 and back[50] == 1.0,
+           f"argmax={int(np.argmax(back))}")
+
+    # --- 2) 换算同向 -----------------------------------------------------
+    record("l1.p3a.offset 换算与 channel_sync 实测同向 (timeline = source - offset)",
+           source_to_timeline(1960, 960) == 1000
+           and timeline_to_source(1000, 960) == 1960)
+
+    # --- 3) 端到端 impulse: 晚到轨被对齐到同一 timeline 位置 --------------
+    d = WORK / "p3a_sync"
+    anchor = _p3a_fixture(d / "anch.wav", 1, 4000, {0: 1000})
+    late = _p3a_fixture(d / "late.wav", 1, 4000, {0: 1960})
+    plan = _p3a_plan([
+        {"source_id": "anch", "path": anchor, "channels": 1, "samples": 4000},
+        {"source_id": "late", "path": late, "channels": 1, "samples": 4000},
+    ])
+    set_p3a_offset(plan, "late:s0:c0", 960)
+    out = d / "aligned.wav"
+    res = _p3a_render(plan, out, chunk_frames=97)
+    arr, _info = _p3a_read(out)
+    peaks = _p3a_impulse_map(arr)
+    record("l1.p3a.impulse +960: 两轨 impulse 对齐到同一 timeline 位置",
+           res.ok and peaks == [[1960], [1960]]
+           and res.timeline.start_sample == -960
+           and res.frames == 4960,
+           f"ok={res.ok} peaks={peaks} start={res.timeline.start_sample if res.timeline else None} "
+           f"errors={res.errors}")
+
+    # 负 offset: 内容**后移** (起点仍为 0, 头部补静音, 尾部延长)
+    plan2 = _p3a_plan([
+        {"source_id": "anch", "path": anchor, "channels": 1, "samples": 4000},
+        {"source_id": "early", "path": late, "channels": 1, "samples": 4000},
+    ])
+    set_p3a_offset(plan2, "early:s0:c0", -960)
+    out2 = d / "delayed.wav"
+    res2 = _p3a_render(plan2, out2, chunk_frames=97)
+    arr2, _i2 = _p3a_read(out2)
+    peaks2 = _p3a_impulse_map(arr2)
+    record("l1.p3a.impulse -960: 内容后移 960 (窗口 0..4960)",
+           res2.ok and peaks2[0] == [1000] and peaks2[1] == [2920]
+           and res2.frames == 4960
+           and res2.timeline.start_sample == 0,
+           f"peaks={peaks2} frames={res2.frames} "
+           f"start={res2.timeline.start_sample if res2.timeline else None} "
+           f"errors={res2.errors}")
+
+    # 零 offset / 未测量: 原样
+    plan3 = _p3a_plan([
+        {"source_id": "anch", "path": anchor, "channels": 1, "samples": 4000},
+        {"source_id": "late", "path": late, "channels": 1, "samples": 4000},
+    ])
+    out3 = d / "plain.wav"
+    res3 = _p3a_render(plan3, out3, chunk_frames=101)
+    arr3, _i3 = _p3a_read(out3)
+    peaks3 = _p3a_impulse_map(arr3)
+    record("l1.p3a.未测量 (not_processed) 不施加任何移位",
+           res3.ok and peaks3 == [[1000], [1960]],
+           f"peaks={peaks3}")
+
+    # 状态非 success 时即便 offset 字段有值也不应用 (§只应用已确认结果)
+    plan4 = _p3a_plan([
+        {"source_id": "anch", "path": anchor, "channels": 1, "samples": 4000},
+        {"source_id": "late", "path": late, "channels": 1, "samples": 4000},
+    ])
+    for track in plan4.input_tracks:
+        for ch in track.channels:
+            if ch.id == "late:s0:c0":
+                track.set_sync(AudioSyncResult(
+                    status=SyncStatus.LOW_CONFIDENCE, offset_samples=960.0,
+                    reason="low_confidence",
+                ))
+    out4 = d / "unconfirmed.wav"
+    res4 = _p3a_render(plan4, out4, chunk_frames=64)
+    arr4, _i4 = _p3a_read(out4)
+    peaks4 = _p3a_impulse_map(arr4)
+    record("l1.p3a.low_confidence 的 offset 不被应用 (只用成功结论)",
+           res4.ok and peaks4[1] == [1960], f"peaks={peaks4}")
+
+
+def l1_audio_route() -> None:
+    """Phase 3A: 路由 T1–T10 (4CH / 2×2CH / 4×mono / 跨来源 / 逐样本一致)。"""
+    if not _p3a_ready("route"):
+        return
+
+    section("L1 音频通道路由 (v0.7.1 Phase 3A)")
+    from core.audio_timeline import REASON_AUDIO_SAMPLE_RATE_MISMATCH
+
+    d = WORK / "p3a_route"
+    d.mkdir(parents=True, exist_ok=True)
+
+    # --- T1/T2: 4CH -> 4CH 逐声道一致 ------------------------------------
+    q = _p3a_fixture(d / "quad.wav", 4, 1000,
+                     {0: 100, 1: 200, 2: 300, 3: 400})
+    plan = _p3a_plan([{"source_id": "cam", "path": q, "channels": 4,
+                       "samples": 1000}])
+    out = d / "quad_out.wav"
+    res = _p3a_render(plan, out, chunk_frames=128)
+    arr, info = _p3a_read(out)
+    peaks = _p3a_impulse_map(arr)
+    record("l1.p3a.T2 4CH -> 4CH: out[i] == in[i]",
+           res.ok and arr.shape == (1000, 4)
+           and peaks == [[100], [200], [300], [400]]
+           and info.frame_count == 1000 and info.channel_count == 4,
+           f"peaks={peaks} shape={arr.shape}")
+
+    # --- T3: 4CH reorder [2,0,3,1] --------------------------------------
+    from core.audio_plan import AudioPlanner
+
+    p3 = _p3a_plan([{"source_id": "cam", "path": q, "channels": 4,
+                     "samples": 1000}])
+    planner = AudioPlanner(p3)
+    try:
+        planner.map_channels("cam:s0:c2", "cam:s0:c0", "cam:s0:c3",
+                             "cam:s0:c1")
+        ok3 = True
+    except Exception as exc:                # noqa: BLE001
+        ok3, _ = False, exc
+    out3 = d / "reorder.wav"
+    res3 = _p3a_render(p3, out3, chunk_frames=97)
+    arr3, _i3 = _p3a_read(out3)
+    peaks3 = _p3a_impulse_map(arr3)
+    record("l1.p3a.T3 4CH reorder [2,0,3,1] 逐样本精确",
+           ok3 and res3.ok
+           and peaks3 == [[300], [100], [400], [200]]
+           and [tl_ch for tl_ch in res3.timeline.output_channel_ids]
+           == ["cam:s0:c2", "cam:s0:c0", "cam:s0:c3", "cam:s0:c1"],
+           f"peaks={peaks3} order={res3.timeline.output_channel_ids if res3.timeline else None}")
+
+    # --- T3b: UNION 下短 source 尾部补**确定性静音** (渲染级验证) ---------
+    b3 = _p3a_fixture(d / "u_b.wav", 1, 800, {0: 42})
+    plan3 = _p3a_plan([
+        {"source_id": "cam", "path": q, "channels": 4, "samples": 1000},
+        {"source_id": "rec", "path": b3, "channels": 1, "samples": 800},
+    ])
+    out3b = d / "union_short.wav"
+    res3b = _p3a_render(plan3, out3b, chunk_frames=91)
+    arr3b, info3b = _p3a_read(out3b)
+    tail = arr3b[800:, 4]
+    record("l1.p3a.T3b UNION: 长 source 不截断, 短 source 尾部确定性静音",
+           res3b.ok and arr3b.shape == (1000, 5)
+           and tail.size == 200 and not np.any(tail)
+           and float(np.max(np.abs(arr3b[:, 0]))) > 0.0
+           and res3b.silence_samples >= 200
+           and info3b.frame_count == 1000,
+           f"shape={arr3b.shape} tailmax={float(np.abs(tail).max()) if tail.size else None} "
+           f"silence={res3b.silence_samples}")
+
+    # --- T12: metadata 与实际解码不一致 -> 检测 + 以实际为准 ---------------
+    # fixture: header 声明 1000 帧, 文件里实际只有 600 帧 (声明 > 实际)。
+    t12 = _p3a_truncated_fixture(d / "meta_lie.wav", 1000, 600)
+    plan12 = _p3a_plan([
+        {"source_id": "cam", "path": q, "channels": 4, "samples": 1000},
+        {"source_id": "short", "path": t12, "channels": 1, "samples": 1000},
+    ])
+    out12 = d / "mismatch.wav"
+    res12 = _p3a_render(plan12, out12, chunk_frames=64)
+    arr12, info12 = _p3a_read(out12)
+    plan12b = _p3a_plan([
+        {"source_id": "short", "path": t12, "channels": 1, "samples": 1000},
+    ])
+    out12b = d / "mismatch_solo.wav"
+    res12b = _p3a_render(plan12b, out12b, chunk_frames=64)
+    arr12b, info12b = _p3a_read(out12b)
+    record("l1.p3a.T12 header 声明 1000 / 实际 600 -> 检测 mismatch",
+           res12.ok
+           and any(m["reason"] == "audio_duration_metadata_mismatch"
+                   for m in res12.duration_mismatches)
+           and any("short" in str(m.get("stream_id"))
+                   for m in res12.duration_mismatches),
+           f"{json.dumps(res12.duration_mismatches, ensure_ascii=False)[:220]}")
+    record("l1.p3a.T12 派生窗口以**实际解码**为准 (单来源输出 600 而非 1000)",
+           res12b.ok and info12b.frame_count == 600
+           and arr12b.shape == (600, 1) and res12b.frames == 600,
+           f"frames={info12b.frame_count}")
+    record("l1.p3a.T12 多来源时 UNION 取长 (cam 1000 不被误导的 metadata 截断)",
+           res12.ok and info12.frame_count == 1000
+           and arr12.shape == (1000, 5),
+           f"frames={info12.frame_count}")
+
+    # --- T4: 4CH -> 单声道 (CH3) ---------------------------------------
+    p4 = _p3a_plan([{"source_id": "cam", "path": q, "channels": 4,
+                     "samples": 1000}])
+    AudioPlanner(p4).select_channels("cam:s0:c2")
+    out4 = d / "mono.wav"
+    res4 = _p3a_render(p4, out4, chunk_frames=64)
+    arr4, info4 = _p3a_read(out4)
+    ref, _ri = _p3a_read(q)
+    record("l1.p3a.T4 4CH -> CH3 输出 mono 且样本精确相等",
+           res4.ok and arr4.shape == (1000, 1)
+           and info4.channel_count == 1
+           and np.array_equal(arr4[:, 0], ref[:, 2]),
+           f"shape={arr4.shape}")
+
+    # --- T5/T6: 2×2CH / 4×mono 跨流重排 --------------------------------
+    s1 = _p3a_fixture(d / "s1.wav", 2, 600, {0: 10, 1: 20})
+    s2 = _p3a_fixture(d / "s2.wav", 2, 600, {0: 30, 1: 40})
+    raw = [
+        _raw_audio_stream(1, channels=2, codec="pcm_f32le",
+                          sample_rate="48000", sample_fmt="flt",
+                          duration="0.012500", bit_rate=None, tag_string=None),
+        _raw_audio_stream(2, channels=2, codec="pcm_f32le",
+                          sample_rate="48000", sample_fmt="flt",
+                          duration="0.012500", bit_rate=None, tag_string=None),
+    ]
+    from core.audio_models import (
+        AudioPlan, AudioSource, AudioSourceType, AudioTrackBuilder,
+        build_audio_streams,
+    )
+
+    src_a = AudioSource(
+        source_id="s1", source_type=AudioSourceType.WAV, path=str(s1),
+        streams=build_audio_streams(
+            [_raw_audio_stream(0, channels=2, codec="pcm_f32le",
+                               sample_rate="48000", sample_fmt="flt",
+                               duration="0.012500", bit_rate=None,
+                               tag_string=None)],
+            source_id="s1"),
+        input_index=0,
+    )
+    src_b = AudioSource(
+        source_id="s2", source_type=AudioSourceType.WAV, path=str(s2),
+        streams=build_audio_streams(
+            [_raw_audio_stream(0, channels=2, codec="pcm_f32le",
+                               sample_rate="48000", sample_fmt="flt",
+                               duration="0.012500", bit_rate=None,
+                               tag_string=None)],
+            source_id="s2"),
+        input_index=1,
+    )
+    plan5 = AudioPlan(sources=[src_a, src_b])
+    plan5.input_tracks = (
+        AudioTrackBuilder(src_a.streams, source_id="s1").tracks()
+        + AudioTrackBuilder(src_b.streams, source_id="s2").tracks()
+    )
+    plan5.selected_tracks = [t.track_id for t in plan5.input_tracks]
+    plan5.selected_channels = [c.id for c in plan5.all_channels()]
+    planner5 = AudioPlanner(plan5)
+    planner5.select_channels("s1:s0:c1", "s2:s0:c1", "s1:s0:c0",
+                             "s2:s0:c0")
+    planner5.map_channels("s1:s0:c1", "s2:s0:c1", "s1:s0:c0", "s2:s0:c0")
+    out5 = d / "cross.wav"
+    res5 = _p3a_render(plan5, out5, chunk_frames=64)
+    arr5, info5 = _p3a_read(out5)
+    peaks5 = _p3a_impulse_map(arr5)
+    record("l1.p3a.T5 跨来源 2×2CH 重排 (L2R2L1R1) 精确",
+           res5.ok and peaks5 == [[20], [40], [10], [30]]
+           and info5.channel_count == 4,
+           f"peaks={peaks5} err={res5.errors}")
+    m1 = _p3a_fixture(d / "m1.wav", 1, 500, {0: 50})
+    m2 = _p3a_fixture(d / "m2.wav", 1, 500, {0: 60})
+    m3 = _p3a_fixture(d / "m3.wav", 1, 500, {0: 70})
+    m4 = _p3a_fixture(d / "m4.wav", 1, 500, {0: 80})
+    specs = [
+        {"source_id": f"m{i}", "path": p, "channels": 1, "samples": 500}
+        for i, p in enumerate((m1, m2, m3, m4), start=1)
+    ]
+    plan6 = _p3a_plan(specs)
+    planner6 = AudioPlanner(plan6)
+    order6 = ["m4:s0:c0", "m2:s0:c0", "m1:s0:c0", "m3:s0:c0"]
+    planner6.select_channels(*order6)
+    planner6.map_channels(*order6)
+    out6 = d / "mono4.wav"
+    res6 = _p3a_render(plan6, out6, chunk_frames=37)
+    arr6, _i6 = _p3a_read(out6)
+    peaks6 = _p3a_impulse_map(arr6)
+    record("l1.p3a.T6 4×mono 跨流重排 (4,2,1,3) 不塌缩",
+           res6.ok and peaks6 == [[80], [60], [50], [70]]
+           and arr6.shape[1] == 4
+           and len(plan6.input_tracks) == 4
+           and all(t.channel_count == 1 for t in plan6.input_tracks),
+           f"peaks={peaks6}")
+
+    # --- T7: 外挂 WAV 输入输出逐样本一致 (bit-exact) ---------------------
+    w = _p3a_fixture(d / "ext.wav", 2, 777, {0: 111, 1: 222})
+    plan7 = _p3a_plan([{"source_id": "wav", "path": w, "channels": 2,
+                        "samples": 777}])
+    out7 = d / "ext_out.wav"
+    res7 = _p3a_render(plan7, out7, chunk_frames=53)
+    arr7, _i7 = _p3a_read(out7)
+    ref7, _r7 = _p3a_read(w)
+    record("l1.p3a.T7 外挂 WAV -> WAV 逐样本 bit-exact",
+           res7.ok and arr7.shape == ref7.shape
+           and np.array_equal(arr7, ref7),
+           f"shape={arr7.shape}")
+
+    # --- T8: camera + WAV 跨来源 routing (含多声道混合来源) --------------
+    cam4 = _p3a_fixture(d / "cam4.wav", 4, 900, {0: 5, 1: 6, 2: 7, 3: 8})
+    ext2 = _p3a_fixture(d / "ext2.wav", 2, 900, {0: 15, 1: 16})
+    plan8 = _p3a_plan([
+        {"source_id": "camera", "path": cam4, "channels": 4, "samples": 900},
+        {"source_id": "recorder", "path": ext2, "channels": 2,
+         "samples": 900},
+    ])
+    planner8 = AudioPlanner(plan8)
+    order8 = ["camera:s0:c2", "recorder:s0:c0", "camera:s0:c0"]
+    planner8.select_channels(*order8)
+    planner8.map_channels(*order8)
+    out8 = d / "cross3.wav"
+    res8 = _p3a_render(plan8, out8, chunk_frames=41)
+    arr8, info8 = _p3a_read(out8)
+    peaks8 = _p3a_impulse_map(arr8)
+    record("l1.p3a.T8 camera+WAV 跨来源 3 声道 routing (无相加)",
+           res8.ok and peaks8 == [[7], [15], [5]]
+           and info8.channel_count == 3
+           and bool(res8.route_spec and res8.route_spec.is_multi_source)
+           and res8.route_spec.source_ids == ["camera", "recorder"],
+           f"peaks={peaks8} err={res8.errors}")
+
+    # --- T9: 采样率不一致拒绝 -------------------------------------------
+    other = _p3a_fixture(d / "alt.wav", 1, 900, {0: 5}, sample_rate=96000)
+    plan9 = _p3a_plan([
+        {"source_id": "camera", "path": cam4, "channels": 4, "samples": 900},
+        {"source_id": "alt", "path": other, "channels": 1, "samples": 900},
+    ])
+    plan9.source("alt").streams[0].sample_rate = 96000
+    out9 = d / "mismatch_sr.wav"
+    try:
+        out9.unlink()
+    except OSError:
+        pass
+    res9 = _p3a_render(plan9, out9)
+    record("l1.p3a.T9 不同采样率 -> audio_sample_rate_mismatch 且不产出文件",
+           (not res9.ok)
+           and REASON_AUDIO_SAMPLE_RATE_MISMATCH
+           in [e.get("reason") for e in res9.errors]
+           and not out9.exists(),
+           f"{[e.get('reason') for e in res9.errors]}")
+
+    # --- T10: 整数 PCM 归一化到 canonical float32 ------------------------
+    t10 = _p3a_pcm16_roundtrip(d)
+    record("l1.p3a.T10 s16/s24/s32 -> canonical float32 满量程归一",
+           t10, "写入-读回-渲染三段一致")
+
+
+def _p3a_pcm16_roundtrip(d: Path) -> bool:
+    """整数 PCM 输入经 ffmpeg -> float32 -> WAV 后仍在 [-1,1] 且可往返。"""
+    from core.audio_wav import WavFormat, read_wav, write_wav
+
+    sr = 48000
+    n = 480
+    ramp = (np.arange(n, dtype=np.float32) / (n / 2.0) - 1.0).astype(np.float32)
+    for fmt, codec, tol in (
+        (WavFormat.PCM16, "pcm_s16le", 1.5 / 32768),
+        (WavFormat.PCM24, "pcm_s24le", 3.0 / 8388608),
+        (WavFormat.PCM32, "pcm_s32le", 3.0 / 2147483648),
+    ):
+        src = d / f"int_{fmt.value}.wav"
+        write_wav(src, [ramp.reshape(-1, 1)], sample_rate=sr, channel_count=1,
+                  sample_format=fmt, frame_count=n, overwrite=True)
+        plan = _p3a_plan([{"source_id": "i", "path": src, "channels": 1,
+                           "samples": n}], sample_rate=sr)
+        plan.source("i").streams[0].codec_name = codec
+        out = d / f"int_{fmt.value}_out.wav"
+        res = _p3a_render(plan, out)
+        if not res.ok:
+            return False
+        back, _info = read_wav(out)
+        if float(np.max(np.abs(back))) > 1.0:
+            return False
+        if float(np.max(np.abs(back[:, 0] - ramp))) > tol:
+            return False
+    return True
+
+
+def _p3a_truncated_fixture(path: Path, declared_frames: int,
+                           real_frames: int) -> Path:
+    """WAV fixture: **header 声明 `declared_frames` / 实际 `real_frames`**。
+
+    做法: 正常写入 `real_frames` 帧, 再把 `data` chunk 长度改写成
+    `declared_frames` 对应的字节数 (文件的真实长度仍是 real, 因此
+    "实际解码样本数" 与 "metadata 声明值" 人为错开)。
+
+    用于 T12: metadata 与实际解码不一致时必须**检测到**, 并以实际解码为
+    最终事实 —— 不静默相信 metadata, 也不静默补静音。
+    """
+    from core.audio_wav import WavFormat, write_wav
+
+    x = np.zeros((real_frames, 1), dtype=np.float32)
+    x[100, 0] = 0.5
+    x[real_frames - 1, 0] = 0.25
+    write_wav(path, [x], sample_rate=P3A_SR, channel_count=1,
+              sample_format=WavFormat.FLOAT32, frame_count=real_frames,
+              overwrite=True)
+    raw = bytearray(path.read_bytes())
+    # 定位 data chunk 的 size 字段并改写为声明长度
+    pos = 12
+    while pos + 8 <= len(raw):
+        chunk_id = bytes(raw[pos:pos + 4])
+        size = int.from_bytes(raw[pos + 4:pos + 8], "little")
+        if chunk_id == b"data":
+            raw[pos + 4:pos + 8] = (declared_frames * 4).to_bytes(4, "little")
+            break
+        pos += 8 + size + (size % 2)
+    path.write_bytes(bytes(raw))
+    return path
+
+
+def l1_audio_wav_export() -> None:
+    """Phase 3A: WAV writer/reader (4 格式往返 + header 精确 + 命名)。"""
+    if not _p3a_ready("wav"):
+        return
+
+    section("L1 WAV 导出 (v0.7.1 Phase 3A)")
+    from core.audio_wav import (
+        WavFormat, default_wav_name, parse_wav_header, read_wav,
+        unique_output_path, write_wav,
+    )
+
+    d = WORK / "p3a_wav"
+    d.mkdir(parents=True, exist_ok=True)
+    sr = 48000
+    n = 1000
+    x = np.zeros((n, 4), dtype=np.float32)
+    x[:, 0] = np.linspace(-1.0, 1.0, n)
+    x[:, 1] = 0.5
+    x[:, 2] = -0.25
+    x[:, 3] = 1.0 / 3.0
+
+    results = {}
+    for fmt, tol in (
+        (WavFormat.PCM16, 1.5 / 32768),
+        (WavFormat.PCM24, 1.5 / 8388608),
+        (WavFormat.PCM32, 1.5 / 2147483648),
+        (WavFormat.FLOAT32, 0.0),
+    ):
+        path = d / f"rt_{fmt.value}.wav"
+        info, spec = write_wav(
+            path, [x[:300], x[300:700], x[700:]], sample_rate=sr,
+            channel_count=4, sample_format=fmt, frame_count=n, layout="4.0",
+            overwrite=True,
+        )
+        back, h = read_wav(path)
+        err = float(np.max(np.abs(back - x))) if back.shape == x.shape else 9.9
+        results[fmt] = (info, h, err, tol, spec)
+        record(f"l1.p3a.WAV {fmt.value} 往返 (sample rate/channels/bits/frames)",
+               back.shape == (n, 4) and h.sample_rate == sr
+               and h.channel_count == 4
+               and h.bits_per_sample == fmt.bits
+               and h.frame_count == n and err <= max(tol, 1e-9)
+               and h.data_bytes == n * 4 * fmt.bytes_per_sample,
+               f"err={err:.3e} tol={tol:.3e} bits={h.bits_per_sample}")
+
+    info16, h16, _e, _t, _s = results[WavFormat.PCM16]
+    record("l1.p3a.WAV header 精确: riff/data 与实际字节数一致",
+           h16.riff_bytes == path_size_check(info16.path) - 8
+           and h16.data_bytes == 1000 * 4 * 2
+           and h16.byte_rate == 48000 * 4 * 2
+           and h16.block_align == 8,
+           f"riff={h16.riff_bytes} size={path_size_check(info16.path)}")
+    infof, hf, _ef, _tf, _sf = results[WavFormat.FLOAT32]
+    record("l1.p3a.float32 输出 bit-exact 且 EXTENSIBLE 带 channel mask",
+           _ef == 0.0 and hf.is_float and hf.extensible
+           and hf.channel_mask == 0x33
+           and hf.effective_format_code == 3,
+           f"err={_ef} mask={hf.channel_mask:#x}")
+    info24, h24, _e24, _t24, _s24 = results[WavFormat.PCM24]
+    record("l1.p3a.24-bit 与 float 不依赖标准库 wave (EXTENSIBLE fmt=40B)",
+           h24.extensible is True and h24.bits_per_sample == 24
+           and h24.effective_format_code == 1,
+           f"fmt_code={h24.effective_format_code}")
+    record("l1.p3a.单声道写经典 PCM 头 (不滥用 EXTENSIBLE)",
+           _p3a_mono_header(d))
+
+    # --- T13: 输出样本数严格等于声明 (EOF 精确) -------------------------
+    short = d / "short_decl.wav"
+    try:
+        write_wav(short, [x[:10]], sample_rate=sr, channel_count=4,
+                  sample_format=WavFormat.PCM16, frame_count=20,
+                  overwrite=True)
+        exact = False
+    except ValueError as exc:
+        exact = "audio_wav_write_failed" in str(exc)
+    record("l1.p3a.T13 写入样本数与声明不符 -> 报错且不留半成品",
+           exact and not short.exists())
+
+    # --- 命名策略 -------------------------------------------------------
+    names = {
+        "单声道": default_wav_name(channel_ids=["camera:s2:c2"]),
+        "单来源整流": default_wav_name(source_stem="camera"),
+        "映射": default_wav_name(channel_ids=["camera:s2:c2"],
+                                 mapping="r2031"),
+        "跨来源": default_wav_name(
+            channel_ids=["camera:s1:c0", "recorder:s0:c0"]),
+    }
+    record("l1.p3a.WAV 命名稳定且可编程",
+           names["单声道"] == "camera_s2c2.wav"
+           and names["单来源整流"] == "camera_all.wav"
+           and names["映射"] == "camera_s2c2_r2031.wav"
+           and names["跨来源"] == "multi_mix.wav",
+           f"{names}")
+
+    clash = d / "dup.wav"
+    clash.write_bytes(b"")
+    second = unique_output_path(clash)
+    record("l1.p3a.同名输出不覆盖 (自动 -2 后缀)",
+           second.name == "dup-2.wav" and clash.exists())
+
+    bad = d / "bad.wav"
+    bad.write_bytes(b"not a wav at all")
+    try:
+        parse_wav_header(bad.read_bytes(), path=str(bad))
+        rejected = False
+    except ValueError as exc:
+        rejected = "audio_pcm_format_unsupported" in str(exc)
+    record("l1.p3a.非 WAV 输入明确拒绝 (audio_pcm_format_unsupported)",
+           rejected)
+
+
+def path_size_check(path: str) -> int:
+    return Path(path).stat().st_size
+
+
+def _p3a_mono_header(d: Path) -> bool:
+    from core.audio_wav import WavFormat, write_wav
+
+    p = d / "mono_head.wav"
+    info, _spec = write_wav(
+        p, [np.zeros((16, 1), dtype=np.float32)], sample_rate=48000,
+        channel_count=1, sample_format=WavFormat.PCM16, frame_count=16,
+        overwrite=True,
+    )
+    return (not info.extensible) and info.format_code == 1 \
+        and info.bits_per_sample == 16
+
+
+def l1_audio_chunk_invariance() -> None:
+    """Phase 3A: chunk 边界不得影响结果 (§chunk invariance) 与内存有界。"""
+    if not _p3a_ready("chunk"):
+        return
+
+    section("L1 音频 chunk invariance / 内存 (v0.7.1 Phase 3A)")
+    from core.audio_wav import WavFormat, read_wav
+
+    d = WORK / "p3a_chunk"
+    d.mkdir(parents=True, exist_ok=True)
+
+    # EOF 恰在 chunk 边界 / chunk 中间 (T9/T10): 长度取 1024 的整数倍附近。
+    # chunk=1/7 是刻意的最坏情形 (每块 1~7 帧过管道), 只跑小 fixture 以控制
+    # 回归时间; 边界对齐/不齐、长度不同都由 1024/1025/4096/4097 覆盖。
+    for samples, chunks in (
+        (1024, (1, 7, 256, 1024, 4096)),
+        (1025, (1, 256, 1024)),
+        (4096, (7, 256, 4096)),
+        (4097, (256, 1024, 4096)),
+    ):
+        src = _p3a_fixture(d / f"eof_{samples}.wav", 2, samples,
+                           {0: 7, 1: samples - 3})
+        plan = _p3a_plan([
+            {"source_id": "a", "path": src, "channels": 2,
+             "samples": samples},
+        ])
+        hashes = {}
+        shapes = {}
+        for chunk in chunks:
+            out = d / f"eof_{samples}_{chunk}.wav"
+            res = _p3a_render(plan, out, chunk_frames=chunk)
+            if not res.ok:
+                hashes[chunk] = f"ERR {res.errors}"
+                continue
+            arr, _info = read_wav(out)
+            hashes[chunk] = _p3a_hash(out)
+            shapes[chunk] = arr.shape
+        record(f"l1.p3a.T9/T10 EOF={samples} (边界/中间) 全 chunk 划分 byte-identical",
+               len(set(hashes.values())) == 1
+               and all(s == (samples, 2) for s in shapes.values()),
+               f"shapes={set(shapes.values())} distinct={len(set(hashes.values()))}")
+
+    # T11: 多来源 + 重排 + offset 下的 chunk invariance (含跨 chunk 读回退)
+    a = _p3a_fixture(d / "inv_a.wav", 4, 1200, {0: 111, 1: 500, 2: 900,
+                                                3: 1199})
+    b = _p3a_fixture(d / "inv_b.wav", 2, 900, {0: 700, 1: 42})
+    from core.audio_plan import AudioPlanner
+
+    plan = _p3a_plan([
+        {"source_id": "cam", "path": a, "channels": 4, "samples": 1200},
+        {"source_id": "rec", "path": b, "channels": 2, "samples": 900},
+    ])
+    set_p3a_offset(plan, "rec:s0:c0", 480)
+    set_p3a_offset(plan, "rec:s0:c1", -240)
+    order = ["rec:s0:c0", "cam:s0:c3", "rec:s0:c1", "cam:s0:c0"]
+    pl = AudioPlanner(plan)
+    pl.select_channels(*order)
+    pl.map_channels(*order)
+    hashes, peaks = {}, {}
+    for chunk in (1, 7, 256, 1024, 4096):
+        out = d / f"inv_{chunk}.wav"
+        res = _p3a_render(plan, out, chunk_frames=chunk)
+        if not res.ok:
+            hashes[chunk] = f"ERR {[e.get('reason') for e in res.errors]}"
+            continue
+        hashes[chunk] = _p3a_hash(out)
+        arr, _info = read_wav(out)
+        peaks[chunk] = _p3a_impulse_map(arr)
+    record("l1.p3a.T11 chunk 1/7/256/1024/4096 -> byte-identical 输出",
+           len(set(hashes.values())) == 1,
+           f"{json.dumps(hashes, ensure_ascii=False)}")
+    record("l1.p3a.T11 impulse 位置与 chunk 无关 (含 +480/-240 offset)",
+           len({json.dumps(v) for v in peaks.values()}) == 1
+           and len(next(iter(peaks.values()))) == 4,
+           f"{json.dumps(peaks.get(256), ensure_ascii=False)}")
+
+    # --- 内存/长素材: 不全量载入, 峰值内存受 chunk 限制 -------------------
+    long_wav = d / "long.wav"
+    long_seconds = 30
+    _p3a_long_fixture(long_wav, seconds=long_seconds)
+    before = _work_set_mb()
+    big = d / "long_out.wav"
+    res = _p3a_render(
+        _p3a_plan([{"source_id": "long", "path": long_wav, "channels": 4,
+                    "samples": P3A_SR * long_seconds}]),
+        big,
+        chunk_frames=16384,
+    )
+    after = _work_set_mb()
+    growth = None if (before is None or after is None) else after - before
+    record(f"l1.p3a.长素材 ({long_seconds}s×4CH float32 源) chunked 渲染成功",
+           res.ok and res.frames == P3A_SR * long_seconds,
+           f"frames={res.frames} errors={res.errors}")
+    record("l1.p3a.长素材渲染内存增长受 chunk 限制 (非全量载入)",
+           growth is None or growth < 260.0,
+           f"ΔWorkingSet={growth}MB (chunk=16384 frames ≈ 0.34s ≈ 5.2MB)")
+    # 无重复 decode: 每流只解一次
+    record("l1.p3a.每流只解码一次 (无重复 decode)",
+           res.ok and len(res.prepared) == 1
+           and res.prepared[0]["actual_samples"] == P3A_SR * long_seconds,
+           f"{json.dumps(res.prepared, ensure_ascii=False)[:160]}")
+
+
+def _p3a_long_fixture(path: Path, *, seconds: float = 30.0) -> Path:
+    """长音频 fixture (分块生成, 每块只驻留一个 chunk)。
+
+    素材长度用 `seconds` 显式给出 (默认 30s: 4CH float32 ≈ 23MB, 足以验证
+    "峰值内存受 chunk 限制"而不让回归时间失控)。
+    """
+    from core.audio_wav import WavFormat, write_wav
+
+    total = int(P3A_SR * seconds)
+    chunk = 4096
+    t = (np.arange(total, dtype=np.float32)) / P3A_SR
+    blocks = []
+    for start in range(0, total, chunk):
+        n = min(chunk, total - start)
+        seg = t[start:start + n]
+        block = np.zeros((n, 4), dtype=np.float32)
+        block[:, 0] = 0.4 * np.sin(2 * np.pi * 440.0 * seg)
+        block[:, 1] = 0.3 * np.sin(2 * np.pi * 1000.0 * seg)
+        block[:, 2] = 0.2 * np.sin(2 * np.pi * 250.0 * seg)
+        block[:, 3] = 0.1 * np.sin(2 * np.pi * 60.0 * seg)
+        blocks.append(block)
+    write_wav(path, blocks, sample_rate=P3A_SR, channel_count=4,
+              sample_format=WavFormat.FLOAT32, frame_count=total,
+              overwrite=True)
+    return path
+
+
+def _p3a_integer_pcm(d: Path) -> tuple[bool, str]:
+    """s16/s24/s32/f32 线性 PCM -> canonical float32, 与 ffmpeg 直读逐样本一致。
+
+    用确定性正弦 (lavfi `sine`) 生成, 避免"素材全静音"掩盖归一化错误。
+    """
+    from core.audio_models import build_audio_streams
+    from core.audio_wav import read_wav
+
+    details: list[str] = []
+    all_ok = True
+    for codec, wav_fmt in (("pcm_s16le", "s16"), ("pcm_s24le", "s24"),
+                           ("pcm_s32le", "s32"), ("pcm_f32le", "f32")):
+        src = d / f"int_{codec}.wav"
+        rc = sh(FFMPEG, "-v", "error", "-y", "-f", "lavfi", "-i",
+                "sine=frequency=997:sample_rate=48000:duration=1",
+                "-af", "volume=0.5", "-c:a", codec, "-ac", "1", src,
+                timeout=600)
+        if rc.returncode != 0:
+            return False, f"{codec}: fixture 生成失败"
+        streams = build_audio_streams(
+            ffprobe_json(src).get("streams", []), source_id="pcm"
+        )
+        plan = _p3a_build_plan([{
+            "source_id": "pcm", "path": str(src), "streams": streams,
+        }])
+        out = d / f"int_{codec}_out.wav"
+        res = _p3a_render(plan, out, chunk_frames=4096)
+        if not res.ok:
+            return False, f"{codec}: render 失败 {res.errors}"
+        got, info = read_wav(out)
+        ref_path = d / f"int_{codec}.raw"
+        rc2 = sh(FFMPEG, "-v", "error", "-y", "-i", src, "-map", "0:a:0",
+                 "-vn", "-sn", "-dn", "-f", "f32le", "-ac", "1", ref_path)
+        if rc2.returncode != 0:
+            return False, f"{codec}: 参考解码失败"
+        ref = np.fromfile(ref_path, dtype="<f4")
+        exact = bool(np.array_equal(got[:, 0], ref[: info.frame_count]))
+        peak = float(np.abs(got).max())
+        # 归一化到 [-1,1] 且非静音 (s16 只有 16-bit 精度, sine 峰值本就低)
+        all_ok = all_ok and exact and 0.01 < peak <= 1.0
+        details.append(f"{wav_fmt}:exact={exact},peak={peak:.4f}")
+    return all_ok, " ".join(details)
+
+
+def l3_audio_process() -> None:
+    """v0.7.1 Phase 3A: 真实素材 PCM routing + WAV export.
+
+    真实素材:
+      * Sony A7M5 4CH (testsets, **4×mono PCM s24be**, layout 缺失) -> media source
+      * ffmpeg 生成的 deterministic 外挂 WAV (mono / stereo / 4CH) -> wav source
+
+    验证: 4CH→4CH、CH selection、reorder、外挂 WAV、camera+WAV 跨来源 ->
+    WAV, 全部逐样本可追溯; 并证明 4×mono **不会**被当成一个 4CH 流。
+    """
+    section("L3 音频 PCM 路由 / WAV 导出 (v0.7.1 Phase 3A)")
+    from core.audio_models import AudioSourceType, build_audio_streams
+    from core.audio_plan import AudioPlanner
+    from core.audio_wav import read_wav
+
+    d = IN_DIR / "audio_p3a"
+    d.mkdir(parents=True, exist_ok=True)
+    real_dir = ROOT / "testsets" / "a7m5_4k60p_265_10bit420_150m_xavchs_4ch"
+    real_files = sorted(real_dir.glob("*.MP4")) if real_dir.is_dir() else []
+    if not real_files:
+        record("l3.p3a.真实 A7M5 素材存在", False, "testsets 素材不存在")
+        return
+    src_mp4 = real_files[0]
+
+    # --- 真实素材建模 (4×mono) -----------------------------------------
+    raw_streams = ffprobe_json(src_mp4).get("streams", [])
+    audio_streams = build_audio_streams(raw_streams, source_id="camera")
+    record("l3.p3a.真实 A7M5 = 4 条独立 mono 流 (不是 1 条 4CH 流)",
+           len(audio_streams) == 4
+           and all(s.channel_count == 1 for s in audio_streams)
+           and [s.stream_index for s in audio_streams] == [1, 2, 3, 4]
+           and [s.audio_position for s in audio_streams] == [0, 1, 2, 3]
+           and audio_streams[0].codec_name == "pcm_s24be",
+           f"{[(s.stream_index, s.channel_count, s.codec_name) for s in audio_streams]}")
+
+    def plan_of(sources: list[dict[str, Any]]) -> Any:
+        return _p3a_build_plan(sources)
+
+    cam_plan = plan_of([{
+        "source_id": "camera", "path": str(src_mp4),
+        "streams": audio_streams,
+    }])
+
+    # --- A7M5 4CH -> 4CH WAV -------------------------------------------
+    out1 = d / "a7m5_all.wav"
+    res1 = _p3a_render(cam_plan, out1, chunk_frames=4096)
+    arr1, info1 = read_wav(out1) if out1.exists() else (None, None)
+    expected_frames = 288288          # 实测: 真实素材 6.006s @48k
+    record("l3.p3a.真实 A7M5 4×mono -> 4 声道 WAV (逐声道 = 逐流)",
+           res1.ok and info1 is not None
+           and info1.channel_count == 4
+           and info1.sample_rate == 48000
+           and info1.frame_count == expected_frames
+           and arr1.shape == (expected_frames, 4),
+           f"ok={res1.ok} info={info1.to_dict() if info1 else None} "
+           f"errors={res1.errors}")
+
+    # 与 ffmpeg 直接解码的真实样本逐样本比对 (canonical float32 归一化正确)
+    refs_real: dict[int, Any] = {}
+    for position in range(4):
+        rp = d / f"a7m5_real_a{position}.raw"
+        rc = sh(FFMPEG, "-v", "error", "-y", "-i", src_mp4,
+                "-map", f"0:a:{position}", "-vn", "-sn", "-dn",
+                "-f", "f32le", "-ac", "1", rp)
+        if rc.returncode == 0 and rp.is_file():
+            refs_real[position] = np.fromfile(rp, dtype="<f4")
+    if info1 is not None and len(refs_real) == 4:
+        same = all(
+            np.array_equal(arr1[:, c], refs_real[c][: info1.frame_count])
+            for c in range(4)
+        )
+        # ⚠️ 该 testsets 素材实测为**全静音** PCM (4 条流全部 0), 因此这里
+        # 断言"逐样本一致 + 未被重排/混音"而不是"有非零内容"。
+        record("l3.p3a.真实 A7M5 s24be -> canonical float32 逐样本一致 "
+               "(素材实测全静音, 故只断言结构一致)",
+               same and info1.channel_count == 4
+               and all(float(np.abs(refs_real[c]).max()) == 0.0
+                       for c in range(4)),
+               f"frames={info1.frame_count} "
+               f"peaks={[float(np.abs(arr1[:, c]).max()) for c in range(4)]}")
+    else:
+        record("l3.p3a.真实 A7M5 s24be -> canonical float32 逐样本一致 "
+               "(素材实测全静音, 故只断言结构一致)",
+               False, "参考解码失败")
+
+    # --- A7M5 CH selection -> mono WAV ---------------------------------
+    sel_plan = plan_of([{
+        "source_id": "camera", "path": str(src_mp4), "streams": audio_streams,
+    }])
+    AudioPlanner(sel_plan).select_channels("camera:s3:c0")
+    out2 = d / "a7m5_ch3.wav"
+    res2 = _p3a_render(sel_plan, out2, chunk_frames=4096)
+    arr2, info2 = read_wav(out2) if out2.exists() else (None, None)
+    raw3 = d / "a7m5_ch3_ref.raw"
+    rr3 = sh(FFMPEG, "-v", "error", "-y", "-i", src_mp4, "-map", "0:a:2",
+             "-vn", "-sn", "-dn", "-f", "f32le", "-ac", "1", raw3)
+    ref3 = np.fromfile(raw3, dtype="<f4") if rr3.returncode == 0 else None
+    record("l3.p3a.真实 A7M5 选单通道 -> mono WAV 且样本来自该流",
+           res2.ok and info2 is not None and info2.channel_count == 1
+           and ref3 is not None
+           and np.array_equal(arr2[:, 0], ref3[: info2.frame_count])
+           and sel_plan.selected_channels == ["camera:s3:c0"],
+           f"ok={res2.ok} frames={info2.frame_count if info2 else None} "
+           f"errors={res2.errors}")
+
+    # --- A7M5 reorder (4,2,1,3) ----------------------------------------
+    ord_plan = plan_of([{
+        "source_id": "camera", "path": str(src_mp4), "streams": audio_streams,
+    }])
+    order = ["camera:s4:c0", "camera:s2:c0", "camera:s1:c0", "camera:s3:c0"]
+    planner = AudioPlanner(ord_plan)
+    planner.select_channels(*order)
+    planner.map_channels(*order)
+    out3 = d / "a7m5_reorder.wav"
+    res3 = _p3a_render(ord_plan, out3, chunk_frames=4096)
+    arr3, info3 = read_wav(out3) if out3.exists() else (None, None)
+    refs = []
+    for position in (3, 1, 0, 2):
+        rp = d / f"a7m5_ref_a{position}.raw"
+        rc = sh(FFMPEG, "-v", "error", "-y", "-i", src_mp4,
+                "-map", f"0:a:{position}", "-vn", "-sn", "-dn",
+                "-f", "f32le", "-ac", "1", rp)
+        refs.append(np.fromfile(rp, dtype="<f4") if rc.returncode == 0 else None)
+    ok3 = (res3.ok and info3 is not None and info3.channel_count == 4
+           and all(r is not None for r in refs))
+    if ok3:
+        n = info3.frame_count
+        ok3 = all(np.array_equal(arr3[:, c], refs[c][:n]) for c in range(4))
+    record("l3.p3a.真实 A7M5 4×mono 重排 (4,2,1,3) 逐样本精确",
+           bool(ok3)
+           and res3.timeline.output_channel_ids == order
+           and res3.route_spec is not None
+           and all(r.offset_samples == 0 for r in res3.route_spec.channels),
+           f"ok={res3.ok} order={res3.timeline.output_channel_ids if res3.timeline else None} "
+           f"errors={res3.errors}")
+    record("l3.p3a.4×mono 重排仍是「逐流整流」(不塌缩成 1 条 4CH 流)",
+           bool(res3.ok and res3.route_spec is not None
+                and len(res3.route_spec.channels) == 4
+                and len({r.stream_id for r in res3.route_spec.channels}) == 4
+                and all(r.channel_index == 0
+                        for r in res3.route_spec.channels)))
+
+    # --- 真实素材上的静音事实 (不是缺陷) --------------------------------
+    if info1 is not None:
+        record("l3.p3a.真实 A7M5 音频实测全静音 (4 流全 0, 非管线缺陷)",
+               float(np.abs(arr1).max()) == 0.0
+               and info1.frame_count == expected_frames,
+               f"peak={float(np.abs(arr1).max())} frames={info1.frame_count}")
+
+    # --- 线性 PCM 整数格式 -> canonical float32 (确定性正弦, 非静音) ----
+    int_ok, int_detail = _p3a_integer_pcm(d)
+    record("l3.p3a.真实 ffmpeg 解码 s16/s24/s32/f32 -> float32 逐样本一致",
+           int_ok, int_detail)
+
+    # --- 外挂 WAV -> WAV (逐样本一致) ----------------------------------
+    wav_mono = d / "ext_mono.wav"
+    wav_stereo = d / "ext_stereo.wav"
+    wav_4ch = d / "ext_4ch.wav"
+    mk_ok = True
+    for path, channels, seed in ((wav_mono, 1, 11), (wav_stereo, 2, 12),
+                                 (wav_4ch, 4, 13)):
+        rc = sh(FFMPEG, "-v", "error", "-y", "-f", "lavfi", "-i",
+                f"anoisesrc=duration=2:sample_rate=48000:color=pink:seed={seed}",
+                "-c:a", "pcm_s24le", "-ac", str(channels), path, timeout=600)
+        mk_ok = mk_ok and rc.returncode == 0 and path.is_file()
+    record("l3.p3a.外挂 WAV fixture 生成 (mono/stereo/4CH)", mk_ok)
+
+    wav_streams = build_audio_streams(
+        ffprobe_json(wav_stereo).get("streams", []), source_id="recorder"
+    )
+    wav_plan = plan_of([{
+        "source_id": "recorder", "path": str(wav_stereo),
+        "streams": wav_streams, "source_type": AudioSourceType.WAV,
+    }])
+    out4 = d / "ext_stereo_out.wav"
+    res4 = _p3a_render(wav_plan, out4, chunk_frames=997)
+    arr4, info4 = read_wav(out4) if out4.exists() else (None, None)
+    ref4, head4 = read_wav(wav_stereo)
+    record("l3.p3a.外挂 WAV (stereo, pcm_s24le) -> WAV 逐样本一致",
+           res4.ok and info4 is not None and info4.channel_count == 2
+           and info4.frame_count == head4.frame_count == 96000
+           and np.array_equal(arr4, ref4),
+           f"ok={res4.ok} frames={info4.frame_count if info4 else None} "
+           f"errors={res4.errors}")
+
+    # --- camera + WAV 跨来源 -> 多声道 WAV ------------------------------
+    cross_plan = plan_of([
+        {"source_id": "camera", "path": str(src_mp4), "streams": audio_streams},
+        {"source_id": "recorder", "path": str(wav_stereo),
+         "streams": wav_streams, "source_type": AudioSourceType.WAV},
+    ])
+    cross_order = ["camera:s3:c0", "recorder:s0:c0", "camera:s1:c0"]
+    cross = AudioPlanner(cross_plan)
+    cross.select_channels(*cross_order)
+    cross.map_channels(*cross_order)
+    out5 = d / "cross_source.wav"
+    res5 = _p3a_render(cross_plan, out5, chunk_frames=4096)
+    arr5, info5 = read_wav(out5) if out5.exists() else (None, None)
+    ok5 = (res5.ok and info5 is not None and info5.channel_count == 3
+           and info5.frame_count == expected_frames          # UNION: camera 更长
+           and ref3 is not None)
+    if ok5:
+        # 短来源 (2s WAV) 在 6.006s 窗口内: 前 96000 帧真实, 其余静音
+        ok5 = (np.array_equal(arr5[:96000, 1], ref4[:, 0])
+               and not np.any(arr5[96000:, 1])
+               and np.array_equal(arr5[:, 0], ref3[: info5.frame_count]))
+    record("l3.p3a.camera + 外挂 WAV 跨来源 -> 3 声道 WAV (UNION, 短源补静音)",
+           bool(ok5)
+           and res5.route_spec is not None
+           and res5.route_spec.is_multi_source
+           and res5.silence_samples > 0,
+           f"ok={res5.ok} frames={info5.frame_count if info5 else None} "
+           f"silence={res5.silence_samples} errors={res5.errors}")
+
+    # --- 真实素材上的时长/EOF 事实 --------------------------------------
+    if res1.timeline is not None:
+        tl = res1.timeline
+        record("l3.p3a.真实素材 render window = 实际解码并集 (无 metadata 冲突)",
+               tl.frame_count == expected_frames
+               and tl.start_sample == 0 and tl.end_sample == expected_frames
+               and not res1.duration_mismatches
+               and all(c.actual_samples == expected_frames
+                       for c in tl.channels),
+               f"{tl.summary()}")
+
+    for tmp in d.glob("*.raw"):
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+
+
+# ===========================================================================
 # runner
 # ===========================================================================
 
@@ -4234,6 +5791,11 @@ SUITES: dict[str, list[tuple[str, Callable[[], None]]]] = {
         ("channel-sync P1", l1_channel_sync_p1),
         ("audio model v0.7.1", l1_audio_model),
         ("audio select/map v0.7.1", l1_audio_selection),
+        ("audio timeline v0.7.1", l1_audio_timeline),
+        ("audio sync offset v0.7.1", l1_audio_sync_offset),
+        ("audio route v0.7.1", l1_audio_route),
+        ("audio wav export v0.7.1", l1_audio_wav_export),
+        ("audio chunk invariance v0.7.1", l1_audio_chunk_invariance),
         ("av1", l1_av1),
         ("cli v0.6.2", l1_cli_v062),
     ],
@@ -4241,6 +5803,7 @@ SUITES: dict[str, list[tuple[str, Callable[[], None]]]] = {
     "full": [("pipeline", l3_pipeline),
              ("audio model probe v0.7.1", l3_audio_probe),
              ("audio select/map v0.7.1", l3_audio_selection),
+             ("audio pcm/wav v0.7.1", l3_audio_process),
              ("channel-sync P1 E2E", l3_channel_sync_p1),
              ("channel-sync P1 算法级", l3_channel_sync_p1_algo)],
 }

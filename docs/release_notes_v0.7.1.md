@@ -1,4 +1,4 @@
-# v0.7.1 发布说明 — 音频模型（Phase 1 + Phase 2）
+# v0.7.1 发布说明 — 音频模型（Phase 1 + Phase 2 + Phase 3A）
 
 > **状态**：Phase 1（音频中间模型）与 Phase 2（多来源 + 选择 + 通道映射 +
 > 可执行 AudioPlan/AudioMapSpec）均已完成。
@@ -554,3 +554,219 @@ DAW 式音频编辑 / timeline editor / clip system
 一字未改）、Sony/DJI 保留管线、硬件解码路径。`AudioPlan` 的 `mix_mode` /
 `channel_map` / `wav_outputs` 仍为预留字段；`AudioMapSpec` 只给出策略分类
 与身份，**不生成 filtergraph 字符串、不执行 ffmpeg**。
+
+---
+
+# Phase 3A — PCM Routing + WAV Export
+
+> Phase 3 分两段：**3A = PCM Reader + 无混音路由 + WAV 导出**（本节），
+> **3B = PCM Mixing**（见文末 §21，只在 3A 全绿后才开始）。
+
+## 11. 新增分层
+
+```
+AudioSource / AudioStream / AudioChannel      ← Phase 1/2 模型（未改）
+        ↓  Channel Sync Result（只读既有报告）
+AudioPlan                                     ← Phase 2 规划（未改）
+        ↓
+core/audio_timeline.py   AudioTimeline        ← **唯一**时长/EOF/offset 权威
+        ↓
+core/audio_pcm.py        AudioPCMReader       ← ffmpeg 解码 → canonical float32
+        ↓
+core/audio_route.py      AudioRouter          ← 纯样本搬运（**无相加**）
+        ↓
+core/audio_wav.py        WavExporter          ← RIFF / PCM16·24·32 / float32
+        ↓
+core/audio_process.py    AudioOutputSpec      ← 声明式输出描述 + 处理图编排
+```
+
+`AudioMapSpec` 仍然只描述 `-map` 层面的策略；PCM 处理走上面这条**新的**
+执行链，两者不互相替代。
+
+## 12. AudioTimeline / RenderPolicy（时长权威）
+
+**输出时长不是"谁先 EOF 就结束"**，而是由 `AudioPlan` 按明确规则确定。
+`PCMReader` / `AudioRouter` / `WavExporter` / （Phase 3B 的）Mixer 都
+**不得**自行决定 EOF 或输出长度。
+
+| 概念 | 说明 |
+|---|---|
+| `AudioTimeline` | `sample_rate` / `start_sample` / `end_sample` / `frame_count` / `duration_seconds` + 逐声道 `ChannelTimeline` |
+| `RenderPolicy.UNION` | **Phase 3A 唯一启用**：render window = 参与输出的源 timeline **并集** |
+| `RenderPolicy.INTERSECTION` / `EXPLICIT`+`INTERSECTION` | **预留**；显式给出时会以 `audio_timeline_invalid` 拒绝，不假装支持 |
+| `DurationMode` | `derived`（并集推导）/ `explicit`（调用方给出）/ `metadata` |
+| `SyncApplication` | `APPLY`（输入是未修正源，需应用 offset）/ `NONE`（输入已是修正产物，防止二次移位） |
+
+解析顺序：显式 duration → `AudioSource`/`AudioStream` 的 duration 事实 →
+按 policy 从参与源推导 → 仍未知则 `audio_duration_unknown` **拒绝**。
+**不**用 `file_size / bit_rate` 猜 duration。
+
+### 12.1 EOF / 短 source 策略（确定性）
+
+```text
+camera   0..60min
+recorder 0..58min
+UNION → render 0..60min
+recorder: 58min..60min = float32 静音 0.0（继续输出, 不终止整个 render）
+camera  : 不因 recorder EOF 而截断
+```
+
+* EOF = 缺失区间补 **`float32 0.0`**（不是 NaN，**不**循环，**不**复制最后一个样本）；
+* 输出样本数**严格**等于 `frame_count`（sample-accurate）；
+* `chunk_frames` 只影响分块，**不得**影响结果（回归已钉 `byte-identical`）；
+* 多源 timeline **overlap 允许**，但不会因此自动 mixing（输出声道仍各自独立）。
+
+### 12.2 采样率与 offset 方向
+
+* 参与同一 render 的来源必须**同采样率**，否则 `audio_sample_rate_mismatch`
+  拒绝 —— **不偷偷 resample**（resampling 属后续阶段）；
+* `offset_samples` 的语义与方向由**实测**确定，不按字段名猜：
+
+  ```text
+  4×mono 素材 CH2 内容晚到 960 样本
+  channel_sync 报告: delay_samples=+960  shift_samples=960
+  修正后音频 vs 修正前互相关 lag = -960   (after[n] == before[n + 960])
+  ⇒ 统一换算:  timeline_sample = source_sample - offset_samples
+  ```
+
+  `core/audio_timeline.source_to_timeline()` 是**唯一**换算入口；只有
+  `status == success` 的固定整数 offset 会被应用，浮点分数部分只记录为
+  residual（**不做**分数插值）。**不重新估计 delay**（不重写 GCC-PHAT）。
+
+## 13. PCM Reader（canonical float32）
+
+`core/audio_pcm.AudioPCMReader`：
+
+* 只消费既有 `AudioStream` 模型，**不新建 ffprobe parser**；压缩音频（AAC/Opus…）
+  一律交给 ffmpeg 解码；
+* 解码落 raw 临时文件后按块读取（与 `channel_sync` 同策略，避免 Windows 大流量管道），
+  峰值内存 ≈ 一个 chunk，与素材时长无关；
+* **canonical 内部格式 = float32**，线性 PCM 归一化到 `[-1, 1]`：
+  s16 ×2⁻¹⁵ / s24 ×2⁻²³ / s32 ×2⁻³¹ / f32 原样；`sample_rate` 与声道数仍由
+  source model 提供，**不猜测**；
+* ⚠️ 解码命令行带 `-af channelmap=0|1|…|N-1`：ffmpeg 默认会按**声明布局**
+  重排/下混（实测 4 声道 + `quad` 布局会把 FC/BC 折进 BL/BR），
+  identity channelmap 强制"按位置逐声道复制"，**不插值、不混合、不改增益**；
+* `actual_samples`（实际解码样本数）是 **EOF 最终事实**；与声明值
+  （`nb_frames` / WAV header / `duration × rate`）不一致时记录
+  `audio_duration_metadata_mismatch`，并让**派生**窗口按实际重算
+  （显式 duration 不受影响，缺口补静音）。
+
+## 14. Channel Routing
+
+`core/audio_route.AudioRouter`：**一个输出声道 = 一个源声道**，纯样本搬运。
+
+```text
+camera:s0:c2 -> out0
+recorder:s0:c0 -> out1
+camera:s0:c0 -> out2
+```
+
+* 同时读取多个 source，按统一 timeline 产出固定数量输出帧；
+* 与块划分无关：每块只读它需要的那段源区间（按流合并区间），**不重复 decode**；
+* **不存在**任何样本级相加路径；源声道重复占用同一输出/多输出在到达 router 前
+  就被拒绝（`audio_mapping_output_order`；Phase 2 契约未放宽）。
+
+## 15. WAV 导出
+
+`core/audio_wav.WavExporter` + `read_wav`（round-trip 校验用）：
+
+| 格式 | 实现 |
+|---|---|
+| `pcm16` / `pcm24` / `pcm32` | 整数，`rint(x × 2^(bits-1))` 后裁剪 |
+| `float32` | IEEE float 原样（**允许 over-range**，不自动 normalize） |
+
+* 头部**按实际写出的字节数回填**（`RIFF` 大小 / `fmt` / `data` 大小 /
+  `byte_rate` / `block_align` / `bits_per_sample`）；写入样本数与声明不符
+  → `audio_wav_write_failed` 且**删除半成品**；
+* 3 声道及以上写 `WAVE_FORMAT_EXTENSIBLE`（含 channel mask），1/2 声道写经典
+  头（兼容性最佳）；24-bit / IEEE float 标准库 `wave` 表达不了，因此自带小型
+  writer（纯标准库 + numpy），**不引入任何音频框架**；
+* 命名集中在 `AudioOutputSpec` / `default_wav_name()`：
+  `<source>_<track/channel>_<mapping>.wav`（如 `camera_s2c2.wav`、
+  `multi_mix.wav`），同名冲突自动 `-2` 后缀，**不覆盖**；
+* **WAV 与 Mixing 解耦**：exporter 只负责写文件，不实现任何 DSP。
+
+## 16. 处理图与输出描述
+
+`core/audio_process.py`：
+
+* `AudioOutputSpec`：`output kind / sample rate / sample format / channel count /
+  source plan / destination`（Phase 4 的 MP4 集成预留）；
+* `run_audio_render(plan, ffmpeg=…, work_dir=…, output_dir|output_path=…,
+  sample_format=…, chunk_frames=…, render_policy=…, …)`：
+  预解码 → timeline → 路由 → 写 WAV，返回 `AudioRenderResult`（JSON 友好）；
+* 失败时 `ok=False` 且**不产出文件**（校验/时间轴问题绝不"尽可能输出"）；
+* `reader_factory` 可替换读取后端（测试用管道读取器验证结果不依赖传输层）。
+
+## 17. 新增 reason codes（稳定契约）
+
+```text
+audio_sample_rate_mismatch          audio_timeline_invalid
+audio_negative_render_duration      audio_sync_offset_invalid
+audio_duration_unknown              audio_duration_metadata_mismatch
+audio_duration_explicit_invalid     audio_decode_failed
+audio_pcm_format_unsupported        audio_pcm_short_read
+audio_output_invalid                audio_route_offset_unknown
+audio_wav_write_failed              audio_mix_invalid
+```
+
+（Phase 2 的 `audio_*_not_found` / `audio_mapping_*` / `audio_mix_not_supported`
+语义不变。）
+
+## 18. Phase 3A 实测
+
+| 测试面 | 套件 | 结果 |
+|---|---|---|
+| 时间轴 / RenderPolicy / EOF（T1–T8 + 采样率 + duration） | `audio timeline v0.7.1` | 15 断言全通过 |
+| offset 方向（impulse 正/负/零 + `shift_stream` 实测钉向） | `audio sync offset v0.7.1` | 7 断言全通过 |
+| 通道路由（T2–T10 + T3b + T12） | `audio route v0.7.1` | 13 断言全通过 |
+| WAV 导出（4 格式往返 + header 精确 + 命名） | `audio wav export v0.7.1` | 9 断言全通过 |
+| chunk invariance + 内存上界 | `audio chunk invariance v0.7.1` | 9 断言全通过 |
+| 真实 A7M5 4×mono + 外挂 WAV 端到端 | `audio pcm/wav v0.7.1`（L3） | 12 断言全通过 |
+| 全量 L1 | `--level unit` | **364 PASS / 0 FAIL** |
+| 全量 L3 | `--level full` | **477 PASS / 0 FAIL**（unit 364 + toolchain 16 + full 97） |
+
+确定性验证手段：impulse fixture（逐样本位置断言）、`byte-identical` 哈希比对
+（chunk 1/7/256/1024/4096）、`read_wav` round-trip（sample rate / 声道 /
+位深 / 样本数 / 样本值 / 时长）、与 ffmpeg 直读 PCM 的逐样本一致性。
+
+真实素材：
+
+```text
+testsets/a7m5_4k60p_265_10bit420_150m_xavchs_4ch/*.MP4
+    4 条独立 mono 流（容器 index 1..4 / audio_position 0..3, pcm_s24be）
+    ⚠️ 实测该素材音频**全静音**（4 流全 0）—— 用例因此断言结构一致
+       （逐样本等于 ffmpeg 直读、声道不串位）而不是"有非零内容"
+ffmpeg 生成的 deterministic 外挂 WAV: ext_mono / ext_stereo / ext_4ch
+外加 s16/s24/s32/f32 正弦素材 -> canonical float32 逐样本一致
+```
+
+## 19. 默认生产路径回归
+
+* `AudioPlan = None` 依然是 `-map 0` + `-c:a copy`（Sony/DJI 仍是 GPAC 音频复制）；
+* 新链路**只有显式调用** `run_audio_render()` 才会解码/写 WAV；
+  CLI 未新增任何音频开关；
+* `core/channel_sync.py`、`encoders/hwdecode.py`、`encoders/integrity.py`、
+  视频缩放与 x265 缩放规则：**零改动**（`git status` 仅新增音频模块 +
+  测试文件）。
+
+## 20. Phase 3A **未**实现（明确边界）
+
+```text
+PCM Mixing（N 源声道 -> 1 输出声道的样本级合成 / 增益）
+Selective MP4 retention（音轨选择进容器）
+Audio codec integration（aac/opus/… 编码与 mux）
+Automatic external-source synchronization（自动跨文件时间对齐）
+Drift correction / time-stretch / pitch shift
+Resampling（不同采样率一律拒绝）
+compressor / EQ / reverb / limiter / normalizer / noise reduction / AGC /
+spectral processing
+新 CLI（--audio-* 全部未开放）
+DAW 式编辑 / timeline editor / clip system
+```
+
+`AudioPlan.mix_mode` 仍为预留：`build_audio_map_spec()` 继续以
+`audio_mix_not_supported` 拒绝（`-map` 规格无法表达样本级合成）；PCM 渲染
+路径在 Phase 3B 落地 MixEngine 之前也会明确拒绝。
+

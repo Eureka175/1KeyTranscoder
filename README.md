@@ -212,12 +212,13 @@ DJI（djmd）→ DJI
 不再被 P1 主路径引用。设计细节与 P1 vs vendored 差异对照见
 `docs/design/channel_sync_p1.md`。
 
-## 音频模型（v0.7.1 Phase 1 + Phase 2，内部能力层）
+## 音频模型与 PCM 处理（v0.7.1 Phase 1 + Phase 2 + Phase 3A，内部能力层）
 
 **这一层目前不影响任何输出**：默认音频路径仍是"整流原样 copy"
 （经典路径 `-map 0` + `-c:a copy`；Sony/DJI 保留管线由 GPAC 从源容器
-复制音频）。v0.7.1 只建立**数据结构 + 规划层**，供后续混音 / WAVE 导出 /
-MP4 音轨保留使用；**本阶段不执行任何音频处理，也不新增 CLI**。
+复制音频）。v0.7.1 建立**数据结构 + 规划层 + PCM 处理链**，供后续混音 /
+MP4 音轨保留使用；**不新增 CLI，默认生产路径一字未改** —— 新的 PCM 处理
+只在显式调用 `core.audio_process.run_audio_render()` 时才会执行。
 
 ```text
 输入文件（可多个来源）
@@ -232,6 +233,13 @@ Selection         哪些 source channel 被保留   （决定"保留什么"）
 Channel Mapping   已选声道按什么顺序进入输出   （决定"输出顺序"）
 AudioPlan         sources / selected_channels / channel_mapping / output_tracks
 AudioMapSpec      可 dry-run 的执行规格（策略分类 + 完整身份，不执行 ffmpeg）
+
+── Phase 3A：执行链（只有 run_audio_render 才进入） ──
+  ↓  core.audio_timeline    AudioTimeline / RenderPolicy（**唯一**时长·EOF·offset 权威）
+  ↓  core.audio_pcm         AudioPCMReader（ffmpeg → canonical float32, chunked）
+  ↓  core.audio_route       AudioRouter（1 输出声道 = 1 源声道, **无相加**）
+  ↓  core.audio_wav         WavExporter（PCM16 / PCM24 / PCM32 / float32）
+  ↓  core.audio_process     AudioOutputSpec + run_audio_render 编排
 ```
 
 | 模块 | 职责 |
@@ -239,6 +247,11 @@ AudioMapSpec      可 dry-run 的执行规格（策略分类 + 完整身份，�
 | `core/audio_models.py` | Model 层：`AudioSource` / `AudioStream` / `AudioChannel` / `AudioTrack` / `AudioPlan` / `AudioSyncResult` / `AudioTiming` / `AudioTrackBuilder` / `AudioSourceBuilder` / `ChannelSyncReport`。**纯数据**，不构造 ffmpeg 命令 |
 | `core/audio_plan.py` | 规划层：`AudioPlanner`（selection / mapping）、`AudioOutputTrack`、`AudioMapSpec`、validation（V1–V8 reason codes）。**不持有 PCM、不执行 ffmpeg** |
 | `core/audio_probe.py` | Probe 层：`probe_source()` 的原始 stream → 上述模型；`AudioProbeResult` 提供 `summary()` / `plan()` / `tracks()` |
+| `core/audio_timeline.py` | **P3A**：`AudioTimeline` / `RenderPolicy`（UNION）/ 时长解析 / EOF 策略 / `source_to_timeline()`（唯一 offset 换算入口） |
+| `core/audio_pcm.py` | **P3A**：`AudioPCMReader`（ffmpeg 解码 → canonical float32，分块读取，identity channelmap 防隐式重排） |
+| `core/audio_route.py` | **P3A**：`AudioRouter`（纯样本搬运，1:1，**无混音**） |
+| `core/audio_wav.py` | **P3A**：`WavExporter` / `read_wav` / `AudioOutputSpec` / `default_wav_name()` |
+| `core/audio_process.py` | **P3A**：`run_audio_render()` 处理图编排 + `AudioRenderResult` |
 | `core/channel_sync.py` | Sync 层（**未改动**）：模型只**读取**它的报告 JSON，不重实现算法 |
 
 支持的输入形态（都有测试）：
@@ -278,6 +291,20 @@ AudioMapSpec      可 dry-run 的执行规格（策略分类 + 完整身份，�
   （`AudioTiming`），**不实现**任何跨文件同步算法。
 - **JSON 往返**：所有模型提供 `to_dict()` / `from_dict()`，输出稳定、
   JSON-compatible、enum 有稳定字符串表示。
+- **P3A：时长/EOF 只有一个权威**。`AudioTimeline` 决定 render window
+  （`RenderPolicy.UNION` = 参与输出来源 timeline 的并集）；短 source 的缺失
+  区间补**确定性静音 0.0**（不循环、不复制末样本、不写 NaN），长 source
+  不因别的 source EOF 而截断；输出样本数严格 `= frame_count`，`chunk_frames`
+  不影响结果。采样率不一致直接 `audio_sample_rate_mismatch`（**不偷偷 resample**）。
+- **P3A：offset 方向由实测钉死**。`timeline = source − offset`
+  （`core.audio_timeline.source_to_timeline()` 是唯一入口）；channel_sync 对
+  晚到轨报 `shift_samples=+960`，其修正会把该轨**前移** 960 样本 ——
+  impulse 回归把该方向钉住。只应用 `status=success` 的固定整数 offset，
+  **不重新估计 delay**（不重写 GCC-PHAT）。
+- **P3A：解码不隐式重排/混音声道**。解码命令行带 identity `channelmap`
+  （ffmpeg 默认会按声明布局重排/下混，实测 4 声道 + `quad` 会把 FC/BC 折进
+  BL/BR）；canonical 中间格式 float32，满量程归一（s16 ×2⁻¹⁵ / s24 ×2⁻²³ /
+  s32 ×2⁻³¹ / f32 原样）。
 - 详细设计与测试见 [docs/release_notes_v0.7.1.md](docs/release_notes_v0.7.1.md)。
 
 用法（内部 API，尚无 CLI）：
@@ -299,12 +326,31 @@ if spec.ok:
     spec.trace(0)                          # output 0 -> camera:s2:c2 -> sync
 ```
 
-> ⚠️ **本阶段未实现（不要据此宣称）**：Mixing（4CH 混音 / 通道混排 /
-> weighted mixing / 增益 / limiter / compressor）、WAVE 导出、
-> selective MP4 retention（音轨选择进容器）、重采样、漂移校正、
-> 新 CLI（`--audio-tracks` / `--audio-map` / `--audio-source` 均未开放）、
-> DAW 式编辑、自动跨文件同步。`AudioMapSpec` 只给出策略分类与身份，
-> **不生成 filtergraph 字符串、不执行 ffmpeg**。
+Phase 3A：把计划真正渲染成 WAV（internal API）：
+
+```python
+from core.audio_process import run_audio_render
+from core.audio_wav import WavFormat
+
+res = run_audio_render(
+    plan,
+    ffmpeg=Path("tools/ffmpeg.exe"),
+    work_dir=Path("work/audio"),
+    output_dir=Path("work/audio/out"),      # 或 output_path=... 指定文件名
+    sample_format=WavFormat.PCM24,
+    chunk_frames=16384,                     # 只影响分块, 不影响结果
+)
+res.ok, res.output.path, res.timeline.frame_count
+res.duration_mismatches                     # metadata vs 实际解码样本数
+```
+
+> ⚠️ **仍未实现（不要据此宣称）**：PCM Mixing（N 源声道 → 1 输出声道的样本级
+> 合成 / 增益 / limiter / compressor / EQ / normalizer）、selective MP4
+> retention（音轨选择进容器）、音频编码与 mux、重采样、漂移校正、自动跨文件
+> 同步、新 CLI（`--audio-tracks` / `--audio-map` / `--audio-source` 均未开放）、
+> DAW 式编辑。`AudioMapSpec` 仍只给出策略分类与身份，**不生成 filtergraph
+> 字符串、不执行 ffmpeg**；`AudioPlan.mix_mode` 非空时 `build_audio_map_spec()`
+> 继续以 `audio_mix_not_supported` 拒绝。
 
 ## 硬件解码：`--hw-decode off|auto|require`（v0.7.0，**默认 `off`**）
 
@@ -466,28 +512,33 @@ python -m tests.hwdecode.harness summary         # 汇总闸门
 ## 自动化测试（三级深度）
 
 ```powershell
-python tests\full_autotest.py --level unit        # L1 纯逻辑 (178 项, 秒级, 零外部依赖)
+python tests\full_autotest.py --level unit        # L1 纯逻辑 + 确定性强逻辑 (秒级~3.5 分钟)
 python tests\full_autotest.py --level toolchain   # L2 + 工具版本/实机能力/旗标白名单 (~16s)
-python tests\full_autotest.py --level full        # L3 + 真实管线集成 + 故障注入 (~9.5 分钟)
+python tests\full_autotest.py --level full        # L3 + 真实管线集成 + 故障注入 (~12 分钟)
 python tests\full_autotest.py --level all         # 等同 full
 ```
 
-> 当前基线（v0.7.1 Phase 2）：**L1 = 308 PASS / 0 FAIL**；
-> **`--level full` = 409 PASS / 0 FAIL**（v0.7.0 hardware decode +
-> v0.7.1 音频模型 Phase 1/2 全部并入 `main` 后实测）。
-> 任何改动后必须复核不出现新增 FAIL。
+> 当前基线（v0.7.1 Phase 3A）：**L1 = 364 PASS / 0 FAIL**；
+> **`--level full` = 477 PASS / 0 FAIL**（unit 364 + toolchain 16 + full 97；
+> v0.7.0 hardware decode + v0.7.1 音频模型 Phase 1/2 + Phase 3A PCM 路由/WAV
+> 导出全部并入 `main` 后实测）。任何改动后必须复核不出现新增 FAIL。
 
-- **L1 unit**（308 项）：color token 表、caps 解析、格式规划、失败分类、
+- **L1 unit**（364 项）：color token 表、caps 解析、格式规划、失败分类、
   flag 构造、probe/paths、源分类、缩放引擎、gpac parse_info、dji facts、
   channel-sync 纯逻辑、**channel-sync 内存回归（有界窗口流 / 窗口切片一致 /
-  64 MB 整轨扫描后工作集增量 ≤32 MB）**、AV1 档位与参数映射；
+  64 MB 整轨扫描后工作集增量 ≤32 MB）**、AV1 档位与参数映射、
+  **音频时间轴/EOF/offset（P3A）、通道路由（P3A）、WAV 往返与 header 精确
+  （P3A）、chunk invariance 与内存上界（P3A）**；
 - **L2 toolchain**（+16 项）：真实工具版本、`--check-features` 实机能力、
   known_flags 白名单、Gyroflow/GPAC 探测；
-- **L3 full**（+101 项）：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
+- **L3 full**（97 项 = 16 + 基础 41 + v0.7.0 硬件解码 + v0.7.1 音频的累计）：
+  Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
   截断文件/尾部垃圾/断点续跑/retry-list 故障注入、strip 机制本体、
   AV1 管线、channel-sync P1 端到端与算法级、
   **音频模型 probe 集成（真 ffprobe，v0.7.1 P1）**、
-  **音频来源/选择/映射集成（真 A7M5 + 外挂 WAV，v0.7.1 P2）**。
+  **音频来源/选择/映射集成（真 A7M5 + 外挂 WAV，v0.7.1 P2）**、
+  **音频 PCM 路由/WAV 导出集成（真 A7M5 4×mono + s16/s24/s32/f32 正弦，
+  v0.7.1 P3A，12 项）**。
   输入在 `work/autotest/` 自建副本（testsets 只读），报告
   `work/autotest/autotest_report.{json,md}`，退出码 0=全过。
 
@@ -503,7 +554,7 @@ docs/
 ├── design/              设计文档：硬件后端设计 / 实施报告(含 DJI §15) / 集成报告 / HEVC 4:2:2 Rext 播放兼容性
 ├── evaluation/          评估：HEVC 生产就绪度(重写版) / x265 生产就绪 / AV1 可行性 / AV1 调参 / SVT-AV1 归档 / AV1 档位标定
 ├── hardware-decode/     ★ v0.7.0 硬件解码 integration 交付物：测试矩阵 / 最终判定 / 补丁 / toolchain provenance
-├── release_notes_v0.7.1.md  v0.7.1 发布说明（音频模型 Phase 1 + Phase 2）
+├── release_notes_v0.7.1.md  v0.7.1 发布说明（音频模型 Phase 1 + Phase 2 + Phase 3A）
 └── reference/           第三方一手资料存档（x265 / SVT-AV1 含 v4.2.0 调参调研报告 / NVENC / QSV / VCE）
 
 olddocs/                 历史档案存档（各阶段代码快照 / 被取代的旧脚本），详见 olddocs/README.md

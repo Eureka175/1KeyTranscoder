@@ -215,11 +215,12 @@ P1 设计见 `docs/design/channel_sync_p1.md`，实现要点：
 
 ---
 
-## 6.1 音频模型（v0.7.1 Phase 1 + Phase 2）
+## 6.1 音频模型与 PCM 处理（v0.7.1 Phase 1 + Phase 2 + Phase 3A）
 
 **这一层不参与任何生产决策**：默认路径上没有任何调用方，也不产生 ffmpeg
 命令。它的存在是为后续音频能力（选择 / 通道映射 / 混排 / WAVE 导出 /
-MP4 音轨保留）提供一个稳定、可测试、可序列化的中间模型。
+MP4 音轨保留）提供一个稳定、可测试、可序列化的中间模型，并把 Phase 3 起的
+PCM 处理放在一条**独立的执行链**上。
 
 ```
 probe_source() 的 raw stream dict（每来源一次）
@@ -241,6 +242,20 @@ core/audio_plan.py            ← 规划层（Selection → Mapping → Validati
       │  ChannelSyncReport.apply_to()  ← 只**读取** core/channel_sync 的报告 dict
       │
 core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
+
+──────────── Phase 3A：执行链（只有显式调用 run_audio_render 才进入） ────────────
+
+AudioPlan
+      ▼
+core/audio_timeline.py   AudioTimeline / RenderPolicy  ← **唯一**时长·EOF·offset 权威
+      ▼
+core/audio_pcm.py        AudioPCMReader                ← ffmpeg → canonical float32
+      ▼
+core/audio_route.py      AudioRouter                   ← 纯样本搬运（**无相加**）
+      ▼
+core/audio_wav.py        WavExporter                   ← RIFF / PCM16·24·32 / float32
+      ▼
+core/audio_process.py    AudioOutputSpec + 处理图编排（run_audio_render）
 ```
 
 ### 6.1.1 四个概念 + 三维身份
@@ -300,7 +315,55 @@ k 条 mono 流的任意重排**仍是** `stream_copy`（每条流被整体保留
 
 `-map 0` + `-c:a copy`（经典路径）与 GPAC 音频复制（Sony/DJI）**未改动**：
 `AudioPlan = None` 时行为与 v0.7.0 完全一致。外挂来源的跨媒体时间对齐、
-Mixing、WAV 导出、selective MP4 retention、重采样与漂移校正**均未实现**。
+Mixing、selective MP4 retention、重采样与漂移校正**均未实现**。
+
+### 6.1.6 AudioTimeline：时长 / EOF / offset 的唯一权威（P3A）
+
+`AudioRouter` / `WavExporter` / （P3B 的）Mixer **都不得**自行决定 EOF 或
+输出长度；三者只消费 `core/audio_timeline.AudioTimeline`。
+
+| 项 | 规则 |
+|---|---|
+| render window | `RenderPolicy.UNION`（**P3A 唯一启用**）= 参与输出源 timeline 的并集；`INTERSECTION` 为预留，显式给会 `audio_timeline_invalid` |
+| duration 解析 | 显式 duration → source/stream duration 事实 → 按 policy 推导 → 否则 `audio_duration_unknown` **拒绝**（不用 file_size/bit_rate 猜） |
+| 短 source | EOF 之后补 **`float32 0.0`**（不循环、不复制末样本、不写 NaN），长 source **不**因此截断 |
+| 输出长度 | 严格 `= frame_count`（sample-accurate）；`chunk_frames` 不影响结果（回归钉 `byte-identical`） |
+| 采样率 | 同一 render 必须同采样率，否则 `audio_sample_rate_mismatch`（**不偷偷 resample**） |
+| offset | `timeline = source − offset`（**实测**确定：channel_sync 对晚到轨 → `shift_samples=+960`，修正后互相关 lag = −960）；只有 `status=success` 的固定整数 offset 被应用 |
+| metadata 冲突 | 实际解码样本数是最终事实；不一致记 `audio_duration_metadata_mismatch`，派生窗口按实际重算 |
+
+### 6.1.7 PCM 处理链要点（P3A）
+
+* `core/audio_pcm.AudioPCMReader`：只消费既有 `AudioStream`，**不新建 ffprobe
+  parser**；解码落 raw 临时文件后分块读（峰值内存 ≈ 1 chunk）。canonical 内部
+  格式 = **float32**，线性 PCM 归一化到 `[-1,1]`（s16 ×2⁻¹⁵ / s24 ×2⁻²³ /
+  s32 ×2⁻³¹ / f32 原样）。
+* ⚠️ 解码命令带 `-af channelmap=0|1|…|N-1`：ffmpeg 默认按**声明布局**重排/下混
+  （实测 4 声道 + `quad` 会把 FC/BC 折进 BL/BR），identity channelmap 强制
+  "按位置逐声道复制"——**不插值、不混合、不改增益**。
+* `core/audio_route.AudioRouter`：**1 输出声道 = 1 源声道**，纯搬运；按块只读所需
+  源区间（按流合并），无重复 decode；**不存在**样本级相加路径。
+* `core/audio_wav.WavExporter`：头部按实际字节数回填；≥3 声道写
+  `WAVE_FORMAT_EXTENSIBLE`（含 channel mask），1/2 声道写经典头；自带小型
+  writer（标准库 `wave` 无法表达 24-bit / IEEE float）；**不实现 mixing**。
+* 命名集中在 `AudioOutputSpec` / `default_wav_name()`，同名冲突 `-2` 后缀不覆盖。
+
+### 6.1.8 Phase 3A 的 reason codes（新增，稳定契约）
+
+```text
+audio_sample_rate_mismatch      audio_timeline_invalid
+audio_negative_render_duration  audio_sync_offset_invalid
+audio_duration_unknown          audio_duration_metadata_mismatch
+audio_duration_explicit_invalid audio_decode_failed
+audio_pcm_format_unsupported    audio_pcm_short_read
+audio_output_invalid            audio_route_offset_unknown
+audio_wav_write_failed          audio_mix_invalid
+```
+
+Phase 2 的 `audio_*_not_found` / `audio_mapping_*` / `audio_mix_not_supported`
+语义不变：`build_audio_map_spec()` 仍以 `audio_mix_not_supported` 拒绝
+`mix_mode`（`-map` 规格表达不了样本级合成），PCM 渲染路径在 Phase 3B 之前
+同样明确拒绝。
 
 ---
 
@@ -486,7 +549,24 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 18. **（v0.7.1 P2）默认计划必须可识别。** `AudioPlan.is_default` 为真时
     （全选 + `derived` 映射 + `preserve_original`），生产路径继续走旧行为，
     不得因为引入音频规划而自动进入 filtergraph。
-   两者混用会让完整性闸门误判。
+19. **（v0.7.1 P3A）时长/EOF 只有一个权威。** `AudioRouter` / `WavExporter` /
+    Mixer 都不得自行决定 render duration 或 EOF：一律来自
+    `core/audio_timeline.AudioTimeline`。输出样本数严格 `= frame_count`，
+    `chunk_frames` 不得影响结果。
+20. **（v0.7.1 P3A）缺数据一律是确定性静音。** 短 source 的缺失区间补
+    `float32 0.0`（**不是** NaN、**不**循环、**不**复制末样本）；长 source
+    不因为别的 source EOF 而截断。
+21. **（v0.7.1 P3A）offset 只在唯一入口换算，方向由实测钉死。**
+    `timeline = source − offset`（`source_to_timeline()`）；只有
+    `status=success` 的固定整数 offset 被应用，**不重新估计 delay**
+    （不重写 GCC-PHAT）。`core/channel_sync.py` 的算法与阈值一字不改。
+22. **（v0.7.1 P3A）解码不得隐式重排/混音声道。** 解码命令行必须带 identity
+    `channelmap`；canonical 中间格式是 float32，满量程归一不得改变原始数据
+    语义（sample_rate / 声道数仍由 source model 给出）。
+23. **（v0.7.1 P3A）不偷偷 resample。** 同一 render 内采样率不一致即
+    `audio_sample_rate_mismatch` 拒绝。
+24. **（v0.7.1 P3A）WAV 头部必须准确。** `data_size` / `riff_size` 按实际写出的
+    字节数回填；写入样本数与声明不符 → `audio_wav_write_failed` 且不留半成品。
 
 ---
 
@@ -494,11 +574,11 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 
 | 历史说法 | 出处 | 实际 |
 |---|---|---|
-| "`core/` 54 文件、`encoders/` 24 文件、`preservation/` 46 文件" | `docs/README.md` 目录树 | **21 / 10 / 16** 个 `.py`（v0.7.0 + v0.7.1 并入后实测） |
-| "`core/` 含 `sync_estimate` …" 但列表遗漏 `models.py`、`postprobe.py`、`dashboard_ui.py`、`mp4_channel_sync.py`、`version.py` | `docs/README.md` | 实际 21 个模块见 §12（v0.7.1 新增 `audio_models.py` / `audio_probe.py`） |
+| "`core/` 54 文件、`encoders/` 24 文件、`preservation/` 46 文件" | `docs/README.md` 目录树 | **27 / 10 / 16** 个 `.py`（v0.7.0 + v0.7.1 并入后实测） |
+| "`core/` 含 `sync_estimate` …" 但列表遗漏 `models.py`、`postprobe.py`、`dashboard_ui.py`、`mp4_channel_sync.py`、`version.py` | `docs/README.md` | 实际 27 个模块见 §12（v0.7.1 新增 `audio_models.py` / `audio_probe.py` / `audio_plan.py` / `audio_timeline.py` / `audio_pcm.py` / `audio_route.py` / `audio_wav.py` / `audio_process.py`） |
 | "NVEncC … ✅ 生产默认" | `README.md` 编码器矩阵 | v0.6.2 起为**能力优先自动选择**（NVENC→QSV→x265），无固定默认 |
 | "生产路径恒用 `--avsw` 软解" / "硬件解码不可达（`--avsw` 字面量）" / "integration 未开始" | 本文档 §2.1、§8（v0.6.2 版）与硬件解码 research 归档 | **已被 v0.7.0 推翻（v0.7.0 已于 2026-09-14 并入 main）**：硬件解码已接入 `--hw-decode off\|auto\|require`，带 runtime-proven 白名单、完整性闸门与 `--seek` 拒绝。**默认仍是 `off` = 软解**，所以"默认行为未改"这一半仍然成立。以本版 §8 为准 |
-| "音频模型只有 Phase 1（4CH 已是全部场景）" | 本档 §6.1（v0.7.1 P1 版） | **已被 Phase 2 扩展**：新增 `AudioSource`（media/wav/external）、三维声道身份、Selection、Channel Mapping、`AudioOutputTrack`、`AudioMapSpec`；Phase 1 的「4CH 流不塌缩」「同步不改身份」等结论仍然成立 |
+| "音频模型只有 Phase 1（4CH 已是全部场景）" | 本档 §6.1（v0.7.1 P1 版） | **已被 Phase 2/3A 扩展**：Phase 2 新增 `AudioSource`（media/wav/external）、三维声道身份、Selection、Channel Mapping、`AudioOutputTrack`、`AudioMapSpec`；Phase 3A 新增 `AudioTimeline`（时长/EOF/offset 唯一权威）、`AudioPCMReader`（canonical float32）、`AudioRouter`（无混音）、`WavExporter`、`AudioOutputSpec`。Phase 1 的「4CH 流不塌缩」「同步不改身份」等结论仍然成立 |
 | 各文档中 "当前版本 `v0.6.2`" | 根 `README.md` 等 | `main` 现为 **v0.7.1**，且已含 v0.7.0 hardware-decode integration（`v0.7.0 ∈ ancestors(main)`）；`v0.6.x` 的说法仅描述 v0.6 线的能力基线 |
 
 ---
@@ -514,6 +594,11 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | `core/audio_models.py` | 2143 | **v0.7.1** 音频模型：Source/Stream/Channel/Track/Plan/Sync（纯数据） |
 | `core/audio_plan.py` | 1760 | **v0.7.1 P2** 规划层：Selection / Channel Mapping / Validation / AudioMapSpec |
 | `core/audio_probe.py` | 328 | **v0.7.1** 音频 Probe 适配层（raw stream → 模型，含来源维度） |
+| `core/audio_timeline.py` | 1212 | **v0.7.1 P3A** AudioTimeline / RenderPolicy / EOF·offset 唯一权威 |
+| `core/audio_pcm.py` | 633 | **v0.7.1 P3A** PCM Reader：ffmpeg → canonical float32（chunked） |
+| `core/audio_route.py` | 531 | **v0.7.1 P3A** 通道路由：纯样本搬运（无混音） |
+| `core/audio_wav.py` | 900 | **v0.7.1 P3A** WAV writer/reader（PCM16·24·32 / float32 / EXTENSIBLE） |
+| `core/audio_process.py` | 560 | **v0.7.1 P3A** 处理图：AudioOutputSpec + run_audio_render 编排 |
 | `core/sync_estimate.py` | 786 | GCC-PHAT 时差估计 |
 | `core/logging_utils.py` | 493 | 分层日志 + 缩放 CSV |
 | `core/probe.py` | 391 | 源探测（v0.7.1 起 `-show_entries` 增加 `stream_tags`） |
@@ -587,5 +672,5 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | 后端选型评估 | `docs/evaluation/*` |
 | **硬件解码 integration（已并入 main）** | [`docs/hardware-decode/`](../hardware-decode/README.md) ★ 主交付物 `integration-test-matrix.md` |
 | 硬件解码 research（已封存） | `olddocs/docs/hardware-decode/` |
-| v0.7.1 音频模型（Phase 1 + Phase 2） | [`docs/release_notes_v0.7.1.md`](../release_notes_v0.7.1.md) |
+| v0.7.1 音频模型（Phase 1 + Phase 2 + Phase 3A） | [`docs/release_notes_v0.7.1.md`](../release_notes_v0.7.1.md) |
 | 历史代码快照 | `olddocs/backup/` |
