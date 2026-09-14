@@ -1,0 +1,40 @@
+diff --git a/NVEncCore/NVEncPipeline.h b/NVEncCore/NVEncPipeline.h
+index 7372e87..a955d53 100644
+--- a/NVEncCore/NVEncPipeline.h
++++ b/NVEncCore/NVEncPipeline.h
+@@ -1653,6 +1653,17 @@ protected:
+             if (m_gotFrameAfterFirstPts) {
+                 break;
+             }
++            // シークしていない通常のデコードでは、最初のパケットのptsを「出力開始位置」として
++            // 扱ってはならない。XAVCのように最初のキーフレームが提示順の先頭でないストリームでは、
++            // キーフレームより前に提示される先行ピクチャのptsは必ず最初のパケットのptsより
++            // 小さくなるため、下のフィルタが先行ピクチャをすべて捨ててしまう。
++            // 先行ピクチャはデコード順ではキーフレームの後ろにあるので、デコーダは正しく出力する。
++            // 捨てるべきなのは「シークで要求した位置より前」のフレームだけなので、
++            // シーク指定があるときのみ以下のフィルタを適用する。
++            if (m_input->getSeekParam().first <= 0.0f) {
++                m_gotFrameAfterFirstPts = true;
++                break;
++            }
+             // OpenGOP等でキーフレームより前のフレームのptsで出てくることがあるのを調整
+             // 実際に前のフレームが出ているのではなく、前のフレームのptsで出てきているだけの場合(パターンA[例: "Beauty_3840x2160_120fps_420_8bit_HEVC_MP4.mp4"の--seek 6.66667])もあるので注意が必要
+             // そうでなくキーフレームより前のフレームがたくさん出てきてしまう場合もある(パターンB [例: "720p - AVC - MP2 2.0 - ZDF HD.ts"の先頭から])
+diff --git a/NVEncCore/rgy_input.h b/NVEncCore/rgy_input.h
+index 8b304b8..8865c01 100644
+--- a/NVEncCore/rgy_input.h
++++ b/NVEncCore/rgy_input.h
+@@ -328,6 +328,13 @@ public:
+     virtual RGYDOVIProfile getInputDOVIProfile() {
+         return RGY_DOVI_PROFILE_UNSET;
+     }
++
++    //読み込み開始位置 (first = --seek, second = --seekto)
++    //HWデコードでは、最初のパケットのptsを「出力開始位置」として扱ってよいのは
++    //実際にシークしたときだけなので、パイプライン側から参照できるようにする
++    std::pair<float, float> getSeekParam() const {
++        return m_seek;
++    }
+ protected:
+     virtual RGY_ERR Init(const TCHAR *strFileName, VideoInfo *pInputInfo, const RGYInputPrm *prm) = 0;
+     virtual void CreateInputInfo(const TCHAR *inputTypeName, const TCHAR *inputCSpName, const TCHAR *outputCSpName, const TCHAR *convSIMD, const VideoInfo *inputPrm);

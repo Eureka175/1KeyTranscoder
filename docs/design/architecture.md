@@ -68,17 +68,17 @@ HW_AUTOSELECT_FALLBACK = "x265"              # 1kt.py:1108
 
 ### 2.1 "硬件路径永不回退软件"到底约束什么
 
-这句话在本项目里有**两个不同的层次**，历史上被混用过：
+这句话在本项目里有**三个不同的层次**，历史上被混用过：
 
 | 层次 | 规则 | 实现位置 |
 |---|---|---|
 | **后端选择** | 自动选择可以选到 x265（因为压根没有硬件后端） | `resolve_default_backend()` |
 | **单次运行** | 一旦选定硬件后端，**轨道内**绝不改成软件编码 | `hw_encode_with_fallback()` |
-| **硬件解码** | 生产路径**恒用 `--avsw` 软解** | `encoders/nvencc.py:107`、`encoders/qsvencc.py:102` |
+| **硬件解码** | 默认 `--hw-decode off` = **软解 `--avsw`**；`auto`/`require` 时由**能力路由**决定读者 | `encoders/hwdecode.py`、`core/batch_hw.py:243` |
 
-第三行是当前的实际状态，也是"硬件路径永不回退软件"最容易被误读的地方：
-**生产从未使用硬件解码**，两个硬件后端都是**硬编 + 软解**。硬件解码的调研
-见 §8。
+第三行是 v0.7.0 起的实际状态（v0.7.0 已并入 `main`）：**默认仍是软解**，
+硬件解码是**显式启用**的能力，且只在白名单内、且必须通过完整性闸门才被接受。
+细节见 §8。
 
 ### 2.2 三级降级梯（`core/batch_hw.py:245 hw_encode_with_fallback`）
 
@@ -277,26 +277,95 @@ core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
 
 ---
 
-## 8. 硬件解码：当前状态（与调研线的区别）
+## 8. 硬件解码：v0.7.0 起已接入（默认仍为软解）
 
-**生产状态：硬件解码未被使用。** 两个硬件后端都硬编码 `--avsw`：
+> **v0.7.0 已于 2026-09-14 并入 `main`**（merge commit
+> `merge: integrate v0.7.0 hardware decode into main`），因此本节描述的是
+> **当前主线行为**，不再是"调研线未接通"。research/Phase 1 的归档结论仍在
+> [`olddocs/docs/hardware-decode/`](../olddocs/docs/hardware-decode/README.md)，
+> integration 交付物在 [`docs/hardware-decode/`](../hardware-decode/README.md)。
 
-| 后端 | 位置 | 内容 |
-|---|---|---|
-| NVEncC | `encoders/nvencc.py:107` | `"--avsw", "--video-track", "1", "-c", <codec>` |
-| QSVEncC | `encoders/qsvencc.py:102` | 同上 |
+### 8.1 策略：`--hw-decode off|auto|require`（默认 `off`）
 
-注意 `encoders/nvencc.py:72` 的透传白名单里**留了 `"avhw"` 这个名字**，
-但没有任何调用方会传它——这是历史遗留，不是可用开关。
+| 策略 | 行为 |
+|---|---|
+| `off`（**默认**） | 软解。行为与 v0.6.2 **逐字节一致**：不尝试硬件解码，不改变任何默认 |
+| `auto` | 输入命中 **runtime-proven 白名单**时用硬件读者，否则软解。**每次降级都出声**：WARNING + reason code 进主日志/单文件日志/report |
+| `require` | 必须硬件解码；不可用则报错（`require_unmet`），**绝不静默降级** |
 
-**调研状态：已完成并封存。** P0-A 硬件解码调研由四个 research 分支完成，
-交叉结论见 `olddocs/docs/hardware-decode/README.md`。要点：
+路由实现：`encoders/hwdecode.py::decide_route()`。它回答且只回答一个问题
+——"这个输入、这个后端、这个策略下，**必须**用哪个解码读者，**为什么**"。
+判定依据是**闭集白名单** `PROVEN`（`(backend, codec, chroma, depth)` 四元组，
+每行必须引用一次实测），白名单外一律 `not_proven` → 软解。理由写在模块里：
+这个 integration 存在的意义就是防止硬件路径**静默产出"看着对但实际错"的结果**，
+而未测过的 profile 正是它出现的场景。
 
-* rigaya `--avhw` 的 Sony 丢帧**根因已定位到厂商特有 pipeline task**，
-  两处补丁**均已运行时验证**（NVEncC 9.31 / QSVEncC 8.26 pinned）。
-* FFmpeg `-hwaccel` 全程帧精确，保留为独立正确性/回退路径。
-* **硬件解码收益是 CPU 余量，不是单任务提速**。
-* **integration 未开始**，默认后端行为未改。
+`REFUSED` 记录硬件读者**明确拒绝**的组合（如 QSV 的 H.264 4:2:2，`rc=-31`，
+读者根本没被构造出来）——日志要说"refused"，不是"failed"。
+
+### 8.2 完整性闸门：`encoders/integrity.py`
+
+闸门存在的理由是一个真实缺陷：stock 硬件读者在 Sony 素材上只吐 `N−3` 帧，
+`rc = 0`、无任何错误文本、文件完全可播放。只看"进程成功了吗"的闸门会放它过去
+——事实上过去就是放过去的。
+
+| 级别 | 触发 | 检查内容 | 代价 |
+|---|---|---|---|
+| `count` | 硬件解码开启时**恒开** | 五方帧数对账 + **读者身份断言** | 一次容器解析 + 两次**输出**解码 |
+| `sequence` | `--hw-decode-verify` 显式开启 | 硬件与软件结果**逐帧有序指纹比对** | 多一次完整编码 |
+
+规则是 research 线自己的结论：**以交付容器的实际内容为准，绝不以解码器/读者的
+自述为准**。读者的 `N frames` 只作证据记录 —— XAVC 上它按构造就少报
+（`FramePosList::setPocAndFix`），信它反而会掩盖要找的丢帧。
+
+闸门不过 → **丢弃硬件产物 + 出声 + 改用软解重跑**（`HD-C11..C13`/`HD-F05`）。
+
+### 8.3 `--seek` 拒绝（`seek_not_equivalent`）
+
+实测（矩阵 HD-D02/D-04/D-05）：带时间 seek 时两个 rigaya 读者**不等价**，
+且**两侧都确定性**——帧数与 PTS 序列相同，画面内容不同。补丁不背这个锅
+（patched 与 stock `--avhw` 的 seek 输出逐字节相同），这是**既有的读者语义**，
+research 线此前没测到，因为它只验过"seek 与 stock 一致"，从未验过
+"seek 与 `--avsw` 一致"。
+
+因此：**只要请求了 `--seek`，路由直接拒绝硬件解码**（`seek_not_equivalent`），
+走软解（软解在每个 seek 位置上都是精确的）。`--trim` 是读者等价的（逐字节相同），
+不受此限制。显式 `--seek 0` 与不 seek 无差别（HD-D06）。
+
+### 8.4 binary provenance（`docs/hardware-decode/toolchain-provenance.json`）
+
+`tests/hwdecode/sources.py::verify_provenance()` 在**任何测试执行前**运行，
+逐项校验 sha256 + 版本行 token；**不符即 FAIL，不是 warning**。三类二进制：
+
+* `hardware_decode`：`tools/avhw/` 下的**补丁版**（research build，**不得分发**）
+* `software_control`：同一个补丁版跑 `--avsw`
+* `stock_control`：`tools/` 下的 shipped 版 —— **负对照**，用来复现 N−3 / N−2 头部丢帧
+
+默认路径必须解析到 shipped build，硬件解码必须解析到 patched build：两个 build
+只在行为上不同，误换后要**到丢帧才发现**（`HD-A09`/`HD-B10`）。
+
+### 8.5 与发布包的关系（边界声明）
+
+`tools/avhw/` 与 `docs/` 都不进发布包（`release/build_release.py` 白名单制），
+因此在**发布安装**中：
+
+* `--hw-decode auto` 会以 `not_proven` 降级到软解；
+* `--hw-decode require` 会明确失败。
+
+**这是设计行为，不是缺陷。** 引用补丁结论时必须带边界：NVEncC 补丁仅在
+9.31（`2cb9d810`）验证；QSVEncC 补丁 **runtime-proven on 8.26 pinned
+revision, not a general claim for later releases**（8.27–8.30 未检验）。
+
+### 8.6 测试矩阵
+
+`tests/hwdecode/`（83 个用例，A–K 十一类），入口见
+[`docs/hardware-decode/README.md`](../hardware-decode/README.md)。三条硬规则：
+
+1. **`exit code = 0` 不是正确性证据**（上面那个 N−3 就是 `rc=0`）。
+2. **读者身份必须从工具日志读，不能从命令行推断** —— QSVEncC 在硬件不可用时会
+   **静默构造 avsw**，把它记成 hardware pass 等于把整个特性做成假的。
+3. **`--frames` 是编码器输入帧数契约，不是解码器输出帧数**（HD-D07/D08）；
+   两者混用会让闸门误判。
 
 ---
 
@@ -309,6 +378,26 @@ core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
 * 失败记录 `record_failure()` → 结构化失败清单，供重试与统计。
 * `--fresh-log` 清空 `total.log`（默认**追加**）。
 * `core/versions.py` 记录工具链版本，供复现与问题定位。
+
+### 9.1 ⚠️ `tools/` 的位置不可变（踩过的坑）
+
+`tools/`（ffmpeg/ffprobe、NVEncC、QSVEncC、GPAC，约 1.3 GB）**被 `.gitignore` 排除**，
+即**不受 git 保护**：删除不进回收站、不留记录，缺失时的症状只是"报错找不到 ffmpeg"。
+
+> **2026-09 两次真实事故**：为让 research 工作树共享工具链，在工作树里建了
+> `tools` → 主 `tools/` 的 **junction**；随后 `git worktree remove --force`
+> 递归删除工作树，把工作树里的**工具链实体副本**一并删除，主 `tools/` 变空。
+
+三条硬规则：
+
+1. **工具链只存在 `F:\1KeyTranscoder\tools\` 一处**，不在任何工作树/临时目录复制或链接它。
+   跨位置引用用参数：`--tool-nvencc` / `--tool-qsvencc` / `--ffmpeg` / `--ffprobe` / `--gpac-dir`。
+2. **不要用 `Move-Item` 移动 junction**（跟随语义，移动的是目标内容）；动带链接的目录前
+   先 `Get-Item <路径> -Force | Select LinkType,Target`。
+3. **`git worktree remove --force` 会删除该工作树下的全部内容**（含未跟踪文件）。
+   执行前用 `git status --ignored` 列一遍，确认没有要紧东西。
+
+根 `README.md` §依赖 有更完整的说明。
 
 ---
 
@@ -334,17 +423,32 @@ core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
    不冒充标准声道语义；`sample_format` 未知即 `unknown`；`role` 只能显式
    赋值（且必须给 reason），不做任何自动推断。
 
+11. **（v0.7.0）硬件解码默认关闭。** `--hw-decode` 默认 `off`，即 v0.6.2 行为；
+   硬件解码只在 `auto`/`require` **且命中 `PROVEN` 白名单**时使用，并且
+   **必须**通过完整性闸门才被接受。白名单外一律 `not_proven` → 软解，
+   **不得**因为「看起来能用」而放行未测过的 profile。
+12. **（v0.7.0）读者身份以工具日志为准，不得从命令行推断。** QSVEncC 在硬件
+   不可用时会静默构造 `avsw`；把它记成 hardware pass 等于把整个特性做成假的。
+13. **（v0.7.0）请求了 `--seek` 就不得用硬件解码**（`seek_not_equivalent`）：
+   两个 rigaya 读者在时间 seek 上不等价（帧数与 PTS 相同、画面不同），
+   且补丁不背这个锅（patched 与 stock 输出逐字节相同）。`--trim` 不受限制。
+14. **（v0.7.0）binary provenance 不符即 FAIL，不是 warning。**
+   `tests/hwdecode/sources.py::verify_provenance()` 在任何测试执行前运行，
+   逐项校验 sha256 + 版本 token。
+15. **（v0.7.0）`--frames` 是编码器输入帧数契约，不是解码器输出帧数。**
+   两者混用会让完整性闸门误判。
+
 ---
 
 ## 11. 与历史文档不一致之处（以本文档为准）
 
 | 历史说法 | 出处 | 实际 |
 |---|---|---|
-| "`core/` 54 文件、`encoders/` 24 文件、`preservation/` 46 文件" | `docs/README.md` 目录树 | **19 / 8 / 16** 个 `.py` |
-| "`core/` 含 `sync_estimate` …" 但列表遗漏 `models.py`、`postprobe.py`、`dashboard_ui.py`、`mp4_channel_sync.py`、`version.py` | `docs/README.md` | 实际 19 个模块见 §12 |
+| "`core/` 54 文件、`encoders/` 24 文件、`preservation/` 46 文件" | `docs/README.md` 目录树 | **21 / 10 / 16** 个 `.py`（v0.7.0 + v0.7.1 并入后实测） |
+| "`core/` 含 `sync_estimate` …" 但列表遗漏 `models.py`、`postprobe.py`、`dashboard_ui.py`、`mp4_channel_sync.py`、`version.py` | `docs/README.md` | 实际 21 个模块见 §12（v0.7.1 新增 `audio_models.py` / `audio_probe.py`） |
 | "NVEncC … ✅ 生产默认" | `README.md` 编码器矩阵 | v0.6.2 起为**能力优先自动选择**（NVENC→QSV→x265），无固定默认 |
-| "硬件解码不可达（`--avsw` 字面量）" | 硬件解码 Phase 1 文档 | 结论仍成立，但**原因**是刻意的生产决策，不是"尚未接通" |
-| 各文档中 "当前版本 `v0.6.2`" | 根 `README.md` 等 | `main` 自 v0.7.0 tag 起已到 **v0.7.1**（音频模型 Phase 1）；`v0.6.x` 的说法仅描述 v0.6 线的能力基线 |
+| "生产路径恒用 `--avsw` 软解" / "硬件解码不可达（`--avsw` 字面量）" / "integration 未开始" | 本文档 §2.1、§8（v0.6.2 版）与硬件解码 research 归档 | **已被 v0.7.0 推翻（v0.7.0 已于 2026-09-14 并入 main）**：硬件解码已接入 `--hw-decode off\|auto\|require`，带 runtime-proven 白名单、完整性闸门与 `--seek` 拒绝。**默认仍是 `off` = 软解**，所以"默认行为未改"这一半仍然成立。以本版 §8 为准 |
+| 各文档中 "当前版本 `v0.6.2`" | 根 `README.md` 等 | `main` 现为 **v0.7.1**，且已含 v0.7.0 hardware-decode integration（`v0.7.0 ∈ ancestors(main)`）；`v0.6.x` 的说法仅描述 v0.6 线的能力基线 |
 
 ---
 
@@ -352,9 +456,9 @@ core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
 
 | 路径 | 行数 | 职责 |
 |---|---|---|
-| `1kt.py` | 1896 | 主入口：参数解析、后端解析、编排、x265 手动路径 |
+| `1kt.py` | 1923 | 主入口：参数解析、后端解析、编排、x265 手动路径 |
 | `watchfolder.py` | 92 | 轮询批处理转调 |
-| `core/batch_hw.py` | 1752 | 硬件批量：降级梯、三条源路径、并发池、失败记录 |
+| `core/batch_hw.py` | 1966 | 硬件批量：降级梯、三条源路径、并发池、失败记录、**硬件解码接线与完整性闸门调用** |
 | `core/channel_sync.py` | 1038 | 延时补偿主算法与阈值 |
 | `core/audio_models.py` | 1443 | **v0.7.1** 音频模型：AudioStream/Channel/Track/Plan/Sync（纯数据） |
 | `core/audio_probe.py` | 228 | **v0.7.1** 音频 Probe 适配层（raw stream → 模型） |
@@ -363,7 +467,7 @@ core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
 | `core/probe.py` | 391 | 源探测（v0.7.1 起 `-show_entries` 增加 `stream_tags`） |
 | `core/mp4_channel_sync.py` | 369 | MP4 音频轨重建 |
 | `core/scaling.py` | 347 | 缩放规则引擎 |
-| `core/config.py` | 312 | 工具链与 JSON 解析 |
+| `core/config.py` | 324 | 工具链与 JSON 解析（v0.7.0 起含硬件解码 binary 解析） |
 | `core/versions.py` | 221 | 工具链版本记录 |
 | `core/postprobe.py` | 155 | 编码后复探 |
 | `core/sync_fix.py` | 154 | 样本移位实施 |
@@ -374,12 +478,14 @@ core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
 | `core/paths.py` | 89 | 发现/命名/工作目录 |
 | `core/source_classifier.py` | 76 | 效率分类 |
 | `core/version.py` | 30 | 版本字符串 |
+| `encoders/integrity.py` | 539 | **v0.7.0** 硬件解码完整性闸门（count / sequence 两级） |
+| `encoders/hwdecode.py` | 428 | **v0.7.0** 硬件解码能力路由 + 白名单 + reason codes |
 | `encoders/hw.py` | 395 | `plan_initial_format()`：能力 → 初始输出形态 |
 | `encoders/x265.py` | 300 | x265 后端 |
 | `encoders/svtav1.py` | 249 | SVT-AV1 后端 |
 | `encoders/caps.py` | 215 | `--check-features` 能力探测 |
-| `encoders/nvencc.py` | 145 | NVEncC 后端（`--avsw`） |
-| `encoders/qsvencc.py` | 142 | QSVEncC 后端（`--avsw`） |
+| `encoders/nvencc.py` | 162 | NVEncC 后端（读者由 `--hw-decode` 决定，默认 `--avsw`） |
+| `encoders/qsvencc.py` | 157 | QSVEncC 后端（同上） |
 | `encoders/base.py` | 80 | 后端接口 |
 | `preservation/isobmf.py` | 752 | ISO-BMF 底层读写 |
 | `preservation/dji.py` | 693 | DJI 保留 |
@@ -396,13 +502,22 @@ core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
 | `preservation/colour.py` | 100 | 保留侧色彩处理 |
 | `preservation/backends.py` | 57 | 后端选择 |
 | `preservation/audio_sync.py` | 53 | 保留管线内的音轨同步 |
+| `tests/hwdecode/harness.py` | 4256 | **v0.7.0** 硬件解码集成测试矩阵驱动与全部用例实现 |
+| `tests/hwdecode/probe.py` | 629 | 容器/读者探针（帧数、PTS、指纹、读者身份） |
+| `tests/hwdecode/checks.py` | 568 | 矩阵断言原语 |
+| `tests/hwdecode/runners.py` | 405 | 编码调用封装（reader/seek/trim/frames 契约） |
+| `tests/hwdecode/sources.py` | 239 | **provenance 校验**（sha256 + 版本 token，不符即 FAIL） |
+| `tests/hwdecode/fixtures.py` | 238 | control fixtures 生成 |
+| `tests/hwdecode/inventory.py` | 80 | 语料盘点 + fixture 刷新 |
+| `tests/hwdecode/matrix.json` | 351 | **机器可读矩阵**（83 用例，与 harness 双向漂移检查） |
 | `tests/full_autotest.py` | 3506 | 全量自动回归（档位改动的唯一依据） |
 | `tests/run_selfcheck.py` | 189 | 自检驱动 |
 | `tests/sony_selfcheck.py` | 21 | Sony 自检入口 |
 | `release/build_release.py` | — | 发布包构建（allowlist） |
 | `release/verify_package.py` | — | 发布包校验 |
 
-> 行数为 `main` @ `15cf218` 实测值，随代码演进会漂移；结构以函数名与职责为准。
+> 行数为 `main` @ 2026-09-14（v0.7.0 hardware decode + v0.7.1 音频模型并入后）
+> 实测值，随代码演进会漂移；结构以函数名与职责为准。
 
 ---
 
@@ -418,5 +533,7 @@ core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
 | channel-sync P1 设计 | `docs/design/channel_sync_p1.md` |
 | HEVC 4:2:2 Rext 兼容矩阵 | `docs/design/hevc_422_rext_compatibility.md` |
 | 后端选型评估 | `docs/evaluation/*` |
-| 硬件解码调研（已封存） | `olddocs/docs/hardware-decode/` |
+| **硬件解码 integration（已并入 main）** | [`docs/hardware-decode/`](../hardware-decode/README.md) ★ 主交付物 `integration-test-matrix.md` |
+| 硬件解码 research（已封存） | `olddocs/docs/hardware-decode/` |
+| v0.7.1 音频模型 | [`docs/release_notes_v0.7.1.md`](../release_notes_v0.7.1.md) |
 | 历史代码快照 | `olddocs/backup/` |

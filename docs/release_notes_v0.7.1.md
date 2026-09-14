@@ -2,7 +2,54 @@
 
 > **状态**：Phase 1 完成。**默认音频路径与输出行为未改变** —— 本版本是
 > 纯内部能力层，不新增 CLI、不改变 MP4 音频处理方式。
-> **基线**：`v0.7.0`。
+> **基线**：`v0.7.0`（已于 2026-09-14 并入 `main`，见 §0）。
+
+---
+
+## 0. 基线整合（2026-09-14）
+
+`v0.7.0`（hardware-decode integration）此前不在 `main` 的祖先链上 ——
+它是一条独立线的 tag，`main` 反而多出两个 licensing commit。本轮已把两者
+合并为**统一开发基线**：
+
+```text
+                        ┌── 015bee8 licensing
+                        ├── 62c5504 licensing
+                        ├── b933c18 feat(audio): add audio track model for v0.7.1
+main (now) ─────────────┤
+                        └── merge: integrate v0.7.0 hardware decode into main
+                                 │
+v0.7.0 (1a41fff) ────────────────┘   ← 因此 v0.7.0 ∈ ancestors(main)
+```
+
+合并后 `main` 同时具备三份内容：**v0.7.0 hardware decode**、
+**licensing commits**、**v0.7.1 Audio Model Phase 1**。三条互不冲突：
+
+| 关注点 | 冲突情况 |
+|---|---|
+| `1kt.py` | 无冲突（v0.7.1 未改 `1kt.py`；v0.7.0 只加 `--hw-decode` 旗标与接线） |
+| `core/` | 无冲突（v0.7.1 是纯新增模块；v0.7.0 只改 `batch_hw.py` / `config.py`） |
+| `tests/` | 无冲突（v0.7.1 改 `tests/full_autotest.py`；v0.7.0 新增 `tests/hwdecode/`，两者独立） |
+| `encoders/` | 无冲突（v0.7.0 新增 `hwdecode.py`/`integrity.py` 并让读者可参数化，默认值仍是 `avsw`） |
+| `probe` | 无冲突（v0.7.0 未改 `core/probe.py`） |
+| 文档 | 3 处文本冲突：`README.md`、`docs/README.md`、`VERSION` —— 逐项人工合并（保留两侧内容，`VERSION` 保持 `0.7.1`） |
+
+### 0.1 一并修正的既有缺陷（非本轮引入）
+
+`v0.7.0` 里 `docs/hardware-decode/toolchain-provenance.json` 记录的补丁
+hash/字节数与**实际提交的补丁文件**不符，导致 `harness provenance`
+在干净检出上必然失败。根因：补丁在 `core.autocrlf=true` 下于**提交时**被
+重新编码为 LF，而 provenance 记录的是提交前的 CRLF 形态。
+
+处理方式（**不改补丁、不改策略、不改 harness**）：
+
+* 把两条记录的 `sha256` / `bytes` 更正为**提交后的规范 LF 形态**
+  （`= git show v0.7.0:<file>` 的字节），并保留原值于 `sha256_note` 供追溯；
+* 新增 `.gitattributes`（`*.patch text eol=lf`），使补丁字节跨检出稳定；
+* 校验补丁**内容**仍与记录的 `scope` 完全一致：nvenc `+18/-0` / 2 文件、
+  qsv `+15/-1` / 2 文件。
+
+修正后 `harness provenance` 通过，`HD-A01/A02/A08` 恢复 PASS。
 
 ---
 
@@ -214,10 +261,12 @@ apply_channel_sync_report(plan, report)    # report = run_channel_sync(...) 的�
 | Sony/DJI 保留管线音频 | GPAC 从源容器复制 | **同左（未改动）** |
 | `--channel-sync` 行为 | 算法与阈值不变 | **同左（未改动）** |
 | 新增 CLI | — | **无** |
+| 硬件解码（v0.7.0 并入） | 默认 `off` = 软解 | **同左**：`off` 时 `reader="avsw"`，既不走白名单路由也不跑完整性闸门，argv 形态与 v0.6.2 一致（矩阵 HD-B05 断言） |
 | 新依赖 | — | **无（纯标准库）** |
 | `probe_source()` 返回 | `(summary, streams)` | 同签名；stream dict **仅新增 `tags` 键**（`-show_entries` 增加 `stream_tags`）。CSV 字段是显式白名单，既有键与数值不变 |
 
-即：`AudioPlan = None`（模型未被调用）时，行为与 v0.7.0 完全一致。新模型是
+即：`AudioPlan = None`（模型未被调用）时，行为与 v0.7.0 完全一致；
+`--hw-decode off`（默认）时，行为与本轮合并前的 `main` 完全一致。新模型是
 **内部能力**，Phase 2 才会逐步接入输出决策。
 
 ---
@@ -231,8 +280,20 @@ apply_channel_sync_report(plan, report)    # report = run_channel_sync(...) 的�
 | L1 `audio model v0.7.1`（新增套件） | 52 断言 | T1 mono / T2 stereo / T3 4CH / T4 4×mono / T5 2×stereo / T6 unknown layout（含未知布局字符串、布局与声道数不符）/ T7 metadata 缺失与存在 / T8 sample format 缺失与未知；非音频流忽略与 `audio_position`；track 映射（per_stream / per_channel / 单通道选择 / 剔除通道 / 4×mono / 2×stereo）；role 不自动推断；plan 默认/选择/预留字段；同步集成（success+offset_samples/offset_ms、anchor、low_confidence、non_constant、文件级状态、未知 reason）；序列化往返与深拷贝、未知 enum/未知键安全回退 |
 | L3 `audio model probe v0.7.1`（新增套件） | 15 断言 | 真实 ffmpeg 合成素材 + 真实 ffprobe：单流 4CH（`channel_layout=4.0`）、4×mono、2×stereo；真实 A7M5 4CH 素材（`channel_layout` 缺失的 4×mono PCM）；与 `eligible_audio` 生产判定一致性（4×mono 可对齐 / 2ch 与 4CH 仍被拒）；同步报告按音频序号回填 4 条 track 且身份可追溯 |
 
-既有测试全部保留并回归通过（见提交记录中的 `tests/full_autotest.py --level full`
-报告 `work/autotest/autotest_report.md`）。
+既有测试全部保留并回归通过。本轮（基线整合后）实测：
+
+| 测试面 | 命令 | 结果 |
+|---|---|---|
+| L1 unit | `python tests/full_autotest.py --level unit` | **230 PASS / 0 FAIL** |
+| L1+L2+L3 full | `python tests/full_autotest.py --level full` | **315 PASS / 0 FAIL** |
+| 音频模型 L1 | 套件 `audio model v0.7.1` | 52/52 PASS |
+| 音频模型 L3 | 套件 `audio model probe v0.7.1` | 15/15 PASS |
+| 硬件解码 provenance | `python -m tests.hwdecode.harness provenance` | **ok = True**（二进制 ×4 + 补丁 ×2） |
+| 硬件解码矩阵漂移 | `python -m tests.hwdecode.harness check-matrix` | 83 用例全部有实现 |
+| 硬件解码矩阵 | `python -m tests.hwdecode.harness run --phase 1..6` | 见 §0 与 `work/avhw_integration/results/summary.json` |
+
+报告落盘 `work/autotest/autotest_report.{json,md}`（`full_autotest`）与
+`work/avhw_integration/results/summary.json`（硬件解码矩阵）。
 
 ---
 
@@ -247,6 +308,10 @@ MP4 音轨选择、通道映射、mux 变更、audio codec 变更
 DAW 式音频编辑
 ```
 
-也**未修改**：视频缩放、x265 缩放规则、硬件解码路径、channel-sync 算法。
+也**未修改**：视频缩放、x265 缩放规则、channel-sync 算法。至于硬件解码 ——
+本轮只把 v0.7.0 的既有实现**并入 `main`**，未重新设计：架构、runtime
+白名单、fallback 策略、完整性闸门、binary provenance、seek 拒绝、
+`_encoded_ok()`、NVEncC/QSV pipeline 补丁与测试 harness 全部保持原样
+（唯一改动是 §0.1 的 provenance 元数据更正与 `.gitattributes`）。
 `AudioPlan` 的 `mix_mode` / `channel_map` / `wav_outputs` 仅为预留字段，
 本阶段只保存取值，不解释、不执行。

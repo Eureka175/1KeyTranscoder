@@ -9,6 +9,7 @@
 | 看**评估汇总与决策记录** | [[`FINAL_REPORT.md`](FINAL_REPORT.md)](FINAL_REPORT.md)（注意其头部状态横幅） |
 | 查**某后端为什么这样选、参数怎么定的** | [`evaluation/`](evaluation/)（先看该目录索引表里的"状态"列） |
 | 查**某个子系统的设计**（硬件后端 / channel-sync / 4:2:2） | [`design/`](design/) |
+| 看**硬件解码 integration 的测试矩阵与最终判定** | [`hardware-decode/`](hardware-decode/) ★ 主交付物是 [`integration-test-matrix.md`](hardware-decode/integration-test-matrix.md) |
 | 找**厂商官方文档 / 上游源码 / GPU 能力探测** | [`reference/README.md`](reference/README.md) |
 | 查**已封存的历史调查**（硬件解码 Phase 1 等） | [`../olddocs/docs/`](../olddocs/docs/) ★ **先读 [`../olddocs/README.md`](../olddocs/README.md) 的状态标注** |
 | 看**测试素材清单与冻结基线** | [`fixtures/a7m5_channel_sync_fixtures.md`](fixtures/a7m5_channel_sync_fixtures.md) |
@@ -44,13 +45,15 @@ F:\1KeyTranscoder\
 │                             sync_fix / audio_models / audio_probe /
 │                             logging_utils / dashboard / dashboard_ui /
 │                             models / versions / version / color
-├── encoders/               ★ 编码后端（8 个 .py）：nvencc / qsvencc / x265 /
-│                             svtav1 / caps / hw(plan_initial_format) / base
+├── encoders/               ★ 编码后端（10 个 .py）：nvencc / qsvencc / x265 /
+│                             svtav1 / hwdecode(硬件解码策略) / integrity(完整性闸门) /
+│                             caps / hw(plan_initial_format) / base
 ├── preservation/           ★ 元数据保留（16 个 .py）：pipeline / sony / dji / gpac /
 │                             isobmf / validate / checker / selfcheck / quality /
 │                             colour / gyroflow / backends / audio_sync / models /
 │                             poc_video
 ├── tests/                  自动化测试（full_autotest / run_selfcheck / sony_selfcheck）
+│                             + hwdecode/（v0.7.0 硬件解码集成测试矩阵与 harness）
 │                             + fixtures/channel_sync（137 段冻结基线 CSV）
 ├── release/                发布工具：build_release.py / verify_package.py
 │
@@ -59,10 +62,18 @@ F:\1KeyTranscoder\
 │                             vce[预留未接]）—— 运行时配置，非文档
 │
 ├── docs/                   📚 文档（见下）
-├── tools/                  自带工具链（ffmpeg/ffprobe 9.0.1、NVEncC 9.31、
-│                             QSVEncC 8.26、VCEEncC 9.12、GPAC）—— 1.34 GB，gitignored
+├── tools/                  ⚠️ 自带工具链 —— gitignored，**只有这一份**
+│   │                         （详见根 README §依赖 的警告框）
+│   ├── ffmpeg.exe / ffprobe.exe      9.0.1 gyan full
+│   ├── NVEncC_9.31_x64/              shipped 版（r4047，CUDA 11.8）
+│   ├── QSVEncC_8.26_x64/             shipped 版（r4504）
+│   ├── GPAC/                         MP4Box 等容器工具
+│   └── avhw/                         ★ 硬解研究用的**补丁版**二进制（非 shipped）
+│       ├── NVEncC_9.31_avhw/         `9.31 (r1)` CUDA 13.1
+│       │                             sha256 dcf6d7a63143c777…7c8be4b
+│       └── QSVEncC_8.26_avhw/        `8.26 (r4504)` 自建
 ├── testsets/               测试素材（1063 文件 / 97.5 GB）—— gitignored
-├── work/                   实验产物与阶段证据（gitignored；含 _worktrees/ 研究分支工作树）
+├── work/                   实验产物与阶段证据（gitignored）
 ├── dist/                   发布产物：v0.6.1 zip + sha256 + manifest（0.54 GB）
 ├── olddocs/                历史代码快照与废弃脚本（详见 olddocs/README.md）
 ├── metadata_forensics/     取证数据（18 文件 / 2.7 MB，被 design 文档引用）
@@ -80,7 +91,7 @@ F:\1KeyTranscoder\
 | `1kt.py` `watchfolder.py` `start.bat` `README.md` `LICENSE` `NOTICE` `licenses/GPL-3.0.txt` `VERSION` | ✅ | 必需条目（缺失即拒绝构建） |
 | `core/` `encoders/` `preservation/` `tests/` | ✅ | 全部 `.py`（排除 `__pycache__`/.pyc） |
 | `*.json`（档位配置） | ✅ | `TOP_GLOBS = ("*.json",)` |
-| `tools/`（ffmpeg / NVEncC / QSVEncC / GPAC） | ✅ | 仅 `TOOL_FILES` + `TOOL_DIRS` 白名单；**`tools/VCEEncC_9.12_x64` 不入包** |
+| `tools/`（ffmpeg / NVEncC / QSVEncC / GPAC） | ✅ | **白名单制**：`TOOL_FILES = tools/ffmpeg.exe, tools/ffprobe.exe`；`TOOL_DIRS = tools/NVEncC_9.31_x64, tools/QSVEncC_8.26_x64, tools/GPAC`。**不在白名单的目录一律不入包**——`tools/avhw/`（补丁版研究二进制）因此自动排除 |
 | `docs/` `olddocs/` `logs/` `work/` `testsets/` `dist/` `release/` `metadata_forensics/` | ❌ | **明确排除**，见 manifest `excluded_by_design` |
 
 > 即：**文档、实验产物、测试素材、发布工具本身都不进包**，
@@ -103,6 +114,7 @@ F:\1KeyTranscoder\
 | 文件 | 说明 |
 |---|---|
 | [`release_notes_v0.7.1.md`](release_notes_v0.7.1.md) | **v0.7.1 发布说明（音频轨道模型 Phase 1）**：`AudioStream`/`AudioChannel`/`AudioTrack`/`AudioPlan` 数据模型、与 channel-sync 的只读连接、序列化 schema、新增测试矩阵、**默认音频路径 unchanged** 的证据与"本阶段未实现"清单 |
+| `../docs/hardware-decode/` | **v0.7.0 hardware-decode integration 交付物**（本轮已并入 `main`，`v0.7.0 ∈ ancestors(main)`）：[`README.md`](hardware-decode/README.md) 入口、[`integration-test-matrix.md`](hardware-decode/integration-test-matrix.md) 测试矩阵、[`final-report.md`](hardware-decode/final-report.md) 最终判定、`patches/` 与 `toolchain-provenance.json` |
 | [`release_notes_v0.6.1.md`](release_notes_v0.6.1.md) | **v0.6.1 发布说明**：Channel Sync P1 / AV1 mainline / AV1 色彩保真 / 流式内存修复；含验证矩阵、实测性能与已知限制 |
 
 > 阶段验证报告的正式副本已归档在 `work/docs/` 与 `work/releases/`

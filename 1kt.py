@@ -1047,6 +1047,31 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--hw-decode",
+        choices=("off", "auto", "require"),
+        default="off",
+        help=(
+            "硬件解码策略 (默认 off = 软解, 即 v0.6.2 行为). "
+            "auto: 输入在 runtime-proven 白名单内时用硬件解码, 否则软解 "
+            "(降级会出 WARNING + reason code). "
+            "require: 必须硬件解码, 不可用则报错, 绝不静默降级. "
+            "无论哪种策略, 硬件结果都必须通过帧完整性闸门 "
+            "(五方帧数对账 + reader 身份断言); 闸门不过则丢弃硬件产物并"
+            "改用软解重跑, 且该失败一定会出声. "
+            "注意: patched 硬件解码 binary 是 research build, 且 QSVEncC "
+            "的补丁仅对 pinned 8.26 版本成立."
+        ),
+    )
+    parser.add_argument(
+        "--hw-decode-verify",
+        action="store_true",
+        help=(
+            "在硬件解码之上追加 ordered fingerprint 校验: 同时跑软件解码, "
+            "逐帧比较画面序列. 能抓到「帧数不变但画面错序/替换」的缺陷, "
+            "代价是每个文件多一次编码. 仅在 --hw-decode 非 off 时有意义."
+        ),
+    )
+    parser.add_argument(
         "--no-hw-autoselect",
         action="store_true",
         help=(
@@ -1842,6 +1867,8 @@ def main() -> int:
             multiple_presets=multiple_presets,
             keep_work=args.keep_work,
             no_downgrade=args.no_downgrade,
+            hw_decode=args.hw_decode,
+            hw_decode_memo={},
             check_level=args.check,
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,

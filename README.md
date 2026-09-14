@@ -12,7 +12,9 @@
 （v0.6.2 起；加 `--no-hw-autoselect` 可固定为 x265，即 v0.6.1 及更早的行为）。
 注意 `--config` 里的 `encoder` 字段与 `--encoder` **二者不一致时直接报错**，
 不会静默取舍。
-**当前版本 `v0.7.1`**（v0.7 线：音频轨道模型层，**不改默认音频输出行为**）。
+**当前版本 `v0.7.1`**（v0.7 线：**已整合 v0.7.0 hardware-decode integration**
+—— `--hw-decode` 默认仍为 `off`；**并新增音频轨道模型层，不改默认音频输出行为**）。
+**主入口：`1kt.py`。**
 **主入口：`1kt.py`。**
 
 > 📚 文档索引见 [docs/README.md](docs/README.md)；**代码实际怎么跑见
@@ -114,11 +116,32 @@ DJI（djmd）→ DJI
 
 ## 依赖
 
+> ## ⚠️ 工具链只有一份：`tools/` 请勿在别处复制，也勿做成 junction/软链接
+>
+> `tools/`（约 1.3 GB：ffmpeg/ffprobe、NVEncC、QSVEncC、GPAC）是**整个项目共享的
+> 唯一工具链**，且被 `.gitignore` 排除 —— **git 不管它**：删掉不进回收站，也不报错。
+>
+> **已发生过两次的真实事故**（2026-09）：为让 research 工作树共享工具链，曾在工作树里
+> 建 `tools` → 主 `tools/` 的 **junction**；随后 `git worktree remove --force`
+> 递归删除该工作树时，把工作树里的**工具链实体副本**一并删除，主 `tools/` 变空，
+> 直到构建与测试全部不可用才发现。
+>
+> **规则（照做即可避免）**
+>
+> 1. **工具链只放 `F:\1KeyTranscoder\tools\`**，不要在任何工作树/临时目录里复制或链接它。
+>    要给别处指定路径就用参数：`--tool-nvencc` / `--tool-qsvencc` / `--ffmpeg` / `--ffprobe` / `--gpac-dir`。
+> 2. **动带链接的目录前先看一眼**：`Get-Item <路径> -Force | Select LinkType,Target`。
+>    **不要用 `Move-Item` 移动 junction** —— 它是"跟随"语义，移动的是目标内容而非链接本身。
+> 3. **`git worktree remove --force` 会删掉该工作树下的全部内容**，包括未被 git 跟踪的文件。
+>    执行前先列一遍未跟踪内容（`git status --ignored`），确认没有要紧东西。
+> 4. **备份/搬运项目时单独确认 `tools/`**：体积大、无 git 记录，缺失时的症状是
+>    "报错找不到 ffmpeg"，而不是"文件丢了"。
+
 | 组件 | 说明 |
 |---|---|
 | GPAC / MP4Box | `C:\Program Files\GPAC`（或 `--gpac-dir`）——容器重建与元数据保留核心（**行为绑定 26.02**，升级须回归） |
 | NVEncC / QSVEncC | `tools/NVEncC_9.31_x64/`、`tools/QSVEncC_8.26_x64/`（或 `--tool-*`） |
-| ffmpeg / ffprobe | 9.0.1 gyan full（tools/ 自带，内置 libx265/libsvtav1 v4.2.0/libvmaf；**必须用项目自带版本**，PATH 老版本不支持 AV1 新特性） |
+| ffmpeg / ffprobe | 9.0.1 gyan full（`tools/` 自带，内置 libx265/libsvtav1 v4.2.0/libvmaf；**必须用项目自带版本**，PATH 老版本不支持 AV1 新特性） |
 | Gyroflow（可选） | 消费端校验（`--check advanced/full`；未安装则提示并跳过） |
 | numpy / scipy（可选） | 仅 `--channel-sync` 延时补偿需要（缺失时该功能跳过并 WARNING，转码不受影响） |
 
@@ -238,6 +261,79 @@ AudioPlan         本次任务准备如何处理音频（input_tracks / selected
 > MP4 音轨选择/保留、重采样、增益/limiter/compressor、漂移校正。
 > 这些是 v0.7.1 第二阶段与更后续的工作。
 
+
+## 硬件解码：`--hw-decode off|auto|require`（v0.7.0，**默认 `off`**）
+
+> v0.7.0 的 hardware-decode integration 已于 2026-09-14 并入 `main`。
+> 交付物（测试矩阵 / 最终判定 / 补丁 / provenance）在
+> [`docs/hardware-decode/`](docs/hardware-decode/README.md)。
+
+```powershell
+# 保持软解（默认, 与 v0.6.2 逐字节一致的行为, 无需加任何旗标）
+python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset hq
+
+# 命中 runtime-proven 白名单时用硬件解码, 否则软解 (每次降级出 WARNING + reason code)
+python 1kt.py ... --hw-decode auto
+
+# 必须硬件解码, 不可用则报错 (绝不静默降级)
+python 1kt.py ... --hw-decode require
+
+# 在硬件解码之上追加逐帧有序指纹比对 (能抓"帧数不变但画面错序/替换")
+python 1kt.py ... --hw-decode auto --hw-decode-verify
+```
+
+**策略语义**（`encoders/hwdecode.py::decide_route()`）：
+
+| 策略 | 行为 |
+|---|---|
+| `off`（**默认**） | 软解。不尝试硬件解码，不改变任何默认 —— 这就是 v0.6.2 行为 |
+| `auto` | 输入命中 **runtime-proven 白名单**时用硬件读者，否则软解；**降级一定出声**（WARNING + reason code 进主日志/单文件日志/report） |
+| `require` | 必须硬件解码，不可用即报错（`require_unmet`），绝不静默降级 |
+
+**白名单是闭集**：`(backend, codec, chroma, depth)` 四元组，每行必须引用一次实测；
+白名单外一律 `not_proven` → 软解。这不是保守，是因为这个 integration 存在的
+唯一理由就是防止硬件路径**静默产出"看着对但实际错"的结果**，而未测过的 profile
+正是它出现的场景。目前 proven 的组合：NVENC HEVC 4:2:0 10bit、NVENC H.264
+4:2:2 10bit、QSV HEVC 4:2:0 10bit。
+
+**完整性闸门**（`encoders/integrity.py`）：硬件解码开启时**恒开** `count` 级
+——五方帧数对账 + **读者身份断言**（读者身份从工具日志读，**不从命令行推断**：
+QSVEncC 在硬件不可用时会静默构造 `avsw`）。失败的产物**丢弃、出声、改用软解重跑**。
+`--hw-decode-verify` 追加 `sequence` 级逐帧有序指纹比对（代价是多一次编码）。
+闸门存在的理由是一个真实缺陷：stock 硬件读者在 Sony 素材上只吐 `N−3` 帧、
+`rc = 0`、无任何报错、文件完全可播放 —— **`exit code = 0` 不是正确性证据**。
+
+**`--seek` 与硬件解码互斥**：带时间 seek 时两个 rigaya 读者**不等价**
+（帧数与 PTS 序列相同、画面内容不同，两侧都确定性；补丁不背这个锅），
+因此只要请求了 `--seek`，路由直接拒绝硬件解码（`seek_not_equivalent`）走软解。
+`--trim` 是读者等价的，不受限制。
+
+> ⚠️ **发布安装中硬件解码不可用，这是设计行为**：补丁版二进制是
+> **research build、不得分发**，位于 `tools/avhw/`（release 白名单**不含**它，
+> `docs/` 也不入包）。因此在发布包里 `--hw-decode auto` 会以 `not_proven`
+> 降级到软解，`require` 会明确失败。
+>
+> ⚠️ **引用补丁结论必须带上边界**：NVEncC 补丁仅在 **9.31（`2cb9d810`）** 验证；
+> QSVEncC 补丁 **runtime-proven on QSVEncC 8.26 pinned revision, not a general
+> claim for later releases**（8.27–8.30 未检验）。
+
+### 硬件解码测试矩阵（`tests/hwdecode/`）
+
+83 个用例（A–K 十一类），机器可读矩阵 `tests/hwdecode/matrix.json`
+（与 harness 做双向漂移检查）。常用入口：
+
+```powershell
+python -m tests.hwdecode.harness provenance      # 二进制/补丁身份 (不符即 FAIL)
+python -m tests.hwdecode.harness check-matrix    # 文档与矩阵漂移检查
+python -m tests.hwdecode.harness run --phase 1   # A 工具链 + B 路由
+python -m tests.hwdecode.harness run --phase 2   # C 完整性 + D 时间轴
+python -m tests.hwdecode.harness summary         # 汇总闸门
+```
+
+**注意**：`tests/hwdecode/` **不在** `tests/full_autotest.py --level full` 里
+（它需要真实 GPU + 补丁版二进制 + 数十分钟到数小时）。两个测试面互不替代：
+`full_autotest` 管生产回归，`tests/hwdecode` 管硬件解码正确性。
+
 ## 编码后验证：`--check basic|advanced|full`
 
 | 强度 | Sony（rtmd） | DJI（djmd） |
@@ -332,20 +428,20 @@ python tests\full_autotest.py --level full        # L3 + 真实管线集成 + �
 python tests\full_autotest.py --level all         # 等同 full
 ```
 
-> 当前基线：**L1 = 178 PASS / 0 FAIL**（v0.6.2 新增 20 条：CLI 大小写 /
-> 默认后端自动选择 / 分层日志）。`--level full` 在 v0.6.1 为 228 PASS /
-> 0 FAIL，v0.6.2 因上述新增断言应为 248 PASS。任何改动后必须复核不出现
-> 新增 FAIL。
+> 当前基线（v0.7.1）：**L1 = 230 PASS / 0 FAIL**；
+> **`--level full` = 315 PASS / 0 FAIL**（v0.7.0 hardware decode +
+> v0.7.1 音频模型并入 `main` 后实测）。任何改动后必须复核不出现新增 FAIL。
 
-- **L1 unit**（158 项）：color token 表、caps 解析、格式规划、失败分类、
+- **L1 unit**（230 项）：color token 表、caps 解析、格式规划、失败分类、
   flag 构造、probe/paths、源分类、缩放引擎、gpac parse_info、dji facts、
   channel-sync 纯逻辑、**channel-sync 内存回归（有界窗口流 / 窗口切片一致 /
   64 MB 整轨扫描后工作集增量 ≤32 MB）**、AV1 档位与参数映射；
 - **L2 toolchain**（+16 项）：真实工具版本、`--check-features` 实机能力、
   known_flags 白名单、Gyroflow/GPAC 探测；
-- **L3 full**（+54 项）：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
+- **L3 full**（+85 项）：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
   截断文件/尾部垃圾/断点续跑/retry-list 故障注入、strip 机制本体、
-  AV1 管线、channel-sync P1 端到端与算法级。
+  AV1 管线、channel-sync P1 端到端与算法级、
+  **音频模型 probe 集成（真 ffprobe，v0.7.1）**。
   输入在 `work/autotest/` 自建副本（testsets 只读），报告
   `work/autotest/autotest_report.{json,md}`，退出码 0=全过。
 
@@ -360,6 +456,8 @@ docs/
 ├── FINAL_REPORT.md      ★ 四份评估汇总结论与路线图
 ├── design/              设计文档：硬件后端设计 / 实施报告(含 DJI §15) / 集成报告 / HEVC 4:2:2 Rext 播放兼容性
 ├── evaluation/          评估：HEVC 生产就绪度(重写版) / x265 生产就绪 / AV1 可行性 / AV1 调参 / SVT-AV1 归档 / AV1 档位标定
+├── hardware-decode/     ★ v0.7.0 硬件解码 integration 交付物：测试矩阵 / 最终判定 / 补丁 / toolchain provenance
+├── release_notes_v0.7.1.md  v0.7.1 发布说明（音频轨道模型 Phase 1）
 └── reference/           第三方一手资料存档（x265 / SVT-AV1 含 v4.2.0 调参调研报告 / NVENC / QSV / VCE）
 
 olddocs/                 历史档案存档（各阶段代码快照 / 被取代的旧脚本），详见 olddocs/README.md
@@ -435,6 +533,18 @@ olddocs/                 历史档案存档（各阶段代码快照 / 被取代�
   - `--channel-sync-transparent` 成功路径会在 `.1ktwork/` 保留 4 个
     `audio_*.mov` 与通道报告 JSON（10 分钟输入约 330 MB），属既有行为，
     需自行判废。
+- **硬件解码（v0.7.0）默认 `off`，且发布安装中不可用**：
+  - 补丁版二进制是 research build、**不得分发**，位于 `tools/avhw/`，
+    release 白名单不含它；因此发布包里 `--hw-decode auto` 会降级软解、
+    `require` 会明确失败（设计行为，不是缺陷）；
+  - 白名单是**闭集**，目前仅 3 个 `(backend, codec, chroma, depth)` 组合；
+    白名单外一律 `not_proven` → 软解；
+  - **`--seek` 与硬件解码互斥**（读者不等价，`seek_not_equivalent`）；
+  - 硬件解码收益是**CPU 余量**，不是单任务提速；跨二进制 wall-clock / fps
+    **不是**受控基准（patched 是 research build）；
+  - QSVEncC 补丁仅对 pinned 8.26 成立（8.27–8.30 未检验），NVEncC 补丁
+    仅在 9.31（`2cb9d810`）验证；
+  - `tests/hwdecode/` 矩阵**不在** `--level full` 内，需单独跑。
 - **音频轨道模型（v0.7.1 Phase 1）当前是纯内部能力层**：
   - 不改变默认音频路径（仍为全流 `-c:a copy`）与 MP4 输出；没有新增 CLI；
   - AudioTrack/AudioPlan 里的 track 同步结果**不会被应用到任何 ffmpeg 命令**
@@ -463,6 +573,8 @@ git tag -l                         # pre_S1S5 / post_S1S5 / pre_ui / post_1kt_ui
                                    # post_av1 / post_av1_calib / v0.5.0 / v0.5.1
                                    # v0.6.0 (HEVC+AV1 合并主线, 含 AV1 色彩保真修复)
                                    # v0.6.1 (channel-sync 流式内存修复)
+                                   # v0.7.0 (hardware decode integration, 已并入 main)
+                                   # v0.7.1 (音频轨道模型 Phase 1, 当前)
                                    # v0.7.0 (v0.7 线基线)
                                    # v0.7.1 (音频轨道模型层, 默认音频路径不变)
 git checkout backup/pre-av1-main-merge   # AV1 合并进 main 之前的状态 (回滚点)

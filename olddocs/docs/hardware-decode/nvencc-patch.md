@@ -79,6 +79,15 @@ build-time record exactly.
 | Version string | `NVEncC (x64) 9.31 (r1) by rigaya, Sep 12 2026 (VC 1951/Win)` · `[NVENC API v13.1, CUDA 13.1]` |
 | Built from | the two files in §2.1, after a deliberate revert/re-apply cycle that caught a half-patched tree (recorded in `nvencc-avhw-experiment.md` §5.1.1) |
 
+> **✅ 二进制现存位置（2026-09 补注）。** 上面那个 build-tree 路径已随研究分支
+> 工作树的移除而消失（`git worktree remove` 会连同未跟踪文件一起删除）。
+> 该被测二进制已保存在项目内：
+> **`tools/avhw/NVEncC_9.31_avhw/NVEncC64.exe`**，2026-09 实测 sha256 仍为
+> `dcf6d7a63143c777…7c8be4b`（与上文一致），`--version` 报
+> `9.31 (r1) ... CUDA 13.1`，reader 列表含 `avhw` —— 可直接用于复核本补丁。
+> QSVEncC 对应物在 `tools/avhw/QSVEncC_8.26_avhw/`。
+> 注意 `tools/` 是 gitignored：**该二进制不受版本控制保护**。
+
 The tested binary is a **research build, not a distribution candidate**: `avs`
 and `vpy` readers disabled, a generated CUDA 13.0 MSBuild shim, FFmpeg linked
 dynamically rather than statically. Consequences are listed in §6.

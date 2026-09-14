@@ -1,0 +1,40 @@
+diff --git a/QSVPipeline/qsv_pipeline_ctrl.h b/QSVPipeline/qsv_pipeline_ctrl.h
+index a328edec..09cd4032 100644
+--- a/QSVPipeline/qsv_pipeline_ctrl.h
++++ b/QSVPipeline/qsv_pipeline_ctrl.h
+@@ -1261,9 +1261,17 @@ protected:
+             m_getNextBitstream = false;
+             return RGY_ERR_MORE_BITSTREAM; //入力ビットストリームは終了
+         }
++        // POINT OF FIX (docs/hardware-decode/qsvencc-root-cause.md):
++        // For streams whose first keyframe is not first in presentation
++        // order (XAVC), the leading pictures are always presented before
++        // the first fed packet, so their PTS is < m_firstPts. They are
++        // decodable (they follow the keyframe in decode order), so they
++        // must be kept. Only pictures before a REQUESTED seek position
++        // should be dropped, hence the filter is applied only when seeking.
++        const bool bSeeked = (m_input != nullptr && m_input->getSeekParam().first > 0.0f);
+         if (surfDecOut != nullptr && lastSyncP != nullptr
+             // 最初のフレームはOpenGOPのBフレームのために投入フレーム以前のデータの場合があるので、その場合はフレームを無視する
+-            && (!m_gotFirstPts || m_firstPts <= surfDecOutTimestamp || m_decFrameOutCount > 0)) {
++            && (!bSeeked || !m_gotFirstPts || m_firstPts <= surfDecOutTimestamp || m_decFrameOutCount > 0)) {
+             auto taskSurf = useTaskSurf(surfDecOut);
+             const auto picstruct = taskSurf.mfx()->surf()->Info.PicStruct;
+             auto flags = RGY_FRAME_FLAG_NONE;
+diff --git a/QSVPipeline/rgy_input.h b/QSVPipeline/rgy_input.h
+index 8b304b8e..db136ef7 100644
+--- a/QSVPipeline/rgy_input.h
++++ b/QSVPipeline/rgy_input.h
+@@ -325,6 +325,12 @@ public:
+     RGY_CODEC getInputCodec() {
+         return m_inputVideoInfo.codec;
+     }
++    // Read start position (first = --seek, second = --seekto).
++    // For hardware decode the first fed packet's PTS may only be treated
++    // as the output start position when a seek was actually requested.
++    std::pair<float, float> getSeekParam() const {
++        return m_seek;
++    }
+     virtual RGYDOVIProfile getInputDOVIProfile() {
+         return RGY_DOVI_PROFILE_UNSET;
+     }

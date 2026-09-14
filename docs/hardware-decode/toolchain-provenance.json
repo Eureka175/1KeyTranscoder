@@ -1,0 +1,104 @@
+{
+  "_doc": "Hardware-decode integration toolchain provenance. This file is the machine-readable half of matrix category A. tests/hwdecode/sources.py reads it at startup and refuses to run when a binary on disk does not match. Any mismatch is FAIL, never a warning.",
+  "_generated": "2026-09-13",
+  "policy": {
+    "default_decode_reader": "avsw",
+    "hardware_decode_default": false,
+    "note": "Hardware decode stays non-default in this integration. The patched binaries are research builds and must not be distributed; they live under tools/avhw/ which release/build_release.py does NOT whitelist.",
+    "distribution": "research-only"
+  },
+  "backends": {
+    "nvenc": {
+      "kind": "nvencc",
+      "upstream": "https://github.com/rigaya/NVEnc",
+      "baseline_tag": "9.31",
+      "baseline_commit": "2cb9d810c045202548b98ff130b12bc764eb39ea",
+      "patch": {
+        "file": "docs/hardware-decode/patches/0001-nvencc-avhw-keep-leading-pictures.patch",
+        "sha256": "2321ed72d21ca3483c755e082964606d942f0a90e4b7a4acf9428ba305134299",
+        "bytes": 2802,
+        "sha256_note": "Canonical LF form of the committed patch (what `git show v0.7.0:<file>` yields). The previous values (53084fa8…, 2832 bytes) were the authoring-time CRLF form; `core.autocrlf=true` re-encoded the file to LF at commit time, so the recorded hash could never match the committed blob and `harness provenance` failed on a clean checkout. Patch content is unchanged — see 2026-09-14 baseline-integration note.",
+        "scope": "18 added lines, 2 files, 0 deletions (NVEncCore/NVEncPipeline.h +11, NVEncCore/rgy_input.h +7)",
+        "defect": "RC-1: PipelineTaskNVDecode::getOutputFrame() treated the first *fed* packet's PTS as the presentation start and released every buffered picture below it, so open-GOP leading pictures were never emitted."
+      },
+      "hardware_decode": {
+        "binary": "tools/avhw/NVEncC_9.31_avhw/NVEncC64.exe",
+        "sha256": "dcf6d7a63143c777e54a749281bef7ee1dd50d61c44b14d128e66a1217c8be4b",
+        "bytes": 77757440,
+        "version_line": "NVEncC (x64) 9.31 (r1) by rigaya, Sep 12 2026 12:10:28 (VC 1951/Win)",
+        "version_must_contain": ["9.31", "(r1)", "Sep 12 2026"],
+        "runtime_dir": "tools/avhw/NVEncC_9.31_avhw",
+        "reader_arg": "--avhw",
+        "reader_identity_expected": "avcuvid"
+      },
+      "software_control": {
+        "binary": "tools/avhw/NVEncC_9.31_avhw/NVEncC64.exe",
+        "reader_arg": "--avsw",
+        "reader_identity_expected": "avsw"
+      },
+      "stock_control": {
+        "binary": "tools/NVEncC_9.31_x64/NVEncC64.exe",
+        "sha256": "4c043e7b9c572f8ed809b33729db46a48c06e0595c92b0fe43491c805299f595",
+        "bytes": 161058304,
+        "version_line": "NVEncC (x64) 9.31 (r4047) by rigaya, Aug  8 2026 12:55:12 (VC 1944/Win)",
+        "version_must_contain": ["9.31", "(r4047)", "Aug  8 2026"],
+        "reader_arg": "--avhw",
+        "reader_identity_expected": "avcuvid",
+        "role": "negative control: reproduces the N-3 / N-2 head loss. Used by HD-C01 and as the injected failure in HD-C11/HD-F05."
+      },
+      "proven_combinations": [
+        {"codec": "hevc", "chroma": "4:2:0", "depth": 10, "evidence": "research: N-3 -> N at 30/330/10170 frames, byte-identical to --avsw"},
+        {"codec": "h264", "chroma": "4:2:2", "depth": 10, "evidence": "research: N-2 -> N at 195 frames, byte-identical to --avsw"}
+      ],
+      "known_refusals": []
+    },
+    "qsv": {
+      "kind": "qsvencc",
+      "upstream": "https://github.com/rigaya/QSVEnc",
+      "baseline_commit": "b14c9652b34b998351516cc63c86eb990c01c7c8",
+      "baseline_version": "8.26",
+      "patch": {
+        "file": "docs/hardware-decode/patches/0001-qsvencc-avhw-keep-leading-pictures.patch",
+        "sha256": "adb4137439bbcfdaacee33c267c967d443cb78f0c0dcd29b4569f0492a6c85f9",
+        "bytes": 2255,
+        "sha256_note": "Canonical LF form of the committed patch (what `git show v0.7.0:<file>` yields). The previous values (5621ebb0…, 2285 bytes) were the authoring-time CRLF form; `core.autocrlf=true` re-encoded the file to LF at commit time. Patch content is unchanged.",
+        "scope": "15 added lines, 1 line replaced, 2 files (QSVPipeline/qsv_pipeline_ctrl.h +10/-1, QSVPipeline/rgy_input.h +6)",
+        "defect": "RC-2: PipelineTaskMFXDecode::sendBitstream() rejected every MFX output whose presentation timestamp preceded m_firstPts, and m_decFrameOutCount could not advance while rejections were ongoing, so all such pictures were rejected."
+      },
+      "claim_boundary": "Runtime-proven on QSVEncC 8.26 pinned revision; not yet a general claim for later releases. Releases 8.27-8.30 exist and were not examined.",
+      "hardware_decode": {
+        "binary": "tools/avhw/QSVEncC_8.26_avhw/QSVEncC64.exe",
+        "sha256": "f5df83f12911d99d69b07e8270d6cdef4a8e4b62adb06711599c8cee62f8804d",
+        "bytes": 10505216,
+        "version_line": "QSVEncC (x64) 8.26 (r4504) by rigaya, Sep 12 2026 14:41:29 (VC 1951/Win)",
+        "version_must_contain": ["8.26", "(r4504)", "Sep 12 2026"],
+        "runtime_dir": "tools/avhw/QSVEncC_8.26_avhw",
+        "reader_arg": "--avhw",
+        "reader_identity_expected": "avqsv"
+      },
+      "software_control": {
+        "binary": "tools/avhw/QSVEncC_8.26_avhw/QSVEncC64.exe",
+        "reader_arg": "--avsw",
+        "reader_identity_expected": "avsw"
+      },
+      "stock_control": {
+        "binary": "tools/QSVEncC_8.26_x64/QSVEncC64.exe",
+        "sha256": "107e5f0d3256316293e3650fcd3c4fa1daaf64218dee2f9f3742e5a0489968b3",
+        "bytes": 10688512,
+        "version_line": "QSVEncC (x64) 8.26 (r4504) by rigaya, Aug  8 2026 12:17:31 (VC 1944/Win)",
+        "version_must_contain": ["8.26", "(r4504)", "Aug  8 2026"],
+        "reader_arg": "--avhw",
+        "reader_identity_expected": "avqsv",
+        "role": "negative control: reproduces N-3 on Sony and the H.264 4:2:2 capability refusal."
+      },
+      "proven_combinations": [
+        {"codec": "hevc", "chroma": "4:2:0", "depth": 10, "evidence": "research: N-3 -> N, per-frame SHA-256 identical to --avsw (30/30)"}
+      ],
+      "known_refusals": [
+        {"codec": "h264", "chroma": "4:2:2", "depth": 10, "reason": "capability_refused", "evidence": "avqsv: codec h264(yuv422p10le) unable to decode by qsv. rc=-31, no reader constructed, no output file. Unchanged by the patch."}
+      ]
+    }
+  },
+  "build_deviation_note": "Both patched binaries are research builds: avs/vpy readers disabled (NVEncC), OpenVINO and avs/vpy readers disabled (QSVEncC), generated CUDA MSBuild shim and dynamically linked FFmpeg (NVEncC), OneVPL built separately (QSVEncC). Consequence for the matrix: cross-binary wall-clock and fps are NOT a controlled benchmark. Cross-binary comparisons in this matrix are correctness-only (counts, PTS, keyframes, fingerprints, bytes).",
+  "baseline_integration_note_2026_09_14": "v0.7.0 was merged into main (merge commit 'merge: integrate v0.7.0 hardware decode into main'). The two patch sha256/bytes values above were corrected to the canonical LF blob form committed in v0.7.0, so that `python -m tests.hwdecode.harness provenance` verifies on a clean checkout. No patch file, binary, policy, allowlist, reason code or harness logic was modified by that correction; the verified patch contents still match the recorded `scope` lines exactly (nvenc +18/-0 over 2 files, qsv +15/-1 over 2 files)."
+}

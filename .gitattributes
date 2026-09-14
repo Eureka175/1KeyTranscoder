@@ -1,0 +1,11 @@
+# Line-ending policy.
+#
+# Patch files and the provenance file that records their sha256 must be
+# byte-stable across checkouts: docs/hardware-decode/toolchain-provenance.json
+# pins the patch hashes, and tests/hwdecode/sources.py refuses to run when a
+# hash does not match. With `core.autocrlf=true` (a common Windows default,
+# and the setting on the machine where v0.7.0 was authored) git re-encodes
+# text files to LF at commit time, which silently changed the patch hashes
+# and made `python -m tests.hwdecode.harness provenance` fail on a clean
+# checkout. Force LF so the recorded hashes stay valid everywhere.
+*.patch text eol=lf
