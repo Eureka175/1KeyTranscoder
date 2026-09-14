@@ -243,7 +243,7 @@ core/audio_plan.py            ← 规划层（Selection → Mapping → Validati
       │
 core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
 
-──────────── Phase 3A：执行链（只有显式调用 run_audio_render 才进入） ────────────
+──────────── Phase 3：执行链（只有显式调用 run_audio_render 才进入） ────────────
 
 AudioPlan
       ▼
@@ -251,12 +251,20 @@ core/audio_timeline.py   AudioTimeline / RenderPolicy  ← **唯一**时长·EOF
       ▼
 core/audio_pcm.py        AudioPCMReader                ← ffmpeg → canonical float32
       ▼
-core/audio_route.py      AudioRouter                   ← 纯样本搬运（**无相加**）
+   ┌──┴─────────────────────────────┐
+   │ 无混音意图                      │ 有混音意图 (mix_buses / mix_mode)
+core/audio_route.py               core/audio_mix.py
+   AudioRouter (1:1 纯搬运)          AudioMixer (Σ sample × gain, float32)
+   └──┬─────────────────────────────┘
       ▼
 core/audio_wav.py        WavExporter                   ← RIFF / PCM16·24·32 / float32
       ▼
 core/audio_process.py    AudioOutputSpec + 处理图编排（run_audio_render）
 ```
+
+**同一张图, 只换节点**: `AudioRouter` 与 `AudioMixer` 暴露相同的"逐块
+float32 输出"接口, 因此 `WavExporter` 完全不需要知道自己在写路由结果还是
+混音结果（WAV 与 Mixing 解耦）。
 
 ### 6.1.1 四个概念 + 三维身份
 
@@ -362,8 +370,35 @@ audio_wav_write_failed          audio_mix_invalid
 
 Phase 2 的 `audio_*_not_found` / `audio_mapping_*` / `audio_mix_not_supported`
 语义不变：`build_audio_map_spec()` 仍以 `audio_mix_not_supported` 拒绝
-`mix_mode`（`-map` 规格表达不了样本级合成），PCM 渲染路径在 Phase 3B 之前
-同样明确拒绝。
+`mix_mode`（`-map` 规格表达不了样本级合成）——它描述的是 ffmpeg argv,
+与 PCM 层的 `core/audio_mix.py` **并存不冲突**。
+
+### 6.1.9 PCM 混音：N→1 + gain + peak/clipping（P3B）
+
+`core/audio_mix.py`：`MixBus` → `MixSink` → `MixGain`(源声道 + 线性增益)，
+`AudioMixer` 逐块做 `sum = Σ(sample × gain)`。
+
+* **图的选择**: 计划无 `mix_buses` 且 `mix_mode is None` -> `AudioRouter`
+  (P3A 纯搬运); 否则 -> `AudioMixer`（`AudioPlan.is_default` 也要求
+  `mix_buses` 为空）;
+* **不重新定义 EOF**: render window 仍来自 `AudioTimeline`; 某个输入先 EOF
+  时该项贡献**静音 0.0**，输出继续（1000 帧 + 400 帧 -> 输出仍 1000 帧）;
+* **offset 走同一入口**: `source_to_timeline()`；晚到 60 的轨前移后与另一轨
+  在同一 timeline 位置求和;
+* **不自动 normalize**: `1.0 + 1.0 = 2.0` 保留并计为 clipping;
+  `ClipPolicy` = `detect`(默认, 只统计) / `hard_clip`(显式裁剪) /
+  `error`(`audio_mix_clipping`, 不产出文件)。**没有** `AUTO_NORMALIZE`;
+* **检波统计** `MixStats`: `peak` / `peak_frame` / `peak_inputs`(峰值逐输入
+  分解, Σ = peak) / `clip_count` / `format_clip_count` / `per_output_peak`;
+* **增益不写回源声道**: 只在 `MixBus` 输入项上；负增益 -> `audio_mix_invalid`;
+* 混音输出声道身份是 `mix{N}`, span 取各输入区间的**交集**
+  (`mix_intersection`), 逐输入区间留在 warnings 里。
+
+### 6.1.10 Phase 3B 的 reason codes（新增）
+
+```text
+audio_mix_clipping     audio_mix_invalid
+```
 
 ---
 
@@ -567,6 +602,13 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
     `audio_sample_rate_mismatch` 拒绝。
 24. **（v0.7.1 P3A）WAV 头部必须准确。** `data_size` / `riff_size` 按实际写出的
     字节数回填；写入样本数与声明不符 → `audio_wav_write_failed` 且不留半成品。
+25. **（v0.7.1 P3B）Mixing 不得重新定义 EOF / 时长。** 混音与路由共用
+    `AudioTimeline`；短输入在混音里同样按 §EOF 策略补静音，不终止整个 render。
+26. **（v0.7.1 P3B）不自动归一化。** 超范围样本按明确的 `ClipPolicy` 处理
+    （`detect` / `hard_clip` / `error`），并如实记录 `clip_count`；
+    增益只能是 `MixBus` 上的有限非负线性系数，绝不写回源声道模型。
+27. **（v0.7.1 P3B）WAV exporter 不实现 mixing。** 混音与导出解耦：路由图与
+    混音图暴露同一"逐块 float32"接口，只换节点。
 
 ---
 
@@ -574,8 +616,8 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 
 | 历史说法 | 出处 | 实际 |
 |---|---|---|
-| "`core/` 54 文件、`encoders/` 24 文件、`preservation/` 46 文件" | `docs/README.md` 目录树 | **27 / 10 / 16** 个 `.py`（v0.7.0 + v0.7.1 并入后实测） |
-| "`core/` 含 `sync_estimate` …" 但列表遗漏 `models.py`、`postprobe.py`、`dashboard_ui.py`、`mp4_channel_sync.py`、`version.py` | `docs/README.md` | 实际 27 个模块见 §12（v0.7.1 新增 `audio_models.py` / `audio_probe.py` / `audio_plan.py` / `audio_timeline.py` / `audio_pcm.py` / `audio_route.py` / `audio_wav.py` / `audio_process.py`） |
+| "`core/` 54 文件、`encoders/` 24 文件、`preservation/` 46 文件" | `docs/README.md` 目录树 | **28 / 10 / 16** 个 `.py`（v0.7.0 + v0.7.1 并入后实测） |
+| "`core/` 含 `sync_estimate` …" 但列表遗漏 `models.py`、`postprobe.py`、`dashboard_ui.py`、`mp4_channel_sync.py`、`version.py` | `docs/README.md` | 实际 28 个模块见 §12（v0.7.1 新增 `audio_models.py` / `audio_probe.py` / `audio_plan.py` / `audio_timeline.py` / `audio_pcm.py` / `audio_route.py` / `audio_wav.py` / `audio_process.py` / `audio_mix.py`） |
 | "NVEncC … ✅ 生产默认" | `README.md` 编码器矩阵 | v0.6.2 起为**能力优先自动选择**（NVENC→QSV→x265），无固定默认 |
 | "生产路径恒用 `--avsw` 软解" / "硬件解码不可达（`--avsw` 字面量）" / "integration 未开始" | 本文档 §2.1、§8（v0.6.2 版）与硬件解码 research 归档 | **已被 v0.7.0 推翻（v0.7.0 已于 2026-09-14 并入 main）**：硬件解码已接入 `--hw-decode off\|auto\|require`，带 runtime-proven 白名单、完整性闸门与 `--seek` 拒绝。**默认仍是 `off` = 软解**，所以"默认行为未改"这一半仍然成立。以本版 §8 为准 |
 | "音频模型只有 Phase 1（4CH 已是全部场景）" | 本档 §6.1（v0.7.1 P1 版） | **已被 Phase 2/3A 扩展**：Phase 2 新增 `AudioSource`（media/wav/external）、三维声道身份、Selection、Channel Mapping、`AudioOutputTrack`、`AudioMapSpec`；Phase 3A 新增 `AudioTimeline`（时长/EOF/offset 唯一权威）、`AudioPCMReader`（canonical float32）、`AudioRouter`（无混音）、`WavExporter`、`AudioOutputSpec`。Phase 1 的「4CH 流不塌缩」「同步不改身份」等结论仍然成立 |
@@ -591,14 +633,15 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | `watchfolder.py` | 92 | 轮询批处理转调 |
 | `core/batch_hw.py` | 1966 | 硬件批量：降级梯、三条源路径、并发池、失败记录、**硬件解码接线与完整性闸门调用** |
 | `core/channel_sync.py` | 1038 | 延时补偿主算法与阈值 |
-| `core/audio_models.py` | 2143 | **v0.7.1** 音频模型：Source/Stream/Channel/Track/Plan/Sync（纯数据） |
+| `core/audio_models.py` | 2158 | **v0.7.1** 音频模型：Source/Stream/Channel/Track/Plan/Sync（纯数据） |
 | `core/audio_plan.py` | 1760 | **v0.7.1 P2** 规划层：Selection / Channel Mapping / Validation / AudioMapSpec |
 | `core/audio_probe.py` | 328 | **v0.7.1** 音频 Probe 适配层（raw stream → 模型，含来源维度） |
 | `core/audio_timeline.py` | 1212 | **v0.7.1 P3A** AudioTimeline / RenderPolicy / EOF·offset 唯一权威 |
-| `core/audio_pcm.py` | 633 | **v0.7.1 P3A** PCM Reader：ffmpeg → canonical float32（chunked） |
-| `core/audio_route.py` | 531 | **v0.7.1 P3A** 通道路由：纯样本搬运（无混音） |
-| `core/audio_wav.py` | 900 | **v0.7.1 P3A** WAV writer/reader（PCM16·24·32 / float32 / EXTENSIBLE） |
-| `core/audio_process.py` | 560 | **v0.7.1 P3A** 处理图：AudioOutputSpec + run_audio_render 编排 |
+| `core/audio_pcm.py` | 665 | **v0.7.1 P3A** PCM Reader：ffmpeg → canonical float32（chunked） |
+| `core/audio_route.py` | 530 | **v0.7.1 P3A** 通道路由：纯样本搬运（无混音） |
+| `core/audio_wav.py` | 935 | **v0.7.1 P3A** WAV writer/reader（PCM16·24·32 / float32 / EXTENSIBLE） |
+| `core/audio_process.py` | 675 | **v0.7.1 P3A/P3B** 处理图：AudioOutputSpec + run_audio_render 编排（路由/混音换节点） |
+| `core/audio_mix.py` | 832 | **v0.7.1 P3B** PCM 混音：MixBus/MixSink/MixGain + AudioMixer（float32 累加 / 检波 / ClipPolicy） |
 | `core/sync_estimate.py` | 786 | GCC-PHAT 时差估计 |
 | `core/logging_utils.py` | 493 | 分层日志 + 缩放 CSV |
 | `core/probe.py` | 391 | 源探测（v0.7.1 起 `-show_entries` 增加 `stream_tags`） |

@@ -40,6 +40,13 @@ from .audio_plan import (
     _effective_mapping,
     validate_selection,
 )
+from .audio_mix import (
+    AudioMixer,
+    MixBus,
+    MixStats,
+    mixing_timeline,
+    validate_mix_bus,
+)
 from .audio_route import AudioRouter, AudioRouteSpec, build_route_spec
 from .audio_timeline import (
     AudioRenderError,
@@ -342,6 +349,8 @@ class AudioRenderResult:
     output: AudioOutputSpec | None = None
     timeline: AudioTimeline | None = None
     route_spec: AudioRouteSpec | None = None
+    mix_bus: MixBus | None = None
+    mix_stats: MixStats | None = None
     prepared: list[dict[str, Any]] = field(default_factory=list)
     frames: int = 0
     output_channels: int = 0
@@ -372,6 +381,13 @@ class AudioRenderResult:
             data["timeline"] = self.timeline.to_dict()
         if self.route_spec is not None:
             data["route_spec"] = self.route_spec.to_dict()
+        if self.mix_bus is not None:
+            data["mix_bus"] = self.mix_bus.to_dict()
+            data["graph"] = "mixing"
+        else:
+            data["graph"] = "routing"
+        if self.mix_stats is not None:
+            data["mix_stats"] = self.mix_stats.to_dict()
         if self.duration_mismatches:
             data["duration_mismatches"] = list(self.duration_mismatches)
         if self.errors:
@@ -383,6 +399,7 @@ class AudioRenderResult:
     def summary(self) -> dict[str, Any]:
         return {
             "ok": bool(self.ok),
+            "graph": "mixing" if self.mix_bus is not None else "routing",
             "frames": int(self.frames),
             "output_channels": int(self.output_channels),
             "output": self.output.path if self.output else None,
@@ -409,8 +426,17 @@ def run_audio_render(
     overwrite: bool = False,
     on_chunk: Any = None,
     reader_factory: Any = None,
+    mix_bus: Any = None,
+    clip_policy: Any = None,
 ) -> AudioRenderResult:
-    """AudioPlan -> canonical float32 -> 路由 -> WAV (Phase 3A 全链路)。
+    """AudioPlan -> canonical float32 -> 路由/混音 -> WAV (P3A + P3B 全链路)。
+
+    图的选择 (同一张图, 只换节点):
+
+    * **无混音意图** (无 `mix_buses` / `mix_mode` 为 `None`) -> `AudioRouter`
+      (Phase 3A: 1 输出声道 = 1 源声道, 纯搬运);
+    * **有混音意图** (`plan.mix_buses` 非空或 `mix_mode` 非空) ->
+      `core.audio_mix.AudioMixer` (Phase 3B: Σ sample × gain)。
 
     返回 `AudioRenderResult`; **失败时 `ok=False` 且不产出文件** (校验/时间轴
     问题绝不"尽可能输出")。渲染中途失败会删除半成品。
@@ -418,6 +444,7 @@ def run_audio_render(
     `on_chunk(block, index)` 可选: 逐块观察 (测试/进度用), 收到的是
     **借用语义**的数组, 不得长期持有。
     `reader_factory` 可替换 PCM 读取后端 (接口同 `AudioPCMReader`)。
+    `clip_policy` 是混音超范围策略 (`detect` / `hard_clip` / `error`)。
     """
     result = AudioRenderResult(ok=False)
     reader, issues = prepare_plan(
@@ -430,33 +457,42 @@ def run_audio_render(
         return result
     try:
         result.prepared = reader.describe()
-        # Phase 3B 的混合在 PCM 渲染路径上表达; Phase 3A 只做路由。
-        if plan.mix_mode is not None:
-            result.errors = [{
-                "reason": REASON_AUDIO_MIX_NOT_SUPPORTED,
-                "detail": (
-                    f"mix_mode={plan.mix_mode!r} requests sample-level "
-                    "combination; mixing is implemented in v0.7.1 Phase 3B "
-                    "(core.audio_mix), not in the routing path"
-                ),
-            }]
-            return result
-
-        timeline = resolve_render_timeline(
+        base_timeline = resolve_render_timeline(
             plan, reader,
             render_policy=render_policy,
             explicit_duration_seconds=explicit_duration_seconds,
             explicit_start_seconds=explicit_start_seconds,
             explicit_end_seconds=explicit_end_seconds,
         )
-        result.timeline = timeline
         result.duration_mismatches = reader.duration_mismatches()
-        result.warnings.extend(timeline.warnings)
-        route_spec = build_route_spec(timeline)
-        result.route_spec = route_spec
-        if not route_spec.executable:
-            result.errors = list(route_spec.errors)
-            return result
+        result.warnings.extend(base_timeline.warnings)
+
+        # ---- 图的选择: 同一张图, 只换节点 (Routing / Mixing) ----------
+        mixer = None
+        bus = _resolve_mix_bus(plan, mix_bus)
+        if bus is not None:
+            issues = validate_mix_bus(plan, bus)
+            if issues:
+                result.errors = list(issues)
+                return result
+            timeline = mixing_timeline(plan, bus, base=base_timeline)
+            result.mix_bus = bus
+            mixer = AudioMixer(
+                reader, bus, timeline,
+                source_timeline=base_timeline,
+                clip_policy=clip_policy,
+                output_format=sample_format,
+            )
+        else:
+            timeline = base_timeline
+        result.timeline = timeline
+
+        if mixer is None:
+            route_spec = build_route_spec(timeline)
+            result.route_spec = route_spec
+            if not route_spec.executable:
+                result.errors = list(route_spec.errors)
+                return result
 
         target_dir = Path(output_dir) if output_dir is not None else (
             Path(output_path).parent if output_path is not None else work_dir
@@ -488,11 +524,11 @@ def run_audio_render(
             return result
 
         export = wav_export_spec(spec, layout=layout, overwrite=overwrite)
-        router = AudioRouter(reader, timeline)
+        source = mixer if mixer is not None else AudioRouter(reader, timeline)
         writer = WavExporter(export)
         try:
             index = 0
-            for block in router.frames(chunk_frames=chunk_frames):
+            for block in _iter_blocks(source, chunk_frames):
                 writer.write(block)
                 if on_chunk is not None:
                     on_chunk(block, index)
@@ -518,8 +554,15 @@ def run_audio_render(
         result.peak = float(info.peak or 0.0)
         result.clipped_samples = int(writer.clipped_samples)
         total = result.frames * max(1, result.output_channels)
-        faithful = _count_faithful(reader, route_spec, timeline)
-        result.silence_samples = max(0, total - faithful)
+        if mixer is not None:
+            result.mix_stats = mixer.stats
+            result.silence_samples = max(
+                0, total - _count_faithful_mix(mixer, timeline)
+            )
+        else:
+            result.silence_samples = max(
+                0, total - _count_faithful(reader, route_spec, timeline=timeline)
+            )
         result.decode_seconds = float(reader.decode_seconds)
         result.ok = True
         return result
@@ -534,6 +577,82 @@ def run_audio_render(
         return result
     finally:
         reader.close()
+
+
+def _iter_blocks(source: Any, chunk_frames: int) -> Any:
+    """统一 `AudioRouter` / `AudioMixer` 的块产出 (两者接口一致)。
+
+    * `AudioMixer.frames()` 产出 `(block, faithful)`;
+    * `AudioRouter.frames()` 只产出 `block` (`with_report=True` 时才带掩码)。
+
+    两种节点都只暴露"逐块 float32 输出", WAV 导出因此不需要知道自己在写
+    路由结果还是混音结果 (§WAV 与 Mixing 解耦)。
+    """
+    for item in source.frames(chunk_frames=chunk_frames):
+        if isinstance(item, tuple):
+            yield item[0]
+        else:
+            yield item
+
+
+def _count_faithful_mix(mixer: Any, timeline: AudioTimeline) -> int:
+    """混音路径下"至少有一个输入真实供数"的输出样本数 (逐 sink 并集)。"""
+    total = 0
+    for sink in mixer.bus.sinks:
+        spans: list[tuple[int, int]] = []
+        for item in sink.inputs:
+            ct = timeline.channel(item.channel_id)
+            if ct is None:
+                continue
+            bounds = ct.available_bounds
+            if bounds is None:
+                continue
+            lo = max(bounds[0], timeline.start_sample)
+            hi = min(bounds[1], timeline.end_sample)
+            if hi > lo:
+                spans.append((lo, hi))
+        spans.sort()
+        covered = 0
+        cursor: int | None = None
+        for lo, hi in spans:
+            if cursor is None or lo > cursor:
+                covered += hi - lo
+                cursor = hi
+            elif hi > cursor:
+                covered += hi - cursor
+                cursor = hi
+        total += covered
+    return int(total)
+
+
+def _resolve_mix_bus(plan: AudioPlan, mix_bus: Any) -> Any:
+    """决定本次渲染是否走混音, 并给出 MixBus (None = 纯路由)。
+
+    * 显式传入 `mix_bus` -> 用它 (single bus);
+    * 否则 `plan.mix_buses` 非空 -> 用它 (首个 bus; 多 bus 目前不支持);
+    * 否则 `plan.mix_mode` 非空 -> 全部选中声道 N->1 求和;
+    * 否则 None (Phase 3A 路由路径, 行为完全不变)。
+    """
+    from .audio_mix import build_mix_buses, mix_buses_of
+
+    if mix_bus is not None:
+        from .audio_mix import MixBus as _MixBus
+
+        return mix_bus if isinstance(mix_bus, _MixBus) else _MixBus.from_dict(
+            mix_bus if isinstance(mix_bus, Mapping) else {}
+        )
+    buses = mix_buses_of(plan)
+    if buses:
+        return buses[0]
+    if not plan.mix_mode:
+        return None
+    mode = str(plan.mix_mode)
+    derived = build_mix_buses(plan, mix_mode=mode, collapse=True)
+    if len(derived) > 1:
+        derived[0].notes.append(
+            "only the first mix bus is rendered in this phase"
+        )
+    return derived[0] if derived else None
 
 
 def _count_faithful(

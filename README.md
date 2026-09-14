@@ -212,13 +212,13 @@ DJI（djmd）→ DJI
 不再被 P1 主路径引用。设计细节与 P1 vs vendored 差异对照见
 `docs/design/channel_sync_p1.md`。
 
-## 音频模型与 PCM 处理（v0.7.1 Phase 1 + Phase 2 + Phase 3A，内部能力层）
+## 音频模型与 PCM 处理（v0.7.1 Phase 1 + Phase 2 + Phase 3A/3B，内部能力层）
 
 **这一层目前不影响任何输出**：默认音频路径仍是"整流原样 copy"
 （经典路径 `-map 0` + `-c:a copy`；Sony/DJI 保留管线由 GPAC 从源容器
-复制音频）。v0.7.1 建立**数据结构 + 规划层 + PCM 处理链**，供后续混音 /
-MP4 音轨保留使用；**不新增 CLI，默认生产路径一字未改** —— 新的 PCM 处理
-只在显式调用 `core.audio_process.run_audio_render()` 时才会执行。
+复制音频）。v0.7.1 建立**数据结构 + 规划层 + PCM 处理链**；**不新增 CLI，
+默认生产路径一字未改** —— 新的 PCM 处理只在显式调用
+`core.audio_process.run_audio_render()` 时才会执行。
 
 ```text
 输入文件（可多个来源）
@@ -231,15 +231,16 @@ AudioTrack        逻辑输入轨（4CH 流 → 1 track / 4 channel；4×mono �
   ↓  core.audio_plan
 Selection         哪些 source channel 被保留   （决定"保留什么"）
 Channel Mapping   已选声道按什么顺序进入输出   （决定"输出顺序"）
-AudioPlan         sources / selected_channels / channel_mapping / output_tracks
+AudioPlan         sources / selected_channels / channel_mapping / mix_buses
 AudioMapSpec      可 dry-run 的执行规格（策略分类 + 完整身份，不执行 ffmpeg）
 
-── Phase 3A：执行链（只有 run_audio_render 才进入） ──
+── Phase 3：执行链（只有 run_audio_render 才进入） ──
   ↓  core.audio_timeline    AudioTimeline / RenderPolicy（**唯一**时长·EOF·offset 权威）
   ↓  core.audio_pcm         AudioPCMReader（ffmpeg → canonical float32, chunked）
-  ↓  core.audio_route       AudioRouter（1 输出声道 = 1 源声道, **无相加**）
+  ↓  ┌ 无混音意图 → core.audio_route  AudioRouter（1 输出声道 = 1 源声道, 无相加）
+     └ 有混音意图 → core.audio_mix    AudioMixer（Σ sample × gain, float32）
   ↓  core.audio_wav         WavExporter（PCM16 / PCM24 / PCM32 / float32）
-  ↓  core.audio_process     AudioOutputSpec + run_audio_render 编排
+  ↓  core.audio_process     AudioOutputSpec + run_audio_render 编排（同一张图换节点）
 ```
 
 | 模块 | 职责 |
@@ -251,7 +252,8 @@ AudioMapSpec      可 dry-run 的执行规格（策略分类 + 完整身份，�
 | `core/audio_pcm.py` | **P3A**：`AudioPCMReader`（ffmpeg 解码 → canonical float32，分块读取，identity channelmap 防隐式重排） |
 | `core/audio_route.py` | **P3A**：`AudioRouter`（纯样本搬运，1:1，**无混音**） |
 | `core/audio_wav.py` | **P3A**：`WavExporter` / `read_wav` / `AudioOutputSpec` / `default_wav_name()` |
-| `core/audio_process.py` | **P3A**：`run_audio_render()` 处理图编排 + `AudioRenderResult` |
+| `core/audio_mix.py` | **P3B**：`MixBus` / `MixSink` / `MixGain` / `AudioMixer`（N→1、线性 gain、float32 累加、`MixStats` 检波、`ClipPolicy`） |
+| `core/audio_process.py` | **P3A/P3B**：`run_audio_render()` 处理图编排（路由/混音换节点）+ `AudioRenderResult` |
 | `core/channel_sync.py` | Sync 层（**未改动**）：模型只**读取**它的报告 JSON，不重实现算法 |
 
 支持的输入形态（都有测试）：
@@ -326,11 +328,12 @@ if spec.ok:
     spec.trace(0)                          # output 0 -> camera:s2:c2 -> sync
 ```
 
-Phase 3A：把计划真正渲染成 WAV（internal API）：
+Phase 3A/3B：把计划真正渲染成 WAV（internal API）：
 
 ```python
 from core.audio_process import run_audio_render
 from core.audio_wav import WavFormat
+from core.audio_mix import MixBusBuilder, ClipPolicy
 
 res = run_audio_render(
     plan,
@@ -342,15 +345,31 @@ res = run_audio_render(
 )
 res.ok, res.output.path, res.timeline.frame_count
 res.duration_mismatches                     # metadata vs 实际解码样本数
+res.summary()["graph"]                      # "routing" (无混音意图)
+
+# N -> 1 混音 (Phase 3B)
+plan.mix_mode = "sum"                       # 或显式给出 plan.mix_buses
+bus = MixBusBuilder(plan).sum_all(
+    ["camera:s0:c0", "recorder:s0:c0"],
+    gains={"camera:s0:c0": 0.5, "recorder:s0:c0": 0.5},   # 线性; 0dB = 1.0
+)
+res = run_audio_render(plan, ffmpeg=..., work_dir=..., output_path=...,
+                       mix_bus=bus, clip_policy=ClipPolicy.DETECT)
+res.mix_bus.trace(0)      # output 0 -> [camera:s0:c0 ×0.5, recorder:s0:c0 ×0.5]
+res.mix_stats.to_dict()   # peak / clip_count / peak_inputs / format_clip_count
 ```
 
-> ⚠️ **仍未实现（不要据此宣称）**：PCM Mixing（N 源声道 → 1 输出声道的样本级
-> 合成 / 增益 / limiter / compressor / EQ / normalizer）、selective MP4
-> retention（音轨选择进容器）、音频编码与 mux、重采样、漂移校正、自动跨文件
-> 同步、新 CLI（`--audio-tracks` / `--audio-map` / `--audio-source` 均未开放）、
-> DAW 式编辑。`AudioMapSpec` 仍只给出策略分类与身份，**不生成 filtergraph
-> 字符串、不执行 ffmpeg**；`AudioPlan.mix_mode` 非空时 `build_audio_map_spec()`
-> 继续以 `audio_mix_not_supported` 拒绝。
+> ⚠️ **仍未实现（不要据此宣称）**：selective MP4 retention（音轨选择进容器）、
+> 音频编码与 mux、重采样、漂移校正、自动跨文件同步、
+> loudness normalization / LUFS / AGC / limiter / compressor / EQ / reverb /
+> noise reduction / spectral processing / time-stretch / pitch shift、
+> 新 CLI（`--audio-tracks` / `--audio-map` / `--audio-source` 均未开放）、
+> DAW 式编辑、多 bus 同时渲染。
+> `AudioMapSpec` 仍只给出策略分类与身份，**不生成 filtergraph 字符串、不执行
+> ffmpeg**；`AudioPlan.mix_mode` 非空时 `build_audio_map_spec()` 继续以
+> `audio_mix_not_supported` 拒绝（它描述 `-map` argv，与 PCM 层的
+> `core/audio_mix.py` 并存不冲突）。混音**不自动归一化**：`1.0 + 1.0 = 2.0`
+> 会被保留并计为 clipping 事件（`ClipPolicy` 显式选择 `detect`/`hard_clip`/`error`）。
 
 ## 硬件解码：`--hw-decode off|auto|require`（v0.7.0，**默认 `off`**）
 
@@ -512,33 +531,35 @@ python -m tests.hwdecode.harness summary         # 汇总闸门
 ## 自动化测试（三级深度）
 
 ```powershell
-python tests\full_autotest.py --level unit        # L1 纯逻辑 + 确定性强逻辑 (秒级~3.5 分钟)
+python tests\full_autotest.py --level unit        # L1 纯逻辑 + 确定性强逻辑 (~1 分钟)
 python tests\full_autotest.py --level toolchain   # L2 + 工具版本/实机能力/旗标白名单 (~16s)
 python tests\full_autotest.py --level full        # L3 + 真实管线集成 + 故障注入 (~12 分钟)
 python tests\full_autotest.py --level all         # 等同 full
 ```
 
-> 当前基线（v0.7.1 Phase 3A）：**L1 = 364 PASS / 0 FAIL**；
-> **`--level full` = 477 PASS / 0 FAIL**（unit 364 + toolchain 16 + full 97；
-> v0.7.0 hardware decode + v0.7.1 音频模型 Phase 1/2 + Phase 3A PCM 路由/WAV
-> 导出全部并入 `main` 后实测）。任何改动后必须复核不出现新增 FAIL。
+> 当前基线（v0.7.1 Phase 3B）：**L1 = 388 PASS / 0 FAIL**；
+> **`--level full` = 507 PASS / 0 FAIL**（unit 388 + toolchain 16 + full 103；
+> v0.7.0 hardware decode + v0.7.1 音频 Phase 1/2/3A/3B 全部并入 `main` 后实测）。
+> 任何改动后必须复核不出现新增 FAIL。
 
-- **L1 unit**（364 项）：color token 表、caps 解析、格式规划、失败分类、
+- **L1 unit**（388 项）：color token 表、caps 解析、格式规划、失败分类、
   flag 构造、probe/paths、源分类、缩放引擎、gpac parse_info、dji facts、
   channel-sync 纯逻辑、**channel-sync 内存回归（有界窗口流 / 窗口切片一致 /
   64 MB 整轨扫描后工作集增量 ≤32 MB）**、AV1 档位与参数映射、
   **音频时间轴/EOF/offset（P3A）、通道路由（P3A）、WAV 往返与 header 精确
-  （P3A）、chunk invariance 与内存上界（P3A）**；
+  （P3A）、chunk invariance 与内存上界（P3A）、PCM 混音（P3B：gain/相消/
+  overflow/ClipPolicy/多 bus/短 source/offset）、混音 chunk invariance 与
+  图等价（P3B）**；
 - **L2 toolchain**（+16 项）：真实工具版本、`--check-features` 实机能力、
   known_flags 白名单、Gyroflow/GPAC 探测；
-- **L3 full**（97 项 = 16 + 基础 41 + v0.7.0 硬件解码 + v0.7.1 音频的累计）：
-  Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
+- **L3 full**（103 项）：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
   截断文件/尾部垃圾/断点续跑/retry-list 故障注入、strip 机制本体、
   AV1 管线、channel-sync P1 端到端与算法级、
   **音频模型 probe 集成（真 ffprobe，v0.7.1 P1）**、
   **音频来源/选择/映射集成（真 A7M5 + 外挂 WAV，v0.7.1 P2）**、
   **音频 PCM 路由/WAV 导出集成（真 A7M5 4×mono + s16/s24/s32/f32 正弦，
-  v0.7.1 P3A，12 项）**。
+  v0.7.1 P3A，12 项）**、
+  **音频 PCM 混音集成（真 A7M5 + 外挂 4CH WAV，v0.7.1 P3B，6 项）**。
   输入在 `work/autotest/` 自建副本（testsets 只读），报告
   `work/autotest/autotest_report.{json,md}`，退出码 0=全过。
 
@@ -554,7 +575,7 @@ docs/
 ├── design/              设计文档：硬件后端设计 / 实施报告(含 DJI §15) / 集成报告 / HEVC 4:2:2 Rext 播放兼容性
 ├── evaluation/          评估：HEVC 生产就绪度(重写版) / x265 生产就绪 / AV1 可行性 / AV1 调参 / SVT-AV1 归档 / AV1 档位标定
 ├── hardware-decode/     ★ v0.7.0 硬件解码 integration 交付物：测试矩阵 / 最终判定 / 补丁 / toolchain provenance
-├── release_notes_v0.7.1.md  v0.7.1 发布说明（音频模型 Phase 1 + Phase 2 + Phase 3A）
+├── release_notes_v0.7.1.md  v0.7.1 发布说明（音频 Phase 1 + Phase 2 + Phase 3A/3B）
 └── reference/           第三方一手资料存档（x265 / SVT-AV1 含 v4.2.0 调参调研报告 / NVENC / QSV / VCE）
 
 olddocs/                 历史档案存档（各阶段代码快照 / 被取代的旧脚本），详见 olddocs/README.md

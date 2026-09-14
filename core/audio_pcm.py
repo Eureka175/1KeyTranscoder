@@ -497,6 +497,38 @@ class AudioPCMReader:
             block[lo_c - lo: lo_c - lo + valid] = framed[:, chan]
         return block, valid
 
+    def read_frames(
+        self,
+        stream_id: str,
+        *,
+        channel_index: int = 0,
+        start: int,
+        count: int,
+    ) -> np.ndarray:
+        """读取 `[start, start+count)`（**以该区间自身为原点**的样本坐标）。
+
+        与 `read()` 的区别: `read()` 返回按请求下标对齐的块（便于窗口拼接）,
+        本方法返回"贴着窗口"的块 —— `out[k]` 就是源样本 `start + k`, 越界
+        一律静音 0.0. 逐样本按 timeline 对齐的混音用这个形式最自然。
+        """
+        want = int(count)
+        if want <= 0:
+            return np.zeros(max(0, want), dtype=CANONICAL_PCM_DTYPE)
+        info = self._ensure_stream(stream_id)
+        out = np.zeros(want, dtype=CANONICAL_PCM_DTYPE)
+        lo = int(start)
+        lo_c = max(0, lo)
+        hi_c = min(int(info.actual_samples), lo + want)
+        valid = max(0, hi_c - lo_c)
+        if valid > 0:
+            got, fetched = self.read(
+                stream_id, channel_index=channel_index, start=lo_c,
+                count=valid,
+            )
+            if fetched > 0:
+                out[lo_c - lo: lo_c - lo + fetched] = got[:fetched]
+        return out
+
     def eof_sample(self, stream_id: str) -> int:
         """实际解码样本数 (= 该流 EOF 的 sample-accurate 位置)。"""
         return int(self._info(stream_id).actual_samples)

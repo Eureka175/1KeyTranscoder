@@ -122,6 +122,18 @@ class WavFormat(str, Enum):
     def bytes_per_sample(self) -> int:
         return self.bits // 8
 
+    def clip_limit(self) -> float:
+        """该输出格式可无损表示的**开区间**上界 (|x| >= limit 即裁剪)。
+
+        整数格式写 `rint(x * 2^(bits-1))` 后截到 `[-(2^(bits-1)),
+        2^(bits-1)-1]`, 因此 `|x| >= 1.0` 必被裁剪 (PCM16 因量化步长更大,
+        实际从 `32767.5/32768` 起就“顶格”)。FLOAT32 不裁剪 -> inf。
+        """
+        if self.is_float:
+            return float("inf")
+        half = float(1 << (self.bits - 1))
+        return (half - 0.5) / half
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "format": self.value,

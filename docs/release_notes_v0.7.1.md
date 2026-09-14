@@ -1,4 +1,4 @@
-# v0.7.1 发布说明 — 音频模型（Phase 1 + Phase 2 + Phase 3A）
+# v0.7.1 发布说明 — 音频模型与 PCM 处理（Phase 1 + Phase 2 + Phase 3A + Phase 3B）
 
 > **状态**：Phase 1（音频中间模型）与 Phase 2（多来源 + 选择 + 通道映射 +
 > 可执行 AudioPlan/AudioMapSpec）均已完成。
@@ -767,6 +767,148 @@ DAW 式编辑 / timeline editor / clip system
 ```
 
 `AudioPlan.mix_mode` 仍为预留：`build_audio_map_spec()` 继续以
-`audio_mix_not_supported` 拒绝（`-map` 规格无法表达样本级合成）；PCM 渲染
-路径在 Phase 3B 落地 MixEngine 之前也会明确拒绝。
+`audio_mix_not_supported` 拒绝（`-map` 规格无法表达样本级合成）。
+
+---
+
+# Phase 3B — PCM Mixing（N→1 + gain + peak/clipping）
+
+## 21. 新增分层
+
+```
+AudioTimeline (P3A, 时长/EOF/offset 权威 —— 未改)
+        ↓
+core/audio_mix.py
+    MixBus  ──► MixSink ──► MixGain (source channel + 线性 gain)
+        ↓
+    AudioMixer:  sum = Σ (sample × gain)   ← float32 累加
+        ↓
+core/audio_wav.WavExporter   ← **不实现** mixing, 只写文件
+```
+
+`core/audio_process.run_audio_render()` 在同一张图上只换一个节点：
+
+| 计划状态 | 图 | 节点 |
+|---|---|---|
+| 无 `mix_buses` 且 `mix_mode is None` | **routing** | `AudioRouter`（P3A，1 输出声道 = 1 源声道） |
+| `plan.mix_buses` 非空 / `mix_mode` 非空 | **mixing** | `AudioMixer`（P3B，Σ sample × gain） |
+
+## 22. Mix API
+
+```python
+from core.audio_mix import MixBusBuilder, MixGain, MixSink, ClipPolicy
+
+bus = MixBusBuilder(plan).sum_all(              # N -> 1
+    ["camera:s0:c0", "recorder:s0:c0"],
+    gains={"camera:s0:c0": 0.5, "recorder:s0:c0": 0.5},
+)
+// 多输出单元 (每个输出一个 sink)
+bus.sinks = [
+    MixSink(output_index=0, channel_id="mix0",
+            inputs=[MixGain("cam:s0:c0", 0.5), MixGain("rec:s0:c0", 0.5)]),
+    MixSink(output_index=1, channel_id="mix1",
+            inputs=[MixGain("cam:s0:c1", 1.0)]),
+]
+res = run_audio_render(plan, ffmpeg=..., work_dir=..., output_path=...,
+                       mix_bus=bus, clip_policy=ClipPolicy.DETECT)
+res.mix_bus.trace(0)          # output 0 -> [camera:s0:c0 ×0.5, recorder:s0:c0 ×0.5]
+res.mix_stats.to_dict()       # peak / clip_count / peak_inputs / …
+```
+
+* `source selection → mapping → mix bus` 链条清晰：**增益只存在于 `MixBus`
+  的输入项**，源声道身份与 `sync` 完全不动（`MixGain.channel_id` 就是
+  `AudioChannel.id`）；
+* `plan.mix_buses`（**新增模型字段**，JSON-compatible）可承载显式混音定义；
+  `plan.mix_mode` 非空且无显式 bus 时回退为"全部选中声道求和成一个输出"；
+* `AudioPlan.is_default` 现在也要求 `mix_buses` 为空。
+
+## 23. 数值处理
+
+* **float32 累加**：`sum = Σ (sample × gain)`；`_mix_block` 逐块独立，无跨块状态
+  → 结果与 `chunk_frames` 无关（回归钉 `byte-identical`）；
+* 检波统计（`MixStats`）：`peak` / `peak_frame` / `peak_channel` /
+  `peak_inputs`（**峰值可分解到逐输入贡献**，Σ contribution = peak）/
+  `clip_count` / `clip_count_by_channel` / `per_output_peak` /
+  `format_clip_count`（超出整数输出满量程的样本数）;
+* **不自动 normalize**：`1.0 + 1.0 = 2.0` 会被**保留**并计为 clipping 事件；
+  非峰值样本不会被整体缩放（回归断言"仅 1 个非零样本"）。
+
+| `ClipPolicy` | 行为 |
+|---|---|
+| `DETECT`（默认） | 只统计，数据原样保留（float32 输出因此可 over-range） |
+| `HARD_CLIP` | 显式裁剪到 `[-1, 1]`，计 `hard_clipped` |
+| `ERROR` | 出现 `|sum| > 1` 即抛 `audio_mix_clipping`，**不产出文件** |
+
+**没有** `AUTO_NORMALIZE`：那会让数据行为不可预测。
+
+## 24. Gain
+
+线性增益（`db_to_linear()` / `linear_to_db()`）：`0 dB = 1.0`、
+`−6 dB ≈ 0.5012`、`+6 dB ≈ 1.9953`。**不做** loudness normalization / LUFS /
+compressor / limiter / AGC。增益必须有限且非负（负增益 → `audio_mix_invalid`）。
+
+## 25. EOF / offset 在混音中的一致性
+
+* 混音**不重新定义** render duration / EOF：render window 仍来自
+  `AudioTimeline`（UNION）；某个输入先 EOF 时, 该项按 §EOF 策略贡献
+  **静音 0.0**，输出继续（回归: 1000 帧长的 + 400 帧短的混音输出仍是
+  1000 帧, 短的后 600 帧等同静音）；
+* offset 在混音路径上**同样**只经 `source_to_timeline()` 换算：
+  晚到 60 样本的轨被前移 60 后与另一轨在同一 timeline 位置求和
+  （回归: impulse 落点 timeline 1000, 幅度 `0.5 + 0.5 = 1.0`）；
+* 混音输出声道的 `ChannelTimeline` 身份是 `mix{N}`，span 取各输入区间的
+  **交集**（`mix_intersection`），逐输入区间保留在 warnings 里便于追溯。
+
+## 26. Phase 3B 实测
+
+| 测试面 | 套件 | 结果 |
+|---|---|---|
+| gain 标度 / N→1 / 相消 / overflow / policy / 多 bus / 短 source / offset / 校验 / JSON | `audio mix v0.7.1` | 19 断言全通过 |
+| 混音 chunk invariance + 图等价 + 传输层无关 | `audio mix invariance v0.7.1` | 4 断言全通过 |
+| 真实 A7M5 + 外挂 4CH WAV 多来源混音 | `audio mix v0.7.1`（L3） | 6 断言全通过 |
+| 全量 L1 | `--level unit` | **388 PASS / 0 FAIL** |
+| 全量 L3 | `--level full` | **507 PASS / 0 FAIL**（unit 388 + toolchain 16 + full 103） |
+
+确定性断言要点:
+
+```text
+1.0×0.5 + 1.0×0.5   = 1.0        (sample-exact)
+1.0×0.5 + (−1.0)×0.5 = 0.0        (相位相消, 精确 0)
+1.0 + 1.0            = 2.0        (detect 保留 + clip_count=1, 无自动归一化)
+1.0 + 1.0 (hard_clip)= 1.0        (hard_clipped=1)
+1.0 + 1.0 (error)    → audio_mix_clipping, 不产出文件
+0.5×(cam) + 0.5×(rec) = 0.375     (两路独立 bus)
+混音图 1:1 == 路由图             (逐样本一致, 含重排)
+混音 chunk 7/256/1024/4096       (byte-identical)
+ffmpeg 管道读 == span 文件读      (byte-identical)
+```
+
+## 27. Phase 3B **未**实现（明确边界）
+
+```text
+Selective MP4 retention（音轨选择进容器）
+Audio codec integration（aac/opus/… 编码与 mux）
+Automatic external-source synchronization / 漂移校正
+Resampling（采样率不一致仍直接拒绝）
+loudness normalization / LUFS / AGC / limiter / compressor / EQ /
+reverb / noise reduction / spectral processing / time-stretch / pitch shift
+新 CLI（--audio-* 全部未开放）
+多 bus 同时渲染（当前一次渲染只消费第一个 MixBus）
+```
+
+默认生产路径**仍然**不受影响：`AudioPlan = None` → `-map 0` + `-c:a copy`；
+混音只在显式传入 `mix_bus` / 设置 `plan.mix_buses` 时才会执行。
+
+## 28. Phase 3B 之后仍未完成的总体清单
+
+```text
+WAV 导出 ✅（P3A）
+PCM Routing ✅（P3A）
+PCM Mixing ✅（P3B）
+Selective MP4 retention ❌
+音频编码 + mux 进 MP4 ❌
+自动跨文件时间轴对齐 ❌
+漂移校正 ❌
+```
+
 

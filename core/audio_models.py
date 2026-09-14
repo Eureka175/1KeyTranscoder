@@ -1361,6 +1361,11 @@ class AudioPlan:
     output_sample_format: AudioSampleFormat | None = None
     # -- 后续阶段预留: 本阶段只保存取值, 不解释、不执行 --
     mix_mode: str | None = None
+    #: v0.7.1 Phase 3B: 混音定义 (JSON-compatible dict 列表, 见 core.audio_mix)。
+    #: 非空即表示"本次输出需要样本级合成"; 注意 `-map` 层面的
+    #: `build_audio_map_spec()` **仍然**以 `audio_mix_not_supported` 拒绝 ——
+    #: 那条路只描述 ffmpeg argv, 表达不了 Σ(sample × gain)。
+    mix_buses: list[Any] = field(default_factory=list)
     channel_map: list[dict[str, Any]] = field(default_factory=list)
     wav_outputs: list[dict[str, Any]] = field(default_factory=list)
     model_version: int = AUDIO_MODEL_VERSION
@@ -1436,6 +1441,7 @@ class AudioPlan:
             and not self.channel_mapping
             and not self.output_tracks
             and self.mix_mode is None
+            and not self.mix_buses
             and not self.channel_map
             and not self.wav_outputs
             and self.output_sample_rate is None
@@ -1510,6 +1516,11 @@ class AudioPlan:
             data["output_sample_format"] = self.output_sample_format.value
         if self.mix_mode is not None:
             data["mix_mode"] = self.mix_mode
+        if self.mix_buses:
+            data["mix_buses"] = [
+                b.to_dict() if hasattr(b, "to_dict") else copy.deepcopy(b)
+                for b in self.mix_buses
+            ]
         if self.channel_map:
             data["channel_map"] = copy.deepcopy(self.channel_map)
         if self.wav_outputs:
@@ -1547,6 +1558,10 @@ class AudioPlan:
                 if raw_out_format else None
             ),
             mix_mode=_opt_str(data.get("mix_mode")),
+            mix_buses=[
+                dict(b) for b in (data.get("mix_buses") or [])
+                if isinstance(b, Mapping)
+            ],
             channel_map=[
                 dict(m) for m in (data.get("channel_map") or [])
                 if isinstance(m, Mapping)
