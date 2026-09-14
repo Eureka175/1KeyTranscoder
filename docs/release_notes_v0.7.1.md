@@ -1,7 +1,9 @@
-# v0.7.1 发布说明 — 音频轨道模型（Phase 1）
+# v0.7.1 发布说明 — 音频模型（Phase 1 + Phase 2）
 
-> **状态**：Phase 1 完成。**默认音频路径与输出行为未改变** —— 本版本是
-> 纯内部能力层，不新增 CLI、不改变 MP4 音频处理方式。
+> **状态**：Phase 1（音频中间模型）与 Phase 2（多来源 + 选择 + 通道映射 +
+> 可执行 AudioPlan/AudioMapSpec）均已完成。
+> **默认音频路径与输出行为未改变** —— 全部为内部能力层，不新增 CLI、
+> 不改变 MP4 音频处理方式（§21：`AudioPlan = None` 仍走旧路径）。
 > **基线**：`v0.7.0`（已于 2026-09-14 并入 `main`，见 §0）。
 
 ---
@@ -53,7 +55,7 @@ hash/字节数与**实际提交的补丁文件**不符，导致 `harness provena
 
 ---
 
-## 1. 这次做了什么
+## 1. Phase 1 — 音频中间模型
 
 v0.7.1 的目标不是增加最终输出能力，而是建立一个**稳定、可测试、可扩展的
 内部音频数据模型**，使后续处理链能够明确区分"流 / 声道 / 轨道 / 输出轨道"。
@@ -267,7 +269,8 @@ apply_channel_sync_report(plan, report)    # report = run_channel_sync(...) 的�
 
 即：`AudioPlan = None`（模型未被调用）时，行为与 v0.7.0 完全一致；
 `--hw-decode off`（默认）时，行为与本轮合并前的 `main` 完全一致。新模型是
-**内部能力**，Phase 2 才会逐步接入输出决策。
+**内部能力**：Phase 2 已把它扩展到"选择 + 通道映射 + 可执行规格"，
+但仍**没有任何调用方在生产路径上执行它**（§8 起）。
 
 ---
 
@@ -297,7 +300,7 @@ apply_channel_sync_report(plan, report)    # report = run_channel_sync(...) 的�
 
 ---
 
-## 7. 本阶段**未**实现（Phase 2 及以后）
+## 7. Phase 1 阶段**未**实现（现已由 Phase 2 补足一部分）
 
 ```text
 4CH → stereo / mono / 4CH 混音, weighted mixing
@@ -315,3 +318,239 @@ DAW 式音频编辑
 （唯一改动是 §0.1 的 provenance 元数据更正与 `.gitattributes`）。
 `AudioPlan` 的 `mix_mode` / `channel_map` / `wav_outputs` 仅为预留字段，
 本阶段只保存取值，不解释、不执行。
+
+---
+
+# Phase 2 — AudioSource + Selection + Channel Mapping
+
+> 目标：在 Phase 1 的模型上补足**多来源音频**，并实现**音频选择**与
+> **通道映射**。仍然只生成"可 dry-run 的执行规格"，**不执行 ffmpeg**，
+> **不新增 CLI**。
+
+## 8. 本阶段做了什么
+
+```text
+AudioSource                    一个物理音频来源 (media / wav / external)
+    ↓
+AudioStream                    来源内的一条音频流 (source_id + stream_index)
+    ↓
+AudioChannel                   流内可独立寻址的声道 (三维身份)
+    ↓
+AudioTrack                     逻辑输入轨 (不限定 mono; 4CH 流 -> 1 track / 4 channel)
+    ↓
+Selection                      哪些 source channel 被保留
+    ↓
+Channel Mapping                已选声道按什么顺序进入输出
+    ↓
+AudioPlan                      声明式计划 (sources/selected_channels/channel_mapping/output_tracks)
+    ↓
+AudioMapSpec                   可 dry-run 的执行规格 (无 PCM / 无 ffmpeg / JSON)
+```
+
+新增模块 `core/audio_plan.py`（规划层：选择 / 映射 / 校验 / 规格），
+`core/audio_models.py` 扩展出 `AudioSource` / `AudioTiming` / `AudioSourceBuilder`，
+`core/audio_probe.py` 增加来源维度。
+
+### 8.1 AudioSource（§3）
+
+```text
+source_id, source_type(media|wav|external), path, display_name,
+streams[], metadata, timing, input_index
+```
+
+* **WAV 不是另一套模型**：`source_type` 只影响读取方式；media 与 wav 产出的
+  都是同一套 `AudioStream` / `AudioChannel`（`AudioSourceType` 一个枚举区分）。
+* `input_index` 记录该来源在 ffmpeg 输入序列（`-i` 顺序）中的位置 ——
+  规划 map/filtergraph 规格时必须知道"用第几个输入"，而不是从路径猜。
+* `AudioSourceBuilder` 组装多来源；重复 `source_id` **明确报错**，不静默覆盖。
+
+### 8.2 身份升级为三维（§4/§5/§14）
+
+| 维度 | 字段 | 说明 |
+|---|---|---|
+| 来源 | `source_id` | `camera` / `wav01` / … |
+| 流 | `stream_index` | **容器** index（ffprobe 的 `index`） |
+| 音频序号 | `audio_position` | 该来源内 0-based 音频序号 = `-map N:a:M` = channel_sync 报告的 `stream` 字段 |
+| 声道 | `channel_index` | 流内物理位置，不做重命名 |
+
+`AudioChannel.id` = `"{source_id}:s{stream_index}:c{channel_index}"`
+（如 `camera:s2:c0`），`AudioTrack.track_id` 在多来源时前缀 `"{source_id}:"`。
+
+**跨来源同名不碰撞**：`camera:s0:c0` 与 `recorder:s0:c0` 是两个不同声道。
+`_parse_channel_id` 兼容 canonical 与紧凑（`camera:s2c0`）两种写法，
+并从右往左切分以容纳含冒号的 `source_id`（`cam:left:s1:c3`）。
+
+`audio_position` 与 `stream_index` 继续严格区分（§14）：真实 A7M5 素材上
+容器 index `1..4` ↔ 音频序号 `0..3`，测试断言不变。
+
+### 8.3 外挂 WAV 的时间轴（§6）
+
+`AudioTiming(start_offset_sec, duration_sec, time_base, start_time_sec,
+shares_timeline, note)` 只**记录**时间轴事实：`media` 默认
+`shares_timeline=True`，外挂来源默认 `False`，其余一律留 `None`（不推断）。
+
+> ⚠️ **本阶段不实现任何跨文件同步算法**，尤其**没有**把 WAV 与
+> `camera.mp4` 的时间偏移塞进 `core/channel_sync.py`。channel_sync 继续只
+> 负责它原有的职责（容器内多声道之间的既有同步分析与结果记录）。
+
+### 8.4 Selection（§7/§15）
+
+```python
+p = AudioPlanner(plan)
+p.select_all()
+p.select_sources("camera", "recorder")
+p.select_tracks("camera:a2c0-1-2-3")
+p.select_channels("camera:s2:c2", "recorder:s0:c0")   # 顺序即选择顺序
+p.exclude_channels("camera:s2:c1")
+```
+
+* 每次操作都**返回新的 AudioPlan**，且 **`AudioSource` / `AudioStream` /
+  `AudioChannel` 的原始身份完全不变**（`source_id`、`stream_index`、
+  `audio_position`、`channel_index`、`sync`、`metadata` 全部原样保留）。
+* `selected_tracks` 是 `selected_channels` 的**聚合视图**（"这条 track 有
+  声道被选中"），两者不允许长期不一致。
+* 未选中的声道**不会被删除**：`plan.all_channels()` 始终返回全部输入声道。
+
+### 8.5 Channel Mapping（§8/§11/§16）
+
+```python
+p.map_channels("camera:s2:c2", "recorder:s0:c0", "camera:s2:c0")
+p.map_channel("camera:s2:c1", 0)     # 位置互换语义
+p.reorder("camera:s2:c2", "camera:s2:c0", "camera:s2:c3", "camera:s2:c1")
+```
+
+* 输出 index 恒为 `0..N-1`（连续、唯一），不接受任意 index 列表。
+* **Selection ≠ Mapping**：选择决定"保留什么"，映射决定"按什么顺序输出"。
+  `camera:s2:c0 + camera:s2:c2` 的选择结果**只是两个独立源声道**，
+  绝不会自动产生任何 PCM 合成。
+* **Mixing 完全禁止**：任何 "N 源声道 -> 1 输出声道" 都返回
+  `audio_mix_not_supported`（详见 §8.7）。本模块**不存在**增益/求和/归一化
+  代码路径 —— 拒绝是结构性的。
+
+### 8.6 AudioOutputTrack 语义修正（§9）
+
+`AudioOutputTrack` **不是**"一个 source channel"，而是**最终输出中的一个
+逻辑音频单元**，可以承载：
+
+| 承载 | 例 | 策略 |
+|---|---|---|
+| 一整条 source track | 4CH 流整流保留 | `stream_copy` |
+| 一个被选中的 source channel | `camera:s2:c2` -> output 0 | `channel_filter` |
+| 一个被显式映射的源声道组 | 4CH 重排后的多通道输出 | `channel_filter` |
+| 多个源声道合成到 1 个输出 | `0.5*CH1 + 0.5*CH2` | `mixing` -> **拒绝** |
+
+`AudioOutputTrack.source_ids` 给出逐声道的来源身份（`§18` 的追溯链），
+`sync_of(output_index)` 给出该输出声道继承的同步结果。
+
+### 8.7 AudioMapSpec（§12/§13）
+
+```python
+spec = build_map_spec(plan)          # 不抛异常, 失败时 executable=False + errors
+spec.executable, spec.strategy, spec.full_stream_copy
+spec.operations                      # 每个输出段的策略与身份
+spec.trace(0)                        # output 0 -> camera:s2:c2 -> +960 samples
+```
+
+职责边界（硬要求，逐条实现）：
+
+* **不持有 PCM**、**不执行 ffmpeg**（模块不 import subprocess，不拼 argv）；
+* JSON-compatible（`to_dict()`/`from_dict()` 往返）；
+* 每个输出声道都带完整 `AudioChannelRef`（source/stream/channel/audio_position/sync）；
+* output index 稳定（0..N-1，validation 保证）；
+* **不含任何 mixer 参数**（增益/权重/求和字段在该结构里不存在）；
+* 可以 dry-run 检查（校验失败不抛异常，返回 `errors`）。
+
+**FFmpeg mapping 的策略区分（§13）**：
+
+| 情况 | 判定 | 策略 |
+|---|---|---|
+| 完整 stream 原样保留 | 输出段恰为某条流的**完整且自然顺序**全通道 | `stream_copy`（可 `-map` + `-c:a copy`） |
+| 只取 stream 内部分 channel / 重排 | 其余情况 | `channel_filter`（需要声道过滤） |
+
+注意 k 条 mono 流的任意重排**仍然是** `stream_copy`（每条 mono 流被整体
+保留，只是 `-map` 顺序变了）；只有"从一条多声道流里取子集/重排"才需要
+声道过滤。本阶段只生成**策略分类与身份**，不生成 filtergraph 字符串、
+不实现任何采样级 DSP。
+
+### 8.8 Validation（§17）
+
+`validate_selection()` + `validate_mapping()` -> 稳定 reason 列表；
+`validate_plan(plan)` 返回去重后的 reason 字符串；`build_map_spec(plan)`
+在不抛异常的前提下给出 `errors`（含 `detail` 与 `location`）。
+优先顺序：**引用有效性 -> 与 selection 一致 -> 结构 -> Mixing**，
+因此不会出现"映射了未选中的声道却报混音"这类误导性 reason。
+
+| 规则 | reason code |
+|---|---|
+| V1 来源存在 | `audio_source_not_found` |
+| V2 流存在 | `audio_stream_not_found` |
+| V3 声道存在（含 id 格式非法） | `audio_channel_not_found` |
+| V4 选择集身份不重复 | `audio_source_duplicate` |
+| V5 output index 连续且唯一 | `audio_mapping_output_order` |
+| V6 mapping 的声道必须已被 selection 选中 | `audio_mapping_not_selected` |
+| V7 duplicate mapping（同一源声道占两个输出） | `audio_mapping_output_order`（复制语义未定义 -> 拒绝） |
+| V8 Mixing | `audio_mix_not_supported` |
+
+V8 的两个触发形态：**同一 output index 被不同源声道占用**；以及
+**选择集比输出集大**（N 源 -> 更少输出，等价于合成）。两种都由
+`map_channels()` 与 `validate_mapping()` 一致拒绝。
+
+### 8.9 AudioPlan 扩展（§10）
+
+| 字段 | 状态 |
+|---|---|
+| `sources` | **新增**：参与本次规划的 `AudioSource` 列表 |
+| `selected_channels` | **新增**：逐声道选择集（`AudioChannel.id`，保持选择顺序） |
+| `channel_mapping` | **新增**：显式映射条目（`output_index` + 完整身份 + sync） |
+| `mapping_kind` | **新增**：`derived`（按选择顺序派生）/ `explicit`（调用方指定顺序） |
+| `output_tracks` | **新增**：输出单元描述（Phase 2 只描述，不执行） |
+| `notes` | **新增**：非致命问题（validation warning 通道） |
+| `input_tracks` / `selected_tracks` / `preserve_original` / `output_sample_rate` / `output_sample_format` | **保留**（Phase 1 语义不变） |
+| `mix_mode` / `channel_map` / `wav_outputs` | **保留**为后续预留（本阶段只存不解释，且 `mix_mode` 非空即判 Mixing 拒绝） |
+
+`is_default` 现在同时要求 `mapping_kind == "derived"` 且 selection 等于全部
+声道 —— 默认计划因此可被生产路径稳定识别为"不进 filtergraph"。
+
+---
+
+## 9. Phase 2 实测
+
+| 测试面 | 命令 | 结果 |
+|---|---|---|
+| L1 unit | `python tests/full_autotest.py --level unit` | 见 §10 提交时实测 |
+| 音频来源/选择/映射 L1 | 套件 `audio select/map v0.7.1` | 78 断言全通过 |
+| 音频来源/选择/映射 L3 | 套件 `audio select/map v0.7.1` | 15 断言全通过 |
+| 真实 A7M5 4CH + 外挂 WAV | 同上（testsets + ffmpeg 生成 WAV） | 多来源计划/跨来源选择/重排/sync 追溯全通过 |
+
+真实素材用法（L3 用例）：
+
+```text
+testsets/a7m5_4k60p_265_10bit420_150m_xavchs_4ch/*.MP4  → camera (4×mono PCM)
+ffmpeg 生成 deterministic WAV: ext_mono.wav / ext_stereo.wav / ext_4ch.wav
+                                                          → wav_mono / wav_stereo / wav_4ch
+```
+
+断言覆盖：4CH / 2×2CH / 4×mono / 外挂 mono·stereo·4CH WAV / 多来源混合；
+跨来源选择与重排（`wav_stereo:s0:c0` + `camera:s3:c0` ->
+`[1, 0]` 输入顺序）；4×mono 重排 `(4,2,1,3)`；同步状态经选择+映射后
+`output 0 -> camera:s3:c0 -> +963 samples` 完整可追溯。
+
+---
+
+## 10. 本阶段**未**实现（明确边界）
+
+```text
+Mixing（sample-level 合成 / weighted mixing / 增益 / 求和）
+WAV 导出与命名
+Selective MP4 retention（音轨选择进容器）
+Resampling / sample-rate conversion
+Drift correction（漂移校正）
+新 CLI（--audio-tracks / --audio-map / --audio-source 均未开放）
+DAW 式音频编辑 / timeline editor / clip system
+自动跨文件同步（外挂 WAV 与主容器的时间对齐）
+```
+
+也**未修改**：视频缩放、x265 缩放规则、`core/channel_sync.py`（算法与阈值
+一字未改）、Sony/DJI 保留管线、硬件解码路径。`AudioPlan` 的 `mix_mode` /
+`channel_map` / `wav_outputs` 仍为预留字段；`AudioMapSpec` 只给出策略分类
+与身份，**不生成 filtergraph 字符串、不执行 ffmpeg**。

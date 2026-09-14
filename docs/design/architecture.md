@@ -215,52 +215,92 @@ P1 设计见 `docs/design/channel_sync_p1.md`，实现要点：
 
 ---
 
-## 6.1 音频轨道模型（v0.7.1 Phase 1）
+## 6.1 音频模型（v0.7.1 Phase 1 + Phase 2）
 
-**这一层不参与任何生产决策**：它没有调用方在默认路径上，也不产生 ffmpeg
-命令。它的存在只为让 Phase 2（选择 / 通道映射 / 4CH 混排 / WAVE 导出 /
-MP4 音轨保留）有一个稳定、可测试、可序列化的中间模型。
+**这一层不参与任何生产决策**：默认路径上没有任何调用方，也不产生 ffmpeg
+命令。它的存在是为后续音频能力（选择 / 通道映射 / 混排 / WAVE 导出 /
+MP4 音轨保留）提供一个稳定、可测试、可序列化的中间模型。
 
 ```
-probe_source() 的 raw stream dict
+probe_source() 的 raw stream dict（每来源一次）
       │
       ▼
 core/audio_probe.py            ← Probe 适配层（不新增 ffprobe 调用）
       │  build_audio_streams() / audio_probe_of() / audio_probe_from_file()
       ▼
 core/audio_models.py           ← Model 层（纯数据，不导入项目内任何模块）
-      AudioStream ──channels()──► AudioChannel (含 AudioSyncResult)
-           │
-      AudioTrackBuilder
-           ▼
-      AudioTrack ──► AudioPlan
+      AudioSource ─► AudioStream ──channels()──► AudioChannel (+ AudioSyncResult)
+           │              │
+           │        AudioTrackBuilder / AudioSourceBuilder
+           │              ▼
+           │        AudioTrack ──► AudioPlan
+           ▼                              │
+core/audio_plan.py            ← 规划层（Selection → Mapping → Validation → Spec）
+      AudioPlanner ─► AudioOutputTrack ─► AudioMapSpec（dry-run，不执行 ffmpeg）
       ▲
       │  ChannelSyncReport.apply_to()  ← 只**读取** core/channel_sync 的报告 dict
       │
 core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
 ```
 
+### 6.1.1 四个概念 + 三维身份
+
 | 概念 | 定义 | 例子 |
 |---|---|---|
-| **stream** | 容器里的音频流（ffprobe `index`） | `index=2` |
-| **channel** | 流内声道的物理位置（0-based） | `(stream 2, channel 0)` |
-| **track** | 被选中的 (stream, channel 集合) | `channel_indices=[0,1,2,3]` |
-| **output track** | 输出容器里的音轨 | **Phase 2**，本阶段不表达 |
+| **source** | 一个物理音频来源（文件） | `camera.mp4` / `recorder.wav` |
+| **stream** | 来源内的一条音频流 | `camera` 的容器 `index=2` |
+| **channel** | 流内声道的物理位置（0-based） | `camera:s2:c2` |
+| **track** | 逻辑输入轨 = (stream, channel 集合) | `channel_indices=[0,1,2,3]` |
+| **output track** | 输出中的一个逻辑音频单元 | `out0` ← `camera:s2:c2` |
 
-关键性质（测试已钉住）：
+声道身份是**三维**的：`source_id + stream_index + channel_index`，字符串形式
+`{source_id}:s{stream}:c{channel}`。**跨来源同名不碰撞**
+（`camera:s0:c0` ≠ `recorder:s0:c0`）。
+
+`audio_position`（来源内 0-based 音频序号 = `-map N:a:M` = channel_sync
+报告的 `stream`）与容器 `stream_index` 是**两个字段**，绝不混用。
+
+### 6.1.2 关键性质（测试已钉住）
 
 1. **4CH 流不塌缩**——per-stream 建 1 个 track，但 4 个 `AudioChannel` 独立
    保留，`select_channels([2])` 可取单通道；
-2. **同步不改身份**——`AudioChannel.sync` 写入后 `source_ids` 仍为
-   `s{stream}c{channel}`；
-3. **两条索引不混用**——`AudioStream.audio_position`（音频序号 = `-map 0:a:N`
-   = channel_sync 报告的 `stream`）与容器 `stream_index` 是两个字段，
-   报告回填按前者关联（真实 A7M5 素材：容器 1..4 ↔ 音频序号 0..3）；
-4. **未知即未知**——`channel_layout` 为空时按 `C0/C1/…` positional 命名，
-   `sample_format` 缺失为 `unknown`，`role` 恒为 `unknown`（只能显式赋值）。
+2. **同步不改身份**——`AudioChannel.sync` 写入（或经 selection/mapping）后
+   `source_ids` 仍是完整的 `source:sN:cM` 链；
+3. **未知即未知**——`channel_layout` 为空时按 `C0/C1/…` positional 命名，
+   `sample_format` 缺失为 `unknown`，`role` 恒为 `unknown`（只能显式赋值）；
+4. **WAV 不是另一套模型**——`AudioSourceType(media|wav|external)` 只影响
+   读取方式，产出的都是同一套 `AudioStream` / `AudioChannel`；
+5. **Selection ≠ Mapping ≠ Mixing**——选择决定"保留什么"，映射决定"按什么
+   顺序输出"，两者都不做任何样本运算；任何 "N 源声道 -> 1 输出声道"
+   返回 `audio_mix_not_supported`（本模块不存在增益/求和代码路径）；
+6. **`AudioPlan` 默认计划可识别**——`is_default` 为真（全选 + `derived`
+   映射 + `preserve_original`）时生产路径才继续走旧行为。
 
-默认路径（`-map 0` + `-c:a copy`、Sony/DJI 的 GPAC 音频复制）**未改动**：
-`AudioPlan = None` 时行为与 v0.7.0 完全一致。
+### 6.1.3 Validator reason codes（稳定契约）
+
+`audio_source_not_found` / `audio_stream_not_found` /
+`audio_channel_not_found` / `audio_source_duplicate` /
+`audio_mapping_output_order` / `audio_mapping_not_selected` /
+`audio_mapping_incomplete` / `audio_mix_not_supported`。
+`build_map_spec(plan)` **不抛异常**（返回 `executable=False` + `errors`），
+`require_audio_map_spec()` 才抛 `AudioValidationError`。
+
+### 6.1.4 执行规格策略（§13 的两档）
+
+| 情况 | 判定 | `AudioMapSpec.strategy` |
+|---|---|---|
+| 完整 stream 原样保留 | 输出段恰为某条流的完整且自然顺序全通道 | `stream_copy`（可 `-map` + `-c:a copy`） |
+| 只取流内部分 channel / 重排 | 其余 | `channel_filter`（需声道过滤） |
+
+k 条 mono 流的任意重排**仍是** `stream_copy`（每条流被整体保留，只是
+`-map` 顺序不同）。本阶段只生成策略分类与身份，**不生成 filtergraph
+字符串**、不执行 ffmpeg。
+
+### 6.1.5 默认路径
+
+`-map 0` + `-c:a copy`（经典路径）与 GPAC 音频复制（Sony/DJI）**未改动**：
+`AudioPlan = None` 时行为与 v0.7.0 完全一致。外挂来源的跨媒体时间对齐、
+Mixing、WAV 导出、selective MP4 retention、重采样与漂移校正**均未实现**。
 
 ---
 
@@ -436,6 +476,16 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
    `tests/hwdecode/sources.py::verify_provenance()` 在任何测试执行前运行，
    逐项校验 sha256 + 版本 token。
 15. **（v0.7.0）`--frames` 是编码器输入帧数契约，不是解码器输出帧数。**
+16. **（v0.7.1 P2）Selection / Mapping / Mixing 三者不得混淆。** 选择决定
+    「保留什么」，映射决定「按什么顺序输出」，两者都不做样本运算；任何
+    「N 源声道 -> 1 输出声道」必须返回 `audio_mix_not_supported`。
+17. **（v0.7.1 P2）跨来源身份不得碰撞，且不得丢来源维度。** 声道身份是
+    `source_id + stream_index + channel_index`；选择与映射**只改**
+    `AudioPlan` 的选择/映射字段，绝不改 `AudioSource` / `AudioStream` /
+    `AudioChannel` 的原身份与 `sync`。
+18. **（v0.7.1 P2）默认计划必须可识别。** `AudioPlan.is_default` 为真时
+    （全选 + `derived` 映射 + `preserve_original`），生产路径继续走旧行为，
+    不得因为引入音频规划而自动进入 filtergraph。
    两者混用会让完整性闸门误判。
 
 ---
@@ -448,6 +498,7 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | "`core/` 含 `sync_estimate` …" 但列表遗漏 `models.py`、`postprobe.py`、`dashboard_ui.py`、`mp4_channel_sync.py`、`version.py` | `docs/README.md` | 实际 21 个模块见 §12（v0.7.1 新增 `audio_models.py` / `audio_probe.py`） |
 | "NVEncC … ✅ 生产默认" | `README.md` 编码器矩阵 | v0.6.2 起为**能力优先自动选择**（NVENC→QSV→x265），无固定默认 |
 | "生产路径恒用 `--avsw` 软解" / "硬件解码不可达（`--avsw` 字面量）" / "integration 未开始" | 本文档 §2.1、§8（v0.6.2 版）与硬件解码 research 归档 | **已被 v0.7.0 推翻（v0.7.0 已于 2026-09-14 并入 main）**：硬件解码已接入 `--hw-decode off\|auto\|require`，带 runtime-proven 白名单、完整性闸门与 `--seek` 拒绝。**默认仍是 `off` = 软解**，所以"默认行为未改"这一半仍然成立。以本版 §8 为准 |
+| "音频模型只有 Phase 1（4CH 已是全部场景）" | 本档 §6.1（v0.7.1 P1 版） | **已被 Phase 2 扩展**：新增 `AudioSource`（media/wav/external）、三维声道身份、Selection、Channel Mapping、`AudioOutputTrack`、`AudioMapSpec`；Phase 1 的「4CH 流不塌缩」「同步不改身份」等结论仍然成立 |
 | 各文档中 "当前版本 `v0.6.2`" | 根 `README.md` 等 | `main` 现为 **v0.7.1**，且已含 v0.7.0 hardware-decode integration（`v0.7.0 ∈ ancestors(main)`）；`v0.6.x` 的说法仅描述 v0.6 线的能力基线 |
 
 ---
@@ -460,8 +511,9 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | `watchfolder.py` | 92 | 轮询批处理转调 |
 | `core/batch_hw.py` | 1966 | 硬件批量：降级梯、三条源路径、并发池、失败记录、**硬件解码接线与完整性闸门调用** |
 | `core/channel_sync.py` | 1038 | 延时补偿主算法与阈值 |
-| `core/audio_models.py` | 1443 | **v0.7.1** 音频模型：AudioStream/Channel/Track/Plan/Sync（纯数据） |
-| `core/audio_probe.py` | 228 | **v0.7.1** 音频 Probe 适配层（raw stream → 模型） |
+| `core/audio_models.py` | 2143 | **v0.7.1** 音频模型：Source/Stream/Channel/Track/Plan/Sync（纯数据） |
+| `core/audio_plan.py` | 1760 | **v0.7.1 P2** 规划层：Selection / Channel Mapping / Validation / AudioMapSpec |
+| `core/audio_probe.py` | 328 | **v0.7.1** 音频 Probe 适配层（raw stream → 模型，含来源维度） |
 | `core/sync_estimate.py` | 786 | GCC-PHAT 时差估计 |
 | `core/logging_utils.py` | 493 | 分层日志 + 缩放 CSV |
 | `core/probe.py` | 391 | 源探测（v0.7.1 起 `-show_entries` 增加 `stream_tags`） |
@@ -510,7 +562,7 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | `tests/hwdecode/fixtures.py` | 238 | control fixtures 生成 |
 | `tests/hwdecode/inventory.py` | 80 | 语料盘点 + fixture 刷新 |
 | `tests/hwdecode/matrix.json` | 351 | **机器可读矩阵**（83 用例，与 harness 双向漂移检查） |
-| `tests/full_autotest.py` | 3506 | 全量自动回归（档位改动的唯一依据） |
+| `tests/full_autotest.py` | 4326 | 全量自动回归（档位改动的唯一依据） |
 | `tests/run_selfcheck.py` | 189 | 自检驱动 |
 | `tests/sony_selfcheck.py` | 21 | Sony 自检入口 |
 | `release/build_release.py` | — | 发布包构建（allowlist） |
@@ -535,5 +587,5 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | 后端选型评估 | `docs/evaluation/*` |
 | **硬件解码 integration（已并入 main）** | [`docs/hardware-decode/`](../hardware-decode/README.md) ★ 主交付物 `integration-test-matrix.md` |
 | 硬件解码 research（已封存） | `olddocs/docs/hardware-decode/` |
-| v0.7.1 音频模型 | [`docs/release_notes_v0.7.1.md`](../release_notes_v0.7.1.md) |
+| v0.7.1 音频模型（Phase 1 + Phase 2） | [`docs/release_notes_v0.7.1.md`](../release_notes_v0.7.1.md) |
 | 历史代码快照 | `olddocs/backup/` |

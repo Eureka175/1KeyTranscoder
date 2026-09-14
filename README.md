@@ -212,30 +212,44 @@ DJI（djmd）→ DJI
 不再被 P1 主路径引用。设计细节与 P1 vs vendored 差异对照见
 `docs/design/channel_sync_p1.md`。
 
-## 音频轨道模型（v0.7.1 Phase 1，内部能力层）
+## 音频模型（v0.7.1 Phase 1 + Phase 2，内部能力层）
 
 **这一层目前不影响任何输出**：默认音频路径仍是"整流原样 copy"
 （经典路径 `-map 0` + `-c:a copy`；Sony/DJI 保留管线由 GPAC 从源容器
-复制音频）。v0.7.1 Phase 1 只建立**数据结构与适配层**，供后续
-选择 / 通道映射 / 4CH 混排 / WAVE 导出 / MP4 音轨保留使用。
+复制音频）。v0.7.1 只建立**数据结构 + 规划层**，供后续混音 / WAVE 导出 /
+MP4 音轨保留使用；**本阶段不执行任何音频处理，也不新增 CLI**。
 
 ```text
-输入文件
-  ↓  core.probe.probe_source()          FFprobe JSON（单次探测）
-  ↓  core.audio_probe                   音频适配层
-AudioStream       一条原始音频流（codec/sample_rate/sample_fmt/channels/layout/
-                  duration/bit_rate/language/title/disposition）
-  └── AudioChannel  流内单个声道（stream_index + channel_index + 同步状态）
-AudioTrack        参与输出决策的基本对象（(stream, channel 集合) 的选取结果）
-AudioPlan         本次任务准备如何处理音频（input_tracks / selected_tracks /
-                  preserve_original / output_sample_rate / output_sample_format）
+输入文件（可多个来源）
+  ↓  core.probe.probe_source()          FFprobe JSON（每来源一次探测）
+  ↓  core.audio_probe                   音频适配层（media / wav / external）
+AudioSource       一个物理来源（source_id / source_type / path / timing / streams）
+  └── AudioStream   来源内一条流（stream_index + audio_position 严格区分）
+        └── AudioChannel  流内声道（三维身份：source_id + stream + channel）
+AudioTrack        逻辑输入轨（4CH 流 → 1 track / 4 channel；4×mono → 4 track）
+  ↓  core.audio_plan
+Selection         哪些 source channel 被保留   （决定"保留什么"）
+Channel Mapping   已选声道按什么顺序进入输出   （决定"输出顺序"）
+AudioPlan         sources / selected_channels / channel_mapping / output_tracks
+AudioMapSpec      可 dry-run 的执行规格（策略分类 + 完整身份，不执行 ffmpeg）
 ```
 
 | 模块 | 职责 |
 |---|---|
-| `core/audio_models.py` | Model 层：`AudioStream` / `AudioChannel` / `AudioTrack` / `AudioPlan` / `AudioSyncResult` / `AudioTrackBuilder` / `ChannelSyncReport`。**纯数据**，不构造 ffmpeg 命令 |
+| `core/audio_models.py` | Model 层：`AudioSource` / `AudioStream` / `AudioChannel` / `AudioTrack` / `AudioPlan` / `AudioSyncResult` / `AudioTiming` / `AudioTrackBuilder` / `AudioSourceBuilder` / `ChannelSyncReport`。**纯数据**，不构造 ffmpeg 命令 |
+| `core/audio_plan.py` | 规划层：`AudioPlanner`（selection / mapping）、`AudioOutputTrack`、`AudioMapSpec`、validation（V1–V8 reason codes）。**不持有 PCM、不执行 ffmpeg** |
 | `core/audio_probe.py` | Probe 层：`probe_source()` 的原始 stream → 上述模型；`AudioProbeResult` 提供 `summary()` / `plan()` / `tracks()` |
 | `core/channel_sync.py` | Sync 层（**未改动**）：模型只**读取**它的报告 JSON，不重实现算法 |
+
+支持的输入形态（都有测试）：
+
+| 形态 | 表达 |
+|---|---|
+| 单个 4CH 音频流 | 1 source / 1 stream / 1 track / 4 channel |
+| 2×2CH | 1 source / 2 stream / 2 track |
+| 4×mono | 1 source / 4 stream / 4 track |
+| 外挂 WAV（mono/stereo/4CH） | 独立 source（`source_type=wav`），时间轴独立 |
+| 多来源混合 | 例如 `camera` 的 4CH + `recorder` 的 stereo |
 
 关键约束：
 
@@ -243,24 +257,54 @@ AudioPlan         本次任务准备如何处理音频（input_tracks / selected
   `AudioTrack(channel_indices=[0,1,2,3])`，但逐声道的 `AudioChannel`
   始终独立存在（`select_channels([2])` 可取单通道），**不会塌缩成不可再分的
   1 个对象**；4 条 mono 流则建成 4 个 track。
-- **同步不改身份**：channel-sync 结果写入 `AudioChannel.sync` 与
-  `AudioTrack.sync_*` 之后，仍可追溯到原始 `(stream_index, channel_index)`
-  （`AudioTrack.source_ids`，如 `["s1c0", "s2c0"]`）。同步状态值：
-  `not_processed` / `not_applicable` / `already_aligned` / `success` /
-  `low_confidence` / `non_constant` / `out_of_range` / `recheck_failed` /
-  `failed`。
-- **不猜测**：`sample_format` 取 ffprobe 原样名字（缺失/未知 →
-  `unknown`）；`channel_layout` 可能为空，此时按 `C0/C1/…` positional
-  命名（**不丢流**、不冒充标准声道语义）；`role` 一律 `unknown`，
-  只能由上层显式赋值（`set_role(role, reason)`，reason 必填）。
+- **身份含来源，跨来源不碰撞**：声道 id 是
+  `{source_id}:s{stream}:c{channel}`（如 `camera:s2:c2`）；
+  `camera:s0:c0` 与 `recorder:s0:c0` 是两个不同声道。
+  `AudioStream.audio_position`（音频序号 = `-map N:a:M` = channel_sync 报告的
+  `stream` 字段）与容器 `stream_index` **绝不混用**。
+- **同步不改身份**：channel-sync 结果写入 `AudioChannel.sync` 之后，经选择与
+  映射仍可追溯到 `output 0 -> camera:s2:c2 -> +960 samples`（`AudioMapSpec.trace()`）。
+  同步状态值：`not_processed` / `not_applicable` / `already_aligned` /
+  `success` / `low_confidence` / `non_constant` / `out_of_range` /
+  `recheck_failed` / `failed`。
+- **Selection ≠ Mapping ≠ Mixing**：选择与映射都**不做任何样本运算**；
+  `camera CH1 + camera CH3` 的选择结果就是两个独立源声道，不会自动合成。
+  任何 "N 源声道 -> 1 输出声道" 一律返回 **`audio_mix_not_supported`**
+  （本阶段**完全禁止 Mixing**，代码里也没有增益/求和路径）。
+- **不猜测**：`sample_format` 取 ffprobe 原样名字（缺失/未知 → `unknown`）；
+  `channel_layout` 可能为空，此时按 `C0/C1/…` positional 命名（**不丢流**、
+  不冒充标准声道语义）；`role` 一律 `unknown`，只能由上层显式赋值
+  （`set_role(role, reason)`，reason 必填）；外挂 WAV 的时间轴只**记录**
+  （`AudioTiming`），**不实现**任何跨文件同步算法。
 - **JSON 往返**：所有模型提供 `to_dict()` / `from_dict()`，输出稳定、
   JSON-compatible、enum 有稳定字符串表示。
 - 详细设计与测试见 [docs/release_notes_v0.7.1.md](docs/release_notes_v0.7.1.md)。
 
-> ⚠️ **本阶段未实现（不要据此宣称）**：4CH 混音、通道映射、WAVE 导出、
-> MP4 音轨选择/保留、重采样、增益/limiter/compressor、漂移校正。
-> 这些是 v0.7.1 第二阶段与更后续的工作。
+用法（内部 API，尚无 CLI）：
 
+```python
+from core.audio_plan import AudioPlanner, build_map_spec, source_plan
+
+plan = source_plan([                       # 多来源建计划（默认全选 + 保留原始）
+    {"source_id": "camera", "streams": camera_streams, "path": "camera.mp4"},
+    {"source_id": "recorder", "streams": wav_streams,
+     "source_type": "wav", "path": "recorder.wav"},
+])
+p = AudioPlanner(plan)
+p.select_channels("camera:s2:c2", "recorder:s0:c0", "camera:s2:c0")  # Selection
+p.map_channels("camera:s2:c2", "recorder:s0:c0", "camera:s2:c0")     # Mapping
+spec = p.map_spec()                        # dry-run 执行规格
+if spec.ok:
+    spec.operations                        # stream_copy / channel_filter
+    spec.trace(0)                          # output 0 -> camera:s2:c2 -> sync
+```
+
+> ⚠️ **本阶段未实现（不要据此宣称）**：Mixing（4CH 混音 / 通道混排 /
+> weighted mixing / 增益 / limiter / compressor）、WAVE 导出、
+> selective MP4 retention（音轨选择进容器）、重采样、漂移校正、
+> 新 CLI（`--audio-tracks` / `--audio-map` / `--audio-source` 均未开放）、
+> DAW 式编辑、自动跨文件同步。`AudioMapSpec` 只给出策略分类与身份，
+> **不生成 filtergraph 字符串、不执行 ffmpeg**。
 
 ## 硬件解码：`--hw-decode off|auto|require`（v0.7.0，**默认 `off`**）
 
@@ -428,20 +472,22 @@ python tests\full_autotest.py --level full        # L3 + 真实管线集成 + �
 python tests\full_autotest.py --level all         # 等同 full
 ```
 
-> 当前基线（v0.7.1）：**L1 = 230 PASS / 0 FAIL**；
-> **`--level full` = 315 PASS / 0 FAIL**（v0.7.0 hardware decode +
-> v0.7.1 音频模型并入 `main` 后实测）。任何改动后必须复核不出现新增 FAIL。
+> 当前基线（v0.7.1 Phase 2）：**L1 = 308 PASS / 0 FAIL**；
+> **`--level full` = 409 PASS / 0 FAIL**（v0.7.0 hardware decode +
+> v0.7.1 音频模型 Phase 1/2 全部并入 `main` 后实测）。
+> 任何改动后必须复核不出现新增 FAIL。
 
-- **L1 unit**（230 项）：color token 表、caps 解析、格式规划、失败分类、
+- **L1 unit**（308 项）：color token 表、caps 解析、格式规划、失败分类、
   flag 构造、probe/paths、源分类、缩放引擎、gpac parse_info、dji facts、
   channel-sync 纯逻辑、**channel-sync 内存回归（有界窗口流 / 窗口切片一致 /
   64 MB 整轨扫描后工作集增量 ≤32 MB）**、AV1 档位与参数映射；
 - **L2 toolchain**（+16 项）：真实工具版本、`--check-features` 实机能力、
   known_flags 白名单、Gyroflow/GPAC 探测；
-- **L3 full**（+85 项）：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
+- **L3 full**（+101 项）：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
   截断文件/尾部垃圾/断点续跑/retry-list 故障注入、strip 机制本体、
   AV1 管线、channel-sync P1 端到端与算法级、
-  **音频模型 probe 集成（真 ffprobe，v0.7.1）**。
+  **音频模型 probe 集成（真 ffprobe，v0.7.1 P1）**、
+  **音频来源/选择/映射集成（真 A7M5 + 外挂 WAV，v0.7.1 P2）**。
   输入在 `work/autotest/` 自建副本（testsets 只读），报告
   `work/autotest/autotest_report.{json,md}`，退出码 0=全过。
 
@@ -457,7 +503,7 @@ docs/
 ├── design/              设计文档：硬件后端设计 / 实施报告(含 DJI §15) / 集成报告 / HEVC 4:2:2 Rext 播放兼容性
 ├── evaluation/          评估：HEVC 生产就绪度(重写版) / x265 生产就绪 / AV1 可行性 / AV1 调参 / SVT-AV1 归档 / AV1 档位标定
 ├── hardware-decode/     ★ v0.7.0 硬件解码 integration 交付物：测试矩阵 / 最终判定 / 补丁 / toolchain provenance
-├── release_notes_v0.7.1.md  v0.7.1 发布说明（音频轨道模型 Phase 1）
+├── release_notes_v0.7.1.md  v0.7.1 发布说明（音频模型 Phase 1 + Phase 2）
 └── reference/           第三方一手资料存档（x265 / SVT-AV1 含 v4.2.0 调参调研报告 / NVENC / QSV / VCE）
 
 olddocs/                 历史档案存档（各阶段代码快照 / 被取代的旧脚本），详见 olddocs/README.md
@@ -545,11 +591,16 @@ olddocs/                 历史档案存档（各阶段代码快照 / 被取代�
   - QSVEncC 补丁仅对 pinned 8.26 成立（8.27–8.30 未检验），NVEncC 补丁
     仅在 9.31（`2cb9d810`）验证；
   - `tests/hwdecode/` 矩阵**不在** `--level full` 内，需单独跑。
-- **音频轨道模型（v0.7.1 Phase 1）当前是纯内部能力层**：
+- **音频模型（v0.7.1 Phase 1 + Phase 2）当前是纯内部能力层**：
   - 不改变默认音频路径（仍为全流 `-c:a copy`）与 MP4 输出；没有新增 CLI；
   - AudioTrack/AudioPlan 里的 track 同步结果**不会被应用到任何 ffmpeg 命令**
     （Phase 2 才接执行层）；
-  - 4CH 混音 / 通道映射 / WAVE 导出 / 重采样 / 漂移校正**均未实现**；
+  - **Mixing 被结构性禁止**：任何 "N 源声道 -> 1 输出声道" 返回
+    `audio_mix_not_supported`；代码里没有增益/求和路径；
+  - **选择与映射已实现**（`core/audio_plan.py`），但只产出 dry-run 规格
+    （策略分类 + 身份），**不生成 filtergraph、不执行 ffmpeg**；
+  - **未实现**：Mixing / WAVE 导出 / selective MP4 retention / 重采样 /
+    漂移校正 / 新音频 CLI / 自动跨文件同步。
   - 模型不做 role 自动推断，也不会把未知 channel_layout 当成已知布局。
 
 ## 许可证
@@ -574,7 +625,7 @@ git tag -l                         # pre_S1S5 / post_S1S5 / pre_ui / post_1kt_ui
                                    # v0.6.0 (HEVC+AV1 合并主线, 含 AV1 色彩保真修复)
                                    # v0.6.1 (channel-sync 流式内存修复)
                                    # v0.7.0 (hardware decode integration, 已并入 main)
-                                   # v0.7.1 (音频轨道模型 Phase 1, 当前)
+                                   # v0.7.1 (音频模型 Phase 1 + Phase 2, 当前)
                                    # v0.7.0 (v0.7 线基线)
                                    # v0.7.1 (音频轨道模型层, 默认音频路径不变)
 git checkout backup/pre-av1-main-merge   # AV1 合并进 main 之前的状态 (回滚点)

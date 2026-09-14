@@ -39,10 +39,10 @@ F:\1KeyTranscoder\
 ├── licenses/GPL-3.0.txt    GNU GPL v3 全文（LGPL-3.0 并入引用；不放在
 │                             LICENSE/COPYING 名下以免干扰许可识别）
 │
-├── core/                   ★ 运行时核心（21 个 .py）：config / probe / postprobe /
+├── core/                   ★ 运行时核心（22 个 .py）：config / probe / postprobe /
 │                             paths / scaling / source_classifier / batch_hw /
 │                             channel_sync / sync_estimate / mp4_channel_sync /
-│                             sync_fix / audio_models / audio_probe /
+│                             sync_fix / audio_models / audio_plan / audio_probe /
 │                             logging_utils / dashboard / dashboard_ui /
 │                             models / versions / version / color
 ├── encoders/               ★ 编码后端（10 个 .py）：nvencc / qsvencc / x265 /
@@ -113,7 +113,7 @@ F:\1KeyTranscoder\
 
 | 文件 | 说明 |
 |---|---|
-| [`release_notes_v0.7.1.md`](release_notes_v0.7.1.md) | **v0.7.1 发布说明（音频轨道模型 Phase 1）**：`AudioStream`/`AudioChannel`/`AudioTrack`/`AudioPlan` 数据模型、与 channel-sync 的只读连接、序列化 schema、新增测试矩阵、**默认音频路径 unchanged** 的证据与"本阶段未实现"清单 |
+| [`release_notes_v0.7.1.md`](release_notes_v0.7.1.md) | **v0.7.1 发布说明（音频模型 Phase 1 + Phase 2）**：`AudioStream`/`AudioChannel`/`AudioTrack`/`AudioPlan` 数据模型、与 channel-sync 的只读连接、序列化 schema、新增测试矩阵、**默认音频路径 unchanged** 的证据与"本阶段未实现"清单 |
 | `../docs/hardware-decode/` | **v0.7.0 hardware-decode integration 交付物**（本轮已并入 `main`，`v0.7.0 ∈ ancestors(main)`）：[`README.md`](hardware-decode/README.md) 入口、[`integration-test-matrix.md`](hardware-decode/integration-test-matrix.md) 测试矩阵、[`final-report.md`](hardware-decode/final-report.md) 最终判定、`patches/` 与 `toolchain-provenance.json` |
 | [`release_notes_v0.6.1.md`](release_notes_v0.6.1.md) | **v0.6.1 发布说明**：Channel Sync P1 / AV1 mainline / AV1 色彩保真 / 流式内存修复；含验证矩阵、实测性能与已知限制 |
 
