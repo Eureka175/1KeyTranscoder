@@ -1,14 +1,16 @@
 """ffprobe probing (metadata-only) and the SourceInfo adapter.
 
 probe_source() is preserved from the original x265_archive.py (now
-archived at olddocs/x265_archive.py) with one
-additive extension (stream side_data_list for HDR mastering/CLL): ONE
+archived at olddocs/x265_archive.py) with two
+additive extensions (stream side_data_list for HDR mastering/CLL, and
+stream_tags for the v0.7.1 audio model): ONE
 metadata pass per file, no -show_frames, no -show_packets, no GOP
 analysis. The CSV layer depends on its exact (summary, streams)
 return structure.
 
     probe_source() -> (summary dict, raw stream list)
     build_source_info() -> SourceInfo   (adapter, incl. ColorInfo)
+    build_audio_probe() -> AudioProbeResult  (v0.7.1 adapter, core.audio_probe)
 """
 
 from __future__ import annotations
@@ -167,7 +169,11 @@ def probe_source(
             "duration,bit_rate,nb_frames,channels,sample_rate,sample_fmt,"
             "channel_layout,bits_per_raw_sample,bits_per_coded_sample,"
             "side_data_list:"
-            "disposition"
+            "disposition:"
+            # v0.7.1: 音频模型需要 language/title 等流级标签。仅**新增**
+            # 一个 `tags` 键, 既有键与 CSV 字段白名单不变 (旧路径行为
+            # 不受影响, 见 core/audio_models.py 与 §14)。
+            "stream_tags"
         ),
         "-of", "json",
         str(src),

@@ -9,7 +9,7 @@
 > 不是设计意图的复述。凡是与代码不一致的历史说法，以本文档为准，
 > 并已在 §11 列出。
 >
-> **适用范围**：`v0.6.2`。改动入口或管线时请同步更新本文档。
+> **适用范围**：`v0.7.1`。改动入口或管线时请同步更新本文档。
 
 ---
 
@@ -215,6 +215,55 @@ P1 设计见 `docs/design/channel_sync_p1.md`，实现要点：
 
 ---
 
+## 6.1 音频轨道模型（v0.7.1 Phase 1）
+
+**这一层不参与任何生产决策**：它没有调用方在默认路径上，也不产生 ffmpeg
+命令。它的存在只为让 Phase 2（选择 / 通道映射 / 4CH 混排 / WAVE 导出 /
+MP4 音轨保留）有一个稳定、可测试、可序列化的中间模型。
+
+```
+probe_source() 的 raw stream dict
+      │
+      ▼
+core/audio_probe.py            ← Probe 适配层（不新增 ffprobe 调用）
+      │  build_audio_streams() / audio_probe_of() / audio_probe_from_file()
+      ▼
+core/audio_models.py           ← Model 层（纯数据，不导入项目内任何模块）
+      AudioStream ──channels()──► AudioChannel (含 AudioSyncResult)
+           │
+      AudioTrackBuilder
+           ▼
+      AudioTrack ──► AudioPlan
+      ▲
+      │  ChannelSyncReport.apply_to()  ← 只**读取** core/channel_sync 的报告 dict
+      │
+core/channel_sync.py           ← Sync 层（算法与阈值**零改动**）
+```
+
+| 概念 | 定义 | 例子 |
+|---|---|---|
+| **stream** | 容器里的音频流（ffprobe `index`） | `index=2` |
+| **channel** | 流内声道的物理位置（0-based） | `(stream 2, channel 0)` |
+| **track** | 被选中的 (stream, channel 集合) | `channel_indices=[0,1,2,3]` |
+| **output track** | 输出容器里的音轨 | **Phase 2**，本阶段不表达 |
+
+关键性质（测试已钉住）：
+
+1. **4CH 流不塌缩**——per-stream 建 1 个 track，但 4 个 `AudioChannel` 独立
+   保留，`select_channels([2])` 可取单通道；
+2. **同步不改身份**——`AudioChannel.sync` 写入后 `source_ids` 仍为
+   `s{stream}c{channel}`；
+3. **两条索引不混用**——`AudioStream.audio_position`（音频序号 = `-map 0:a:N`
+   = channel_sync 报告的 `stream`）与容器 `stream_index` 是两个字段，
+   报告回填按前者关联（真实 A7M5 素材：容器 1..4 ↔ 音频序号 0..3）；
+4. **未知即未知**——`channel_layout` 为空时按 `C0/C1/…` positional 命名，
+   `sample_format` 缺失为 `unknown`，`role` 恒为 `unknown`（只能显式赋值）。
+
+默认路径（`-map 0` + `-c:a copy`、Sony/DJI 的 GPAC 音频复制）**未改动**：
+`AudioPlan = None` 时行为与 v0.7.0 完全一致。
+
+---
+
 ## 7. 编码后验证：`--check` 三级
 
 | 级别 | Sony | DJI |
@@ -276,6 +325,14 @@ P1 设计见 `docs/design/channel_sync_p1.md`，实现要点：
    （`tests/full_autotest.py`）。
 6. **AV1 对 Sony 源不打 XAVC tag。** 元数据保留，但容器不声称 XAVC 合规。
 7. **低于 1080p 的素材默认不处理**；channel-sync 只处理 ≥3 条独立单声道 PCM 轨。
+8. **（v0.7.1）音频模型不得改变默认音频路径。** `AudioPlan` 未显式接入输出
+   决策时，经典路径仍是 `-map 0` + `-c:a copy`，Sony/DJI 仍是 GPAC 音频复制。
+9. **（v0.7.1）同步不得破坏原始 stream/channel 身份。** 任何 track 经
+   channel-sync 结果回填后，`source_ids` 仍必须能追溯回
+   `(stream_index, channel_index)`。
+10. **（v0.7.1）未知不得伪装成已知。** `channel_layout` 为空/未知不丢流、
+   不冒充标准声道语义；`sample_format` 未知即 `unknown`；`role` 只能显式
+   赋值（且必须给 reason），不做任何自动推断。
 
 ---
 
@@ -287,6 +344,7 @@ P1 设计见 `docs/design/channel_sync_p1.md`，实现要点：
 | "`core/` 含 `sync_estimate` …" 但列表遗漏 `models.py`、`postprobe.py`、`dashboard_ui.py`、`mp4_channel_sync.py`、`version.py` | `docs/README.md` | 实际 19 个模块见 §12 |
 | "NVEncC … ✅ 生产默认" | `README.md` 编码器矩阵 | v0.6.2 起为**能力优先自动选择**（NVENC→QSV→x265），无固定默认 |
 | "硬件解码不可达（`--avsw` 字面量）" | 硬件解码 Phase 1 文档 | 结论仍成立，但**原因**是刻意的生产决策，不是"尚未接通" |
+| 各文档中 "当前版本 `v0.6.2`" | 根 `README.md` 等 | `main` 自 v0.7.0 tag 起已到 **v0.7.1**（音频模型 Phase 1）；`v0.6.x` 的说法仅描述 v0.6 线的能力基线 |
 
 ---
 
@@ -298,9 +356,11 @@ P1 设计见 `docs/design/channel_sync_p1.md`，实现要点：
 | `watchfolder.py` | 92 | 轮询批处理转调 |
 | `core/batch_hw.py` | 1752 | 硬件批量：降级梯、三条源路径、并发池、失败记录 |
 | `core/channel_sync.py` | 1038 | 延时补偿主算法与阈值 |
+| `core/audio_models.py` | 1443 | **v0.7.1** 音频模型：AudioStream/Channel/Track/Plan/Sync（纯数据） |
+| `core/audio_probe.py` | 228 | **v0.7.1** 音频 Probe 适配层（raw stream → 模型） |
 | `core/sync_estimate.py` | 786 | GCC-PHAT 时差估计 |
 | `core/logging_utils.py` | 493 | 分层日志 + 缩放 CSV |
-| `core/probe.py` | 385 | 源探测 |
+| `core/probe.py` | 391 | 源探测（v0.7.1 起 `-show_entries` 增加 `stream_tags`） |
 | `core/mp4_channel_sync.py` | 369 | MP4 音频轨重建 |
 | `core/scaling.py` | 347 | 缩放规则引擎 |
 | `core/config.py` | 312 | 工具链与 JSON 解析 |
@@ -336,7 +396,7 @@ P1 设计见 `docs/design/channel_sync_p1.md`，实现要点：
 | `preservation/colour.py` | 100 | 保留侧色彩处理 |
 | `preservation/backends.py` | 57 | 后端选择 |
 | `preservation/audio_sync.py` | 53 | 保留管线内的音轨同步 |
-| `tests/full_autotest.py` | 2924 | 全量自动回归（档位改动的唯一依据） |
+| `tests/full_autotest.py` | 3506 | 全量自动回归（档位改动的唯一依据） |
 | `tests/run_selfcheck.py` | 189 | 自检驱动 |
 | `tests/sony_selfcheck.py` | 21 | Sony 自检入口 |
 | `release/build_release.py` | — | 发布包构建（allowlist） |

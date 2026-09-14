@@ -12,7 +12,7 @@
 （v0.6.2 起；加 `--no-hw-autoselect` 可固定为 x265，即 v0.6.1 及更早的行为）。
 注意 `--config` 里的 `encoder` 字段与 `--encoder` **二者不一致时直接报错**，
 不会静默取舍。
-**当前版本 `v0.6.2`**（HEVC/265 与 AV1 合并主线）。
+**当前版本 `v0.7.1`**（v0.7 线：音频轨道模型层，**不改默认音频输出行为**）。
 **主入口：`1kt.py`。**
 
 > 📚 文档索引见 [docs/README.md](docs/README.md)；**代码实际怎么跑见
@@ -188,6 +188,55 @@ DJI（djmd）→ DJI
 `core/mp4_channel_sync.py`（ChronoSync 1.x，MIT）保留作回滚与对照，
 不再被 P1 主路径引用。设计细节与 P1 vs vendored 差异对照见
 `docs/design/channel_sync_p1.md`。
+
+## 音频轨道模型（v0.7.1 Phase 1，内部能力层）
+
+**这一层目前不影响任何输出**：默认音频路径仍是"整流原样 copy"
+（经典路径 `-map 0` + `-c:a copy`；Sony/DJI 保留管线由 GPAC 从源容器
+复制音频）。v0.7.1 Phase 1 只建立**数据结构与适配层**，供后续
+选择 / 通道映射 / 4CH 混排 / WAVE 导出 / MP4 音轨保留使用。
+
+```text
+输入文件
+  ↓  core.probe.probe_source()          FFprobe JSON（单次探测）
+  ↓  core.audio_probe                   音频适配层
+AudioStream       一条原始音频流（codec/sample_rate/sample_fmt/channels/layout/
+                  duration/bit_rate/language/title/disposition）
+  └── AudioChannel  流内单个声道（stream_index + channel_index + 同步状态）
+AudioTrack        参与输出决策的基本对象（(stream, channel 集合) 的选取结果）
+AudioPlan         本次任务准备如何处理音频（input_tracks / selected_tracks /
+                  preserve_original / output_sample_rate / output_sample_format）
+```
+
+| 模块 | 职责 |
+|---|---|
+| `core/audio_models.py` | Model 层：`AudioStream` / `AudioChannel` / `AudioTrack` / `AudioPlan` / `AudioSyncResult` / `AudioTrackBuilder` / `ChannelSyncReport`。**纯数据**，不构造 ffmpeg 命令 |
+| `core/audio_probe.py` | Probe 层：`probe_source()` 的原始 stream → 上述模型；`AudioProbeResult` 提供 `summary()` / `plan()` / `tracks()` |
+| `core/channel_sync.py` | Sync 层（**未改动**）：模型只**读取**它的报告 JSON，不重实现算法 |
+
+关键约束：
+
+- **stream / channel / track 三个概念严格区分**。一条 4CH 流建成
+  `AudioTrack(channel_indices=[0,1,2,3])`，但逐声道的 `AudioChannel`
+  始终独立存在（`select_channels([2])` 可取单通道），**不会塌缩成不可再分的
+  1 个对象**；4 条 mono 流则建成 4 个 track。
+- **同步不改身份**：channel-sync 结果写入 `AudioChannel.sync` 与
+  `AudioTrack.sync_*` 之后，仍可追溯到原始 `(stream_index, channel_index)`
+  （`AudioTrack.source_ids`，如 `["s1c0", "s2c0"]`）。同步状态值：
+  `not_processed` / `not_applicable` / `already_aligned` / `success` /
+  `low_confidence` / `non_constant` / `out_of_range` / `recheck_failed` /
+  `failed`。
+- **不猜测**：`sample_format` 取 ffprobe 原样名字（缺失/未知 →
+  `unknown`）；`channel_layout` 可能为空，此时按 `C0/C1/…` positional
+  命名（**不丢流**、不冒充标准声道语义）；`role` 一律 `unknown`，
+  只能由上层显式赋值（`set_role(role, reason)`，reason 必填）。
+- **JSON 往返**：所有模型提供 `to_dict()` / `from_dict()`，输出稳定、
+  JSON-compatible、enum 有稳定字符串表示。
+- 详细设计与测试见 [docs/release_notes_v0.7.1.md](docs/release_notes_v0.7.1.md)。
+
+> ⚠️ **本阶段未实现（不要据此宣称）**：4CH 混音、通道映射、WAVE 导出、
+> MP4 音轨选择/保留、重采样、增益/limiter/compressor、漂移校正。
+> 这些是 v0.7.1 第二阶段与更后续的工作。
 
 ## 编码后验证：`--check basic|advanced|full`
 
@@ -386,6 +435,12 @@ olddocs/                 历史档案存档（各阶段代码快照 / 被取代�
   - `--channel-sync-transparent` 成功路径会在 `.1ktwork/` 保留 4 个
     `audio_*.mov` 与通道报告 JSON（10 分钟输入约 330 MB），属既有行为，
     需自行判废。
+- **音频轨道模型（v0.7.1 Phase 1）当前是纯内部能力层**：
+  - 不改变默认音频路径（仍为全流 `-c:a copy`）与 MP4 输出；没有新增 CLI；
+  - AudioTrack/AudioPlan 里的 track 同步结果**不会被应用到任何 ffmpeg 命令**
+    （Phase 2 才接执行层）；
+  - 4CH 混音 / 通道映射 / WAVE 导出 / 重采样 / 漂移校正**均未实现**；
+  - 模型不做 role 自动推断，也不会把未知 channel_layout 当成已知布局。
 
 ## 许可证
 
@@ -407,12 +462,14 @@ git tag -l                         # pre_S1S5 / post_S1S5 / pre_ui / post_1kt_ui
                                    # post_autotest / post_x265 / v0.4.0 / v0.4.1 / v0.4.2
                                    # post_av1 / post_av1_calib / v0.5.0 / v0.5.1
                                    # v0.6.0 (HEVC+AV1 合并主线, 含 AV1 色彩保真修复)
-                                   # v0.6.1 (channel-sync 流式内存修复, 当前发布)
+                                   # v0.6.1 (channel-sync 流式内存修复)
+                                   # v0.7.0 (v0.7 线基线)
+                                   # v0.7.1 (音频轨道模型层, 默认音频路径不变)
 git checkout backup/pre-av1-main-merge   # AV1 合并进 main 之前的状态 (回滚点)
 ```
 
 > 分支约定: `main` = **HEVC/265 + AV1 合并主线**（两条线能力同处一分支，
-> 各线最后一次发布包见上节；合并后主线的当前发布为 **`v0.6.1`**）；
-> `av1` 分支保留为 AV1 独立线历史
+> 各线最后一次发布包见上节；v0.7.x 起在同一 `main` 上继续开发音频轨道模型
+> 与后续音频能力）；`av1` 分支保留为 AV1 独立线历史
 > （含 post_av1 / post_av1_calib / v0.5.0 / v0.5.1 tag）；
 > `backup/pre-av1-main-merge` = AV1 合并前的 `main` 快照。

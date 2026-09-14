@@ -40,6 +40,9 @@ work/
 # Release build output (staging tree + archive + manifest)
 dist/
 
+# PyInstaller scratch tree (x265 calibration tooling)
+/build/
+
 # Third-party source checkouts / toolchains used as build inputs by the research
 # experiment line: rigaya/NVEnc + rigaya/QSVEnc pinned checkouts, CUDA
 # headers+libs from redistributable wheels, AviSynth+/VapourSynth/OpenVINO/OpenCL
