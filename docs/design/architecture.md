@@ -215,7 +215,7 @@ P1 设计见 `docs/design/channel_sync_p1.md`，实现要点：
 
 ---
 
-## 6.1 音频模型与 PCM 处理（v0.7.1 Phase 1 + Phase 2 + Phase 3A）
+## 6.1 音频模型与 PCM 处理（v0.7.1 Phase 1 + Phase 2 + Phase 3A + Phase 3B + RC1）
 
 **这一层不参与任何生产决策**：默认路径上没有任何调用方，也不产生 ffmpeg
 命令。它的存在是为后续音频能力（选择 / 通道映射 / 混排 / WAVE 导出 /
@@ -373,6 +373,18 @@ Phase 2 的 `audio_*_not_found` / `audio_mapping_*` / `audio_mix_not_supported`
 `mix_mode`（`-map` 规格表达不了样本级合成）——它描述的是 ffmpeg argv,
 与 PCM 层的 `core/audio_mix.py` **并存不冲突**。
 
+⚠️ **两个 reserved reason code（已定义, 当前生产路径不可达）**：
+
+```text
+audio_sync_offset_invalid       # 常量已导出, 但 _effective_offset() 对非法
+                                # offset 一律静默回退 0, 从不抛它
+audio_pcm_format_unsupported    # audio_pcm 解码路径无此拒绝; 该字符串目前
+                                # 由 core/audio_wav.read_wav/parse_wav_header
+                                # 以字面量形式发出
+```
+
+它们**不是** active runtime error，不应据此编写分支逻辑。
+
 ### 6.1.9 PCM 混音：N→1 + gain + peak/clipping（P3B）
 
 `core/audio_mix.py`：`MixBus` → `MixSink` → `MixGain`(源声道 + 线性增益)，
@@ -399,6 +411,68 @@ Phase 2 的 `audio_*_not_found` / `audio_mapping_*` / `audio_mix_not_supported`
 ```text
 audio_mix_clipping     audio_mix_invalid
 ```
+
+### 6.1.11 输出权威与执行规格的分工（RC1 冻结）
+
+**输出音频集合与顺序的唯一权威 = `AudioTimeline`**（`output_channel_ids` +
+逐 `ChannelTimeline`），**包括混音图产生的 `mixN` 输出身份**。任何"最终写了
+哪些输出声道、什么顺序"的问题，答案只在 `AudioTimeline` 一处：
+
+| 图 | 输出身份来源 | 例 |
+|---|---|---|
+| routing | `resolve_timeline()` → `output_channel_ids` | `camera:s2:c2`（源声道身份） |
+| mixing | `mixing_timeline()` → `output_channel_ids` | `mix0` / `mix1`（合成身份） |
+
+**`AudioMapSpec` 不是"没用的遗留物"** —— 它是 **`-map` / stream-copy /
+channel-filter 路径的执行规格**，仍然服务于：
+
+```text
+完整流原样保留        -> strategy = stream_copy   （-map + -c:a copy）
+只取流内部分声道/重排  -> strategy = channel_filter（需声道过滤）
+N 源声道 -> 1 输出声道 -> strategy = MIXING        （该路径**不可直接执行**）
+```
+
+`strategy == MIXING` 是**明确的转交信号**：`-map` argv 表达不了
+`Σ(sample × gain)`，因此该计划必须转入 PCM processing graph
+（`core/audio_process.run_audio_render`），而不是被当成"计划非法"。
+`AudioMapSpec` 不因此失效：它定义的输出声道顺序由
+`audio_plan.effective_mapping()` 提供，`AudioTimeline` 消费的正是同一个函数
+（`core/audio_timeline._mapping_refs`），两者**不会分叉**。
+
+⚠️ 两者的差异必须记住：`AudioMapSpec` 描述的是**ffmpeg argv 能做的那部分**；
+`AudioTimeline` 描述的是**实际 PCM 输出**。Phase 4 起若需要"最终写进容器的
+音频流集合"，读 `AudioTimeline`；若要生成 `-map` 参数，读 `AudioMapSpec`。
+
+### 6.1.12 RC1 冻结边界（明确**不**保证兼容的部分）
+
+以下条目在 v0.7.1-rc1 被显式标注为内部/预留。**不是缺陷清单**，而是
+"Phase 4 不得依赖"的边界声明：
+
+| 对象 | 状态 | 说明 |
+|---|---|---|
+| `AudioPlan.channel_map` / `AudioPlan.wav_outputs` | **reserved / 不保证兼容** | 字段已存在且参与 `is_default`，但**全项目零写入者**；语义未定，Phase 4 不得依赖，也不得据此推断行为 |
+| `AudioOutputSpec.kind` | 当前唯一合法值 `"wav"` | 自由字符串、无枚举校验；Phase 4B 引入编码输出时可替换为 typed output-kind 抽象（届时为兼容变更） |
+| `AudioMixer.output_format` | **internal** | 仅为"面向 WAV 的混音"提供 `WavFormat.clip_limit()`；Phase 4B 引入编码音频格式时该抽象会被替换 |
+| `AudioMixer.frames()` | **INTERNAL** | 产出 `(block, faithful)`，与 `AudioRouter.frames()`（默认只产出 `block`）**契约不一致**；当前靠 `audio_process._iter_blocks()` 适配。不承诺对外稳定 |
+| `AudioMixer.render_to()` | **INTERNAL / 当前无调用者** | 保留为便捷入口，无生产调用方 |
+| `AudioPCMReader.read()` | **not thread-safe** | 共享 `self._handles` 并使用**绝对 `seek`**；当前 Router/Mixer 串行调用，因此现阶段无问题。Phase 5/6 并行化必须重新设计这一边界（不要直接并发调用） |
+| `AudioPlan.notes` | **stable string only** | 只承诺"稳定字符串"（便于日志比对），**不是**结构化的机器可读元数据契约 |
+
+### 6.1.13 序列化字段策略（自 v0.7.1 起）
+
+```text
+新增 serialized 字段:
+    默认可选 —— 旧 JSON 缺失该键必须照常工作
+    为默认值时 **不写出**（保持 schema 紧凑, 减少无意义 diff）
+
+删除 serialized 字段:
+    必须递增 AUDIO_MODEL_VERSION（core.audio_models）
+    不做 migration framework, 也不静默改写旧 JSON
+```
+
+未知键与未知 enum 一律**容错**（`from_dict` 忽略未知键；`_StrEnum.coerce`
+未知值回退安全默认），因此旧代码读新 JSON 不会崩，但也不会解释新语义 ——
+这是刻意的：**宁可"未知"，不可"猜"**。
 
 ---
 
@@ -609,6 +683,16 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
     增益只能是 `MixBus` 上的有限非负线性系数，绝不写回源声道模型。
 27. **（v0.7.1 P3B）WAV exporter 不实现 mixing。** 混音与导出解耦：路由图与
     混音图暴露同一"逐块 float32"接口，只换节点。
+28. **（v0.7.1 RC1）输出权威只有 `AudioTimeline`。** 混音图的输出声道身份是
+    `mixN`（不是源声道），任何"逐输入事实"统计都必须查**未混音的 base
+    timeline**（`AudioRenderResult.silence_samples` 曾因传错 timeline 而恒报
+    满，见 §6.1.11）。`AudioMapSpec` 只描述 `-map` / stream-copy /
+    channel-filter 路径，`strategy == MIXING` 表示必须转入 PCM 图。
+29. **（v0.7.1 RC1）冻结边界必须写明。** §6.1.12 列的内部/预留对象
+    （`AudioPlan.channel_map` / `wav_outputs`、`AudioOutputSpec.kind`、
+    `AudioMixer.output_format` / `frames()` / `render_to()`、
+    `AudioPCMReader.read()` 的线程安全边界）不得被当作对外契约；
+    序列化字段的新增/删除遵循 §6.1.13。
 
 ---
 
@@ -634,13 +718,13 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | `core/batch_hw.py` | 1966 | 硬件批量：降级梯、三条源路径、并发池、失败记录、**硬件解码接线与完整性闸门调用** |
 | `core/channel_sync.py` | 1038 | 延时补偿主算法与阈值 |
 | `core/audio_models.py` | 2158 | **v0.7.1** 音频模型：Source/Stream/Channel/Track/Plan/Sync（纯数据） |
-| `core/audio_plan.py` | 1760 | **v0.7.1 P2** 规划层：Selection / Channel Mapping / Validation / AudioMapSpec |
+| `core/audio_plan.py` | 1771 | **v0.7.1 P2** 规划层：Selection / Channel Mapping / Validation / AudioMapSpec / **公开 `effective_mapping()`**（输出顺序定义，Timeline 与 spec 共用） |
 | `core/audio_probe.py` | 328 | **v0.7.1** 音频 Probe 适配层（raw stream → 模型，含来源维度） |
 | `core/audio_timeline.py` | 1212 | **v0.7.1 P3A** AudioTimeline / RenderPolicy / EOF·offset 唯一权威 |
 | `core/audio_pcm.py` | 665 | **v0.7.1 P3A** PCM Reader：ffmpeg → canonical float32（chunked） |
 | `core/audio_route.py` | 530 | **v0.7.1 P3A** 通道路由：纯样本搬运（无混音） |
 | `core/audio_wav.py` | 935 | **v0.7.1 P3A** WAV writer/reader（PCM16·24·32 / float32 / EXTENSIBLE） |
-| `core/audio_process.py` | 675 | **v0.7.1 P3A/P3B** 处理图：AudioOutputSpec + run_audio_render 编排（路由/混音换节点） |
+| `core/audio_process.py` | 685 | **v0.7.1 P3A/P3B** 处理图：AudioOutputSpec + run_audio_render 编排（路由/混音换节点；静音统计走 base timeline） |
 | `core/audio_mix.py` | 832 | **v0.7.1 P3B** PCM 混音：MixBus/MixSink/MixGain + AudioMixer（float32 累加 / 检波 / ClipPolicy） |
 | `core/sync_estimate.py` | 786 | GCC-PHAT 时差估计 |
 | `core/logging_utils.py` | 493 | 分层日志 + 缩放 CSV |
@@ -690,7 +774,7 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | `tests/hwdecode/fixtures.py` | 238 | control fixtures 生成 |
 | `tests/hwdecode/inventory.py` | 80 | 语料盘点 + fixture 刷新 |
 | `tests/hwdecode/matrix.json` | 351 | **机器可读矩阵**（83 用例，与 harness 双向漂移检查） |
-| `tests/full_autotest.py` | 4326 | 全量自动回归（档位改动的唯一依据） |
+| `tests/full_autotest.py` | 6505 | 全量自动回归（档位改动的唯一依据） |
 | `tests/run_selfcheck.py` | 189 | 自检驱动 |
 | `tests/sony_selfcheck.py` | 21 | Sony 自检入口 |
 | `release/build_release.py` | — | 发布包构建（allowlist） |

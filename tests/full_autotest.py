@@ -5486,6 +5486,27 @@ def l1_audio_chunk_invariance() -> None:
            and len(next(iter(peaks.values()))) == 4,
            f"{json.dumps(peaks.get(256), ensure_ascii=False)}")
 
+    # 回归 (F1): routing 图的静音统计必须**逐路由签名求和**, 不受 F1 修正
+    # 影响。索引 0 由两个来源共同供数 -> 在 [0,1000) 上重叠计入两次;
+    # 索引 1 在 [400,1000) 上是确定性静音。与 `l1_audio_mix()` 的 mixing
+    # 用例构成同一几何 (1000f + 400f) 下的对照 (routing 600 / mixing 0)。
+    rout_a = _p3a_fixture(d / "faith_a.wav", 1, 1000, {0: 11})
+    rout_b = _p3a_fixture(d / "faith_b.wav", 1, 400, {0: 22})
+    plan_route = _p3a_plan([
+        {"source_id": "cam", "path": rout_a, "channels": 1, "samples": 1000},
+        {"source_id": "rec", "path": rout_b, "channels": 1, "samples": 400},
+    ])
+    plan_route.selected_channels = ["cam:s0:c0", "rec:s0:c0"]
+    res_route = _p3a_render(
+        plan_route, d / "faith_route.wav", chunk_frames=97, backend="reader"
+    )
+    record("l1.p3a.silence_samples (routing 1000f+400f, 2 输出声道) = 600",
+           res_route.ok
+           and res_route.frames == 1000 and res_route.output_channels == 2
+           and res_route.silence_samples == 600,
+           f"silence={res_route.silence_samples} frames={res_route.frames} "
+           f"output_channels={res_route.output_channels}")
+
     # --- 内存/长素材: 不全量载入, 峰值内存受 chunk 限制 -------------------
     long_wav = d / "long.wav"
     long_seconds = 30
@@ -6033,6 +6054,17 @@ def l1_audio_mix() -> None:
            f"frames={info5.frame_count if info5 else None} "
            f"v200={float(arr5[200, 0]) if arr5 is not None else None} "
            f"tail={float(np.abs(arr5[500:]).max()) if arr5 is not None else None}")
+    # 回归 (F1): 静音统计必须走 **base timeline**。混音 timeline 的声道身份
+    # 是 `mix0`, 拿它去查源声道 (`long:s0:c0`) 必然 miss -> 恒定 total=0 ->
+    # silence_samples 恒报满 (1000/1000)。此处钉死正确语义:
+    # 唯一输出声道的输入区间并集 = [0,1000) 覆盖整个 window -> 静音 0。
+    record("l1.p3b.silence_samples 走 base timeline (混音图不恒报满)",
+           res5.ok
+           and res5.silence_samples == 0
+           and res5.frames == 1000 and res5.output_channels == 1
+           and res5.silence_samples != res5.frames * res5.output_channels,
+           f"silence={res5.silence_samples} "
+           f"total={res5.frames * res5.output_channels}")
 
     # --- 带 offset 的混音: 两轨对齐后相加 -------------------------------
     early = _p3b_fixture(d / "off_a.wav", 1, 1200, {0: 0.5}, at=1000)

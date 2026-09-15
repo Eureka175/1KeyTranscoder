@@ -68,7 +68,7 @@ from .audio_models import (
     AudioStream,
     SyncStatus,
 )
-from .audio_plan import _effective_mapping
+from .audio_plan import effective_mapping
 
 __all__ = [
     "AudioRenderError",
@@ -843,7 +843,7 @@ class AudioTimeline:
 
 def _mapping_refs(plan: AudioPlan) -> list[dict[str, Any]]:
     """有效映射 (显式优先, 否则由选择顺序派生) —— 复用 Phase 2 定义。"""
-    return [dict(e) for e in _effective_mapping(plan)]
+    return [dict(e) for e in effective_mapping(plan)]
 
 
 def _used_sources(plan: AudioPlan, refs: Sequence[Mapping[str, Any]]) -> list[str]:

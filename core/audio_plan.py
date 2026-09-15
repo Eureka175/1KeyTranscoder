@@ -71,6 +71,7 @@ __all__ = [
     "build_audio_map_spec",
     "build_map_spec",
     "channel_ref",
+    "effective_mapping",
     "exclude_channels",
     "map_channel",
     "map_channels",
@@ -952,7 +953,7 @@ class AudioPlanner:
         # 以"有效映射"(显式或派生) 为基准, 避免把当前顺序误当成选择顺序
         current = [
             str(e.get("source_channel_id") or "")
-            for e in _effective_mapping(self.plan)
+            for e in effective_mapping(self.plan)
         ]
         if idx > len(current):
             raise AudioValidationError(
@@ -1098,14 +1099,19 @@ def _is_identity_over_selection(
     且流内声道按自然顺序、各流之间按来源/流顺序连续排列。满足它就是
     "整流原样保留", 生产路径可以走 `-map` + `copy`。
     """
-    entries = _effective_mapping(plan, channel_ids)
+    entries = effective_mapping(plan, channel_ids)
     return _is_full_stream_identity(plan, entries)
 
 
-def _effective_mapping(
+def effective_mapping(
     plan: AudioPlan, channel_ids: Sequence[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """有效映射 = 显式 mapping 优先, 否则由选择顺序派生 (derived)。"""
+    """有效映射 = 显式 mapping 优先, 否则由选择顺序派生 (derived)。
+
+    这是**公开**入口: 它是"输出声道集合与顺序"在 `-map` 规格侧的唯一定义,
+    被 validation / spec 构造 / `core.audio_timeline` 共同消费。参数、返回值
+    与 mapping 语义均未改变 (v0.7.1 RC1 只是把私有名提升为公开名)。
+    """
     if plan.channel_mapping:
         entries = [
             dict(e) for e in plan.channel_mapping
@@ -1116,6 +1122,11 @@ def _effective_mapping(
     ids = list(channel_ids if channel_ids is not None
                else plan.selected_channels)
     return _mapping_entries(plan, ids)
+
+
+# 兼容别名: v0.7.1 RC1 之前本函数是私有的, 保留旧名指向同一实现
+# (**不是**第二套实现), 以免打断既有调用点。
+_effective_mapping = effective_mapping
 
 
 def _stream_signature(plan: AudioPlan, source_id: str, stream_index: int):
@@ -1287,7 +1298,7 @@ def validate_mapping(plan: AudioPlan) -> list[AudioValidationIssue]:
         V8 audio_mix_not_supported   N 源声道 -> 1 输出声道
     """
     issues: list[AudioValidationIssue] = []
-    entries = _effective_mapping(plan)
+    entries = effective_mapping(plan)
     if not entries:
         if plan.selected_channels:
             issues.append(AudioValidationIssue(
@@ -1448,7 +1459,7 @@ def _build_output_tracks(plan: AudioPlan) -> list[AudioOutputTrack]:
 
     本阶段不会产生 `MIXING` 单元: 一个输出声道只有一个源声道。
     """
-    entries = _effective_mapping(plan)
+    entries = effective_mapping(plan)
     if not entries:
         return []
     by_id = {c.id: c for c in plan.all_channels()}
@@ -1590,7 +1601,7 @@ def build_audio_map_spec(plan: AudioPlan) -> AudioMapSpec:
     warnings = [i.detail for i in issues
                 if i.severity is AudioValidationSeverity.WARNING]
 
-    entries = _effective_mapping(plan)
+    entries = effective_mapping(plan)
     operations = _operations_for(plan, entries) if not errors else []
     full_copy = bool(not errors and entries and _is_full_stream_identity(
         plan, entries

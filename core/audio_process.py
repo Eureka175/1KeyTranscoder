@@ -37,7 +37,7 @@ from .audio_pcm import (
 )
 from .audio_plan import (
     REASON_AUDIO_MIX_NOT_SUPPORTED,
-    _effective_mapping,
+    effective_mapping,
     validate_selection,
 )
 from .audio_mix import (
@@ -126,7 +126,7 @@ def _pcm_facing_issues(plan: AudioPlan) -> list[AudioRenderIssue]:
             severity=issue.severity.value,
             location=issue.location,
         ))
-    if not _effective_mapping(plan):
+    if not effective_mapping(plan):
         issues.append(AudioRenderIssue(
             reason=REASON_AUDIO_TIMELINE_INVALID,
             detail="audio plan has no effective mapping (nothing to render)",
@@ -138,7 +138,7 @@ def validate_render_plan(plan: AudioPlan) -> list[AudioRenderIssue]:
     """PCM 渲染路径的**完整**校验 (稳定 reason code 列表, 空 = 通过)。"""
     issues = _pcm_facing_issues(plan)
     seen: set[str] = set()
-    for entry in _effective_mapping(plan):
+    for entry in effective_mapping(plan):
         cid = str(entry.get("source_channel_id") or "")
         if cid in seen:
             issues.append(AudioRenderIssue(
@@ -556,8 +556,13 @@ def run_audio_render(
         total = result.frames * max(1, result.output_channels)
         if mixer is not None:
             result.mix_stats = mixer.stats
+            # 逐输入几何查 **base timeline** (未混音的源声道身份):
+            # `mixing_timeline()` 把输出声道身份换成了 `mix0`/`mix1`,
+            # 拿它去查 `camera:s0:c0` 之类必然 miss -> 恒定 total=0 ->
+            # silence_samples 恒报满。routing 图下 timeline 本就是 base,
+            # 因此这一处修正不影响既有路由行为。
             result.silence_samples = max(
-                0, total - _count_faithful_mix(mixer, timeline)
+                0, total - _count_faithful_mix(mixer, base_timeline)
             )
         else:
             result.silence_samples = max(
@@ -596,7 +601,12 @@ def _iter_blocks(source: Any, chunk_frames: int) -> Any:
 
 
 def _count_faithful_mix(mixer: Any, timeline: AudioTimeline) -> int:
-    """混音路径下"至少有一个输入真实供数"的输出样本数 (逐 sink 并集)。"""
+    """混音路径下"至少有一个输入真实供数"的输出样本数 (逐 sink 并集)。
+
+    ⚠️ `timeline` **必须是 base timeline** (未混音的那张), 因为逐输入的
+    身份是源声道 (`camera:s0:c0`), 而 `mixing_timeline()` 产出的声道身份
+    是 `mixN` —— 传混音 timeline 会让所有 lookup miss, 恒定返回 0。
+    """
     total = 0
     for sink in mixer.bus.sinks:
         spans: list[tuple[int, int]] = []

@@ -868,6 +868,12 @@ compressor / limiter / AGC。增益必须有限且非负（负增益 → `audio_
 | 真实 A7M5 + 外挂 4CH WAV 多来源混音 | `audio mix v0.7.1`（L3） | 6 断言全通过 |
 | 全量 L1 | `--level unit` | **388 PASS / 0 FAIL** |
 | 全量 L3 | `--level full` | **507 PASS / 0 FAIL**（unit 388 + toolchain 16 + full 103） |
+| **RC1 修正后** 全量 L1 | `--level unit` | **390 PASS / 0 FAIL** |
+| **RC1 修正后** 全量 L3 | `--level full` | **509 PASS / 0 FAIL**（unit 390 + toolchain 16 + full 103） |
+
+> 未标注 **RC1 修正后** 的两行是 **Phase 3B 完成时**的实测值；标注的两行是
+> RC1 修正后（本文件 §29–§32）的实测值 —— 新增 1 条混音静音回归 + 1 条
+> routing 静音对照，**无 FAIL**，既有断言一条未改。
 
 确定性断言要点:
 
@@ -910,5 +916,97 @@ Selective MP4 retention ❌
 自动跨文件时间轴对齐 ❌
 漂移校正 ❌
 ```
+
+---
+
+# RC1 修正与冻结（v0.7.1-rc1 之前）
+
+## 29. 修正：混音图的 `silence_samples` 统计（F1）
+
+`AudioRenderResult.silence_samples` 在 **mixing** 图下恒定错误地报"全程静音"。
+
+原因：`run_audio_render()` 把 `mixing_timeline()` 的产物传给了
+`_count_faithful_mix()`，而混音 timeline 的输出声道身份是 `mix0`/`mix1`；
+该函数却按**源**声道（`camera:s0:c0`）去 lookup，必然全部 miss → `total = 0`
+→ `silence_samples = frames × output_channels`。
+
+| 图 | 1000f + 400f, 1 输出声道 | 修正前 | 修正后 |
+|---|---|---|---|
+| routing | source A 1ch + source B 1ch（2 输出声道） | 600 ✓ | **600** ✓ |
+| mixing | A×0.5 + B×0.5（1 输出声道） | ~~1000~~ ✗ | **0** ✓ |
+
+修正方式：逐输入几何一律查**未混音的 base timeline**（`core/audio_process.py`），
+并在 `_count_faithful_mix()` docstring 里写明该前提。
+**未改动**：`AudioMixer` / `AudioTimeline` / EOF policy / 实际 PCM 输出 /
+混音 timeline 的 `mixN` 输出身份 / routing 行为。
+
+回归：`l1.p3b.silence_samples 走 base timeline (混音图不恒报满)` 与
+`l1.p3a.silence_samples (routing 1000f+400f, 2 输出声道) = 600`。
+（已验证：撤掉修正后前者立刻 FAIL，detail 恰为 `silence=1000 total=1000`。）
+
+## 30. 修正：`effective_mapping` 提升为公开入口（F6）
+
+`core/audio_plan._effective_mapping()` 被 `core/audio_timeline.py` 直接 import，
+形成 `Timeline → Plan` 的**私有名跨层依赖**。
+
+* `core/audio_plan.py`：`_effective_mapping` → **`effective_mapping`**（公开，
+  进入 `__all__`）；参数、返回值、mapping 语义**完全未变**；
+* 保留 `_effective_mapping = effective_mapping` 作为**兼容别名**（同一实现，
+  不是第二套）；
+* `core/audio_timeline.py` / `core/audio_process.py` 一律引用公开名；
+* 项目代码中私有旧名**只剩别名那一行**。
+
+未改动任何 JSON、任何测试预期、任何 mapping 行为。
+
+## 31. 冻结：输出权威的分工（F5）
+
+```text
+输出音频集合与顺序的唯一权威 = AudioTimeline
+    routing 图: output_channel_ids = 源声道身份      (camera:s2:c2)
+    mixing  图: output_channel_ids = 合成身份        (mix0 / mix1)
+
+AudioMapSpec = -map / stream-copy / channel-filter 路径的执行规格
+    strategy == MIXING  → 该路径**不可直接执行**, 必须转入 PCM processing graph
+                        （不是"计划非法"）
+```
+
+`AudioMapSpec` **并未失效**：它定义的输出顺序来自 `effective_mapping()`，
+而 `AudioTimeline` 消费的正是同一个函数，两者不会分叉。详见
+`docs/design/architecture.md` §6.1.11。
+
+## 32. 冻结：RC 边界（不保证兼容的部分）
+
+以下对象在 v0.7.1-rc1 被显式标注为内部/预留 —— **Phase 4 不得依赖**：
+
+```text
+AudioPlan.channel_map / wav_outputs   reserved, 零写入者, 语义未定, 不保证兼容
+AudioOutputSpec.kind                  当前唯一合法值 "wav"; Phase 4B 可替换为枚举
+AudioMixer.output_format              internal (仅服务面向 WAV 的混音)
+AudioMixer.frames()                   INTERNAL (契约与 AudioRouter.frames() 不一致)
+AudioMixer.render_to()                INTERNAL (当前无调用者)
+AudioPCMReader.read()                 not thread-safe (共享 handles + 绝对 seek;
+                                      当前串行调用无问题, Phase 5/6 并行化须重新设计)
+AudioPlan.notes                       stable string only, 非机器可读元数据契约
+```
+
+reason codes 中有**两个 reserved、当前生产路径不可达**：
+
+```text
+audio_sync_offset_invalid       _effective_offset() 对非法 offset 静默回退 0
+audio_pcm_format_unsupported    audio_pcm 解码路径无此拒绝; 该字符串目前由
+                                core/audio_wav 以字面量形式发出
+```
+
+二者**不是** active runtime error，不得据此编写分支逻辑。
+
+序列化字段策略（自 v0.7.1 起）：
+
+```text
+新增字段: 默认可选, 为默认值时不写出 (旧 JSON 缺失该键必须照常工作)
+删除字段: 必须递增 AUDIO_MODEL_VERSION; 不做 migration framework
+未知键 / 未知 enum: 一律容错 (忽略 / 回退安全默认) —— 宁可"未知", 不可"猜"
+```
+
+详见 `docs/design/architecture.md` §6.1.12 / §6.1.13。
 
 

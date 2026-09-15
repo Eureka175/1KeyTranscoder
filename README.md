@@ -284,8 +284,11 @@ AudioMapSpec      可 dry-run 的执行规格（策略分类 + 完整身份，�
   `recheck_failed` / `failed`。
 - **Selection ≠ Mapping ≠ Mixing**：选择与映射都**不做任何样本运算**；
   `camera CH1 + camera CH3` 的选择结果就是两个独立源声道，不会自动合成。
-  任何 "N 源声道 -> 1 输出声道" 一律返回 **`audio_mix_not_supported`**
-  （本阶段**完全禁止 Mixing**，代码里也没有增益/求和路径）。
+  在 **`-map` 规格侧**，任何 "N 源声道 -> 1 输出声道" 一律返回
+  **`audio_mix_not_supported`**（ffmpeg argv 表达不了样本级合成）；
+  **PCM 路径侧**由 P3B 的 `AudioMixer` 显式实现同一语义（`MixBus` 的
+  N 输入求和），二者并存 —— 详见下节与
+  [docs/release_notes_v0.7.1.md](docs/release_notes_v0.7.1.md)。
 - **不猜测**：`sample_format` 取 ffprobe 原样名字（缺失/未知 → `unknown`）；
   `channel_layout` 可能为空，此时按 `C0/C1/…` positional 命名（**不丢流**、
   不冒充标准声道语义）；`role` 一律 `unknown`，只能由上层显式赋值
@@ -537,12 +540,13 @@ python tests\full_autotest.py --level full        # L3 + 真实管线集成 + �
 python tests\full_autotest.py --level all         # 等同 full
 ```
 
-> 当前基线（v0.7.1 Phase 3B）：**L1 = 388 PASS / 0 FAIL**；
-> **`--level full` = 507 PASS / 0 FAIL**（unit 388 + toolchain 16 + full 103；
-> v0.7.0 hardware decode + v0.7.1 音频 Phase 1/2/3A/3B 全部并入 `main` 后实测）。
+> 当前基线（v0.7.1）：**L1 = 390 PASS / 0 FAIL**；
+> **`--level full` = 509 PASS / 0 FAIL**（unit 390 + toolchain 16 + full 103；
+> v0.7.0 hardware decode + v0.7.1 音频 Phase 1/2/3A/3B + RC1 修正全部并入
+> `main` 后实测）。
 > 任何改动后必须复核不出现新增 FAIL。
 
-- **L1 unit**（388 项）：color token 表、caps 解析、格式规划、失败分类、
+- **L1 unit**（390 项）：color token 表、caps 解析、格式规划、失败分类、
   flag 构造、probe/paths、源分类、缩放引擎、gpac parse_info、dji facts、
   channel-sync 纯逻辑、**channel-sync 内存回归（有界窗口流 / 窗口切片一致 /
   64 MB 整轨扫描后工作集增量 ≤32 MB）**、AV1 档位与参数映射、
@@ -663,16 +667,20 @@ olddocs/                 历史档案存档（各阶段代码快照 / 被取代�
   - QSVEncC 补丁仅对 pinned 8.26 成立（8.27–8.30 未检验），NVEncC 补丁
     仅在 9.31（`2cb9d810`）验证；
   - `tests/hwdecode/` 矩阵**不在** `--level full` 内，需单独跑。
-- **音频模型（v0.7.1 Phase 1 + Phase 2）当前是纯内部能力层**：
+- **音频模型与 PCM 处理（v0.7.1 Phase 1 + Phase 2 + Phase 3A/3B）当前是
+  内部能力层**：
   - 不改变默认音频路径（仍为全流 `-c:a copy`）与 MP4 输出；没有新增 CLI；
-  - AudioTrack/AudioPlan 里的 track 同步结果**不会被应用到任何 ffmpeg 命令**
-    （Phase 2 才接执行层）；
-  - **Mixing 被结构性禁止**：任何 "N 源声道 -> 1 输出声道" 返回
-    `audio_mix_not_supported`；代码里没有增益/求和路径；
-  - **选择与映射已实现**（`core/audio_plan.py`），但只产出 dry-run 规格
-    （策略分类 + 身份），**不生成 filtergraph、不执行 ffmpeg**；
-  - **未实现**：Mixing / WAVE 导出 / selective MP4 retention / 重采样 /
-    漂移校正 / 新音频 CLI / 自动跨文件同步。
+  - **已实现**：音频模型、来源/选择/映射、`AudioMapSpec` dry-run 规格、
+    PCM 处理链（`AudioTimeline` 时长/EOF/offset 权威 → canonical float32
+    Reader → 路由**或**混音 → WAV 导出）、`AudioRenderResult`；
+  - **Mixing**：PCM 路径已实现（`core/audio_mix.py`，N→1 + 线性 gain +
+    float32 累加 + `ClipPolicy`）。但 `-map` 规格侧仍以
+    `audio_mix_not_supported` 拒绝 —— 那是 ffmpeg argv 表达不了样本级合成，
+    两条路径并存，不是矛盾；
+  - 选择与映射只产出 dry-run 规格（策略分类 + 身份），**不生成 filtergraph、
+    不执行 ffmpeg**；PCM 链路只在显式调用 `run_audio_render()` 时才跑；
+  - **未实现**：selective MP4 retention / 音频编码 + mux / 重采样 /
+    漂移校正 / 自动跨文件同步 / 新音频 CLI（完整清单见上节 ⚠️）。
   - 模型不做 role 自动推断，也不会把未知 channel_layout 当成已知布局。
 
 ## 许可证
@@ -696,10 +704,9 @@ git tag -l                         # pre_S1S5 / post_S1S5 / pre_ui / post_1kt_ui
                                    # post_av1 / post_av1_calib / v0.5.0 / v0.5.1
                                    # v0.6.0 (HEVC+AV1 合并主线, 含 AV1 色彩保真修复)
                                    # v0.6.1 (channel-sync 流式内存修复)
-                                   # v0.7.0 (hardware decode integration, 已并入 main)
-                                   # v0.7.1 (音频模型 Phase 1 + Phase 2, 当前)
-                                   # v0.7.0 (v0.7 线基线)
-                                   # v0.7.1 (音频轨道模型层, 默认音频路径不变)
+                                   # v0.7.0 (hardware decode integration, v0.7 线基线)
+                                   # v0.7.1 (音频处理架构与 PCM 管线, 当前)
+                                   # v0.7.1-rc1 (RC freeze, 与 v0.7.1 同一 commit)
 git checkout backup/pre-av1-main-merge   # AV1 合并进 main 之前的状态 (回滚点)
 ```
 
