@@ -28,8 +28,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
+from .audio_execution import mix_intent_bus
 from .audio_models import AudioPlan
 from .audio_pcm import (
     PCM_CHUNK_FRAMES_DEFAULT,
@@ -468,8 +469,10 @@ def run_audio_render(
         result.warnings.extend(base_timeline.warnings)
 
         # ---- 图的选择: 同一张图, 只换节点 (Routing / Mixing) ----------
+        # 混音意图的判定**只有一份实现** (`core.audio_execution`), 与
+        # `resolve_audio_execution_path()` 共用; 这里不保留私有副本。
         mixer = None
-        bus = _resolve_mix_bus(plan, mix_bus)
+        bus = mix_intent_bus(plan, mix_bus)
         if bus is not None:
             issues = validate_mix_bus(plan, bus)
             if issues:
@@ -633,36 +636,6 @@ def _count_faithful_mix(mixer: Any, timeline: AudioTimeline) -> int:
                 cursor = hi
         total += covered
     return int(total)
-
-
-def _resolve_mix_bus(plan: AudioPlan, mix_bus: Any) -> Any:
-    """决定本次渲染是否走混音, 并给出 MixBus (None = 纯路由)。
-
-    * 显式传入 `mix_bus` -> 用它 (single bus);
-    * 否则 `plan.mix_buses` 非空 -> 用它 (首个 bus; 多 bus 目前不支持);
-    * 否则 `plan.mix_mode` 非空 -> 全部选中声道 N->1 求和;
-    * 否则 None (Phase 3A 路由路径, 行为完全不变)。
-    """
-    from .audio_mix import build_mix_buses, mix_buses_of
-
-    if mix_bus is not None:
-        from .audio_mix import MixBus as _MixBus
-
-        return mix_bus if isinstance(mix_bus, _MixBus) else _MixBus.from_dict(
-            mix_bus if isinstance(mix_bus, Mapping) else {}
-        )
-    buses = mix_buses_of(plan)
-    if buses:
-        return buses[0]
-    if not plan.mix_mode:
-        return None
-    mode = str(plan.mix_mode)
-    derived = build_mix_buses(plan, mix_mode=mode, collapse=True)
-    if len(derived) > 1:
-        derived[0].notes.append(
-            "only the first mix bus is rendered in this phase"
-        )
-    return derived[0] if derived else None
 
 
 def _count_faithful(

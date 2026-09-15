@@ -1,9 +1,13 @@
-# 下一开发周期 — 任意 reference 的音频延迟矫正
+# 下一开发周期 — 任意 reference 延迟矫正 + Phase 4A 选择性 MP4 音频保留
 
 > **状态**：已实现（**尚未发布**，未分配版本号；不属于 v0.7.1）
 > **基线**：`v0.7.1`（tag `v0.7.1`，commit `e613b07`）
-> **范围**：只做 constant sample offset。漂移校正 / resampling / time-stretch /
-> 编码 / mux / 新 CLI **均未实现**。
+> **范围**：
+> * 任意 reference 的**恒定**样本偏移矫正（第 1–10 节）；
+> * Phase 4A 选择性 MP4 音频保留（第 11 节）。
+>
+> 漂移校正 / resampling / time-stretch / **音频编码** / PCM 写回 / 新 CLI
+> **均未实现**。
 >
 > v0.7.1 的发布说明在 [`release_notes_v0.7.1.md`](release_notes_v0.7.1.md)，
 > 已随 tag `v0.7.1` 冻结，**本文件不改写其任何语义**。
@@ -173,7 +177,7 @@ resampling（采样率不一致直接拒绝, 不偷偷转换）
 time-stretch / 变速 / 插值 / 分数样本修正
 loudness normalization / LUFS / AGC / limiter / compressor / EQ /
 降噪 / 频谱处理
-音频编码 / MP4 mux / selective MP4 retention
+音频编码 / PCM 写回编码音轨（Phase 4B）
 新 CLI（--audio-* 全部未开放）
 多 bus 同时渲染
 ```
@@ -192,4 +196,140 @@ loudness normalization / LUFS / AGC / limiter / compressor / EQ /
 * 真实素材实测（A7M5 4×mono）四路音频本身全静音，因此以 camera 轨作
   reference 时必然 `sync_insufficient_signal`；外挂 WAV 可正常作
   reference 并对其余可测声道估计。
+
+---
+
+# Phase 4A — 选择性 MP4 音频保留
+
+## 11. 目标与结论
+
+把已稳定的 `AudioPlan` / `AudioMapSpec` / `AudioTimeline` 链路接到**最终
+容器输出**上：用户可以选择性保留 / 重排 / 舍弃原始 MP4 音频，而**不**强制
+重新编码音频。
+
+**与视频完全解耦**：音频的选择与保留是独立决定。`core/audio_execution.py`
+与 `core/audio_retention.py` 不 import `encoders/` / `preservation/` /
+`core.batch_hw`，API 里没有任何视频参数，也不构造 `-c:v`。回归以 AST 检查
+import 集合与公开参数名来钉住这一点。
+
+```text
+Input MP4
+ ├─ Video ──────────────→ output (本层不参与决定)
+ └─ Audio ── select/copy ┐
+                         ├→ output MP4
+External WAV（未来）─────┘
+```
+
+## 12. 执行图判定：`AudioExecutionPath`
+
+v0.7.1 里"路由 vs 混音"藏在 `run_audio_render()` 内部。Phase 4A 把它提出来
+成为**唯一**的显式概念：
+
+```text
+AudioPlan
+    ↓  resolve_audio_execution_path()      core/audio_execution.py
+NONE / STREAM_COPY / PCM_ROUTE / PCM_MIX
+```
+
+| path | 判据 | 由谁执行 |
+|---|---|---|
+| `NONE` | 无计划 / 无选中声道 | 生产默认 `-map 0` + `-c:a copy`（不经本层） |
+| `STREAM_COPY` | 输出恰为若干条**完整源流的自然顺序** | `-map` + `-c:a copy` |
+| `PCM_ROUTE` | 源声道的**子集 / 重排** | `core.audio_route`（PCM） |
+| `PCM_MIX` | 需要样本级合成 | `core.audio_mix`（PCM） |
+
+* **判定只有一份实现**：`core.audio_process` 的私有 `_resolve_mix_bus()`
+  已删除，改为 import `core.audio_execution.mix_intent_bus()`；结构校验复用
+  `validate_render_plan()`。优先级（显式 bus → `plan.mix_buses` →
+  `plan.mix_mode`）与抽离前逐条一致。
+* 回调用 `run_audio_render()` 真跑三种 plan，断言"显式判定 == 实际选中
+  的图"（路由 / 混音逐例一致），因此抽离不会与实现分叉。
+* `STREAM_COPY` 的判据**比 `AudioMapSpec.strategy` 更严格**：`-map` 的位置
+  语义使然（见 §13）。
+
+## 13. 选择性保留：`AudioRetentionSpec`
+
+```text
+AudioPlan (+ AudioTimeline)
+    ↓  build_audio_retention()             core/audio_retention.py
+AudioRetentionSpec
+    ├─ default_plan=True  ->  arguments() == []     （默认路径: 什么都不做）
+    ├─ no_audio=True      ->  ["-an"]
+    ├─ 全部 COPY          ->  ["-map", sel, …, "-c:a", "copy"]
+    └─ 需要 PCM           ->  arguments() 抛异常     （Phase 4B）
+```
+
+* 选择器一律 `"<input>:a:<audio_position>"`。**输入前缀必须显式写出**：
+  `-map a:0` 在 ffmpeg 里不是"第一个输入的第 0 条音频"（缺输入前缀时按流
+  索引解释）。`input_index` 为 `None` 明确落成 `0`。
+* `stream_index`（容器索引）与 `audio_position`（`-map 0:a:N` 的 N）严格
+  区分，**绝不**用前者顶替后者。
+* **顺序权威是 `AudioTimeline.output_channel_ids`**：与本层从
+  `AudioMapSpec` 推出的顺序不一致即 `audio_retention_order_mismatch` 并
+  拒绝 —— 不允许两个顺序真相。
+* COPY 单元必须构成输出的**前缀**，否则纯 `-map` 拼接会给出错误音轨顺序。
+* `MIXING` 是**转交信号**（交回 PCM 图），不是"计划非法"：无 `-map`、
+  `executable=False`。
+* 身份仍是 `source → stream → channel`，**不引入** `mp4_audio_index`。
+
+## 14. 默认路径不变（最硬的回归）
+
+```text
+AudioPlan = None  ->  default_plan == True  ->  arguments() == []
+                  ->  既有 `-map 0` + `-c:a copy` 原样保留
+```
+
+"不变"靠**什么都不做**保证：本层不重拼默认 argv。默认规格的
+`stream_copyable` 为 `False`（没有输出单元），避免被误读成"保留成功了"。
+
+## 15. 测试
+
+| 级别 | 用例数 | 内容 |
+|---|---|---|
+| L1 `audio retention/mp4 v0.8 (Phase 4A)` | 36 | 选择器构造、四条路径、身份、顺序权威、视频解耦、报告契约 |
+| L3 `audio retention/mp4 v0.8 (Phase 4A)` | 26 | 真实 ffmpeg + ffprobe：产物音轨数量 / 顺序 / codec / 逐样本 |
+
+总计 `--level unit` **457 PASS / 0 FAIL**、`--level full` **607 PASS /
+0 FAIL**（重构前基线 421 / 545）。
+
+L3 的关键证据（全部实测）：
+
+```text
+真实素材         1 video + 4×mono PCM, 容器 index 1..4 / audio_position 0..3
+全保留           4 条音轨, codec pcm_s16le 原样（未重编码）
+删除 s3          输出 3 条; 逐样本 == 源的第 0/1/3 条（顺序 + 内容都对）
+reorder [2,0,3,1] 输出 4 条; out0==src2, out1==src0, out2==src3, out3==src1
+4CH 取单声道      拒绝 stream copy（PCM_ROUTE, 由既有 PCM 图承担）
+多声道整流        1 条 -map 0:a:0 + -c:a copy
+真实 A7M5 4×mono  ["-map","0:a:0",…,"0:a:3","-c:a","copy"]; 删 2 条 -> (1,3)
+默认（无计划）    arguments() == [] 且 -map 0 + -c:a copy 仍保留 4 条
+视频重编码        同一音频规格的音轨集合不变（音频决定与视频策略无关）
+2×2CH 交错顺序    每条流声道不相邻 -> PCM_ROUTE（拒绝 -map）
+```
+
+## 16. 本阶段新增的 reason codes（稳定契约）
+
+```text
+audio_retention_source_missing             (core/audio_retention)
+audio_retention_selector_unknown
+audio_retention_order_mismatch
+audio_retention_channel_filter_unsupported
+audio_retention_execution_invalid
+```
+
+`core/audio_execution.py` 不新增 reason code —— 它的 `issues` 直接携带
+`validate_render_plan()` / `validate_mix_bus()` 的既有稳定 reason，避免同一
+件事有两个名字。
+
+## 17. 明确未实现（Phase 4A 边界）
+
+```text
+音频编码（AAC / Opus / …）
+PCM 写回编码音轨（routed packet 的 encode + mux write-back）
+声道过滤 filtergraph
+码率 / 质量参数
+MP4 mux 的完整实现（含 GPAC 路径）
+新 CLI（仍为库级能力, 生产默认路径不增加开关）
+drift correction / resampling（沿用上一周期边界）
+```
 

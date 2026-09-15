@@ -58,12 +58,17 @@ CURRENT_LEVEL = "L1"
 
 
 def record(name: str, ok: bool, detail: str = "", level: str = "") -> None:
+    # `detail` 在本层规范化为字符串: 它是**报告**字段 (会被切片渲染并写进
+    # Markdown), 任何非字符串 (dict/list/…) 都会让整个报告落盘在最后一步
+    # 崩掉 —— 用例全绿却写不出报告, 是最难查的一类失败。这里容错, 而不是
+    # 让它在报告层爆掉。
+    detail_text = detail if isinstance(detail, str) else repr(detail)
     RESULTS.append(
         {
             "name": name,
             "level": level or CURRENT_LEVEL,
             "status": "PASS" if ok else "FAIL",
-            "detail": detail,
+            "detail": detail_text,
         }
     )
 

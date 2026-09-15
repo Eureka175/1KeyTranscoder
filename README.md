@@ -121,14 +121,16 @@ Current release: **v0.7.1** (`VERSION` = `0.7.1`, tag `v0.7.1`).
 | WAV export (PCM16 / PCM24 / PCM32 / float32) | Available (internal API, no CLI) |
 | PCM mixing (N→1, linear gain, clipping detection) | Available (internal API, no CLI) |
 | Arbitrary-reference delay correction | Implemented on `main`; **not part of the v0.7.1 release** and not documented in its release notes |
-| Selective MP4 audio retention | Not implemented (planned, Phase 4A) |
-| Audio encoding / mux into MP4 | Not implemented (planned, Phase 4B) |
+| Audio execution-path resolution (`NONE` / `STREAM_COPY` / `PCM_ROUTE` / `PCM_MIX`) | Implemented on `main` (Phase 4A; internal API) |
+| Selective MP4 audio retention (keep / drop / reorder original audio streams) | Implemented on `main` (Phase 4A; internal API, no CLI). Channel-filter and mixing outputs are **refused** rather than faked as stream copy |
+| Audio encoding / PCM write-back into MP4 | Not implemented (planned, Phase 4B) |
 | Automatic cross-file synchronization | Not implemented |
 | Drift correction / resampling | Not implemented |
 | Audio CLI flags (`--audio-tracks`, `--audio-map`, `--audio-source`) | Not implemented |
 
 "Internal layer" means the code exists, is unit- and integration-tested, and is reached
-only by explicit API calls such as `core.audio_process.run_audio_render()`. The default
+only by explicit API calls such as `core.audio_process.run_audio_render()` or
+`core.audio_retention.build_audio_retention()`. The default
 production path is not changed and no new command-line flag is exposed.
 
 ## Requirements
@@ -377,9 +379,10 @@ These numbers are assertion counts from the automated regression suite at the re
 freeze. They are not a new full production transcoding benchmark: the release was cut
 without a fresh end-to-end encode/transcode campaign on production material.
 
-On current `main` the L1 suite reports 421 PASS / 0 FAIL, the difference being work merged
-after the v0.7.1 tag (arbitrary-reference audio delay correction). Any change must be
-re-checked for new failures.
+On current `main` the L1 suite reports 457 PASS / 0 FAIL and `--level full` reports
+607 PASS / 0 FAIL, the difference being work merged after the v0.7.1 tag
+(arbitrary-reference audio delay correction, then Phase 4A selective MP4 audio
+retention). Any change must be re-checked for new failures.
 
 `tests/full_autotest.py` is a thin compatibility entry point: the CLI, exit code and
 report format are unchanged, while the implementation lives in the `tests/selftest/`
@@ -400,6 +403,7 @@ tests/selftest/
 │   ├── audio_route.py           channel routing, WAV export, chunk invariance
 │   ├── audio_mix.py             PCM mixing, graph equivalence
 │   ├── audio_sync.py            arbitrary-reference delay correction
+│   ├── audio_retention.py       Phase 4A: execution path + selective MP4 retention
 │   ├── audio_integration.py     L3 audio integration on real material
 │   ├── pipeline.py              L3 full pipeline + fault injection
 │   ├── hardware.py              L3 channel-sync end to end

@@ -618,6 +618,119 @@ sync_insufficient_signal       sync_estimation_failed
 
 ---
 
+## 6.3 Phase 4A：音频执行图判定 + 选择性 MP4 音频保留（**不属于 v0.7.1**）
+
+> ⚠️ **版本边界**：v0.7.1 已发布（tag `v0.7.1` = `e613b07`）。本节是 v0.7.1
+> **之后**的增量，不是 v0.7.1 的内容。6.1.x 冻结的是已发布行为，6.2 是
+> arbitrary-reference，本节是 Phase 4A。
+
+### 6.3.1 解决的问题
+
+v0.7.1 里"走路由还是走混音"这个决定**藏在** `run_audio_render()` 内部，
+任何要接入最终容器输出的代码都得把这套判断抄一遍 —— 那等于两套图选择
+逻辑，迟早分叉。Phase 4A 把它提出来成为显式概念。
+
+### 6.3.2 `AudioExecutionPath`：唯一的图判定
+
+```text
+AudioPlan
+    ↓
+resolve_audio_execution_path()          core/audio_execution.py
+    ↓
+NONE / STREAM_COPY / PCM_ROUTE / PCM_MIX
+```
+
+| path | 含义 | 谁能执行 |
+|---|---|---|
+| `NONE` | 无计划 / 无选中声道 | 生产默认 `-map 0` + `-c:a copy`（不经本层） |
+| `STREAM_COPY` | 输出恰为若干条**完整源流的自然顺序** | `-map` + `-c:a copy` |
+| `PCM_ROUTE` | 输出是源声道的**子集 / 重排** | `core.audio_route`（PCM） |
+| `PCM_MIX` | 需要样本级合成 | `core.audio_mix`（PCM） |
+
+**判定只有一份实现**：混音意图用 `core.audio_execution.mix_intent_bus()`
+（`audio_process.py` 直接 import 它，私有副本已删除）；结构校验复用
+`validate_render_plan()`。优先级（显式 bus → `plan.mix_buses` →
+`plan.mix_mode`）与抽离前逐条一致，并由回归钉住"显式判定 == 真实渲染"。
+
+`STREAM_COPY` 的判据比 `AudioMapSpec.strategy` **更严格**：`-map` 的位置
+语义是"每个 `-map` 参数按顺序占用输出流编号"，而 `-map <in>:a:<pos>` 必然
+带出该流的**全部**声道且顺序固定。因此只有"每条流各自完整、连续、自然
+顺序"才可 copy；`k` 条 mono 流互换顺序**仍是** copy（每条流各自完整）。
+"单条 4CH 流取第 2 声道"不是 copy —— 必须走 PCM。
+
+### 6.3.3 选择性保留：`AudioRetentionSpec`
+
+```text
+AudioPlan (+ AudioTimeline)
+    ↓
+build_audio_retention()                 core/audio_retention.py
+    ↓
+AudioRetentionSpec
+    ├─ default_plan=True   -> arguments() == []      (默认路径: 什么都不做)
+    ├─ no_audio=True       -> ["-an"]
+    ├─ 全部 COPY           -> ["-map", sel, …, "-c:a", "copy"]
+    └─ 需要 PCM            -> arguments() 抛异常      (Phase 4B)
+```
+
+* 选择器一律 `"<input>:a:<audio_position>"`。**输入前缀必须显式写出**：
+  `-map a:0` 在 ffmpeg 里不是"第一个输入的第 0 条音频"，缺输入前缀时会
+  按流索引解释。`input_index` 为 `None` 明确落成 `0`，绝不省略。
+* **顺序权威是 `AudioTimeline.output_channel_ids`**：与本层从
+  `AudioMapSpec` 推出的顺序不一致即 `audio_retention_order_mismatch`
+  并拒绝执行 —— 不允许出现两个顺序真相。
+* COPY 单元必须构成输出的**前缀**，否则纯 `-map` 拼接会给出错误音轨顺序
+  （`audio_retention_channel_filter_unsupported`）。
+* `MIXING` 是**转交信号**，不是"计划非法"：`executable=False`、无 `-map`、
+  交回 PCM 图。
+
+### 6.3.4 与视频完全解耦
+
+音频的选择与保留是**独立决定**：`core/audio_execution.py` /
+`core/audio_retention.py` 不 import `encoders/` / `preservation/` /
+`core.batch_hw`，API 中没有 `profile` / `crf` / `pix_fmt` 等视频参数，也不
+构造任何 `-c:v`。回归以**结构性**方式断言这一点（AST 检查 import 集合与
+公开参数名），而不是靠字符串扫描文档。
+
+`-c:v copy` 只出现在测试里，作用是给输出容器一个视频上下文（证明音频决定
+不受视频处理影响），**不是**本层的行为。
+
+### 6.3.5 默认路径不变
+
+```text
+AudioPlan = None  ->  AudioRetentionSpec.default_plan == True
+                  ->  arguments() == []
+                  ->  既有 `-map 0` + `-c:a copy` 原样保留
+```
+
+"不变"是靠**什么都不做**保证的：本层不重拼默认 argv，`build_audio_retention
+(None)` 返回空参数。默认规格的 `stream_copyable` 为 False（没有输出单元），
+避免被误当成"选择性保留成功了"。
+
+### 6.3.6 明确边界（Phase 4A **不**做）
+
+```text
+音频编码 (AAC / Opus / …)           PCM 写回编码音轨
+声道过滤 filtergraph                码率 / 质量参数
+MP4 mux 的完整实现                  新 CLI (仍为库级能力)
+drift correction / resampling
+```
+
+### 6.3.7 本阶段新增的 reason codes（稳定契约）
+
+```text
+audio_retention_source_missing                   (core/audio_retention)
+audio_retention_selector_unknown
+audio_retention_order_mismatch
+audio_retention_channel_filter_unsupported
+audio_retention_execution_invalid
+```
+
+`core/audio_execution.py` 不新增 reason code: 它的 `issues` 直接携带
+`validate_render_plan()` / `validate_mix_bus()` 的既有稳定 reason
+(避免同一件事有两个名字)。
+
+---
+
 ## 7. 编码后验证：`--check` 三级
 
 | 级别 | Sony | DJI |
