@@ -21,7 +21,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..fixtures.audio import _raw_audio_stream
+from ..fixtures.audio import _make_av, _make_av_channels, _raw_audio_stream
 from ..fixtures.plans import _p3a_build_plan
 from ..paths import FFMPEG, IN_DIR, ffprobe_json, record, section, sh
 
@@ -482,64 +482,6 @@ def l1_audio_retention() -> None:
     record("p4a.所有 record() 的 detail 都是字符串表达式 (报告不崩)",
            not offenders, f"{offenders[:6]}")
 
-
-
-def _make_av(
-    dst: Path, streams: int, *, seconds: int = 1,
-) -> bool:
-    """`video + N 条 mono PCM s16le` 的确定性 MOV。
-
-    每条音轨用**不同频率**的 sine (440 + 110·i), 因此"哪条流到了哪个输出
-    音轨"是可解码验证的, 而不只是数量相等。
-    """
-    args: list[str] = [
-        "-v", "error", "-y",
-        "-f", "lavfi", "-i",
-        f"color=c=black:s=64x36:r=10:d={seconds}",
-    ]
-    for i in range(streams):
-        args += [
-            "-f", "lavfi", "-i",
-            f"sine=frequency={440 + 110 * i}:sample_rate=48000:"
-            f"duration={seconds}",
-        ]
-    args += ["-map", "0:v"]
-    args += ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "40",
-             "-pix_fmt", "yuv420p"]
-    # `-c:a N` 会被当成编解码器名字 ("N" 不存在) —— 编解码器只设一次,
-    # 逐**输出流**的声道数用 `-ac:a:{out}` 指定。
-    args += ["-c:a", "pcm_s16le"]
-    for i in range(streams):
-        args += ["-map", f"{i + 1}:a", f"-ac:a:{i}", "1"]
-    r = sh(FFMPEG, *args, dst, timeout=900)
-    return dst.is_file() and dst.stat().st_size > 0 and r.returncode == 0
-
-
-def _make_av_channels(
-    dst: Path, channels: int, *, seconds: int = 1,
-) -> bool:
-    """`video + 1 条 N 声道 PCM` 的确定性 MOV。
-
-    用于验证"取单条流的**部分**声道" —— 只有真正的多声道流才能构造这个
-    场景 (mono 流取第 0 声道其实就是整流, 那是 copy 而不是子集)。
-    每个声道给不同幅度的 sine, 便于区分。
-    """
-    args = [
-        "-v", "error", "-y",
-        "-f", "lavfi", "-i",
-        f"color=c=black:s=64x36:r=10:d={seconds}",
-        "-f", "lavfi", "-i",
-        f"sine=frequency=440:sample_rate=48000:duration={seconds}",
-        "-map", "0:v", "-map", "1:a",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "40",
-        "-pix_fmt", "yuv420p",
-        "-af", f"pan={channels}c|c0=c0|c1=c0|c2=c0|c3=c0",
-        "-c:a", "pcm_s16le", "-ac", str(channels),
-    ]
-    if channels > 4:
-        return False
-    r = sh(FFMPEG, *args, dst, timeout=900)
-    return dst.is_file() and dst.stat().st_size > 0 and r.returncode == 0
 
 
 def _audio_streams(path: Path) -> list[dict[str, Any]]:

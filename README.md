@@ -123,14 +123,17 @@ Current release: **v0.7.1** (`VERSION` = `0.7.1`, tag `v0.7.1`).
 | Arbitrary-reference delay correction | Implemented on `main`; **not part of the v0.7.1 release** and not documented in its release notes |
 | Audio execution-path resolution (`NONE` / `STREAM_COPY` / `PCM_ROUTE` / `PCM_MIX`) | Implemented on `main` (Phase 4A; internal API) |
 | Selective MP4 audio retention (keep / drop / reorder original audio streams) | Implemented on `main` (Phase 4A; internal API, no CLI). Channel-filter and mixing outputs are **refused** rather than faked as stream copy |
-| Audio encoding / PCM write-back into MP4 | Not implemented (planned, Phase 4B) |
+| Audio encoding (AAC / PCM / FLAC) of routed or mixed PCM | Implemented on `main` (Phase 4B; internal API, no CLI) |
+| Final output composition (video + encoded audio → MP4) | Implemented on `main` (Phase 4B; `core/output_compose.py`, internal API). Video is always stream-copied; the composer never re-encodes it |
 | Automatic cross-file synchronization | Not implemented |
 | Drift correction / resampling | Not implemented |
-| Audio CLI flags (`--audio-tracks`, `--audio-map`, `--audio-source`) | Not implemented |
+| Audio CLI flags (`--audio-tracks`, `--audio-map`, `--audio-codec`) | Not implemented |
 
 "Internal layer" means the code exists, is unit- and integration-tested, and is reached
-only by explicit API calls such as `core.audio_process.run_audio_render()` or
-`core.audio_retention.build_audio_retention()`. The default
+only by explicit API calls such as `core.audio_process.run_audio_render()`,
+`core.audio_retention.build_audio_retention()`,
+`core.audio_encode.encode_audio_from_plan()` or
+`core.output_compose.OutputComposer.compose()`. The default
 production path is not changed and no new command-line flag is exposed.
 
 ## Requirements
@@ -379,10 +382,11 @@ These numbers are assertion counts from the automated regression suite at the re
 freeze. They are not a new full production transcoding benchmark: the release was cut
 without a fresh end-to-end encode/transcode campaign on production material.
 
-On current `main` the L1 suite reports 457 PASS / 0 FAIL and `--level full` reports
-607 PASS / 0 FAIL, the difference being work merged after the v0.7.1 tag
+On current `main` the L1 suite reports 486 PASS / 0 FAIL and `--level full` reports
+678 PASS / 0 FAIL, the difference being work merged after the v0.7.1 tag
 (arbitrary-reference audio delay correction, then Phase 4A selective MP4 audio
-retention). Any change must be re-checked for new failures.
+retention, then Phase 4B audio encoding and output composition). Any change must be
+re-checked for new failures.
 
 `tests/full_autotest.py` is a thin compatibility entry point: the CLI, exit code and
 report format are unchanged, while the implementation lives in the `tests/selftest/`
@@ -404,12 +408,15 @@ tests/selftest/
 │   ├── audio_mix.py             PCM mixing, graph equivalence
 │   ├── audio_sync.py            arbitrary-reference delay correction
 │   ├── audio_retention.py       Phase 4A: execution path + selective MP4 retention
+│   ├── audio_encode.py          Phase 4B: PCM → encoded audio (EncodedAudioOutput)
 │   ├── audio_integration.py     L3 audio integration on real material
 │   ├── pipeline.py              L3 full pipeline + fault injection
 │   ├── hardware.py              L3 channel-sync end to end
 │   ├── toolchain.py             L2 tool / capability probing
 │   └── cli.py                   CLI contract
-└── reporting/       result aggregation and report writing
+├── reporting/       result aggregation and report writing
+└── (production coordination lives outside this package: `core/audio_encode.py`,
+    `core/output_compose.py`)
 ```
 
 `paths` is the only module holding mutable test state (`RESULTS` / `CURRENT_LEVEL`).

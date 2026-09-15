@@ -40,9 +40,10 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
     体系迁移是独立议题, 不属于本次结构重构。
     """
     from ..suites import (
-        audio_integration, audio_mix, audio_model, audio_retention,
-        audio_route, audio_selection, audio_sync, audio_timeline,
-        channel_sync, cli, codecs, core, hardware, pipeline, toolchain,
+        audio_encode, audio_integration, audio_mix, audio_model,
+        audio_retention, audio_route, audio_selection, audio_sync,
+        audio_timeline, channel_sync, cli, codecs, core, hardware, pipeline,
+        toolchain,
     )
 
     return {
@@ -71,6 +72,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("audio sync (arbitrary reference)", audio_sync.l1_audio_sync),
             ("audio retention/mp4 v0.8 (Phase 4A)",
              audio_retention.l1_audio_retention),
+            ("audio encode/compose v0.8 (Phase 4B)",
+             audio_encode.l1_audio_encode),
             ("av1", codecs.l1_av1),
             ("cli v0.6.2", cli.l1_cli_v062),
         ],
@@ -90,6 +93,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("channel-sync P1 算法级", hardware.l3_channel_sync_p1_algo),
             ("audio retention/mp4 v0.8 (Phase 4A)",
              audio_retention.l3_audio_retention),
+            ("audio encode/compose v0.8 (Phase 4B)",
+             audio_encode.l3_audio_encode),
         ],
     }
 

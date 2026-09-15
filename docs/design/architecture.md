@@ -731,6 +731,178 @@ audio_retention_execution_invalid
 
 ---
 
+## 6.4 Phase 4B：音频编码 + 最终输出编排（**不属于 v0.7.1**）
+
+> ⚠️ **版本边界**：v0.7.1 已发布（tag `v0.7.1` = `e613b07`）。本节是 v0.7.1
+> **之后**的增量。6.1.x 冻结已发布行为，6.2 是 arbitrary-reference，6.3 是
+> Phase 4A，本节是 Phase 4B。
+
+### 6.4.1 本阶段唯一新增的能力
+
+```text
+PCM  ->  audio encoder  ->  encoded audio  ->  final output composition
+```
+
+这是第一次允许"PCM 变成编码音轨并进入最终容器"。**视频编码没有被碰**：
+视频产物由调用方给出, Composer 只做 stream copy。
+
+### 6.4.2 四层边界（硬性架构约束）
+
+```text
+┌──────────────────────┐                ┌──────────────────────┐
+│ Audio Domain         │                │ Video Domain         │
+│ core/audio_encode.py │                │ encoders/ 1kt.py     │
+│ core/audio_*.py      │                │ preservation/        │
+│                      │                │ core/batch_hw.py     │
+│ AudioPlan            │                │ 解码 / 编码 / copy    │
+│ execution path       │                │ 分辨率 / fps / pixfmt │
+│ timeline / route/mix │                │                      │
+│ encode               │                │                      │
+└──────────┬───────────┘                └──────────┬───────────┘
+           │ EncodedAudioOutput                    │ VideoOutputArtifact
+           ▼                                       ▼
+      ┌─────────────────────────────────────────────────┐
+      │ OutputComposer        core/output_compose.py    │
+      │ (不属于任何一方; 只认识两个**契约**)              │
+      │ stream mapping / ordering / container / metadata │
+      └─────────────────────────────────────────────────┘
+                             ↓
+                        final container
+```
+
+依赖**严格单向**: `Composer -> {AudioOutput, VideoOutput} -> ffmpeg`。
+反向一律禁止, 并由回归以 AST 断言钉住 (§6.4.6)。
+
+### 6.4.3 Audio Domain：`core/audio_encode.py`
+
+职责**很窄**: 只做 `PCM -> encoded audio`。
+
+| 它可以 | 它不可以 |
+|---|---|
+| 消费已渲染的 PCM (WAV) | 读 `AudioPlan` 决定路由/混音 |
+| 产出 `EncodedAudioOutput` | 决定输出顺序 (那是 `AudioTimeline`) |
+| 校验采样率/声道数与 timeline 一致 | 发明 duration |
+| 调用 ffmpeg 做编码 | 找 sync reference / 算 offset |
+| | 碰视频的任何东西 |
+| | 决定容器怎么排布音轨 |
+
+**不重新实现渲染**: PCM 复用既有 `core.audio_process.run_audio_render()`
+(它已经实现"同一张图只换节点"), 因此:
+
+```text
+AudioPlan
+   ↓ run_audio_render()            (既有; routing / mixing / timeline)
+AudioTimeline + rendered WAV
+   ↓ encode_audio()                (本模块; 只编码)
+EncodedAudioOutput
+```
+
+临时中间 WAV 的生命周期在本层收口: 默认 `finally` 清理, **异常路径也不留
+工作区垃圾**; `keep_intermediate=True` 才保留 (调试/回归)。
+
+**采样率与声道布局不偷偷改**: 采样率与声道数必须来自 `AudioTimeline`,
+不一致直接拒绝 (`audio_encode_sample_rate_mismatch`) —— **不 resample**。
+Ffmpeg 命令里**不传** `-ar` / `-ac` / `-channel_layout`: 中间 WAV 是自描述
+的 (`WAVE_FORMAT_EXTENSIBLE` + channel mask), 布局因此来自最终 PCM 输出,
+而不是"把输入布局复制到输出"(routing / mixing 之后输入布局可能已经不代表
+输出了)。
+
+格式表是**显式**的 (AAC / PCM / FLAC), 不是 codec framework: 没有能力探测、
+没有 fallback 链、没有 bitrate/quality/preset/loudness 参数。
+
+### 6.4.4 Output Contract
+
+两个域各自产出**同一个最小形状**: 一个已经落盘的文件 + 它的容器身份。
+
+| 产物 | 表达 | 含义 |
+|---|---|---|
+| `EncodedAudioOutput` | `path` + `codec` + `sample_rate` + `channel_count` + `expected_frames` + `channel_ids` | 音频域交付的编码音轨 |
+| `VideoOutputArtifact` | `path` + `container` (+ `stream`) | 视频域交付的已编码/已复制视频 |
+
+契约里**没有**编码参数: 怎么编码是各自域的事, Composer 不参与决定。
+
+`EncodedAudioOutput.expected_frames` 来自 `AudioTimeline` (**权威**),
+`probed_frames` 是 ffprobe 读回的实测值。有损格式 (AAC) 的编码器
+priming/padding 会造成少量帧差 —— 该差异被**记录**为 warning 而不是被忽略,
+`timeline` 始终是时长权威。
+
+### 6.4.5 Composer：`core/output_compose.py`
+
+只负责容器层面的四件事: **stream mapping / stream ordering / container
+output / metadata policy**。
+
+```text
+-input video.mp4           # VideoOutputArtifact
+-input encoded.aac [...]   # EncodedAudioOutput, 顺序 = 容器里的音轨顺序
+-map 0:v:0 -c:v copy       # 视频一律 stream copy, 无任何视频编码参数
+-map 1:a:0 -c:a copy ...   # 音频一律 stream copy, 顺序 = 传入顺序
+```
+
+* 音频**顺序权威是传入顺序**, 也就是 `AudioTimeline.output_channel_ids` 在
+  编码产物上的体现 (`EncodedAudioOutput.channel_ids` 原样携带) —— Composer
+  不重新判断顺序;
+* Composer **不**判断 PCM_ROUTE / PCM_MIX: 那是
+  `core.audio_execution.resolve_audio_execution_path()` 的唯一权威;
+* Composer **不**找 sync reference、**不**算 offset;
+* Composer **不**截断 / **不**循环音频: 命令里没有 `-shortest`, 音频比视频
+  长时容器取二者较长 (容器不擅自决定内容长度);
+* 已知边界: 只映射**主**视频流。次视频流 (DJI 附加封面图等) 属于视频域的
+  容器策略 (`preservation/` 的 MP4Box 重建路径), 本层不替它猜。
+
+### 6.4.6 解耦如何被**强制**（不是靠人工 review）
+
+回归里有一条架构断言, 每次 `--level unit` 都会跑:
+
+```text
+Audio -> Video   音频模块 import {encoders, preservation, batch_hw, …} == 0
+Video -> Audio   视频模块 import {core.audio_encode, core.audio_execution,
+                  core.audio_retention, core.audio_process, core.audio_timeline,
+                  core.audio_mix, core.audio_pcm, …} == 0
+Composer         import 任何音频算法模块 == 0 (只允许契约 + ffmpeg)
+Audio API        公开参数名里出现 {profile, crf, preset, pix_fmt, fps} == 0
+```
+
+⚠️ 两点精确性要求 (否则断言会给出误导性的"违规"):
+
+1. 按**精确模块路径**匹配, 不用 tail 匹配 —— `preservation/audio_sync.py`
+   是既有的 GPAC 重封装 helper (v0.7.1 起被经典路径生产调用), 与
+   `core.audio_sync` **没有任何关系**;
+2. 禁止集只包含**音频域模块** (`core.audio_*`)。既有模块 (
+   `preservation/audio_sync` 等) 不在其列: 本阶段不重构它们, 因此也不该由
+   本阶段的断言要求它们改变。
+
+### 6.4.7 明确边界（Phase 4B **不**做）
+
+```text
+drift correction                resampling
+loudness / LUFS / AGC / limiter / compressor / EQ
+多 codec 策略框架 / bitrate 框架 / quality preset 框架
+新 CLI (仍为库级能力; 默认生产路径不增加开关)
+次视频流的容器策略 (交给 preservation/)
+Phase 5 的任何内容
+```
+
+默认路径**完全不变**: `AudioPlan = None` -> `AudioExecutionPath.NONE` ->
+生产默认音频路径不动; 不会因为新增 audio encoder 就自动重编码音频。
+
+### 6.4.8 本阶段新增的 reason codes（稳定契约）
+
+```text
+audio_encode_format_unsupported           (core/audio_encode)
+audio_encode_render_failed
+audio_encode_failed
+audio_encode_no_output
+audio_encode_sample_rate_mismatch
+audio_encode_verify_failed
+
+output_compose_no_video                   (core/output_compose)
+output_compose_audio_missing
+output_compose_failed
+output_compose_verify_failed
+```
+
+---
+
 ## 7. 编码后验证：`--check` 三级
 
 | 级别 | Sony | DJI |

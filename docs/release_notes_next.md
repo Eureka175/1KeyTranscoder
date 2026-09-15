@@ -1,12 +1,13 @@
-# 下一开发周期 — 任意 reference 延迟矫正 + Phase 4A 选择性 MP4 音频保留
+# 下一开发周期 — 任意 reference 延迟矫正 + Phase 4A/4B 音频输出
 
 > **状态**：已实现（**尚未发布**，未分配版本号；不属于 v0.7.1）
 > **基线**：`v0.7.1`（tag `v0.7.1`，commit `e613b07`）
 > **范围**：
 > * 任意 reference 的**恒定**样本偏移矫正（第 1–10 节）；
-> * Phase 4A 选择性 MP4 音频保留（第 11 节）。
+> * Phase 4A 选择性 MP4 音频保留（第 11–17 节）；
+> * Phase 4B 音频编码 + 最终输出编排（第 18–25 节）。
 >
-> 漂移校正 / resampling / time-stretch / **音频编码** / PCM 写回 / 新 CLI
+> drift correction / resampling / loudness / 多 codec 策略 / 新 CLI
 > **均未实现**。
 >
 > v0.7.1 的发布说明在 [`release_notes_v0.7.1.md`](release_notes_v0.7.1.md)，
@@ -324,12 +325,189 @@ audio_retention_execution_invalid
 ## 17. 明确未实现（Phase 4A 边界）
 
 ```text
-音频编码（AAC / Opus / …）
-PCM 写回编码音轨（routed packet 的 encode + mux write-back）
+音频编码（由 Phase 4B 补上, 见第 18 节起）
 声道过滤 filtergraph
 码率 / 质量参数
 MP4 mux 的完整实现（含 GPAC 路径）
 新 CLI（仍为库级能力, 生产默认路径不增加开关）
 drift correction / resampling（沿用上一周期边界）
+```
+
+---
+
+# Phase 4B — 音频编码 + 最终输出编排
+
+## 18. 目标与结论
+
+第一次允许:
+
+```text
+PCM  ->  audio encoder  ->  encoded audio  ->  final output composition
+```
+
+**视频编码没有被碰**: 视频产物由调用方给出, Composer 只做 stream copy。
+默认生产路径完全不变 —— 新增 audio encoder **不会**让
+`AudioPlan = None` 自动重编码音频。
+
+## 19. 四层边界（硬性架构约束）
+
+```text
+Audio Domain                        Video Domain
+core/audio_encode.py                encoders/ 1kt.py
+core/audio_*.py                     preservation/ core/batch_hw.py
+AudioPlan / execution path          解码 / 编码 / copy
+timeline / route / mix / encode     分辨率 / fps / pixel format
+        │                                    │
+        │ EncodedAudioOutput                 │ VideoOutputArtifact
+        ▼                                    ▼
+   ┌────────────────────────────────────────────────┐
+   │ OutputComposer      core/output_compose.py     │
+   │ 不属于任何一方; 只认识两个**契约**               │
+   │ stream mapping / ordering / container / metadata│
+   └────────────────────────────────────────────────┘
+                        ↓
+                   final container
+```
+
+依赖严格单向: `Composer -> {AudioOutput, VideoOutput} -> ffmpeg`。
+
+## 20. Audio Domain：`core/audio_encode.py`
+
+职责**很窄** —— 只做 `PCM -> encoded audio`:
+
+```text
+AudioPlan
+   ↓ run_audio_render()      (既有; routing / mixing / timeline 全在这里)
+AudioTimeline + rendered WAV
+   ↓ encode_audio()          (本模块; 只编码)
+EncodedAudioOutput
+```
+
+它**不**读 `AudioPlan`、**不**做 routing/mixing、**不**决定输出顺序、
+**不**发明 duration、**不**找 sync reference、**不**碰视频、**不**决定容器
+策略。PCM 复用既有渲染 (不重新实现"同一张图只换节点")。
+
+* **采样率**: 来自 `AudioTimeline`; 显式指定不一致 -> 拒绝
+  (`audio_encode_sample_rate_mismatch`)，**不偷偷 resample**。
+* **声道数与布局**: 来自最终 PCM 输出。ffmpeg 命令里**不传**
+  `-ar` / `-ac` / `-channel_layout` —— 中间 WAV 自描述
+  (`WAVE_FORMAT_EXTENSIBLE` + channel mask)，因此布局来自实际输出，而不是
+  "把输入布局复制到输出"（routing / mixing 之后输入布局可能已经不代表输出）。
+* **格式表是显式的**（AAC / PCM / FLAC），不是 codec framework: 没有能力
+  探测、没有 fallback 链；参数只有 `format / sample_rate / channel_count /
+  bitrate / extra_args`，**没有** preset / quality / loudness / dynamics。
+* **临时产物生命周期在本层收口**: 中间渲染 WAV 默认在 `finally` 清理
+  （异常路径也不留垃圾），`keep_intermediate=True` 才保留。
+
+## 21. Output Contract
+
+两个域各自产出同一个最小形状: **一个已落盘的文件 + 它的容器身份**。
+
+| 产物 | 表达 | 说明 |
+|---|---|---|
+| `EncodedAudioOutput` | `path` + `codec` + `sample_rate` + `channel_count` + `expected_frames` + `channel_ids` | 音频域交付的编码音轨 |
+| `VideoOutputArtifact` | `path` + `container`（+ `stream`） | 视频域交付的已编码/已复制视频 |
+
+契约里**没有**编码参数: 怎么编码是各自域的事。
+
+`expected_frames` 来自 `AudioTimeline`（**权威**），`probed_frames` 是 ffprobe
+实测。AAC 的 priming/padding 会造成少量帧差（实测 48000 -> 49152/49153），
+该差异被**记录为 warning** 而不是被忽略；`timeline` 始终是时长权威。
+
+## 22. Composer：`core/output_compose.py`
+
+只做容器层面四件事: **stream mapping / stream ordering / container output /
+metadata policy**。
+
+```text
+-input <video>             # VideoOutputArtifact
+-input <encoded audio> …   # EncodedAudioOutput, 顺序 = 容器音轨顺序
+-map 0:v:0 -c:v copy       # 视频一律 stream copy, 无任何视频编码参数
+-map 1:a:0 -c:a copy …     # 音频一律 stream copy, 顺序 = 传入顺序
+```
+
+* 音频**顺序权威 = 传入顺序**（即 `AudioTimeline.output_channel_ids` 经
+  `EncodedAudioOutput.channel_ids` 传递过来）；Composer 不重新判断顺序。
+* **不**判断 PCM_ROUTE / PCM_MIX —— 那是 `resolve_audio_execution_path()`
+  的唯一权威。
+* **不**找 reference、**不**算 offset。
+* **不**截断 / **不**循环: 命令里没有 `-shortest`；音频比视频长时容器取二者
+  较长。实测: 3s 音频 + 1s 视频 -> 容器 3.0000s，音频 3.0000s。
+* 已知边界: 只映射**主**视频流；次视频流（DJI 附加封面图等）属于视频域的
+  容器策略（`preservation/` 的 MP4Box 重建路径）。
+
+## 23. 解耦如何被强制
+
+回归里有一条架构断言，每次 `--level unit` 都会跑:
+
+```text
+Audio -> Video   音频模块 import {encoders, preservation, batch_hw, …} == 0
+Video -> Audio   视频模块 import {core.audio_encode, core.audio_execution,
+                  core.audio_retention, core.audio_process,
+                  core.audio_timeline, core.audio_mix, core.audio_pcm} == 0
+Composer         import 任何音频算法模块 == 0
+Audio API        公开参数名里出现 {profile, crf, preset, pix_fmt, fps} == 0
+```
+
+⚠️ 精确性: 按**精确模块路径**匹配（`preservation/audio_sync.py` 是既有 GPAC
+helper，与 `core.audio_sync` 无关），且禁止集只含**音频域模块** —— 既有模块
+不在其列，本阶段不重构它们。
+
+## 24. 测试
+
+| 级别 | 用例数 | 内容 |
+|---|---|---|
+| L1 `audio encode/compose v0.8 (Phase 4B)` | 29 | 格式表、采样率/声道数校验、契约事实、编排失败路径、架构审计 |
+| L3 `audio encode/compose v0.8 (Phase 4B)` | 42 | 真实 encode->decode 逐样本、四态路径、最终编排、视频身份回归、时长策略、sync 端到端、临时产物生命周期 |
+
+L3 的关键证据（全部实测）:
+
+```text
+四态路径          none / stream_copy / pcm_route / pcm_mix 全部判定正确
+route -> PCM     4CH 取 2 声道 -> PCM_ROUTE; 无损 encode->decode 逐样本一致
+mix -> PCM       输出身份 = mixN; gain 0.5/0.25 保留 (peak=0.0924)
+AAC              48000 -> 49152 帧 (delta 记录为 warning); 真正解码验证
+STREAM_COPY      仍走 -map + -c:a copy (未强制重编码)
+编排 (a)(b)(c)   video copy + {copy, route, mix} 音频 -> 单一音轨 MP4
+编排 (d)         两条音频 -> 两条音轨, 顺序 = 传入顺序 (按主频验证)
+sync 端到端 ⚠️   4CH 各延迟 -> estimate/apply -> encode -> 容器:
+                 4 个声道全部落到 timeline 位置 9683 (= base + max(delay)),
+                 编码后逐样本一致, 帧数 48130 == timeline
+视频身份 ⚠️      四种音频处理下 video basic-stream sha256 完全一致
+                 源 = 8ef5fefe558a3eb0 (copy/route/mix/multi/sync 全等)
+视频属性         codec / 宽 / 高 / 帧率 与视频产物一致
+时长策略         3s 音频 + 1s 视频 -> 容器 3.0000s, 无 -shortest, 不截断
+生命周期         中间 WAV 默认清理; keep_intermediate 保留; 失败路径也清理
+```
+
+总计 `--level unit` **486 PASS / 0 FAIL**、`--level full` **678 PASS /
+0 FAIL**（本阶段前基线 457 / 607；重构前 421 / 545）。
+
+## 25. 本阶段新增的 reason codes（稳定契约）
+
+```text
+audio_encode_format_unsupported           (core/audio_encode)
+audio_encode_render_failed
+audio_encode_failed
+audio_encode_no_output
+audio_encode_sample_rate_mismatch
+audio_encode_verify_failed
+
+output_compose_no_video                   (core/output_compose)
+output_compose_audio_missing
+output_compose_failed
+output_compose_verify_failed
+```
+
+## 26. 明确未实现（Phase 4B 边界）
+
+```text
+drift correction
+resampling
+loudness / LUFS / AGC / limiter / compressor / EQ
+多 codec 策略框架 / bitrate 框架 / quality preset 框架
+新 CLI（仍为库级能力）
+次视频流的容器策略（交给 preservation/）
+Phase 5 的任何内容
 ```
 
