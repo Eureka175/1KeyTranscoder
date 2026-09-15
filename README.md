@@ -381,6 +381,38 @@ On current `main` the L1 suite reports 421 PASS / 0 FAIL, the difference being w
 after the v0.7.1 tag (arbitrary-reference audio delay correction). Any change must be
 re-checked for new failures.
 
+`tests/full_autotest.py` is a thin compatibility entry point: the CLI, exit code and
+report format are unchanged, while the implementation lives in the `tests/selftest/`
+package, split by responsibility.
+
+```text
+tests/selftest/
+├── runner/          CLI (argparse), suite registry, executor
+├── fixtures/        reusable material: deterministic PCM, AudioPlan builders, real media
+├── assertions/      reusable audio observation primitives (impulse maps, hashes)
+├── suites/          the tests themselves, one module per area
+│   ├── core.py                  color / caps / hw planning / probe / classifier / GPAC
+│   ├── codecs.py                x265 P0, AV1
+│   ├── channel_sync.py          delay compensation (pure logic + algorithm)
+│   ├── audio_model.py           audio track / channel / plan model
+│   ├── audio_selection.py       sources, selection, channel mapping
+│   ├── audio_timeline.py        timeline, render policy, EOF, sync offset direction
+│   ├── audio_route.py           channel routing, WAV export, chunk invariance
+│   ├── audio_mix.py             PCM mixing, graph equivalence
+│   ├── audio_sync.py            arbitrary-reference delay correction
+│   ├── audio_integration.py     L3 audio integration on real material
+│   ├── pipeline.py              L3 full pipeline + fault injection
+│   ├── hardware.py              L3 channel-sync end to end
+│   ├── toolchain.py             L2 tool / capability probing
+│   └── cli.py                   CLI contract
+└── reporting/       result aggregation and report writing
+```
+
+`paths` is the only module holding mutable test state (`RESULTS` / `CURRENT_LEVEL`).
+Legacy names (`full_autotest.SUITES`, `full_autotest.record`, …) still forward to the
+real implementation, and no suite display name changed, so report filtering by name
+keeps working.
+
 Scheduled hardware-decode verification is separate:
 
 ```powershell
@@ -422,7 +454,7 @@ Targeted self-checks: `python tests\run_selfcheck.py --encoder nvenc|qsv|x265` a
 | `encoders/` | Backend implementations (NVEncC, QSVEncC, x265, SVT-AV1), capability tables, hardware-decode routing, integrity gate. |
 | `preservation/` | Sony and DJI preservation pipelines, container/ISO-BMFF handling, validation checkers, quality sampling. |
 | `release/` | `build_release.py` (allowlist-based packaging) and `verify_package.py`. |
-| `tests/` | `full_autotest.py` (unit / toolchain / full), targeted self-checks, fixtures, and the hardware-decode matrix in `tests/hwdecode/`. |
+| `tests/` | `full_autotest.py` (thin entry point: unit / toolchain / full), the `tests/selftest/` runner + fixtures + suites, targeted self-checks, fixtures, and the hardware-decode matrix in `tests/hwdecode/`. |
 | `docs/` | Design documents, evaluation reports, release notes, third-party reference archive. |
 | `logos/` | Primary logo, symbol mark and word mark. |
 | `licenses/` | GNU GPL v3 text incorporated by reference by LGPL-3.0. |
