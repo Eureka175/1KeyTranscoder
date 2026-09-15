@@ -1,722 +1,585 @@
 # 1KeyTranscoder
 
-递归、可断点续跑的 Windows 批量归档转码器，带 **Sony / DJI 双相机元数据保留**：
-- **Sony XAVC**（rtmd 数据流）：逐帧陀螺仪/镜头数据（rtmd）、镜头配置文件
-  （nrtm）、厂商 uuid box（PROF/USMT）全量保留；
-- **DJI**（djmd 数据流，Osmo Action 系列 / 无人机）：djmd 运动四元数 +
-  dbgi + tmcd 时码原生保留，Gyroflow 逐帧消费端校验。
+<p align="center">
+  <img src="logos/Primary%20Logo.png" alt="1KeyTranscoder Primary Logo" width="360">
+</p>
 
-编码后端：**NVEncC / QSVEncC 硬件编码**（HEVC 与 AV1；解码恒软解，硬件
-路径永不回退软件）、**SVT-AV1 软件 AV1**、**x265 手动高压缩档**；
-**未指定 `--encoder` 时按能力优先自动选择：NVENC → QSV → x265**
-（v0.6.2 起；加 `--no-hw-autoselect` 可固定为 x265，即 v0.6.1 及更早的行为）。
-注意 `--config` 里的 `encoder` 字段与 `--encoder` **二者不一致时直接报错**，
-不会静默取舍。
-**当前版本 `v0.7.1`**（v0.7 线：**已整合 v0.7.0 hardware-decode integration**
-—— `--hw-decode` 默认仍为 `off`；**并新增音频轨道模型层，不改默认音频输出行为**）。
-**主入口：`1kt.py`。**
-**主入口：`1kt.py`。**
+> Recursive, resumable Windows batch transcoder for camera archives, with Sony XAVC / DJI
+> metadata preservation and a structured PCM audio pipeline.
 
-> 📚 文档索引见 [docs/README.md](docs/README.md)；**代码实际怎么跑见
-> [docs/design/architecture.md](docs/design/architecture.md)**；评估汇总与决策见
-> [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md)（注意其头部状态横幅）。
+[![Version](https://img.shields.io/badge/version-0.7.1-blue)](VERSION)
+[![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#requirements)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Release](https://img.shields.io/badge/release-v0.7.1-informational)](https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.7.1)
 
-## 编码器矩阵
+## Overview
 
-| 后端 | 状态 | 档位 JSON | 定位 |
-|---|---|---|---|
-| NVEncC（NVIDIA NVENC HEVC） | ✅ 生产（**自动选择首选**） | `nvenc.json` | 主后端。本机 5070 Laptop：HQ 4K60 ≈ 23fps，4:2:2 直编 Rext 保真 |
-| QSVEncC（Intel QSV HEVC） | ✅ 生产（**自动选择次选**） | `qsv.json` / **`qsv_aligned.json`** | 第二后端。`qsv_aligned.json` 为按 NVENC 同档质量标定的对齐版（见下） |
-| x265（软件 HEVC） | ✅ 手动高压缩档 + **自动选择兜底** | `x265.json` + `x265_scaling.json` | 质量优先冷归档 / 4:2:2 保真唯一软件路径。**无可用硬件后端时由自动选择选中**（v0.6.2 起）；吞吐受限，缩放规则仍 PROVISIONAL |
-| VCEEncC（AMD VCE HEVC） | 预留（JSON 已备未接） | `vce.json` | AMD 机器扩展 |
-| **SVT-AV1（软件 AV1）** | ✅ 已实施（四档标定完成，见评估） | `svtav1.json` + `svtav1_scaling.json` | `--encoder svtav1`；ffmpeg 9.0.1 内置 SVT-AV1 v4.2.0；Sony/DJI 元数据保留管线；软件 AV1 体积/细节优势（档位对标 x265 判定见 `docs/evaluation/av1_calibration.md`） |
-| **AV1**（NVENC/QSV 硬件） | ✅ 已实施 | `nvenc_av1.json` / `qsv_av1.json` | 免版税备选；`--encoder nvenc-av1\|qsv-av1`；Sony 源同样走保留管线（不打 XAVC tag） |
+1KeyTranscoder is a command-line batch transcoder for Windows, built for archiving camera
+footage at scale. It walks an input tree, transcodes every clip with a hardware (NVEncC /
+QSVEncC) or software (x265 / SVT-AV1) backend, and writes a mirrored output tree as
+`.MP4` files. Batches are resumable: completed work is detected and skipped, failures are
+recorded per file and can be re-run selectively.
 
-> ⚠️ **"生产默认"这一列的含义**：**没有固定默认后端。** 未给 `--encoder` 时按
-> 能力探测自动选择 NVENC → QSV → x265（见文首）；AV1 三后端**不在**自动选择
-> 序列内（不静默换 codec）。`--no-hw-autoselect` 可固定为 x265。
-> 端到端管线与后端解析细节见 [`docs/design/architecture.md`](docs/design/architecture.md)。
+Its distinguishing feature is metadata preservation. Sony XAVC clips carry per-frame
+gyroscope and lens data (`rtmd`), lens profiles (`nrtm`) and vendor `uuid` boxes; DJI
+action-camera clips carry `djmd` motion quaternions, `dbgi` and `tmcd`. Both are copied
+through the transcode by a dedicated preservation pipeline and verified afterwards
+(payload checksums, structure checks, and optional Gyroflow consumer-side quaternion
+validation), instead of being silently dropped by a generic transcoder.
 
-> ⚠️ 档位 JSON 内的数值为作者实测标定值，请勿改动；调参须以测试集回归
-> 与 `tests/full_autotest.py` 为依据。
->
-> AV1 三后端（SVT-AV1 / NVENC-AV1 / QSV-AV1）已通过合并后阶段验收：
-> 真实 Sony 素材上的 Sony 元数据保留、4:2:2→4:2:0 策略、AV1 MP4 容器、
-> 色彩元数据保真、以及 `--channel-sync` 组合回归（27 case / 348 断言全绿，
-> 全量短回归 228 PASS / 0 FAIL）。
+It also ships a multi-channel audio delay compensation pass (`--channel-sync`) for
+multi-mic camera layouts, and — since v0.7.1 — an internal PCM audio pipeline
+(source/stream/track/channel modelling, routing, WAV export, and N→1 mixing with gain and
+clipping policy). The PCM pipeline is an internal capability layer in v0.7.1: it does not
+change the default audio path or add CLI flags.
 
-## 下载（自包含发布包）
+Target use case: a single workstation turning multi-hour Sony / DJI shoots into archive
+copies without losing the motion and lens metadata that post-processing tools
+(Gyroflow, editors) need.
 
-无需自行搭建工具链：发布包内置 **ffmpeg/ffprobe 9.0.1（libsvtav1
-v4.2.0/libx265/libvmaf）+ NVEncC 9.31 + QSVEncC 8.26 + GPAC 26.02**，
-解压即用（另需 Python 3.11+ 与对应 GPU 驱动；Gyroflow 为可选消费端
-工具，请从 gyroflow.xyz 单独安装）。
+## Features
 
-- **v0.6.1**（`main` 主线 · **当前正式发布** · bugfix release）：
-  [1KeyTranscoder-v0.6.1-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/1KeyTranscoder-v0.6.1-win64-selfcontained.zip)
-  —— 修复 `--channel-sync` 长素材内存无上限增长（10 min/4CH/48 kHz 峰值
-  RSS ≤ 512 MB 已实测达标），并含 AV1 色彩元数据保真修复；发布说明见
-  [docs/release_notes_v0.6.1.md](docs/release_notes_v0.6.1.md)
-- **v0.6.0**（`main` 主线 · HEVC/265 + AV1 合并后首个版本 + AV1 色彩
-  元数据保真修复）：该版本**长程 channel-sync 内存问题未修复**（10 min/4CH
-  峰值 RSS 达 605–713 MB），**不建议用于长素材的 `--channel-sync`**，请用
-  v0.6.1。**注意：历史上未发布 v0.6.0 的独立发布包**——`dist/` 中只有
-  v0.6.1 的产物。`v0.6.0` 这个 tag 指向 `e024bb9`，**正是引入发布基建
-  （`VERSION` / `release/` / `--version`）的那个 commit**（该 commit 自带
-  `VERSION=0.6.0` 与 `release/build_release.py`），与本节描述的能力对应；
-  只是当时并未用它打出发布包。需要可下载的合并后版本请用 `v0.6.1`
-- **v0.5.1**（AV1 线 · 软件 + 硬件 AV1；tag 现已在 `main` 历史中）：
-  [1KeyTranscoder-v0.5.1-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.5.1/1KeyTranscoder-v0.5.1-win64-selfcontained.zip)
-- **v0.4.2**（HEVC/265 线）：
-  [1KeyTranscoder-v0.4.2-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.4.2/1KeyTranscoder-v0.4.2-win64-selfcontained.zip)
+### Video / transcoding
 
-> 版本线：`v0.4.x` = HEVC/265 线，`v0.5.x` = AV1 独立线，**`v0.6.x` =
-> 两条线合并进 `main` 后的主线**（AV1 与 HEVC 同处一分支，共用一个入口与
-> 一套保留管线）。`v0.6.1` 是 `v0.6.0` 的缺陷修复版本，无功能新增。
-> `v0.6.1` 是 v0.6 线上**唯一带独立发布包**的版本。
+- Hardware backends: NVEncC (HEVC, AV1), QSVEncC (HEVC, AV1); software backends: SVT-AV1
+  and x265 (HEVC).
+- With no `--encoder`, the backend is auto-selected by capability probe:
+  NVENC → QSV → x265. `--no-hw-autoselect` pins x265.
+- A mismatch between `--config`'s `encoder` field and `--encoder` is a hard error, not a
+  silent override.
+- Presets `uhq` / `hq` / `small` / `fast` / `all`, defined in per-backend JSON profile
+  files; capability-based downgrade (4:2:2 → 10-bit 4:2:0 → 8-bit 4:2:0) with a loud
+  WARNING, or skipping with `--no-downgrade`.
 
-## 快速开始
+### Preservation / archival
+
+- Sony pipeline: `rtmd` / `nrtm` / vendor `uuid` payloads carried through re-encoding
+  with strength-parameterised post-checks.
+- DJI pipeline: `djmd` / `dbgi` / `tmcd` copied natively, payload `sha256` recorded,
+  optional Gyroflow per-frame quaternion validation.
+- Other sources: classic single-pass path (video + audio only), stated explicitly in the
+  log.
+- `--check basic|advanced|full` post-encode verification, plus PSNR/SSIM sampling at
+  `full` on short clips.
+
+### Audio
+
+- Default audio behaviour is unchanged from earlier releases: streams are copied through
+  (`-c:a copy`; the preservation pipelines copy audio inside the container).
+- `--channel-sync`: per-file GCC-PHAT delay measurement across independent mono PCM
+  tracks, corrected by integer sample shifts only.
+- `--channel-sync-transparent`: pre-editing mode that stream-copies video and all
+  non-audio streams and only re-generates audio tracks that need correction.
+- v0.7.1 adds an internal PCM pipeline: source/stream/track/channel model, channel
+  selection and mapping, unified timeline with EOF/offset handling, float32 PCM reading,
+  routing, WAV export, and N→1 mixing with linear gain and clipping policy. See
+  [Audio Processing](#audio-processing) for scope and boundaries.
+
+### Throughput / operations
+
+- `--jobs 1|N|auto` scheduling; `--dry-run` to probe and print commands without encoding.
+- `--retry-list failed_files.json` to re-run only failed items, optionally on another
+  backend.
+- `--experimental-multihw`: experimental NVENC + QSV dual-backend pool (video quality
+  consistency across backends is explicitly not guaranteed).
+- Logging to `error.log` / `warn.log` / `total.log` / `debug.log`, batch-scoped
+  environment version records, and `logs/failed_files.json` failure detail files.
+- Progress dashboard plus worker window for interactive runs, or `--headless` for
+  unattended operation; `watchfolder.py` / `start.bat` for polling batches.
+
+### Hardware decode (v0.7.0)
+
+- `--hw-decode off|auto|require`, default `off` (software decode; byte-identical
+  behaviour to v0.6.2).
+- `auto` uses hardware readers only for runtime-proven `(backend, codec, chroma, depth)`
+  combinations and warns on every downgrade; `require` errors out instead of falling
+  back.
+- A frame-count integrity gate plus reader-identity assertion is always active when
+  hardware decode is in use; `--hw-decode-verify` adds per-frame ordered fingerprint
+  comparison.
+- See [Hardware Decode](#hardware-decode) — the patched research binaries are **not**
+  part of the release package, so hardware decode is unavailable in a release
+  installation by design.
+
+## Current Status
+
+Current release: **v0.7.1** (`VERSION` = `0.7.1`, tag `v0.7.1`).
+
+| Area | Status |
+|---|---|
+| Core transcoding (NVENC / QSV / x265 / SVT-AV1, HEVC + AV1) | Available |
+| Sony `rtmd` / `nrtm` / `uuid` preservation | Available |
+| DJI `djmd` / `dbgi` / `tmcd` preservation | Available |
+| Post-encode verification (`--check basic\|advanced\|full`) | Available |
+| `--channel-sync` (integer-sample delay correction, P1) | Available |
+| `--channel-sync-transparent` (video stream copy) | Available |
+| Hardware decode (`--hw-decode`, default `off`) | Available in source installs; **not usable in the release package** (patched binaries excluded by design) |
+| Audio model (source / stream / track / channel) | Available (internal layer) |
+| Audio selection and channel mapping (`AudioMapSpec`, dry-run) | Available (internal layer, no CLI) |
+| PCM routing (1 output channel ← 1 source channel) | Available (internal layer, no CLI) |
+| WAV export (PCM16 / PCM24 / PCM32 / float32) | Available (internal API, no CLI) |
+| PCM mixing (N→1, linear gain, clipping detection) | Available (internal API, no CLI) |
+| Arbitrary-reference delay correction | Implemented on `main`; **not part of the v0.7.1 release** and not documented in its release notes |
+| Selective MP4 audio retention | Not implemented (planned, Phase 4A) |
+| Audio encoding / mux into MP4 | Not implemented (planned, Phase 4B) |
+| Automatic cross-file synchronization | Not implemented |
+| Drift correction / resampling | Not implemented |
+| Audio CLI flags (`--audio-tracks`, `--audio-map`, `--audio-source`) | Not implemented |
+
+"Internal layer" means the code exists, is unit- and integration-tested, and is reached
+only by explicit API calls such as `core.audio_process.run_audio_render()`. The default
+production path is not changed and no new command-line flag is exposed.
+
+## Requirements
+
+- **Windows 10 / 11** (x64). Development and verification are performed on Windows;
+  no other platform is tested.
+- **Python 3.11+** — no `pip` dependencies are required for the core tool. `numpy`
+  (and `scipy`, for `--channel-sync`) is optional: if it is missing, the features that
+  need it are skipped with a WARNING and transcoding is unaffected.
+- **External tools**, called as separate executables:
+  - `ffmpeg` / `ffprobe` — 9.0.1 (bundled in the release package). The project requires
+    its bundled build; older PATH versions lack the AV1 features used.
+  - `NVEncC` 9.31 and/or `QSVEncC` 8.26 — for the hardware backends.
+  - GPAC / MP4Box — container rebuilding and metadata preservation. Behaviour is bound
+    to GPAC 26.02; upgrading requires a regression run.
+  - Gyroflow (optional) — consumer-side quaternion validation for `--check advanced|full`.
+- **GPU driver** matching the hardware backend in use (NVIDIA for NVENC, Intel for QSV).
+
+Every tool path can be overridden: `--tool-nvencc`, `--tool-qsvencc`, `--ffmpeg`,
+`--ffprobe`, `--gpac-dir`, `--gyroflow`.
+
+> The project's own `tools/` directory (ffmpeg / NVEncC / QSVEncC / GPAC) is
+> `.gitignore`d and is the single shared toolchain used by the build and test runs.
+> Keep it in one place and never copy, junction, or symlink it into other working trees;
+> pass explicit paths instead.
+
+## Installation
+
+### From the release package (self-contained)
+
+The self-contained package bundles ffmpeg/ffprobe 9.0.1, NVEncC 9.31, QSVEncC 8.26 and
+GPAC 26.02, so no separate toolchain setup is needed: unzip, install Python 3.11+ and a
+GPU driver, and run `1kt.py` from the extracted directory.
+
+The currently published package is **v0.6.1** — v0.7.0 and v0.7.1 are published as GitHub
+releases without a binary asset, and their features (hardware decode, the v0.7.1 audio
+pipeline) are source-only. To use v0.7.1, run from a git checkout:
+
+- [v0.6.1 package](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/1KeyTranscoder-v0.6.1-win64-selfcontained.zip)
+  ([SHA256](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/1KeyTranscoder-v0.6.1-win64-selfcontained.zip.sha256),
+  [release manifest](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/release-manifest.json))
+- All releases: <https://github.com/Eureka175/1KeyTranscoder/releases>
+
+The package allowlist is defined by `release/build_release.py`: runtime code plus the
+toolchain binaries, and no `docs/`, `testsets/`, `work/` or `dist/` content.
+
+### From source
 
 ```powershell
-# NVENC, HQ 档, 默认验证强度 (basic)
-python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset hq
+git clone https://github.com/Eureka175/1KeyTranscoder.git
+cd 1KeyTranscoder
 
-# QSV 后端（质量与 NVENC 对齐版）
-python 1kt.py --input D:\素材 --output D:\归档 --encoder qsv --config qsv_aligned.json --preset hq
+# Place ffmpeg/ffprobe, NVEncC, QSVEncC and GPAC under tools/, or point at existing
+# installations with --ffmpeg / --ffprobe / --tool-nvencc / --tool-qsvencc / --gpac-dir.
 
-# 全档位 (UHQ/HQ/SMALL/FAST)
-python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset all
-
-# x265 手动高压缩档（软件，慢）
-python 1kt.py --input D:\素材 --output D:\归档 --encoder x265 --preset hq
-
-# 软件 AV1（SVT-AV1，元数据保留管线，不打 XAVC tag）
-python 1kt.py --input D:\素材 --output D:\归档 --encoder svtav1 --preset hq
-
-# AV1 硬件档（Sony/DJI 均走保留管线, 不打 XAVC tag）
-python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc-av1 --preset hq
-
-# 自动延时补偿（无线麦 CH1/CH2 相对有线参考的逐文件观测时差, 自动测量+整数样本修正）
-python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset hq --channel-sync
-
-# 透明模式（剪辑前预处理: 跳过视频编码, 视频/非音频流 stream copy, 仅修音频轨）
-python 1kt.py --input D:\素材 --output D:\归档 --channel-sync-transparent
-
-# 无人值守 (不弹看板窗口, 全部落日志)
-python 1kt.py ... --headless
+python 1kt.py --version
 ```
 
-**三条自动路径**：Sony XAVC（rtmd）→ 元数据保留管线（AV1 后端同样
-保留 rtmd/nrtm/uuid，但按策略不打 XAVC tag — AV1 不在 XAVC 规范内）；
-DJI（djmd）→ DJI
-保留管线（视频重编码 + djmd/dbgi/tmcd 原生复制 + 载荷 sha256 + Gyroflow
-四元数校验；mjpeg 封面与 udta 因 GPAC 26.02 不可寻址而丢弃并显式记录）；
-其余素材 → 经典单趟（按策略仅视频+音频，日志显式声明）。输出为同名
-`.MP4`，保留目录结构。
+`python 1kt.py --version` prints the version from `VERSION`. No package installation step
+is required; the entry points are run directly from the checkout.
 
-## 依赖
+## Usage
 
-> ## ⚠️ 工具链只有一份：`tools/` 请勿在别处复制，也勿做成 junction/软链接
->
-> `tools/`（约 1.3 GB：ffmpeg/ffprobe、NVEncC、QSVEncC、GPAC）是**整个项目共享的
-> 唯一工具链**，且被 `.gitignore` 排除 —— **git 不管它**：删掉不进回收站，也不报错。
->
-> **已发生过两次的真实事故**（2026-09）：为让 research 工作树共享工具链，曾在工作树里
-> 建 `tools` → 主 `tools/` 的 **junction**；随后 `git worktree remove --force`
-> 递归删除该工作树时，把工作树里的**工具链实体副本**一并删除，主 `tools/` 变空，
-> 直到构建与测试全部不可用才发现。
->
-> **规则（照做即可避免）**
->
-> 1. **工具链只放 `F:\1KeyTranscoder\tools\`**，不要在任何工作树/临时目录里复制或链接它。
->    要给别处指定路径就用参数：`--tool-nvencc` / `--tool-qsvencc` / `--ffmpeg` / `--ffprobe` / `--gpac-dir`。
-> 2. **动带链接的目录前先看一眼**：`Get-Item <路径> -Force | Select LinkType,Target`。
->    **不要用 `Move-Item` 移动 junction** —— 它是"跟随"语义，移动的是目标内容而非链接本身。
-> 3. **`git worktree remove --force` 会删掉该工作树下的全部内容**，包括未被 git 跟踪的文件。
->    执行前先列一遍未跟踪内容（`git status --ignored`），确认没有要紧东西。
-> 4. **备份/搬运项目时单独确认 `tools/`**：体积大、无 git 记录，缺失时的症状是
->    "报错找不到 ffmpeg"，而不是"文件丢了"。
+Transcode a tree with the auto-selected hardware backend and the default `hq` preset:
 
-| 组件 | 说明 |
-|---|---|
-| GPAC / MP4Box | `C:\Program Files\GPAC`（或 `--gpac-dir`）——容器重建与元数据保留核心（**行为绑定 26.02**，升级须回归） |
-| NVEncC / QSVEncC | `tools/NVEncC_9.31_x64/`、`tools/QSVEncC_8.26_x64/`（或 `--tool-*`） |
-| ffmpeg / ffprobe | 9.0.1 gyan full（`tools/` 自带，内置 libx265/libsvtav1 v4.2.0/libvmaf；**必须用项目自带版本**，PATH 老版本不支持 AV1 新特性） |
-| Gyroflow（可选） | 消费端校验（`--check advanced/full`；未安装则提示并跳过） |
-| numpy / scipy（可选） | 仅 `--channel-sync` 延时补偿需要（缺失时该功能跳过并 WARNING，转码不受影响） |
+```powershell
+python 1kt.py --input D:\footage --output D:\archive
+```
 
-## 自动延时补偿：`--channel-sync`（P1）
+Common variations:
 
-无线麦克风（CH1/CH2）经数字无线链路相比有线通道（CH3/CH4）存在逐文件
-变化的固定微延迟（实测 19.7–29.5 ms）。P1（`algo 2.3.0-p1`）开启后对
-每条音轨自动执行 **GCC-PHAT 两阶段测量（8kHz 粗扫 + 全速率精测）→
-相位斜率精估 → 轨道级质量门 → 纯整数样本移位 → 复检**，全程无人工
-常数；锚点按候选顺序 **CH3 > CH4 > CH1 > CH2 自动回退**（CH3 只是
-默认优先级最高，不是"真值基准"）：
+```powershell
+# Explicit backend and profile, quality aligned with the NVENC profile
+python 1kt.py --input D:\footage --output D:\archive --encoder qsv --config qsv_aligned.json --preset hq
 
-- **支持 48kHz / 96kHz；44.1kHz 显式拒绝**（有意的范围收窄，不会
-  silently 跑旧算法）；codec 支持线性 PCM 八类（s16/s24/s32/f32 ×
-  大小端，用户决定：大小端无所谓都支持 — 实测 A7M5 XAVC-S 为大端
-  s24be），压缩/非线性格式（aac/alaw 等）拒绝
-- **适用布局**：≥3 条独立单声道 PCM 流；**2ch（立体声）/1ch（单声道）
-  布局默认不做对齐**（用户决定）
-- **默认修正 = 纯整数样本移位**（48k 下最大量化残差 0.5 sample ≈
-  10.4 µs），无滤波、无插值、样本值不变；尾部补零保全长（轨道时长
-  与源一致，Sony/DJI 结构校验不受影响）
-- **轨道级部分成功**：空轨/静音轨（`silent_track`）、NaN/Inf
-  （`non_finite`）、低置信（`low_confidence`）、非恒定
-  （`non_constant`）、超搜索窗（`out_of_range`）、复检超差
-  （`recheck_residual`）的轨一律 `untouched` 原样保留，**不阻止其它
-  健康轨同步**；文件级失败（无有效锚点/全部健康轨均不可靠）才整文件
-  原音频不动
-- **恒定性**只做 constant/non_constant 二分（MAD + 极差 + 漂移 ppm），
-  不做漂移 `resample`；P1 不提供 fractional sinc 生产模式
-- 质量门不过或复检超差 → 该轨原样 + 显著 WARNING，绝不静音或乱移
-- 三条路径（Sony 保留 / DJI 保留 / 经典）均接入；测量报告
-  `channel_sync_<名>.json` 落盘（含 `decision/reason/shift_samples/
-  fine_delay_ms` 等逐轨字段，`result_scope = file|partial`）
-- **语义约定**：报告中的 delay 是**当前文件内的观测轨间时差**（可含
-  电子/无线链路延迟、录音链路差与麦克风物理位置的声学传播差），
-  不自动等价于设备 latency；不同物理位置的麦克风不禁止同步，但相关
-  性不足时安全放弃该轨
-- 阈值集中在 `core/channel_sync.py::DEFAULTS`（注释"初值, 待真实素材
-  标定"），可经档位 JSON 的 `channel_sync` 节覆盖
-- **真实素材标定（137 段 Sony A7M5 4CH）**：已对齐 111 文件 / 实际修正
-  11 文件 / 测量失败 15 文件；**11/11 修正轨算法复测残差 0.00 样本**
-  （9 段大修正 905–1222 样本 = 18.9–25.5 ms，2 段小修正 −37/−39 样本 =
-  −0.77/−0.81 ms）；真实慢漂移（39–76 ppm，总漂移 0.4–2 ms）与弱相关轨
-  被安全拒修。冻结基线：`tests/fixtures/channel_sync/a7m5_real_137_baseline.csv`
-  （逐轨 548 行，仅文本，不含媒体）。注意 `detail`/`reason` 是诊断口径，
-  不构成互斥的顶层状态，不可直接相加
-- **长程性能（v0.6.1 实测达标）**：10 分钟 / 4 轨 / 48 kHz / 单线程
-  benchmark 实测 **Peak RSS 153–288 MB**、**Runtime 45.3–52.7 s**
-  （5 次运行，进程树 500 ms 采样；达标线 **RSS ≤ 512 MB / Runtime < 60 s**。
-  离散度主要来自机器后台负载——同一构建在后台服务繁忙时段曾测得 59.2 s，
-  仍在门限内）。峰值 RSS **不随时长增长**（60 / 150 / 300 / 450 / 600 s
-  扫描：208.1 / 228.8 / 208.5 / 264.6 / 209.3 MB）；v0.6.0 同场景为
-  605–713 MB（随时长线性增长，v0.6.1 已修复）。
-  详见 [docs/release_notes_v0.6.1.md](docs/release_notes_v0.6.1.md) 与
-  `work/stage12_memory_validation.md`
+# Every preset (uhq / hq / small / fast)
+python 1kt.py --input D:\footage --output D:\archive --encoder nvenc --preset all
 
-### 透明模式：`--channel-sync-transparent`（剪辑前预处理）
+# Software backends
+python 1kt.py --input D:\footage --output D:\archive --encoder x265 --preset hq
+python 1kt.py --input D:\footage --output D:\archive --encoder svtav1 --preset hq
 
-隐含启用 `--channel-sync`；跳过视频编码：视频与所有非音频流
-**stream copy**，仅对需要修正的音频轨重新生成，`untouched` 轨保持
-原始内容；全部已对齐时输出与源文件**字节级一致**（SHA256 相同）；
-文件级失败时输出为源文件原样拷贝（音频原样）。不依赖编码器配置，
-输出命名与常规转码一致。
+# Per-file multi-channel delay compensation
+python 1kt.py --input D:\footage --output D:\archive --encoder nvenc --channel-sync
 
-算法由 `core/sync_estimate.py`（两阶段估计 + 相位斜率精估）与
-`core/sync_fix.py`（整数流式移位）实现；vendored
-`core/mp4_channel_sync.py`（ChronoSync 1.x，MIT）保留作回滚与对照，
-不再被 P1 主路径引用。设计细节与 P1 vs vendored 差异对照见
-`docs/design/channel_sync_p1.md`。
+# Pre-editing pass: stream-copy video, correct only the audio tracks that need it
+python 1kt.py --input D:\footage --output D:\archive --channel-sync-transparent
 
-## 音频模型与 PCM 处理（v0.7.1 Phase 1 + Phase 2 + Phase 3A/3B，内部能力层）
+# Unattended run: no dashboard window, everything goes to logs
+python 1kt.py --input D:\footage --output D:\archive --headless
+```
 
-**这一层目前不影响任何输出**：默认音频路径仍是"整流原样 copy"
-（经典路径 `-map 0` + `-c:a copy`；Sony/DJI 保留管线由 GPAC 从源容器
-复制音频）。v0.7.1 建立**数据结构 + 规划层 + PCM 处理链**；**不新增 CLI，
-默认生产路径一字未改** —— 新的 PCM 处理只在显式调用
-`core.audio_process.run_audio_render()` 时才会执行。
+Backends: `x265`, `svtav1`, `nvenc`, `qsv`, `nvenc-av1`, `qsv-av1`. `--help` lists every
+flag. Output files keep the source directory structure and are written with an `.MP4`
+extension.
+
+Source routing is automatic and is stated in the log for every file: Sony XAVC clips take
+the Sony preservation pipeline, DJI clips take the DJI pipeline, and everything else takes
+the classic single-pass path. AV1 backends preserve Sony `rtmd` / `nrtm` / `uuid` payloads
+but deliberately do not write the XAVC brand (`av01` instead), because XAVC defines only
+H.264 and HEVC.
+
+Long-running batches are resumable: re-running the same command skips completed outputs.
+`--dry-run` probes and prints the commands without encoding.
+
+## Audio Processing
+
+v0.7.1 introduces a structured PCM audio pipeline (`core/audio_*.py`). Its purpose is to
+make audio sources addressable as data — which channel of which stream of which source —
+so that selection, mapping, routing, mixing and export can be expressed and tested
+independently of any single ffmpeg invocation.
+
+### Model
 
 ```text
-输入文件（可多个来源）
-  ↓  core.probe.probe_source()          FFprobe JSON（每来源一次探测）
-  ↓  core.audio_probe                   音频适配层（media / wav / external）
-AudioSource       一个物理来源（source_id / source_type / path / timing / streams）
-  └── AudioStream   来源内一条流（stream_index + audio_position 严格区分）
-        └── AudioChannel  流内声道（三维身份：source_id + stream + channel）
-AudioTrack        逻辑输入轨（4CH 流 → 1 track / 4 channel；4×mono → 4 track）
-  ↓  core.audio_plan
-Selection         哪些 source channel 被保留   （决定"保留什么"）
-Channel Mapping   已选声道按什么顺序进入输出   （决定"输出顺序"）
-AudioPlan         sources / selected_channels / channel_mapping / mix_buses
-AudioMapSpec      可 dry-run 的执行规格（策略分类 + 完整身份，不执行 ffmpeg）
+Source          one physical origin (a media file or an external WAV)
+  └── Stream    one audio stream inside that source
+        └── Channel   one physical channel position (0-based)
 
-── Phase 3：执行链（只有 run_audio_render 才进入） ──
-  ↓  core.audio_timeline    AudioTimeline / RenderPolicy（**唯一**时长·EOF·offset 权威）
-  ↓  core.audio_pcm         AudioPCMReader（ffmpeg → canonical float32, chunked）
-  ↓  ┌ 无混音意图 → core.audio_route  AudioRouter（1 输出声道 = 1 源声道, 无相加）
-     └ 有混音意图 → core.audio_mix    AudioMixer（Σ sample × gain, float32）
-  ↓  core.audio_wav         WavExporter（PCM16 / PCM24 / PCM32 / float32）
-  ↓  core.audio_process     AudioOutputSpec + run_audio_render 编排（同一张图换节点）
+Track           a logical input track = (stream, set of channels)
+Output track    a logical output unit, e.g. output 0 ← camera:s2:c2
 ```
 
-| 模块 | 职责 |
+A channel is identified by all three coordinates — `{source_id}:s{stream}:c{channel}` —
+so identically named channels from different sources never collide. A 4-channel stream
+becomes one track, but its four `AudioChannel` objects remain individually selectable; four
+mono streams become four tracks.
+
+### Supported
+
+- Audio source / stream / track / channel modelling, built from each source's existing
+  ffprobe result (no extra probing).
+- Selection (which source channels are kept) and channel mapping (output order), with a
+  dry-run execution spec and per-output traceability.
+- Audio timeline (`AudioTimeline`) as the single authority for duration, EOF and offsets,
+  with deterministic silence fill for short sources and no hidden resampling.
+- Float32 PCM reading via ffmpeg with an identity channel map, so channels are never
+  silently reordered or downmixed.
+- Routing: 1 output channel ← 1 source channel, no sample arithmetic.
+- WAV export in PCM16 / PCM24 / PCM32 / float32.
+- Mixing: N source channels → 1 output channel, linear gain (0 dB = 1.0), float32
+  accumulation, peak and clipping statistics, and an explicit clipping policy
+  (`detect` / `hard_clip` / `error`). Mixing does not normalise automatically:
+  `1.0 + 1.0 = 2.0` is preserved and counted as a clipping event.
+- Fixed integer sample offsets produced by `channel_sync` reports are applied along the
+  unified timeline; delays are not re-estimated here.
+
+### Input organisation covered by tests
+
+| Layout | Representation |
 |---|---|
-| `core/audio_models.py` | Model 层：`AudioSource` / `AudioStream` / `AudioChannel` / `AudioTrack` / `AudioPlan` / `AudioSyncResult` / `AudioTiming` / `AudioTrackBuilder` / `AudioSourceBuilder` / `ChannelSyncReport`。**纯数据**，不构造 ffmpeg 命令 |
-| `core/audio_plan.py` | 规划层：`AudioPlanner`（selection / mapping）、`AudioOutputTrack`、`AudioMapSpec`、validation（V1–V8 reason codes）。**不持有 PCM、不执行 ffmpeg** |
-| `core/audio_probe.py` | Probe 层：`probe_source()` 的原始 stream → 上述模型；`AudioProbeResult` 提供 `summary()` / `plan()` / `tracks()` |
-| `core/audio_timeline.py` | **P3A**：`AudioTimeline` / `RenderPolicy`（UNION）/ 时长解析 / EOF 策略 / `source_to_timeline()`（唯一 offset 换算入口） |
-| `core/audio_pcm.py` | **P3A**：`AudioPCMReader`（ffmpeg 解码 → canonical float32，分块读取，identity channelmap 防隐式重排） |
-| `core/audio_route.py` | **P3A**：`AudioRouter`（纯样本搬运，1:1，**无混音**） |
-| `core/audio_wav.py` | **P3A**：`WavExporter` / `read_wav` / `AudioOutputSpec` / `default_wav_name()` |
-| `core/audio_mix.py` | **P3B**：`MixBus` / `MixSink` / `MixGain` / `AudioMixer`（N→1、线性 gain、float32 累加、`MixStats` 检波、`ClipPolicy`） |
-| `core/audio_process.py` | **P3A/P3B**：`run_audio_render()` 处理图编排（路由/混音换节点）+ `AudioRenderResult` |
-| `core/channel_sync.py` | Sync 层（**未改动**）：模型只**读取**它的报告 JSON，不重实现算法 |
+| Single 4-channel stream | 1 source / 1 stream / 1 track / 4 channels |
+| 2 × stereo | 1 source / 2 streams / 2 tracks |
+| 4 × mono | 1 source / 4 streams / 4 tracks |
+| External WAV (mono / stereo / 4CH) | separate source with its own timeline |
+| Mixed sources | e.g. camera 4CH + recorder stereo, or camera + external WAV |
 
-支持的输入形态（都有测试）：
+### Boundaries
 
-| 形态 | 表达 |
+- The default production audio path is unchanged. Audio streams are still copied
+  (`-c:a copy`; container-level copy in the preservation pipelines). No new CLI flags were
+  added in v0.7.1.
+- The PCM chain runs only when called explicitly (`run_audio_render()`); nothing on the
+  production path calls it.
+- Selection and mapping produce a dry-run spec only — no filtergraph is generated and no
+  ffmpeg command is executed by the planning layer.
+- `-map`-level specification of "N source channels → 1 output channel" is still rejected
+  as `audio_mix_not_supported`, because ffmpeg argv cannot express sample-level
+  summation. That rejection describes the `-map` path; the PCM path implements the same
+  semantics in `core/audio_mix.py`. The two coexist by design.
+- Deferred (not available in v0.7.1): selective MP4 audio retention, audio
+  encoding/muxing into MP4, resampling, drift correction, automatic cross-file
+  synchronisation, loudness normalisation / AGC / limiter / EQ / noise reduction /
+  time-stretch, audio CLI flags, DAW-style editing, and rendering multiple mix buses in
+  one pass.
+- The 4-channel wireless-mic layout assumes independent mono tracks; stereo and mono
+  layouts are deliberately not aligned by `--channel-sync`.
+
+Implementation details — module responsibilities, invariants, reason codes, and the
+specific internal APIs that are not stable public interfaces — are documented in
+[Architecture](docs/design/architecture.md) §6.1 and in the
+[v0.7.1 release notes](docs/release_notes_v0.7.1.md).
+
+## Hardware Decode
+
+`--hw-decode off|auto|require` was integrated in v0.7.0 and merged into `main` on
+2026-09-14. The default is `off`.
+
+| Policy | Behaviour |
 |---|---|
-| 单个 4CH 音频流 | 1 source / 1 stream / 1 track / 4 channel |
-| 2×2CH | 1 source / 2 stream / 2 track |
-| 4×mono | 1 source / 4 stream / 4 track |
-| 外挂 WAV（mono/stereo/4CH） | 独立 source（`source_type=wav`），时间轴独立 |
-| 多来源混合 | 例如 `camera` 的 4CH + `recorder` 的 stereo |
+| `off` (default) | Software decode. Hardware decoding is not attempted; behaviour matches v0.6.2 byte for byte. |
+| `auto` | Use hardware readers only when the input matches the runtime-proven allowlist `(backend, codec, chroma, depth)`; otherwise software decode. Every downgrade emits a WARNING with a reason code into the run logs and report. |
+| `require` | Hardware decode is mandatory. If unavailable, the file fails (`require_unmet`); it never downgrades silently. |
 
-关键约束：
+The allowlist is a closed set in which every entry references a measurement. Profiles
+outside it resolve to `not_proven` and software decode. Currently proven: NVENC HEVC
+4:2:0 10-bit, NVENC H.264 4:2:2 10-bit, QSV HEVC 4:2:0 10-bit.
 
-- **stream / channel / track 三个概念严格区分**。一条 4CH 流建成
-  `AudioTrack(channel_indices=[0,1,2,3])`，但逐声道的 `AudioChannel`
-  始终独立存在（`select_channels([2])` 可取单通道），**不会塌缩成不可再分的
-  1 个对象**；4 条 mono 流则建成 4 个 track。
-- **身份含来源，跨来源不碰撞**：声道 id 是
-  `{source_id}:s{stream}:c{channel}`（如 `camera:s2:c2`）；
-  `camera:s0:c0` 与 `recorder:s0:c0` 是两个不同声道。
-  `AudioStream.audio_position`（音频序号 = `-map N:a:M` = channel_sync 报告的
-  `stream` 字段）与容器 `stream_index` **绝不混用**。
-- **同步不改身份**：channel-sync 结果写入 `AudioChannel.sync` 之后，经选择与
-  映射仍可追溯到 `output 0 -> camera:s2:c2 -> +960 samples`（`AudioMapSpec.trace()`）。
-  同步状态值：`not_processed` / `not_applicable` / `already_aligned` /
-  `success` / `low_confidence` / `non_constant` / `out_of_range` /
-  `recheck_failed` / `failed`。
-- **Selection ≠ Mapping ≠ Mixing**：选择与映射都**不做任何样本运算**；
-  `camera CH1 + camera CH3` 的选择结果就是两个独立源声道，不会自动合成。
-  在 **`-map` 规格侧**，任何 "N 源声道 -> 1 输出声道" 一律返回
-  **`audio_mix_not_supported`**（ffmpeg argv 表达不了样本级合成）；
-  **PCM 路径侧**由 P3B 的 `AudioMixer` 显式实现同一语义（`MixBus` 的
-  N 输入求和），二者并存 —— 详见下节与
-  [docs/release_notes_v0.7.1.md](docs/release_notes_v0.7.1.md)。
-- **不猜测**：`sample_format` 取 ffprobe 原样名字（缺失/未知 → `unknown`）；
-  `channel_layout` 可能为空，此时按 `C0/C1/…` positional 命名（**不丢流**、
-  不冒充标准声道语义）；`role` 一律 `unknown`，只能由上层显式赋值
-  （`set_role(role, reason)`，reason 必填）；外挂 WAV 的时间轴只**记录**
-  （`AudioTiming`），**不实现**任何跨文件同步算法。
-- **JSON 往返**：所有模型提供 `to_dict()` / `from_dict()`，输出稳定、
-  JSON-compatible、enum 有稳定字符串表示。
-- **P3A：时长/EOF 只有一个权威**。`AudioTimeline` 决定 render window
-  （`RenderPolicy.UNION` = 参与输出来源 timeline 的并集）；短 source 的缺失
-  区间补**确定性静音 0.0**（不循环、不复制末样本、不写 NaN），长 source
-  不因别的 source EOF 而截断；输出样本数严格 `= frame_count`，`chunk_frames`
-  不影响结果。采样率不一致直接 `audio_sample_rate_mismatch`（**不偷偷 resample**）。
-- **P3A：offset 方向由实测钉死**。`timeline = source − offset`
-  （`core.audio_timeline.source_to_timeline()` 是唯一入口）；channel_sync 对
-  晚到轨报 `shift_samples=+960`，其修正会把该轨**前移** 960 样本 ——
-  impulse 回归把该方向钉住。只应用 `status=success` 的固定整数 offset，
-  **不重新估计 delay**（不重写 GCC-PHAT）。
-- **P3A：解码不隐式重排/混音声道**。解码命令行带 identity `channelmap`
-  （ffmpeg 默认会按声明布局重排/下混，实测 4 声道 + `quad` 会把 FC/BC 折进
-  BL/BR）；canonical 中间格式 float32，满量程归一（s16 ×2⁻¹⁵ / s24 ×2⁻²³ /
-  s32 ×2⁻³¹ / f32 原样）。
-- 详细设计与测试见 [docs/release_notes_v0.7.1.md](docs/release_notes_v0.7.1.md)。
+When hardware decode is active, a frame-count integrity gate is always enabled: five-way
+frame accounting plus a reader-identity assertion read from the tool log (never inferred
+from the command line, because QSVEncC silently constructs `avsw` when hardware is
+unavailable). A failing artifact is discarded, reported, and re-run with software decode.
+`--hw-decode-verify` adds `sequence`-level verification by comparing ordered per-frame
+fingerprints of hardware and software decode, at the cost of one extra decode pass.
 
-用法（内部 API，尚无 CLI）：
+Temporal windows and hardware decode are mutually exclusive: with a time seek the two
+rigaya readers are not equivalent (same frame count and PTS, different pictures), so the
+router refuses hardware decode with `seek_not_equivalent` and uses software decode.
+`--trim` is reader-equivalent and unrestricted. These parameters are not exposed as
+`1kt.py` flags; the router reacts to them when a temporal window is passed to the readers.
 
-```python
-from core.audio_plan import AudioPlanner, build_map_spec, source_plan
+Two boundaries matter when reading results:
 
-plan = source_plan([                       # 多来源建计划（默认全选 + 保留原始）
-    {"source_id": "camera", "streams": camera_streams, "path": "camera.mp4"},
-    {"source_id": "recorder", "streams": wav_streams,
-     "source_type": "wav", "path": "recorder.wav"},
-])
-p = AudioPlanner(plan)
-p.select_channels("camera:s2:c2", "recorder:s0:c0", "camera:s2:c0")  # Selection
-p.map_channels("camera:s2:c2", "recorder:s0:c0", "camera:s2:c0")     # Mapping
-spec = p.map_spec()                        # dry-run 执行规格
-if spec.ok:
-    spec.operations                        # stream_copy / channel_filter
-    spec.trace(0)                          # output 0 -> camera:s2:c2 -> sync
-```
+- **Hardware decode is unavailable in a release installation.** The patched binaries are a
+  research build that must not be redistributed; they live under `tools/avhw/`, which the
+  release allowlist excludes. In a release package `--hw-decode auto` therefore downgrades
+  to software decode with `not_proven`, and `require` fails. This is designed behaviour,
+  not a defect.
+- **The patches are version-bound.** The NVEncC patch is verified only on 9.31
+  (`2cb9d810`); the QSVEncC patch is runtime-proven on the pinned 8.26 revision only
+  (8.27–8.30 untested).
 
-Phase 3A/3B：把计划真正渲染成 WAV（internal API）：
+The correctness matrix for this feature is `tests/hwdecode/` (83 cases, classes A–K),
+with entry points in `docs/hardware-decode/README.md`. It requires a real GPU and the
+patched binaries and is **not** part of `tests/full_autotest.py --level full`.
 
-```python
-from core.audio_process import run_audio_render
-from core.audio_wav import WavFormat
-from core.audio_mix import MixBusBuilder, ClipPolicy
+## Testing
 
-res = run_audio_render(
-    plan,
-    ffmpeg=Path("tools/ffmpeg.exe"),
-    work_dir=Path("work/audio"),
-    output_dir=Path("work/audio/out"),      # 或 output_path=... 指定文件名
-    sample_format=WavFormat.PCM24,
-    chunk_frames=16384,                     # 只影响分块, 不影响结果
-)
-res.ok, res.output.path, res.timeline.frame_count
-res.duration_mismatches                     # metadata vs 实际解码样本数
-res.summary()["graph"]                      # "routing" (无混音意图)
-
-# N -> 1 混音 (Phase 3B)
-plan.mix_mode = "sum"                       # 或显式给出 plan.mix_buses
-bus = MixBusBuilder(plan).sum_all(
-    ["camera:s0:c0", "recorder:s0:c0"],
-    gains={"camera:s0:c0": 0.5, "recorder:s0:c0": 0.5},   # 线性; 0dB = 1.0
-)
-res = run_audio_render(plan, ffmpeg=..., work_dir=..., output_path=...,
-                       mix_bus=bus, clip_policy=ClipPolicy.DETECT)
-res.mix_bus.trace(0)      # output 0 -> [camera:s0:c0 ×0.5, recorder:s0:c0 ×0.5]
-res.mix_stats.to_dict()   # peak / clip_count / peak_inputs / format_clip_count
-```
-
-> ⚠️ **仍未实现（不要据此宣称）**：selective MP4 retention（音轨选择进容器）、
-> 音频编码与 mux、重采样、漂移校正、自动跨文件同步、
-> loudness normalization / LUFS / AGC / limiter / compressor / EQ / reverb /
-> noise reduction / spectral processing / time-stretch / pitch shift、
-> 新 CLI（`--audio-tracks` / `--audio-map` / `--audio-source` 均未开放）、
-> DAW 式编辑、多 bus 同时渲染。
-> `AudioMapSpec` 仍只给出策略分类与身份，**不生成 filtergraph 字符串、不执行
-> ffmpeg**；`AudioPlan.mix_mode` 非空时 `build_audio_map_spec()` 继续以
-> `audio_mix_not_supported` 拒绝（它描述 `-map` argv，与 PCM 层的
-> `core/audio_mix.py` 并存不冲突）。混音**不自动归一化**：`1.0 + 1.0 = 2.0`
-> 会被保留并计为 clipping 事件（`ClipPolicy` 显式选择 `detect`/`hard_clip`/`error`）。
-
-## 硬件解码：`--hw-decode off|auto|require`（v0.7.0，**默认 `off`**）
-
-> v0.7.0 的 hardware-decode integration 已于 2026-09-14 并入 `main`。
-> 交付物（测试矩阵 / 最终判定 / 补丁 / provenance）在
-> [`docs/hardware-decode/`](docs/hardware-decode/README.md)。
+Three levels, run from the repository root:
 
 ```powershell
-# 保持软解（默认, 与 v0.6.2 逐字节一致的行为, 无需加任何旗标）
-python 1kt.py --input D:\素材 --output D:\归档 --encoder nvenc --preset hq
-
-# 命中 runtime-proven 白名单时用硬件解码, 否则软解 (每次降级出 WARNING + reason code)
-python 1kt.py ... --hw-decode auto
-
-# 必须硬件解码, 不可用则报错 (绝不静默降级)
-python 1kt.py ... --hw-decode require
-
-# 在硬件解码之上追加逐帧有序指纹比对 (能抓"帧数不变但画面错序/替换")
-python 1kt.py ... --hw-decode auto --hw-decode-verify
+python tests\full_autotest.py --level unit        # L1: pure logic and deterministic logic (about 1-1.5 min)
+python tests\full_autotest.py --level toolchain   # L2: + tool versions, machine capabilities, flag allowlist (about 1 min, no encoding)
+python tests\full_autotest.py --level full        # L3: + real pipeline integration and fault injection (about 10-15 min)
+python tests\full_autotest.py --level all         # same as --level full
 ```
 
-**策略语义**（`encoders/hwdecode.py::decide_route()`）：
+The frozen baseline recorded for the current release (v0.7.1, after the RC fixes) is:
 
-| 策略 | 行为 |
+```text
+L1 unit           390 PASS / 0 FAIL
+L3 --level full   509 PASS / 0 FAIL   (unit 390 + toolchain 16 + full 103)
+```
+
+These numbers are assertion counts from the automated regression suite at the release
+freeze. They are not a new full production transcoding benchmark: the release was cut
+without a fresh end-to-end encode/transcode campaign on production material.
+
+On current `main` the L1 suite reports 421 PASS / 0 FAIL, the difference being work merged
+after the v0.7.1 tag (arbitrary-reference audio delay correction). Any change must be
+re-checked for new failures.
+
+Scheduled hardware-decode verification is separate:
+
+```powershell
+python -m tests.hwdecode.harness provenance      # binary/patch identity; mismatch = FAIL
+python -m tests.hwdecode.harness check-matrix    # documentation vs matrix drift check
+python -m tests.hwdecode.harness run --phase 1   # A toolchain + B routing
+python -m tests.hwdecode.harness summary         # aggregate gate
+```
+
+Targeted self-checks: `python tests\run_selfcheck.py --encoder nvenc|qsv|x265` and
+`python -m preservation.selfcheck <original> <final> <log_dir>`.
+
+## Project Structure
+
+```text
+1KeyTranscoder/
+├── 1kt.py                  Main CLI entry point (orchestration)
+├── watchfolder.py          Polling batch entry point
+├── start.bat               Double-click launcher
+├── VERSION                 Single source of the version number (0.7.1)
+├── *.json                  Encoder profile / scaling configurations
+├── core/                   Runtime core: pipeline, probing, planning, audio, dashboard
+├── encoders/               Encoder backends, capability probing, hardware decode, integrity gate
+├── preservation/           Sony / DJI metadata preservation, validation, quality sampling
+├── release/                Release packaging and package verification tools
+├── tests/                  Automated test suites (incl. tests/hwdecode/)
+├── docs/                   Design, evaluation, release and reference documentation
+├── logos/                  Brand assets
+├── licenses/               GNU GPL v3 text (referenced by LGPL-3.0)
+├── olddocs/                Archived documents and code snapshots
+├── LICENSE                 GNU LGPL v3 text
+└── NOTICE                  Copyright and SPDX identifier
+```
+
+| Path | Purpose |
 |---|---|
-| `off`（**默认**） | 软解。不尝试硬件解码，不改变任何默认 —— 这就是 v0.6.2 行为 |
-| `auto` | 输入命中 **runtime-proven 白名单**时用硬件读者，否则软解；**降级一定出声**（WARNING + reason code 进主日志/单文件日志/report） |
-| `require` | 必须硬件解码，不可用即报错（`require_unmet`），绝不静默降级 |
+| `1kt.py` | Command-line entry point; argument parsing and per-file orchestration. |
+| `core/` | Backend-agnostic runtime logic: configuration, probing, source classification, scaling, batching, channel sync, the v0.7.1 audio modules, logging, dashboard. |
+| `encoders/` | Backend implementations (NVEncC, QSVEncC, x265, SVT-AV1), capability tables, hardware-decode routing, integrity gate. |
+| `preservation/` | Sony and DJI preservation pipelines, container/ISO-BMFF handling, validation checkers, quality sampling. |
+| `release/` | `build_release.py` (allowlist-based packaging) and `verify_package.py`. |
+| `tests/` | `full_autotest.py` (unit / toolchain / full), targeted self-checks, fixtures, and the hardware-decode matrix in `tests/hwdecode/`. |
+| `docs/` | Design documents, evaluation reports, release notes, third-party reference archive. |
+| `logos/` | Primary logo, symbol mark and word mark. |
+| `licenses/` | GNU GPL v3 text incorporated by reference by LGPL-3.0. |
+| `olddocs/` | The project's single archive location for superseded documents and code snapshots. |
 
-**白名单是闭集**：`(backend, codec, chroma, depth)` 四元组，每行必须引用一次实测；
-白名单外一律 `not_proven` → 软解。这不是保守，是因为这个 integration 存在的
-唯一理由就是防止硬件路径**静默产出"看着对但实际错"的结果**，而未测过的 profile
-正是它出现的场景。目前 proven 的组合：NVENC HEVC 4:2:0 10bit、NVENC H.264
-4:2:2 10bit、QSV HEVC 4:2:0 10bit。
+Local-only directories (`tools/`, `testsets/`, `work/`, `logs/`, `dist/`) are not tracked
+by git; `dist/` holds release artifacts built locally.
 
-**完整性闸门**（`encoders/integrity.py`）：硬件解码开启时**恒开** `count` 级
-——五方帧数对账 + **读者身份断言**（读者身份从工具日志读，**不从命令行推断**：
-QSVEncC 在硬件不可用时会静默构造 `avsw`）。失败的产物**丢弃、出声、改用软解重跑**。
-`--hw-decode-verify` 追加 `sequence` 级逐帧有序指纹比对（代价是多一次编码）。
-闸门存在的理由是一个真实缺陷：stock 硬件读者在 Sony 素材上只吐 `N−3` 帧、
-`rc = 0`、无任何报错、文件完全可播放 —— **`exit code = 0` 不是正确性证据**。
+## Documentation
 
-**`--seek` 与硬件解码互斥**：带时间 seek 时两个 rigaya 读者**不等价**
-（帧数与 PTS 序列相同、画面内容不同，两侧都确定性；补丁不背这个锅），
-因此只要请求了 `--seek`，路由直接拒绝硬件解码（`seek_not_equivalent`）走软解。
-`--trim` 是读者等价的，不受限制。
+- [Documentation index](docs/README.md) — classified index of everything under `docs/`.
+- [Architecture](docs/design/architecture.md) — end-to-end data flow, invariants, module map. Start here to understand how the code runs.
+- [v0.7.1 release notes](docs/release_notes_v0.7.1.md) — the audio model and PCM pipeline, phase by phase.
+- [Next-cycle release notes](docs/release_notes_next.md) — arbitrary-reference audio delay correction (implemented on `main`, unpublished).
+- [v0.6.1 release notes](docs/release_notes_v0.6.1.md) — channel-sync streaming memory fix and AV1 colour metadata fix.
+- [Channel-sync P1 design](docs/design/channel_sync_p1.md) — algorithm, thresholds, degradation rules, fixture calibration.
+- [Hardware decode deliverables](docs/hardware-decode/README.md) — integration test matrix, final report, patches, toolchain provenance.
+- [Evaluation reports](docs/evaluation/) — per-backend production-readiness and AV1 calibration studies.
+- [Third-party reference archive](docs/reference/README.md) — archived vendor documentation and upstream sources.
+- [Archive status index](olddocs/README.md) — read the status banners before citing archived conclusions.
 
-> ⚠️ **发布安装中硬件解码不可用，这是设计行为**：补丁版二进制是
-> **research build、不得分发**，位于 `tools/avhw/`（release 白名单**不含**它，
-> `docs/` 也不入包）。因此在发布包里 `--hw-decode auto` 会以 `not_proven`
-> 降级到软解，`require` 会明确失败。
->
-> ⚠️ **引用补丁结论必须带上边界**：NVEncC 补丁仅在 **9.31（`2cb9d810`）** 验证；
-> QSVEncC 补丁 **runtime-proven on QSVEncC 8.26 pinned revision, not a general
-> claim for later releases**（8.27–8.30 未检验）。
+## Release
 
-### 硬件解码测试矩阵（`tests/hwdecode/`）
+Current release: **v0.7.1**
 
-83 个用例（A–K 十一类），机器可读矩阵 `tests/hwdecode/matrix.json`
-（与 harness 做双向漂移检查）。常用入口：
+- [GitHub release v0.7.1](https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.7.1)
+  — published as a GitHub release without a binary asset.
+- [Release notes v0.7.1](docs/release_notes_v0.7.1.md) — frozen with the tag; the release
+  notes file is not rewritten after publication.
+- `v0.7.1-rc1` is the release candidate tag and points at the same commit as `v0.7.1`; it
+  is not a separate release.
+- The GitHub release entries are published with GitHub's "pre-release" flag set; v0.7.1 is
+  nevertheless the current release of the project, matching `VERSION` and the `v0.7.1` tag.
 
-```powershell
-python -m tests.hwdecode.harness provenance      # 二进制/补丁身份 (不符即 FAIL)
-python -m tests.hwdecode.harness check-matrix    # 文档与矩阵漂移检查
-python -m tests.hwdecode.harness run --phase 1   # A 工具链 + B 路由
-python -m tests.hwdecode.harness run --phase 2   # C 完整性 + D 时间轴
-python -m tests.hwdecode.harness summary         # 汇总闸门
-```
+Older releases with downloadable self-contained packages:
 
-**注意**：`tests/hwdecode/` **不在** `tests/full_autotest.py --level full` 里
-（它需要真实 GPU + 补丁版二进制 + 数十分钟到数小时）。两个测试面互不替代：
-`full_autotest` 管生产回归，`tests/hwdecode` 管硬件解码正确性。
-
-## 编码后验证：`--check basic|advanced|full`
-
-| 强度 | Sony（rtmd） | DJI（djmd） |
+| Version | Download | Notes |
 |---|---|---|
-| `basic`（默认） | 时间线/轨清单/rtmd 载荷 sha256+时序+tref+timecode | 轨道清单 + djmd/dbgi/tmcd 载荷 sha256/size/样本数 + 音频流 + 帧数 |
-| `advanced` | + lens/XML/uuid 完整结构 + Gyroflow 消费端 | + Gyroflow 逐帧四元数（type-2 机型/镜头配置 + type-3 org_quat/stab_quat） |
-| `full` | + 详细自检（逐项 PASS/FAIL 落盘）+ **PSNR/SSIM 质量抽样** | + 逐轨时基/媒体时长、载荷首尾 32 字节、ffprobe 流级事实 + **PSNR/SSIM 质量抽样** |
+| v0.6.1 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/1KeyTranscoder-v0.6.1-win64-selfcontained.zip) | Channel-sync streaming memory fix; package still available. |
+| v0.5.1 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.5.1/1KeyTranscoder-v0.5.1-win64-selfcontained.zip) | AV1 line (software + hardware AV1). |
+| v0.4.2 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.4.2/1KeyTranscoder-v0.4.2-win64-selfcontained.zip) | HEVC/265 line. |
 
-任何 critical MISSING/MODIFIED 或 Gyroflow FAIL 都会使该文件判定失败。
+No package was published for v0.7.0 or v0.7.1; those features are available from a source
+checkout of `main`.
 
-**PSNR/SSIM 质量抽样**（`full` 级，防花屏/出错，不是质量门槛）：
-源文件名 sha256 确定性 **10 取 1**，仅 **≤60s 短视频**；`setpts=N`
-帧索引对齐（规避容器 timebase 失配）；阈值 psnr ≥25dB、ssim ≥0.80、
-垃圾帧（psnr<12dB）占比 ≤2%，达标外判定该文件失败（经典路径在
-交付前拦截）。阈值可经各档位 JSON 的 `quality_check` 节调整；
-结果落盘 `quality_<名>.json` + 批次汇总 `logs/quality_samples.csv`。
+## Roadmap
 
-**环境版本记录**：每批次启动时收集软件/驱动版本
-（ffmpeg/SVT-AV1 库/NVEncC/QSVEncC/GPAC/Gyroflow + GPU 驱动）→
-`logs/env_versions.json` + `env_versions.csv`，供编码行为复现。
+Directions currently defined by the existing design and release documentation. No dates
+are assigned.
 
-## 质量对齐（NVENC ↔ QSV）
+| Stage | Item |
+|---|---|
+| Phase 4A | Selective MP4 audio retention — keeping chosen audio tracks in the MP4 container instead of the current whole-stream copy. |
+| Phase 4B | Audio encode / mux integration — encoding the rendered PCM and writing it into the output container, replacing the WAV-only output kind. |
+| Later | Automatic cross-file synchronization — deriving delays across files rather than per file. |
+| Later | Drift correction — correcting slowly varying offsets (currently detected as `non_constant` and refused) instead of constant integer shifts. |
 
-`qsv_aligned.json` 为 QSV 档位按 **NVENC 同档三指标参照**标定的对齐版
-（VMAF v0.6.1 主指标 + SSIM/PSNR 辅，双片段验证轮）：
+Arbitrary-reference delay correction has been implemented on `main` after the v0.7.1 tag
+and is documented in [release_notes_next.md](docs/release_notes_next.md); no version number
+has been assigned to it.
 
-| 档位 | 原 icq | 对齐 icq |
-|---|---|---|
-| UHQ | 21 | 20 |
-| HQ | 22 | 21 |
-| SMALL | 26 | 23 |
-| FAST | 24 | 22 |
+## Limitations
 
-标定报告与全量数据见 `work/quality_align/align_report.md`（可复跑脚本
-`align.py`）。注意：Arc 无 Lookahead/EncTools（官方确认），对齐后的 QSV
-在高运动素材上仍低 NVENC ~1dB——这是硬件天花板，非配置问题；
-`--experimental-multihw` 混跑建议使用对齐版配置以缩小跨后端质量差。
+- **Platform**: Windows only; no other platform is tested.
+- **Audio CLI**: the v0.7.1 audio pipeline has no command-line interface; it is reachable
+  only through the internal API.
+- **Audio output**: PCM results can be rendered to WAV but not yet encoded and muxed into
+  the output MP4; selective audio retention in MP4 is not implemented.
+- **Offset model**: only constant integer sample offsets are supported. Drift correction,
+  resampling and time-stretch do not exist; a slow drift is detected and the track is left
+  untouched rather than corrected.
+- **Channel sync scope**: `--channel-sync` requires at least three independent mono PCM
+  tracks at 48 or 96 kHz with linear PCM sample formats; 44.1 kHz and compressed formats
+  are explicitly refused, and stereo/mono layouts are not aligned by default. The only
+  long-run validated configuration is 4 tracks / 48 kHz / single-threaded; `--jobs auto`,
+  10-minute Sony/DJI material and `--experimental-multihw` long runs are not validated.
+- **Hardware decode**: unavailable in release installations by design; the proven
+  allowlist is a closed set of three combinations; `--seek` is mutually exclusive with it;
+  the measured benefit is CPU headroom, not single-job speedup.
+- **AV1 output**: always 4:2:0; Sony sources keep their metadata but do not get an XAVC
+  brand; inputs below 1080p are not processed by default; the 4K60 UHQ preset is a
+  reference setting, not a practical production setting.
+- **Preservation**: non-Sony, non-DJI sources are transcoded without metadata (video and
+  audio only). For DJI, the MJPEG cover image and `udta` are dropped because GPAC 26.02
+  cannot address them; this is logged explicitly.
+- **Playback**: Sony 4:2:2 output is HEVC Rext, which only NVIDIA 50-series GPUs can
+  hardware-decode; distribute a 4:2:0 copy instead.
+- **Quality alignment**: the QSV profile aligned to the NVENC profile is calibrated, not
+  identical; high-motion material remains roughly 1 dB below NVENC, which is a hardware
+  ceiling rather than a configuration issue.
+- **Stability of internal interfaces**: several v0.7.1 audio objects are explicitly marked
+  internal or reserved and are not guaranteed to keep their current semantics; the
+  authoritative list is in
+  [architecture.md](docs/design/architecture.md) §6.1 and
+  [release_notes_v0.7.1.md](docs/release_notes_v0.7.1.md) §32.
+- **Encoder profile values**: the numbers in the `*.json` profiles are measured
+  calibrations. Changing them requires a test-set regression run.
 
-## 降级与报错处理（不弹窗）
+## Contributions
 
-- **能力预判降级**：4:2:2 → 10bit 4:2:0 → 8bit 4:2:0，显著 WARNING +
-  三处记录（log/CSV/report）；`--no-downgrade` 时改为跳过；
-- **运行时失败**：自动降级梯重试；读不了容器先走 MP4Box strip 回退；
-  全失败则该文件 failed，批处理继续；
-- **失败记录**：`logs/failed_files.json` + 独立详情文件；`--retry-list`
-  支持换后端重跑（可接受 failed_files.json 或纯文本路径清单）。
+Issues and pull requests are welcome. There is no contributor guide yet.
 
-## 并行调度
+- Keep changes reproducible: run `python tests\full_autotest.py --level unit` at minimum,
+  and `--level full` before submitting anything that touches the pipeline. No pull request
+  may introduce a new FAIL.
+- Changes that touch preservation, container handling or encoder profiles must state the
+  material and tool versions used for verification.
+- Do not modify the encoder profile JSON values or the brand/logo assets without an
+  explicit reason recorded in the change.
+- Documentation lives in `docs/` and follows the classification described in
+  [docs/README.md](docs/README.md); the root README stays user-facing.
 
-- `--jobs 1`（默认）/ `--jobs N` 固定并发 / `--jobs auto` 自适应
-  （波次实测聚合吞吐动态调整，无写死预算表）；
-- `--experimental-multihw` 实验性双后端并行（NVENC+QSV，**质量一致性
-  不保证**——见质量对齐节）。**v0.6.2 起无需再指定 `--encoder`**：开关
-  自身探测 NVENC/QSV；两个都可用则双后端调度，只有一个可用则**退化为
-  单后端池并告警**（此时跨后端质量差问题不存在），都不可用则直接报错。
-  与 `--encoder x265|svtav1|*-av1` 同时给出会报错（multihw 只调度 HEVC）；
-- x265 路径顺序执行。
+## Brand Assets
 
-## 日志与可观测性
+The repository provides three brand assets under `logos/`. They are used as-is; the files
+are not renamed or modified.
 
-三个层级各落一个文件（`logs/` 下），互不干扰：
+### Primary Logo
 
-| 文件 | 内容 | 何时写入 |
-|---|---|---|
-| `error.log` | 仅 ERROR | **始终写入**（跨批次追加，排查先看这个） |
-| `warn.log` | WARNING 及以上 | **始终写入**（跨批次追加） |
-| `total.log` | 按 `--log-level` | 默认 INFO 及以上；**追加**，可用 `--fresh-log` 清空 |
-| `debug.log` | DEBUG（完整命令行/阶段耗时） | 仅 `--log-level debug` 时创建 |
+Symbol mark plus word mark. Used for the README header, project presentation, release
+pages and documentation covers.
 
-```powershell
---log-level error|warn|info|debug   # 文件详细度（大小写不敏感），默认 info
---verbose                            # 控制台输出 DEBUG（文件级别不受影响）
---fresh-log                          # 启动时清空 total.log / debug.log
+```markdown
+<p align="center">
+  <img src="logos/Primary%20Logo.png" alt="1KeyTranscoder Primary Logo" width="360">
+</p>
 ```
 
-`error.log` / `warn.log` 与级别无关地始终追加：失败报告不会因为下一次
-正常运行而被截断。
+### Symbol Mark
 
-## 双窗口 UI / watchfolder
+Mark only, without text. Intended for application icons, avatars, favicons and other
+small-size contexts.
 
-非 headless 运行自动打开进度看板（nvidia-smi 风格，1.5s 刷新）+ 工作信息
-窗口；状态数据恒写 `logs/dashboard.json`。`start.bat` /
-`python watchfolder.py --input <dir> --output <dir> --encoder nvenc ...`
-可做轮询批处理（续跑逻辑使重复轮询近零开销）。
-
-## 自动化测试（三级深度）
-
-```powershell
-python tests\full_autotest.py --level unit        # L1 纯逻辑 + 确定性强逻辑 (~1 分钟)
-python tests\full_autotest.py --level toolchain   # L2 + 工具版本/实机能力/旗标白名单 (~16s)
-python tests\full_autotest.py --level full        # L3 + 真实管线集成 + 故障注入 (~12 分钟)
-python tests\full_autotest.py --level all         # 等同 full
+```markdown
+<img src="logos/Symbol%20Mark.png" alt="1KeyTranscoder Symbol Mark" width="120">
 ```
 
-> 当前 `main` 基线：**L1 = 421 PASS / 0 FAIL**；
-> **`--level full` = 545 PASS / 0 FAIL**（unit 421 + toolchain 16 + full 108；
-> v0.7.0 hardware decode + v0.7.1 音频 Phase 1/2/3A/3B + RC1 修正 +
-> **下一周期任意 reference 延迟矫正**全部并入 `main` 后实测）。
-> 已发布版本 **`v0.7.1` 冻结时的基线**是 L1 390 / full 509。
-> 任何改动后必须复核不出现新增 FAIL。
+### Word Mark
 
-- **L1 unit**（421 项）：color token 表、caps 解析、格式规划、失败分类、
-  flag 构造、probe/paths、源分类、缩放引擎、gpac parse_info、dji facts、
-  channel-sync 纯逻辑、**channel-sync 内存回归（有界窗口流 / 窗口切片一致 /
-  64 MB 整轨扫描后工作集增量 ≤32 MB）**、AV1 档位与参数映射、
-  **音频时间轴/EOF/offset（P3A）、通道路由（P3A）、WAV 往返与 header 精确
-  （P3A）、chunk invariance 与内存上界（P3A）、PCM 混音（P3B：gain/相消/
-  overflow/ClipPolicy/多 bus/短 source/offset）、混音 chunk invariance 与
-  图等价（P3B）**、
-  **任意 reference 延迟矫正（下一周期，31 项：reference 置换坐标平移不变量 /
-  source 顺序不变 / 跨来源任意方向 / selection 与采样率约束 / timeline 落点）**；
-- **L2 toolchain**（+16 项）：真实工具版本、`--check-features` 实机能力、
-  known_flags 白名单、Gyroflow/GPAC 探测；
-- **L3 full**（108 项）：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
-  截断文件/尾部垃圾/断点续跑/retry-list 故障注入、strip 机制本体、
-  AV1 管线、channel-sync P1 端到端与算法级、
-  **音频模型 probe 集成（真 ffprobe，v0.7.1 P1）**、
-  **音频来源/选择/映射集成（真 A7M5 + 外挂 WAV，v0.7.1 P2）**、
-  **音频 PCM 路由/WAV 导出集成（真 A7M5 4×mono + s16/s24/s32/f32 正弦，
-  v0.7.1 P3A，12 项）**、
-  **音频 PCM 混音集成（真 A7M5 + 外挂 4CH WAV，v0.7.1 P3B，6 项）**、
-  **任意 reference 延迟矫正集成（真 A7M5 4×mono + 外挂 4CH WAV，
-  下一周期，5 项）**。
-  输入在 `work/autotest/` 自建副本（testsets 只读），报告
-  `work/autotest/autotest_report.{json,md}`，退出码 0=全过。
+The `1KeyTranscoder` wordmark only. Intended for documentation, UI headers and
+horizontally constrained layouts.
 
-另有定向自检：`python tests\run_selfcheck.py --encoder nvenc|qsv|x265`、
-`python -m preservation.selfcheck <original> <final> <log_dir>`。
-
-## 文档导航
-
-```
-docs/
-├── README.md            分类索引
-├── FINAL_REPORT.md      ★ 四份评估汇总结论与路线图
-├── design/              设计文档：硬件后端设计 / 实施报告(含 DJI §15) / 集成报告 / HEVC 4:2:2 Rext 播放兼容性
-├── evaluation/          评估：HEVC 生产就绪度(重写版) / x265 生产就绪 / AV1 可行性 / AV1 调参 / SVT-AV1 归档 / AV1 档位标定
-├── hardware-decode/     ★ v0.7.0 硬件解码 integration 交付物：测试矩阵 / 最终判定 / 补丁 / toolchain provenance
-├── release_notes_v0.7.1.md  v0.7.1 发布说明（音频 Phase 1 + Phase 2 + Phase 3A/3B）
-└── reference/           第三方一手资料存档（x265 / SVT-AV1 含 v4.2.0 调参调研报告 / NVENC / QSV / VCE）
-
-olddocs/                 历史档案存档（各阶段代码快照 / 被取代的旧脚本），详见 olddocs/README.md
+```markdown
+<img src="logos/Word%20Mark.png" alt="1KeyTranscoder Word Mark" width="280">
 ```
 
-## 关键决策记录
+No monochrome, app-icon, favicon, stacked or motion variants exist in this repository.
 
-1. **AV1 与 XAVC 边界**：XAVC 标准只定义 H.264/HEVC。AV1 后端（svtav1 /
-   nvenc-av1 / qsv-av1）对 Sony 源保留 rtmd/nrtm/uuid 元数据管线，但
-   **不打 XAVC tag**（brand 改 av01）——保留 XAVC brand 的 AV1 文件是
-   伪标准产物；XAVC 合规归档请用 HEVC 后端。AV1 统一 4:2:0 输出
-   （4:2:2 源 WARNING 后降采样，不用 AOM）。
-2. **DJI 专线**：djmd 即运动数据载体（Gyroflow 官方支持 Action 4/5/6、
-   Avata、Neo）；`MP4Box -diso` XML 对 DJI 文件解析失败 → 轨道枚举全部
-   走 `-info` 文本解析；mjpeg 封面/udta GPAC 不可寻址，按策略丢弃。
-3. **HEVC 生产就绪度**：硬件双后端"有条件生产就绪"（15/15 验收 +
-   色彩元数据端到端 + 质量对齐）；4:2:2 输出为 Rext，硬解仅 Blackwell，
-   归档定位为"压缩归档副本"（母版标准是 FFV1/ProRes）。
-4. **x265 定位**：手动高压缩档。P0 修复已落地并回归（info=false
-   可复现、level 6.2 + CPB 钳位 240Mbit；FAST rd 保持 2 不动）；
-   `no-strong-intra-smoothing` **全档开启**（用户决定 2026-09-01：
-   触发帧内强力平滑的条件苛刻、对画面影响低，带上后编码器改用
-   其他平滑手段，细纹理/颗粒保留更好）；DJI 素材走同构保留管线
-   （djmd 原生保留）；缩放规则仍 PROVISIONAL。详见
-   `work/x265_test/x265_test_report.md`。
-5. **档位数值权威性**：JSON 数值为作者实测标定，调参须回归测试集。
-6. **AV1 色彩元数据保真**（v0.6.0 修复）：源素材**未声明**色彩描述时
-   （`color_primaries/transfer/space = unknown`；137 段真实 A7M5 素材中
-   有 7 段如此），AV1 输出**不得凭空带上 bt709**。根因不在本项目也不在
-   编码器——编码器位流本就是 `unspecified`——而在 GPAC/MP4Box 的容器重建：
-   它只在 AV1 sequence header 的 `color_description_present_flag == 1` 时
-   才从位流推导 `colr`，该标志为 0 时写死 `colr nclc 1/1/1`（bt709）。
-   QSVEncC 恰好置了该标志，故 `qsv-av1` 从未暴露此问题；FFmpeg/libsvtav1
-   与 NVEncC 不置，于是 `svtav1`/`nvenc-av1` 被判 critical MODIFIED 而失败
-   且无产出。修复是在项目自己的 mux 边界做**窄口径原地对账**
-   （`preservation/colour.py` + `isobmf.patch_video_colr()`）：仅当源未声明
-   色彩时，把已存在的 `colr` 三元组改写为 `2/2/2`（unspecified）。盒子大小
-   不变，故不触碰任何 stco/co64 偏移；源已声明色彩时**完全不执行**。
-   `preservation` 校验规则**一行未改**（不放宽任何 critical 项）。
-   验收：27 case / 348 断言全绿（T1 7 段 × 三后端 + T2 已知色彩 1 段 ×
-   三后端），修复后输出与源色彩字段完全一致。
+## License
 
-## 已知限制与说明
+**GNU Lesser General Public License v3.0 or later (LGPL-3.0-or-later).**
 
-- DJI：mjpeg 封面与 udta 丢弃（GPAC 26.02 不可寻址，日志显式）；机内
-  Rocksteady/EIS 开启的素材无运动数据（djmd 存在但四元数为空，校验按
-  两侧相等通过）；
-- QSV：`lookahead(--la-depth)` 在 Arc 全系无效（LA 全 x，旗标被接受但
-  特性不生效）；驱动/QSVEncC 版本对需钉住（6557/6559 曾有批量编码回归史）；
-- Sony 4:2:2 成品 = HEVC Rext，播放硬解仅 NVIDIA 50 系，其余需软解播放器
-  （VLC/mpv）；分发请出 4:2:0 副本；
-- **AV1**：
-  - 统一 4:2:0 输出（所有 AV1 后端）；Sony 源保留 rtmd/nrtm/uuid 元数据但
-    不打 XAVC tag（brand av01）；
-  - **源未声明色彩 → 输出也不声明**，不发明 bt709（见关键决策记录 6）；
-  - **受支持输入为 ≥1080p**：低于 1080p 的素材默认不处理
-    （`nvenc_av1.json` 的 `level 6.1` 在受支持范围内实测均可用）；
-  - SVT-AV1 无场景关键帧（scd 只管码率分配）、mbr 为软上限（非 VBV 硬钳）；
-  - 4K60 UHQ 档（preset 1，≈1fps 对齐 x265 UHQ）编码耗时极高，属基准档
-    非生产实用。
-- 非 Sony 非 DJI 素材按策略丢弃元数据（仅视频+音频）；
-- VFR 素材自动 `--avsync forcecfr` 规范化（WARNING 记录）；
-- 经典路径无 1:1 帧闸门（不误杀 VFR）；Sony/DJI 路径有；
-- **`--channel-sync`（P1）能力边界**：
-  - 只做**整数样本移位**（无重采样、无 fractional sinc、无 time-warp）。
-    真实慢漂移（39–76 ppm）会被判 `non_constant` 并**拒绝修正**，本轮
-    **不做漂移补偿**（P2 drift/resample 为后续工作，未实施）；
-  - 仅 **48 / 96 kHz 线性 PCM**（44.1 kHz 与压缩/非线性格式显式拒绝）；
-  - 只处理 **≥3 条独立单声道 PCM 轨**（2ch/1ch 布局默认不对齐）；
-  - 长程验证只覆盖 **4 轨 / 48 kHz / 单线程**这一规格（含 `--jobs 1`）。
-    `--jobs auto` 长程、Sony/DJI 10 分钟素材长程、`--experimental-multihw`
-    长程**均未验证**，不得据此声明性能；
-  - `--channel-sync-transparent` 成功路径会在 `.1ktwork/` 保留 4 个
-    `audio_*.mov` 与通道报告 JSON（10 分钟输入约 330 MB），属既有行为，
-    需自行判废。
-- **硬件解码（v0.7.0）默认 `off`，且发布安装中不可用**：
-  - 补丁版二进制是 research build、**不得分发**，位于 `tools/avhw/`，
-    release 白名单不含它；因此发布包里 `--hw-decode auto` 会降级软解、
-    `require` 会明确失败（设计行为，不是缺陷）；
-  - 白名单是**闭集**，目前仅 3 个 `(backend, codec, chroma, depth)` 组合；
-    白名单外一律 `not_proven` → 软解；
-  - **`--seek` 与硬件解码互斥**（读者不等价，`seek_not_equivalent`）；
-  - 硬件解码收益是**CPU 余量**，不是单任务提速；跨二进制 wall-clock / fps
-    **不是**受控基准（patched 是 research build）；
-  - QSVEncC 补丁仅对 pinned 8.26 成立（8.27–8.30 未检验），NVEncC 补丁
-    仅在 9.31（`2cb9d810`）验证；
-  - `tests/hwdecode/` 矩阵**不在** `--level full` 内，需单独跑。
-- **音频模型与 PCM 处理（v0.7.1 Phase 1 + Phase 2 + Phase 3A/3B）当前是
-  内部能力层**：
-  - 不改变默认音频路径（仍为全流 `-c:a copy`）与 MP4 输出；没有新增 CLI；
-  - **已实现**：音频模型、来源/选择/映射、`AudioMapSpec` dry-run 规格、
-    PCM 处理链（`AudioTimeline` 时长/EOF/offset 权威 → canonical float32
-    Reader → 路由**或**混音 → WAV 导出）、`AudioRenderResult`；
-  - **Mixing**：PCM 路径已实现（`core/audio_mix.py`，N→1 + 线性 gain +
-    float32 累加 + `ClipPolicy`）。但 `-map` 规格侧仍以
-    `audio_mix_not_supported` 拒绝 —— 那是 ffmpeg argv 表达不了样本级合成，
-    两条路径并存，不是矛盾；
-  - 选择与映射只产出 dry-run 规格（策略分类 + 身份），**不生成 filtergraph、
-    不执行 ffmpeg**；PCM 链路只在显式调用 `run_audio_render()` 时才跑；
-  - **未实现**：selective MP4 retention / 音频编码 + mux / 重采样 /
-    漂移校正 / 自动跨文件同步 / 新音频 CLI（完整清单见上节 ⚠️）。
-  - 模型不做 role 自动推断，也不会把未知 channel_layout 当成已知布局。
+- [LICENSE](LICENSE) — GNU LGPL v3 text.
+- [licenses/GPL-3.0.txt](licenses/GPL-3.0.txt) — GNU GPL v3 text, incorporated by
+  reference by LGPL-3.0.
+- [NOTICE](NOTICE) — copyright and SPDX identifier.
 
-## 许可证
-
-**GNU Lesser General Public License v3.0 或更高版本（LGPL-3.0-or-later）**，
-全部开源。许可文本：[`LICENSE`](LICENSE)（GNU LGPL v3 正文）+
-[`licenses/GPL-3.0.txt`](licenses/GPL-3.0.txt)（LGPL-3.0 并入引用的 GNU GPL v3
-全文）；版权与 SPDX 标识见 [`NOTICE`](NOTICE)。本仓库未使用 MIT 或其他许可。
-
-> 第三方工具（NVEncC/QSVEncC、GPAC、ffmpeg、Gyroflow）以独立可执行文件
-> 形式调用，各按其自身许可证分发，不并入本项目。
-
-## 回滚
-
-```powershell
-git checkout pre_S1S5              # S1-S5 前基线
-git tag -l                         # pre_S1S5 / post_S1S5 / pre_ui / post_1kt_ui
-                                   # post_adaptive / post_hw_fulltest / post_color_meta
-                                   # post_dji / post_dji_checklevels / post_quality_align
-                                   # post_autotest / post_x265 / v0.4.0 / v0.4.1 / v0.4.2
-                                   # post_av1 / post_av1_calib / v0.5.0 / v0.5.1
-                                   # v0.6.0 (HEVC+AV1 合并主线, 含 AV1 色彩保真修复)
-                                   # v0.6.1 (channel-sync 流式内存修复)
-                                   # v0.7.0 (hardware decode integration, v0.7 线基线)
-                                   # v0.7.1 (音频处理架构与 PCM 管线, 当前)
-                                   # v0.7.1-rc1 (RC freeze, 与 v0.7.1 同一 commit)
-git checkout backup/pre-av1-main-merge   # AV1 合并进 main 之前的状态 (回滚点)
-```
-
-> 分支约定: `main` = **HEVC/265 + AV1 合并主线**（两条线能力同处一分支，
-> 各线最后一次发布包见上节；v0.7.x 起在同一 `main` 上继续开发音频轨道模型
-> 与后续音频能力）；`av1` 分支保留为 AV1 独立线历史
-> （含 post_av1 / post_av1_calib / v0.5.0 / v0.5.1 tag）；
-> `backup/pre-av1-main-merge` = AV1 合并前的 `main` 快照。
+Third-party tools (NVEncC, QSVEncC, GPAC, ffmpeg, Gyroflow) are invoked as separate
+executables and are distributed under their own licences; they are not part of this
+project's codebase.
