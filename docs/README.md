@@ -115,7 +115,8 @@ F:\1KeyTranscoder\
 
 | 文件 | 说明 |
 |---|---|
-| [`release_notes_v0.7.1.md`](release_notes_v0.7.1.md) | **v0.7.1 发布说明（音频模型 Phase 1 + Phase 2 + Phase 3A/3B）**：`AudioStream`/`AudioChannel`/`AudioTrack`/`AudioPlan` 数据模型、`AudioSource`/Selection/Channel Mapping/`AudioMapSpec`、**`AudioTimeline`（时长·EOF·offset 唯一权威）/ `AudioPCMReader`（canonical float32）/ `AudioRouter` / `WavExporter` / `AudioMixer`（N→1 + gain + peak/clipping）/ `AudioOutputSpec`**、与 channel-sync 的只读连接、序列化 schema、新增测试矩阵、**默认音频路径 unchanged** 的证据与"未实现"清单 |
+| [`release_notes_v0.7.1.md`](release_notes_v0.7.1.md) | **v0.7.1 发布说明（音频模型 Phase 1 + Phase 2 + Phase 3A/3B）**：`AudioStream`/`AudioChannel`/`AudioTrack`/`AudioPlan` 数据模型、`AudioSource`/Selection/Channel Mapping/`AudioMapSpec`、**`AudioTimeline`（时长·EOF·offset 唯一权威）/ `AudioPCMReader`（canonical float32）/ `AudioRouter` / `WavExporter` / `AudioMixer`（N→1 + gain + peak/clipping）/ `AudioOutputSpec`**、与 channel-sync 的只读连接、序列化 schema、新增测试矩阵、**默认音频路径 unchanged** 的证据与"未实现"清单。⚠️ **已随 tag `v0.7.1` 冻结**，不再改写 |
+| [`release_notes_next.md`](release_notes_next.md) | **下一开发周期（尚未发布，未分配版本号）**：**任意 reference 的音频延迟矫正** —— reference 必须是可任意选择的 `AudioChannel`（不是固定 camera/recorder 路径）、reference 置换的坐标平移不变量、跨来源（media/WAV 互为 reference）、结果经 `AudioTimeline` 统一应用。明确不含漂移校正 / resampling / 编码 / mux / 新 CLI |
 | `../docs/hardware-decode/` | **v0.7.0 hardware-decode integration 交付物**（本轮已并入 `main`，`v0.7.0 ∈ ancestors(main)`）：[`README.md`](hardware-decode/README.md) 入口、[`integration-test-matrix.md`](hardware-decode/integration-test-matrix.md) 测试矩阵、[`final-report.md`](hardware-decode/final-report.md) 最终判定、`patches/` 与 `toolchain-provenance.json` |
 | [`release_notes_v0.6.1.md`](release_notes_v0.6.1.md) | **v0.6.1 发布说明**：Channel Sync P1 / AV1 mainline / AV1 色彩保真 / 流式内存修复；含验证矩阵、实测性能与已知限制 |
 

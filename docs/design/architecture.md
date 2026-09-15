@@ -476,6 +476,148 @@ N 源声道 -> 1 输出声道 -> strategy = MIXING        （该路径**不可�
 
 ---
 
+## 6.2 任意 reference 的延迟矫正（下一个开发周期 · **不属于 v0.7.1**）
+
+> ⚠️ **版本边界**：v0.7.1 已正式发布（tag `v0.7.1` = `e613b07`）。本节描述的是
+> **v0.7.1 之后**新增的能力，**不是** v0.7.1 的内容。第六节 6.1.x 与本节互不
+> 覆盖：6.1.x 冻结的是 v0.7.1 已发布的行为，本节是新周期的增量。
+
+### 6.2.1 解决的问题与核心原则
+
+v0.7.1 的 PCM 链路能**消费**已经存在的 offset（`AudioChannel.sync` →
+`AudioTimeline`），但**不产出** offset：没有任何模块在 PCM 域测量跨来源时差。
+文件级 `--channel-sync` 只管**单个文件内**的多条独立 mono PCM 流，且锚点由
+`anchor_candidates`（`[CH3, CH4, CH1, CH2]`）候选顺序决定 —— 那是"文件内锚点
+回退"，不是"调用方指定任意参考"。
+
+本节新增的正是这一层。核心原则一句话：
+
+```text
+Reference is data, not topology.
+```
+
+**reference 是"这次同步任务选出来的一路 AudioChannel"，不是 camera /
+recorder / stream 0 / sources[0] / 任何预设路径。** "camera → recorder"
+只是 `reference="camera:s0:c0"` 的一个具体实例；`reference="recorder:s2:c1"`
+同样合法，且**必须**得到数学上一致的结果。
+
+### 6.2.2 数据流
+
+```text
+AudioPlan
+   │  effective_mapping()  <- 只有被 selection 保留的声道可参与
+   ▼
+SyncPlan                       core/audio_sync.py
+   reference_channel_id        <- 任意 AudioChannel id (显式, 无默认)
+   target_channel_ids          <- 不得含 reference; 不得重复
+   ├─ reference 自身 offset 恒为 0 (永不被自我修正)
+   ▼
+estimate_sync()                 逐 target 调 **既有** estimate_pair
+   PCMChannelWindow(reader)  ->  两阶段 GCC-PHAT + 相位斜率精估
+   │                              (core/sync_estimate, **未改动**)
+   ▼
+PairSyncEstimate.offset_samples = delay_samples  (方向同 channel_sync)
+   │  constant sample offset; 分数部分只记录不插值
+   ▼
+apply_sync_result() -> AudioChannel.sync
+   ▼
+AudioTimeline                  <- 唯一 render alignment 权威 (6.1.6/6.1.11)
+   ▼
+AudioRouter / AudioMixer -> WavExporter
+```
+
+**为什么写 `AudioChannel.sync` 而不是直接改 PCM**：那是**既有**的唯一消费
+路径 —— `resolve_timeline()` 从 `AudioChannel.sync` 取 `offset_samples` 并执行
+`timeline_sample = source_sample - offset_samples`。因此不存在第二个 offset
+真相源；同步层只决定"target 在 timeline 上的位置"，真正取样由 PCM 层负责。
+
+### 6.2.3 复用而非重写（`core/channel_sync.py` 未被推翻）
+
+| 关注点 | 既有实现 | 本周期 |
+|---|---|---|
+| 时差估计 | `core/sync_estimate.estimate_pair`（两阶段 GCC-PHAT + 相位斜率 + 轨迹分类） | **原样复用**：直接对 (reference, target) 调它，`delay > 0 = 目标晚到` 语义不变 |
+| 质量门阈值 | `core/channel_sync.DEFAULTS`（`min_usable_frames` / `min_confidence` / `frame_min_rms_dbfs` / `search_window_ms` / `constant_*`） | **同一套标定值**，不另立一套 |
+| 整数移位实施 | `core/sync_fix.shift_stream`（`out[n] = in[n + rint(delay)]`） | 不重复实现；本层只产出 offset |
+| 文件级锚点管线 | `core/channel_sync.run_channel_sync`（按 `audio_position` 选锚点 + 报告 + 回编码） | **未改动**，与本节并存，各自服务不同场景 |
+| PCM 解码 | `core/audio_pcm.AudioPCMReader`（canonical float32） | **同一份样本**：估计与渲染消费同一解码结果，不建第二套解码路径 |
+
+新增的只有三层：**reference selection**（任意 channel 显式指定）、
+**measurement plumbing**（`channel_id` → PCM 视图 → `estimate_pair`）、
+**timeline application**（结果交回 `AudioTimeline`）。
+
+### 6.2.4 offset 符号（沿用既有实测语义，**不另立一套**）
+
+```text
+core/channel_sync : delay > 0 = 目标轨比锚点晚到
+core/sync_fix     : 修正 = out[n] = in[n + shift], shift = rint(delay)
+core/audio_timeline: timeline_sample = source_sample - offset_samples
+                     ^^^^^^^^^^^^^^ 与上式同向
+```
+
+因此 **offset 就是 `estimate_pair` 的 `delay_samples`，不需要任何符号翻转**：
+
+```text
+fixture: reference 内容 @9600, target 晚到 60 -> 内容 @9660
+    测量 delay_samples = +60
+    -> AudioChannel.sync.offset_samples = +60
+    -> target 内容落到 timeline 9600  ==  reference ✓
+```
+
+取整用 IEEE-754 round-half-to-even（与 `int(np.rint(...))` 同一语义），
+固定偏差点绝不引入第二套取整规则。
+
+### 6.2.5 坐标不变式（reference 置换）
+
+`off(q | p)` 记"以 p 为 reference 时 target q 的 offset"。更换 reference
+后**全体 offset 必须一致平移**（同一 timeline 坐标系）：
+
+```text
+反对称:   off(A|B) == -off(B|A)
+坐标平移: off(C|B) == off(C|A) - off(B|A)
+          ≡ off(C|A) + off(A|B)          (由反对称等价)
+```
+
+实测（4 路共享伪噪声，延迟 0 / +60 / −47 / +83；每个 channel 各当一次
+reference，全部 sample-exact）：
+
+| reference | A | B | C | D |
+|---|---|---|---|---|
+| A | 0 | +60 | −47 | +83 |
+| B | −60 | 0 | −107 | +23 |
+| C | +47 | +107 | 0 | +130 |
+| D | −83 | −23 | −130 | 0 |
+
+`reference` 自身恒为 0，且**不写入** `AudioChannel.sync`（不会被二次修正）。
+
+### 6.2.6 明确边界（本周期**不**做）
+
+```text
+漂移校正 / resampling / time-stretch / 变速 / 插值 / 分数样本修正
+loudness normalization / LUFS / AGC / limiter / compressor / EQ /
+降噪 / 频谱处理
+音频编码 / MP4 mux / selective MP4 retention / 新 CLI
+```
+
+漂移（`drift_ppm` / `constant`）只**检出并报告**，不修正。reference 与全部
+targets 必须共享采样率，否则 `sync_sample_rate_mismatch` —— **不偷偷
+resample**。没有显式 sync plan 时**不做任何同步**（默认路径不变）。
+
+### 6.2.7 本周期新增的 reason codes（稳定契约）
+
+```text
+reference_missing              reference_not_selected
+target_not_selected            reference_equals_target
+sync_channel_not_found         sync_duplicate_target
+sync_sample_rate_mismatch      sync_unsupported_format
+sync_insufficient_signal       sync_estimation_failed
+```
+
+与既有 reason code **不重复**：`audio_*` 系列属 6.1.x（v0.7.1 已发布），
+`sync_*` / `*_not_selected` / `*_missing` 系列属本周期。全部由
+`core/audio_sync.py` 以模块常量导出，不使用裸字符串。
+
+---
+
 ## 7. 编码后验证：`--check` 三级
 
 | 级别 | Sony | DJI |

@@ -540,30 +540,35 @@ python tests\full_autotest.py --level full        # L3 + 真实管线集成 + �
 python tests\full_autotest.py --level all         # 等同 full
 ```
 
-> 当前基线（v0.7.1）：**L1 = 390 PASS / 0 FAIL**；
-> **`--level full` = 509 PASS / 0 FAIL**（unit 390 + toolchain 16 + full 103；
-> v0.7.0 hardware decode + v0.7.1 音频 Phase 1/2/3A/3B + RC1 修正全部并入
-> `main` 后实测）。
+> 当前 `main` 基线：**L1 = 421 PASS / 0 FAIL**；
+> **`--level full` = 545 PASS / 0 FAIL**（unit 421 + toolchain 16 + full 108；
+> v0.7.0 hardware decode + v0.7.1 音频 Phase 1/2/3A/3B + RC1 修正 +
+> **下一周期任意 reference 延迟矫正**全部并入 `main` 后实测）。
+> 已发布版本 **`v0.7.1` 冻结时的基线**是 L1 390 / full 509。
 > 任何改动后必须复核不出现新增 FAIL。
 
-- **L1 unit**（390 项）：color token 表、caps 解析、格式规划、失败分类、
+- **L1 unit**（421 项）：color token 表、caps 解析、格式规划、失败分类、
   flag 构造、probe/paths、源分类、缩放引擎、gpac parse_info、dji facts、
   channel-sync 纯逻辑、**channel-sync 内存回归（有界窗口流 / 窗口切片一致 /
   64 MB 整轨扫描后工作集增量 ≤32 MB）**、AV1 档位与参数映射、
   **音频时间轴/EOF/offset（P3A）、通道路由（P3A）、WAV 往返与 header 精确
   （P3A）、chunk invariance 与内存上界（P3A）、PCM 混音（P3B：gain/相消/
   overflow/ClipPolicy/多 bus/短 source/offset）、混音 chunk invariance 与
-  图等价（P3B）**；
+  图等价（P3B）**、
+  **任意 reference 延迟矫正（下一周期，31 项：reference 置换坐标平移不变量 /
+  source 顺序不变 / 跨来源任意方向 / selection 与采样率约束 / timeline 落点）**；
 - **L2 toolchain**（+16 项）：真实工具版本、`--check-features` 实机能力、
   known_flags 白名单、Gyroflow/GPAC 探测；
-- **L3 full**（103 项）：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
+- **L3 full**（108 项）：Sony/DJI/经典 × NVENC/QSV 真实管线（basic+full check）、
   截断文件/尾部垃圾/断点续跑/retry-list 故障注入、strip 机制本体、
   AV1 管线、channel-sync P1 端到端与算法级、
   **音频模型 probe 集成（真 ffprobe，v0.7.1 P1）**、
   **音频来源/选择/映射集成（真 A7M5 + 外挂 WAV，v0.7.1 P2）**、
   **音频 PCM 路由/WAV 导出集成（真 A7M5 4×mono + s16/s24/s32/f32 正弦，
   v0.7.1 P3A，12 项）**、
-  **音频 PCM 混音集成（真 A7M5 + 外挂 4CH WAV，v0.7.1 P3B，6 项）**。
+  **音频 PCM 混音集成（真 A7M5 + 外挂 4CH WAV，v0.7.1 P3B，6 项）**、
+  **任意 reference 延迟矫正集成（真 A7M5 4×mono + 外挂 4CH WAV，
+  下一周期，5 项）**。
   输入在 `work/autotest/` 自建副本（testsets 只读），报告
   `work/autotest/autotest_report.{json,md}`，退出码 0=全过。
 
