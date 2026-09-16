@@ -74,9 +74,11 @@ __all__ = [
     "REASON_AUDIO_ENCODE_RENDER_FAILED",
     "REASON_AUDIO_ENCODE_SAMPLE_RATE_MISMATCH",
     "REASON_AUDIO_ENCODE_VERIFY_FAILED",
+    "RenderWindow",
     "encode_audio",
     "encode_audio_from_plan",
     "resolve_audio_format",
+    "shared_render_window",
 ]
 
 REASON_AUDIO_ENCODE_FORMAT_UNSUPPORTED = "audio_encode_format_unsupported"
@@ -94,12 +96,18 @@ class AudioEncodeFormat(str, Enum):
     + 容器 + 文件扩展名映射, 不做能力探测、不做 fallback 链。扩充格式是
     有意的显式动作 (改这张表), 不是运行时猜测。
 
-    * `AAC`  -> MP4 容器的通用音频编码 (本阶段的默认值);
+    * `AAC`  -> 通用有损音频编码 (MP4 家族容器, v0.8.0 起; 见下方 `_FORMATS`
+      注释: 裸 ADTS 会丢掉编码器 priming, 让采样级对齐失效);
+    * `OPUS` -> 低码率 Speech/WebM 场景 (v0.8.0 加入, §9 要求至少 AAC/Opus);
     * `PCM`  -> 无损 PCM, 用于"编码器必须 bit-exact"的回归;
     * `FLAC` -> 无损压缩, 用于跨平台无损归档。
+
+    `accepts_bitrate` 把"这个格式能不能带 `-b:a`"变成结构事实: 无损格式
+    (PCM/FLAC) 带 bitrate 一律拒绝 (§10), 而不是静默忽略。
     """
 
     AAC = "aac"
+    OPUS = "opus"
     PCM = "pcm"
     FLAC = "flac"
 
@@ -118,6 +126,16 @@ class AudioEncodeFormat(str, Enum):
     @property
     def lossless(self) -> bool:
         return _FORMATS[self].lossless
+
+    @property
+    def encoder_codec(self) -> str:
+        """该编码器产出的 ffprobe `codec_name` (继承判定用, 不猜)。"""
+        return _FORMATS[self].codec
+
+    @property
+    def accepts_bitrate(self) -> bool:
+        """是否可以带 `-b:a` —— 只有有损格式可以。"""
+        return not _FORMATS[self].lossless
 
     @classmethod
     def coerce(
@@ -143,20 +161,32 @@ class _FormatFacts:
     suffix: str
     lossless: bool
     extension: str          # 送入容器时 ffmpeg 需要的 muxer 提示
+    codec: str = ""         # 编码器产出的 ffprobe codec_name
 
 
 _FORMATS: dict[AudioEncodeFormat, _FormatFacts] = {
+    # ⚠️ v0.8.0: AAC 的容器从裸 ADTS 改为 MP4 家族 (`.m4a`)。
+    # 原因**不是**偏好, 而是采样级正确性: ADTS 无法携带编码器 priming,
+    # 于是 "PCM -> AAC(ADTS) -> 解码" 会让内容整体后移 1024 个样本 (实测),
+    # 任何 alignment 结果都会被这一步吃掉。MP4 容器把 priming 写进 edit
+    # list, 解码端据此裁掉, 实测内容位置与输入逐样本一致 —— 这正是
+    # "compressed 显式 alignment -> decode -> PCM -> align -> re-encode"
+    # 必须成立的前提。
     AudioEncodeFormat.AAC: _FormatFacts(
-        encoder="aac", container="adts", suffix=".aac", lossless=False,
-        extension="aac",
+        encoder="aac", container="mp4", suffix=".m4a", lossless=False,
+        extension="m4a", codec="aac",
+    ),
+    AudioEncodeFormat.OPUS: _FormatFacts(
+        encoder="libopus", container="opus", suffix=".opus", lossless=False,
+        extension="opus", codec="opus",
     ),
     AudioEncodeFormat.PCM: _FormatFacts(
         encoder="pcm_s16le", container="wav", suffix=".wav", lossless=True,
-        extension="wav",
+        extension="wav", codec="pcm_s16le",
     ),
     AudioEncodeFormat.FLAC: _FormatFacts(
         encoder="flac", container="flac", suffix=".flac", lossless=True,
-        extension="flac",
+        extension="flac", codec="flac",
     ),
 }
 
@@ -166,6 +196,7 @@ _ALIASES = {
     "mp4a": "aac",
     "pcm_s16le": "pcm",
     "wav": "pcm",
+    "libopus": "opus",
 }
 
 
@@ -511,7 +542,8 @@ def _inspect_encoded(
         size_bytes=int(path.stat().st_size),
         channel_ids=list(timeline.output_channel_ids),
         lossless=bool(spec.format.lossless),
-        notes=[],
+        notes=[f"frames_source={facts.get('frames_source')}"]
+        if facts.get("frames_source") else [],
     )
 
 
@@ -536,7 +568,14 @@ def _ffprobe_binary(ffprobe: Path | None, ffmpeg: Path | None = None) -> Path | 
 def _probe_audio(
     path: Path, ffprobe: Path | None = None, ffmpeg: Path | None = None,
 ) -> dict[str, Any]:
-    """用 ffprobe 读回编码文件的音频事实 (失败时返回 {}, 不静默编造)。"""
+    """用 ffprobe 读回编码文件的音频事实 (失败时返回 {}, 不静默编造)。
+
+    ⚠️ `nb_frames` 的语义**随容器而变**: 裸流容器 (adts / flac / wav) 报的是
+    **样本数**, 而 MP4 家族报的是 **packet 数** (AAC 一包 1024 样本)。因此
+    这里以 `duration × sample_rate` 为**权威样本数**, `nb_frames` 只在
+    duration 不可得时兜底, 并在两者明显不一致时记下 `frames_source` ——
+    否则 "PCM -> AAC(mp4) -> 读回" 会把 49504 个样本读成 50。
+    """
     import json
 
     probe = _ffprobe_binary(ffprobe, ffmpeg)
@@ -569,12 +608,10 @@ def _probe_audio(
     stream = streams[0]
     fmt = data.get("format") or {}
 
-    frames = 0
-    for key in ("nb_frames",):
-        try:
-            frames = int(stream.get(key) or 0)
-        except (TypeError, ValueError):
-            frames = 0
+    try:
+        declared = int(stream.get("nb_frames") or 0)
+    except (TypeError, ValueError):
+        declared = 0
     duration = 0.0
     for candidate in (stream.get("duration"), fmt.get("duration")):
         try:
@@ -584,11 +621,27 @@ def _probe_audio(
         if value > 0:
             duration = value
             break
-    if not frames and duration:
-        try:
-            frames = int(round(duration * float(stream.get("sample_rate") or 0)))
-        except (TypeError, ValueError, ZeroDivisionError):
-            frames = 0
+    try:
+        rate = int(stream.get("sample_rate") or 0)
+    except (TypeError, ValueError):
+        rate = 0
+
+    frames = 0
+    source = "unknown"
+    if duration > 0 and rate > 0:
+        frames = int(round(duration * float(rate)))
+        source = "duration"
+        if declared and frames and abs(declared - frames) <= max(
+            1, frames // 1000
+        ):
+            source = "duration+nb_frames"
+        elif declared:
+            # 容器报的是 packet 数 (MP4 家族的音频流) 或其他计数口径:
+            # 明确标注, 不把它当成样本数。
+            source = "duration(nb_frames=packets)"
+    elif declared:
+        frames = declared
+        source = "nb_frames"
 
     return {
         "codec_name": stream.get("codec_name"),
@@ -596,6 +649,8 @@ def _probe_audio(
         "sample_rate": stream.get("sample_rate"),
         "channel_layout": stream.get("channel_layout"),
         "frames": frames,
+        "frames_source": source,
+        "nb_frames": declared,
         "duration": duration,
         "format_name": fmt.get("format_name"),
     }
@@ -705,3 +760,67 @@ def resolve_audio_format(
         return AudioFormatSpec(format=default)
     spec = AudioFormatSpec.coerce(value)
     return spec
+
+
+@dataclass(frozen=True)
+class RenderWindow:
+    """整份计划的 render window (样本 + 秒)。
+
+    `start_sample` 可以是**负数**: 一条 target 前移 480 个样本时, 它的可用
+    区间就是 [-480, …], 于是整份计划的 union window 也从 -480 开始。这不是
+    异常, 而是统一 timeline 的定义结果。
+    """
+
+    sample_rate: int = 0
+    start_sample: int = 0
+    end_sample: int = 0
+    frame_count: int = 0
+
+    @property
+    def start_seconds(self) -> float:
+        if self.sample_rate <= 0:
+            return 0.0
+        return float(self.start_sample) / float(self.sample_rate)
+
+    @property
+    def duration_seconds(self) -> float:
+        if self.sample_rate <= 0:
+            return 0.0
+        return float(self.frame_count) / float(self.sample_rate)
+
+    @property
+    def shifted(self) -> bool:
+        return self.start_sample != 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sample_rate": int(self.sample_rate),
+            "start_sample": int(self.start_sample),
+            "end_sample": int(self.end_sample),
+            "frame_count": int(self.frame_count),
+            "start_seconds": round(self.start_seconds, 9),
+            "duration_seconds": round(self.duration_seconds, 9),
+        }
+
+
+def shared_render_window(plan: AudioPlan) -> RenderWindow:
+    """整份计划的 render window —— **多组渲染时必须共用它**。
+
+    为什么必须共用: 每组单独渲染时, 各自的 union window 由**该组自己的**
+    声道决定。一旦有 alignment 平移, 不同组的 window 起点就不同 (例如被
+    前移 480 样本的那组从 -480 开始), 于是各组产出的 PCM 时间原点不一致,
+    容器里合起来就是"没对齐"。共用同一个 window 才能让每条输出流落在同一
+    时间轴上, 同时**保持各自独立的声道结构** (mapping 不变)。
+
+    只读 `AudioTimeline` (时长权威), 不读 PCM、不写文件: 它是"问权威要一个
+    数字", 不是第二套时长实现。
+    """
+    from .audio_timeline import resolve_timeline
+
+    timeline = resolve_timeline(plan)
+    return RenderWindow(
+        sample_rate=int(timeline.sample_rate),
+        start_sample=int(timeline.start_sample),
+        end_sample=int(timeline.end_sample),
+        frame_count=int(timeline.frame_count),
+    )

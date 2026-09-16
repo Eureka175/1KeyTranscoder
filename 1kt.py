@@ -440,10 +440,11 @@ def encode_one(
             safe_unlink(part_dst)
             return "failed"
 
-    # 显式音频计划 (Phase 4C): 音频与视频是**平行**分支 —— 视频已在上一步
-    # 编码完成, 这里只负责把音频域的产物与它组装成最终输出。
-    # ⚠️ `1kt.py` **不** import 任何 `core.audio_*` 模块: 音频域的计划解析与
-    # 编排全部收在 `production.output` 之后, 生产入口只传"源 + 请求"。
+    # 显式音频计划 (Phase 4C / v0.8.0): 音频与视频是**平行**分支 —— 视频已在
+    # 上一步编码完成, 这里只负责把音频域的产物与它组装成最终输出。
+    # ⚠️ `1kt.py` **不** import 任何 `core.audio_*` 模块: 音频域的计划解析、
+    # 格式策略与编排全部收在 `production.output` 之后, 生产入口只传
+    # "源 + 请求"(请求对象对它是**不透明**的)。
     if audio_plan_request is not None:
         from production.output import (
             VideoOutputArtifact,
@@ -471,7 +472,7 @@ def encode_one(
             ffmpeg=ffmpeg,
             ffprobe=ffprobe,
             work_dir=(work_dir or part_dst.parent) / "audio",
-            audio_format=audio_plan_request.encode,
+            request=audio_plan_request,
             log=lambda msg: logger.info("[AUDIO] %s | %s", src.name, msg),
         )
         file_logger.info(
@@ -1080,10 +1081,16 @@ def parse_args() -> argparse.Namespace:
             "显式音频输出计划 (JSON 文件). **默认不启用**: 不指定时音频"
             "完全按既有路径处理 (-map 0 + -c:a copy). 计划文件用既有声道"
             "身份 (\"<source>:s<stream>:c<channel>\") 表达选择/排除/排序, "
-            "可选的 encode 块选择输出编码 (aac / pcm / flac). 选择为空时"
-            "该文件等于不启用 (计划被判为默认计划, 走既有路径). 仅经典软件"
-            "路径 (x265 / svtav1) 支持; 硬件后端与 Sony/DJI 保留管线会明确"
-            "报错, 不会静默忽略."
+            "可选的 encode 块选择输出编码 (aac / opus / pcm / flac; 缺省时"
+            "按输入格式继承, PCM 输入默认输出 PCM). 另有四个可选块: "
+            "alignment=\"auto|enabled|disabled\" (PCM 默认允许对齐, "
+            "compressed 默认原样保留, 显式要求时会 decode->PCM->对齐->重编码"
+            "并给出 warning), sync.reference (对齐的参考声道, 必须显式指定, "
+            "从不自动猜), mapping={mode,group_size} (外挂音频的输出流结构), "
+            "external={} (发现并纳入同目录下与视频同名的外挂音频). 选择为空"
+            "且无以上意图时该文件等于不启用 (走既有路径). 仅经典软件路径 "
+            "(x265 / svtav1) 支持; 硬件后端与 Sony/DJI 保留管线会明确报错, "
+            "不会静默忽略."
         ),
     )
     parser.add_argument(

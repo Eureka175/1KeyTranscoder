@@ -3,8 +3,12 @@
 """确定性音频素材 fixture.
 
 只有被多个 suite 复用的素材才抽到这里 (音频模型 / 选择 / 时间轴 / 路由 /
-WAV / 混音 / sync 共用)。测试代码只调用 `_p3a_*` / `_p3b_*` / `_sync_*`,
-不再自己 `tempfile` / 开 ffmpeg / 手写 WAV。
+WAV / 混音 / sync 共用)。测试代码只调用 `_p3a_*` / `_p3b_*` / `_sync_*` /
+`_make_*`, 不再自己 `tempfile` / 开 ffmpeg / 手写 WAV。
+
+v0.8.0 追加的是"格式感知 + 外挂音频"用的容器素材 (`_make_video_only` /
+`_make_audio_file` / `_make_av_compressed` / `_transcode_audio`) 与
+`_video_elementary_hash()` —— 它们只是素材与度量, 不含任何被测逻辑。
 """
 
 from __future__ import annotations
@@ -209,3 +213,107 @@ def _make_av_channels(
     ]
     r = sh(FFMPEG, *args, dst, timeout=900)
     return dst.is_file() and dst.stat().st_size > 0 and r.returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# v0.8.0: 格式感知 / 外挂音频 素材
+# ---------------------------------------------------------------------------
+
+def _make_video_only(
+    dst: Path, *, seconds: int = 1, size: str = "320x240", rate: int = 10,
+) -> bool:
+    """只有视频流的确定性 MP4 (外挂音频用例的宿主)。"""
+    from ..paths import FFMPEG, sh
+
+    r = sh(FFMPEG, "-v", "error", "-y", "-f", "lavfi", "-i",
+           f"color=c=black:s={size}:r={rate}:d={seconds}",
+           "-c:v", "libx264", "-preset", "ultrafast", "-crf", "40",
+           "-pix_fmt", "yuv420p", dst, timeout=900)
+    return dst.is_file() and dst.stat().st_size > 0 and r.returncode == 0
+
+
+def _make_audio_file(
+    dst: Path, channels: int = 1, *, seconds: int = 1, freq: int = 440,
+    codec: str | None = None,
+) -> bool:
+    """外挂音频文件 (扩展名决定编码: .wav -> PCM, .opus -> libopus, .aac -> aac)。
+
+    ⚠️ 这不是"第二套 codec 表": 它只是**造素材**的测试辅助, 编码选择由
+    扩展名决定, 与生产代码里的 `AudioEncodeFormat` 表无关。
+    """
+    from ..paths import FFMPEG, sh
+
+    suffix = Path(dst).suffix.lower()
+    chosen = codec or {
+        ".opus": "libopus", ".aac": "aac", ".flac": "flac",
+    }.get(suffix, "pcm_s16le")
+    args: list[str] = [
+        "-v", "error", "-y", "-f", "lavfi", "-i",
+        f"sine=frequency={freq}:sample_rate=48000:duration={seconds}",
+    ]
+    if channels > 1:
+        args += ["-af", "pan=" + f"{channels}c" + "".join(
+            f"|c{i}=c0" for i in range(channels))]
+    args += ["-ac", str(channels), "-c:a", chosen]
+    if chosen in ("libopus", "aac"):
+        args += ["-b:a", "96k"]
+    r = sh(FFMPEG, *args, dst, timeout=900)
+    return dst.is_file() and dst.stat().st_size > 0 and r.returncode == 0
+
+
+def _make_av_compressed(
+    dst: Path, codec: str = "aac", *, channels: int = 1, seconds: int = 1,
+    size: str = "320x240", rate: int = 10, bitrate: str = "192k",
+) -> bool:
+    """`video(h264) + 1 条 N 声道 compressed 音频` 的确定性 MP4。
+
+    用于验证"compressed 默认不 alignment / 显式 alignment 时解码重编码":
+    只有真的 compressed 流才能构造这个场景 (PCM 走的是另一条分支)。
+    """
+    from ..paths import FFMPEG, sh
+
+    encoder = {"aac": "aac", "opus": "libopus", "mp3": "libmp3lame"}.get(
+        codec, codec)
+    args: list[str] = [
+        "-v", "error", "-y",
+        "-f", "lavfi", "-i",
+        f"color=c=black:s={size}:r={rate}:d={seconds}",
+        "-f", "lavfi", "-i",
+        f"sine=frequency=440:sample_rate=48000:duration={seconds}",
+        "-map", "0:v", "-map", "1:a",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "40",
+        "-pix_fmt", "yuv420p",
+    ]
+    if channels > 1:
+        args += ["-af", "pan=" + f"{channels}c" + "".join(
+            f"|c{i}=c0" for i in range(channels))]
+    args += ["-ac", str(channels), "-c:a", encoder, "-b:a", bitrate]
+    r = sh(FFMPEG, *args, dst, timeout=900)
+    return dst.is_file() and dst.stat().st_size > 0 and r.returncode == 0
+
+
+def _transcode_audio(
+    dst: Path, src: Path, codec: str, *, bitrate: str = "96k",
+) -> bool:
+    """把已有音频文件重编码成 compressed 格式 (外挂 Opus/AAC 素材)。"""
+    from ..paths import FFMPEG, sh
+
+    encoder = {"aac": "aac", "opus": "libopus"}.get(codec, codec)
+    r = sh(FFMPEG, "-v", "error", "-y", "-i", src, "-vn",
+           "-c:a", encoder, "-b:a", bitrate, dst, timeout=900)
+    return dst.is_file() and dst.stat().st_size > 0 and r.returncode == 0
+
+
+def _video_elementary_hash(path: Path) -> str:
+    """视频**基本流** sha256 (与 Phase 4B/4C 回归同一口径)。
+
+    音频无论怎么处理, 这个值都必须不变 —— 那是"视频域一行未改"的机器证据。
+    """
+    from ..paths import FFMPEG, sh
+
+    r = sh(FFMPEG, "-v", "error", "-i", path, "-map", "0:v:0",
+           "-c", "copy", "-f", "hash", "-hash", "sha256", "-", timeout=600)
+    if r.returncode != 0:
+        return ""
+    text = (r.stdout or "").strip()
+    return text.split("=")[-1] if "=" in text else text

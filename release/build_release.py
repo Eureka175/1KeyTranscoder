@@ -13,7 +13,7 @@ Package layout = repository layout minus development artefacts, because
 
     1KeyTranscoder-v<version>-win64-selfcontained/
         1kt.py  watchfolder.py  start.bat
-        core/  encoders/  preservation/  tests/
+        core/  encoders/  preservation/  production/  tests/
         <encoder + scaling profile>.json
         tools/ffmpeg.exe  tools/ffprobe.exe
         tools/NVEncC_9.31_x64/  tools/QSVEncC_8.26_x64/  tools/GPAC/
@@ -63,7 +63,7 @@ TOP_FILES = (
     "licenses/GPL-3.0.txt",
     "VERSION",
 )
-TOP_DIRS = ("core", "encoders", "preservation", "tests")
+TOP_DIRS = ("core", "encoders", "preservation", "production", "tests")
 TOP_GLOBS = ("*.json",)
 TOOL_FILES = ("tools/ffmpeg.exe", "tools/ffprobe.exe")
 TOOL_DIRS = (

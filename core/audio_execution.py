@@ -195,6 +195,37 @@ def mix_intent_bus(plan: AudioPlan, mix_bus: Any = None) -> Any:
     return derived[0] if derived else None
 
 
+def _applied_offsets(plan: AudioPlan) -> dict[str, float]:
+    """输出声道 -> **已应用**的 sync offset (样本)。0 = 不需要平移。
+
+    只读 `effective_mapping()` 上已经存在的身份+offset (它们是
+    `AudioChannel.sync` 的投影), 因此本模块依然不认识 timeline/mixer。
+    """
+    out: dict[str, float] = {}
+    for entry in effective_mapping(plan):
+        cid = str(entry.get("source_channel_id") or "")
+        if not cid:
+            continue
+        raw = entry.get("sync_offset_samples")
+        try:
+            value = float(raw) if raw is not None else 0.0
+        except (TypeError, ValueError):
+            value = 0.0
+        out[cid] = value
+    return out
+
+
+def _shifted_channels(
+    plan: AudioPlan, channel_ids: Sequence[str],
+) -> list[str]:
+    """带非零已应用 offset 的输出声道 (stream copy 表达不了它们)。"""
+    offsets = _applied_offsets(plan)
+    return [
+        str(cid) for cid in channel_ids
+        if offsets.get(str(cid), 0.0) != 0.0
+    ]
+
+
 def _stream_copyable(plan: AudioPlan, channel_ids: Sequence[str]) -> bool:
     """输出是否恰为"若干条完整源流的自然顺序"(可用 `-map` + copy)。
 
@@ -203,11 +234,16 @@ def _stream_copyable(plan: AudioPlan, channel_ids: Sequence[str]) -> bool:
     源顺序。因此仅当
 
     * 每条源流只贡献**一个连续输出段**, 且
-    * 该段恰为该流的全部声道, 且顺序与源一致 (`0,1,…,N-1`)
+    * 该段恰为该流的全部声道, 且顺序与源一致 (`0,1,…,N-1`), 且
+    * **没有任何参与声道带已应用的非零 sync offset**
 
     时才是真正的 stream copy。两条 mono 流互换顺序仍满足 (每条流各自
     完整且连续); 而"4 声道流里第 2 声道与第 1 声道互换"**不**满足 ——
     那不是 `-map` 能表达的, 必须走 PCM 路由。
+
+    最后一条 (v0.8.0) 同样不是策略而是事实: `-map` 只能整条流搬运, 而
+    alignment 是**样本级**平移 —— 已经算出非零 offset 的声道必须重新取样,
+    "照抄"等于把对齐结果默默丢掉。
     """
     ids = list(channel_ids)
     if not ids:
@@ -240,7 +276,7 @@ def _stream_copyable(plan: AudioPlan, channel_ids: Sequence[str]) -> bool:
             return False
         if indices != list(range(total)):
             return False                   # 子集 / 重排 / 重复
-    return True
+    return not _shifted_channels(plan, ids)
 
 
 def resolve_audio_execution_path(
@@ -315,15 +351,26 @@ def resolve_audio_execution_path(
             notes=["invalid plan: path is reported for diagnosis only"],
         )
 
+    shifted = _shifted_channels(plan, channel_ids)
+    if path is AudioExecutionPath.STREAM_COPY:
+        notes = ["output is complete source streams: -map + -c:a copy"]
+    elif shifted:
+        # 不是"选了什么"而是"算出了什么": 已应用的 offset 必须重新取样,
+        # 因此这张图不再只是结构问题。
+        notes = [
+            "applied sync offset on "
+            f"{len(shifted)} channel(s) ({shifted[:4]}"
+            f"{'…' if len(shifted) > 4 else ''}): -map cannot express a "
+            "sample-level shift, PCM routing required"
+        ]
+    else:
+        notes = ["output selects/reorders channels: PCM routing required"]
+
     return AudioExecutionPlan(
         path=path,
         channel_count=len(mapping),
         stream_count=_stream_group_count(plan),
-        notes=(
-            ["output is complete source streams: -map + -c:a copy"]
-            if path is AudioExecutionPath.STREAM_COPY
-            else ["output selects/reorders channels: PCM routing required"]
-        ),
+        notes=notes,
     )
 
 

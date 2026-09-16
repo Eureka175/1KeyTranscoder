@@ -36,6 +36,7 @@ from .audio_models import (
 
 __all__ = [
     "AudioProbeResult",
+    "audio_probe_external",
     "audio_probe_from_file",
     "audio_probe_of",
     "audio_streams_from_probe",
@@ -326,3 +327,40 @@ def _default_source_id(path: Path) -> str:
     """文件名主干 -> source_id; 空则退回 "default" (不臆造内容)。"""
     stem = Path(path).stem.strip()
     return stem or DEFAULT_SOURCE_ID
+
+
+def audio_probe_external(
+    ffprobe: Path,
+    src: Path,
+    *,
+    source_id: str | None = None,
+    source_type: AudioSourceType | str = AudioSourceType.EXTERNAL,
+) -> AudioProbeResult:
+    """外挂音频文件探测入口 (v0.8.0) —— **可以没有视频流**。
+
+    与 `audio_probe_from_file()` 的唯一区别是底层 ffprobe 入口:
+    `probe_source()` 对没有视频流的文件直接报 "No video stream found."
+    (它是**视频**生产探针, 其 summary 的每个消费者都需要视频事实), 而
+    外挂 WAV/AAC/Opus 本来就没有视频流。
+
+    因此本函数走 `core.probe.probe_streams()` —— 同一个 `-show_entries`
+    字段表、同一套 raw stream 结构, 只是不要求视频流。**没有第二套
+    codec probe, 也没有第二套流字典形状**。
+
+    `source_id` 缺省时用**文件名主干**; 外挂来源的完整身份由调用方决定
+    (见 `core.audio_external`, 它用带扩展名的文件名以避免同名不同格式
+    的两个文件碰撞)。
+    """
+    from .probe import probe_streams
+
+    _fmt, streams = probe_streams(ffprobe, src)
+    resolved_id = str(source_id) if source_id else _default_source_id(src)
+    return AudioProbeResult(
+        streams=build_audio_streams(streams, source_id=resolved_id),
+        source_id=resolved_id,
+        source_type=(
+            AudioSourceType.coerce(source_type, AudioSourceType.EXTERNAL)
+            or AudioSourceType.EXTERNAL
+        ),
+        path=str(src),
+    )

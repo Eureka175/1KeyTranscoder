@@ -38,6 +38,7 @@ REQUIRED_ENTRIES = (
     "core/version.py",
     "encoders",
     "preservation",
+    "production",
     "tools/ffmpeg.exe",
     "tools/ffprobe.exe",
     "tools/NVEncC_9.31_x64/NVEncC64.exe",
@@ -72,6 +73,11 @@ FORBIDDEN_PARTS = ("__pycache__",)
 # §8: items that must reconcile hash-for-hash
 KEY_FILES = (
     "1kt.py",
+    "production/output.py",
+    "production/__init__.py",
+    "core/audio_format.py",
+    "core/audio_external.py",
+    "core/audio_output_structure.py",
     "tools/ffmpeg.exe",
     "tools/ffprobe.exe",
     "tools/NVEncC_9.31_x64/NVEncC64.exe",

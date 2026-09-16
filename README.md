@@ -7,11 +7,11 @@
 > Recursive, resumable Windows batch transcoder for camera archives, with Sony XAVC / DJI
 > metadata preservation and a structured PCM audio pipeline.
 
-[![Version](https://img.shields.io/badge/version-0.7.1-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![Release](https://img.shields.io/badge/release-v0.7.1-informational)](https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.7.1)
+[![Release](https://img.shields.io/badge/release-v0.8.0-informational)](https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.8.0)
 
 ## Overview
 
@@ -31,8 +31,10 @@ validation), instead of being silently dropped by a generic transcoder.
 It also ships a multi-channel audio delay compensation pass (`--channel-sync`) for
 multi-mic camera layouts, and — since v0.7.1 — an internal PCM audio pipeline
 (source/stream/track/channel modelling, routing, WAV export, and N→1 mixing with gain and
-clipping policy). The PCM pipeline is an internal capability layer in v0.7.1: it does not
-change the default audio path or add CLI flags.
+clipping policy). v0.8.0 connects that pipeline to the production output: an explicit
+`--audio-plan` JSON can select/reorder channels, ask for format-aware alignment, and pull
+in external recordings found next to each clip. Without `--audio-plan` the default audio
+path is unchanged.
 
 Target use case: a single workstation turning multi-hour Sony / DJI shoots into archive
 copies without losing the motion and lens metadata that post-processing tools
@@ -75,6 +77,12 @@ copies without losing the motion and lens metadata that post-processing tools
   selection and mapping, unified timeline with EOF/offset handling, float32 PCM reading,
   routing, WAV export, and N→1 mixing with linear gain and clipping policy. See
   [Audio Processing](#audio-processing) for scope and boundaries.
+- v0.8.0 adds format-aware audio handling on top of that pipeline: PCM input is allowed
+  to enter alignment by default while compressed input is passed through untouched
+  (decode → PCM → align → re-encode only when alignment is asked for explicitly), output
+  codec/bitrate are inherited from the source unless overridden, and external
+  recordings named after the clip (`clip001.wav`, `clip001_01.aac`, …) are discovered
+  and appended as tracks that follow the same mapping rules.
 
 ### Throughput / operations
 
@@ -104,7 +112,7 @@ copies without losing the motion and lens metadata that post-processing tools
 
 ## Current Status
 
-Current release: **v0.7.1** (`VERSION` = `0.7.1`, tag `v0.7.1`).
+Current release: **v0.8.0** (`VERSION` = `0.8.0`, tag `v0.8.0`).
 
 | Area | Status |
 |---|---|
@@ -120,19 +128,23 @@ Current release: **v0.7.1** (`VERSION` = `0.7.1`, tag `v0.7.1`).
 | PCM routing (1 output channel ← 1 source channel) | Available (internal layer, no CLI) |
 | WAV export (PCM16 / PCM24 / PCM32 / float32) | Available (internal API, no CLI) |
 | PCM mixing (N→1, linear gain, clipping detection) | Available (internal API, no CLI) |
-| Arbitrary-reference delay correction | Implemented on `main`; **not part of the v0.7.1 release** and not documented in its release notes |
-| Audio execution-path resolution (`NONE` / `STREAM_COPY` / `PCM_ROUTE` / `PCM_MIX`) | Implemented on `main` (Phase 4A; internal API) |
-| Selective MP4 audio retention (keep / drop / reorder original audio streams) | Available through the CLI (`--audio-plan`, Phase 4C). Channel-filter and mixing outputs are **refused** rather than faked as stream copy |
-| Audio encoding (AAC / PCM / FLAC) of routed or mixed PCM | Available through the CLI (`--audio-plan`, Phase 4C) |
+| Arbitrary-reference delay correction | Available as an internal API; reachable from the CLI through `--audio-plan`'s `sync.reference` |
+| Audio execution-path resolution (`NONE` / `STREAM_COPY` / `PCM_ROUTE` / `PCM_MIX`) | Available (Phase 4A; internal API) |
+| Selective MP4 audio retention (keep / drop / reorder original audio streams) | Available through the CLI (`--audio-plan`). Channel-filter and mixing outputs are **refused** rather than faked as stream copy |
+| Audio encoding (AAC / Opus / PCM / FLAC) of routed or mixed PCM | Available through the CLI (`--audio-plan`) |
 | Final output composition (video + encoded audio → MP4) | Wired into the production entry point for the classic software path (`1kt.py --encoder x265\|svtav1`, opt-in via `--audio-plan`). Hardware backends, Sony and DJI preservation **reject** an audio plan explicitly rather than ignoring it |
-| Automatic cross-file synchronization | Not implemented |
-| Drift correction / resampling | Not implemented |
+| Format-aware alignment (PCM default on, compressed default off, explicit compressed → decode/re-encode with warning) | Available through the CLI (`--audio-plan`: `alignment`, `sync.reference`) |
+| Codec / bitrate inheritance (`manual > source > encoder default`) | Available through the CLI (`--audio-plan`: `encode`) |
+| External audio discovery (`clip001.wav`, `clip001_01.aac`, …) and mapping-driven track layout | Available through the CLI (`--audio-plan`: `external`, `mapping`) |
+| Automatic cross-file synchronization (content matching) | Not implemented |
+| Drift correction / resampling / loudness | Not implemented |
 | Audio CLI flags beyond `--audio-plan` (`--audio-tracks`, `--audio-map`, `--audio-codec`) | Not implemented |
 
-The audio model, selection layer, timeline, retention and encoding are unit- and
-integration-tested. Phase 4C wires them into the production entry point for the
-classic software path, opt-in through the single `--audio-plan` flag; the default
-path is not changed. The only audio surface reachable from `1kt.py` is
+The audio model, selection layer, timeline, retention, encoding, format policy and
+external-audio handling are unit- and integration-tested. v0.8.0 wires format-aware
+alignment, codec inheritance and external audio into the same production entry point,
+still opt-in through the single `--audio-plan` flag (no new CLI argument was added);
+the default path is not changed. The only audio surface reachable from `1kt.py` is
 `production.output`, and anything below that is an explicit API call such as
 `core.audio_process.run_audio_render()`,
 `core.audio_retention.build_audio_retention()`,
@@ -247,7 +259,8 @@ Long-running batches are resumable: re-running the same command skips completed 
 v0.7.1 introduces a structured PCM audio pipeline (`core/audio_*.py`). Its purpose is to
 make audio sources addressable as data — which channel of which stream of which source —
 so that selection, mapping, routing, mixing and export can be expressed and tested
-independently of any single ffmpeg invocation.
+independently of any single ffmpeg invocation. v0.8.0 connects that pipeline to the
+production output so the same model decides what the delivered `.MP4` contains.
 
 ### Model
 
@@ -296,29 +309,76 @@ mono streams become four tracks.
 
 ### Boundaries
 
-- The default production audio path is unchanged. Audio streams are still copied
-  (`-c:a copy`; container-level copy in the preservation pipelines). No new CLI flags were
-  added in v0.7.1.
-- The PCM chain runs only when called explicitly (`run_audio_render()`); nothing on the
-  production path calls it.
+- The default production audio path is unchanged. Without `--audio-plan`, audio streams
+  are still copied (`-c:a copy`; container-level copy in the preservation pipelines).
+- The PCM chain runs only when the plan calls for it; nothing else on the production path
+  enters it.
 - Selection and mapping produce a dry-run spec only — no filtergraph is generated and no
   ffmpeg command is executed by the planning layer.
 - `-map`-level specification of "N source channels → 1 output channel" is still rejected
   as `audio_mix_not_supported`, because ffmpeg argv cannot express sample-level
   summation. That rejection describes the `-map` path; the PCM path implements the same
   semantics in `core/audio_mix.py`. The two coexist by design.
-- Deferred (not available in v0.7.1): selective MP4 audio retention, audio
-  encoding/muxing into MP4, resampling, drift correction, automatic cross-file
-  synchronisation, loudness normalisation / AGC / limiter / EQ / noise reduction /
-  time-stretch, audio CLI flags, DAW-style editing, and rendering multiple mix buses in
-  one pass.
+- Not implemented in v0.8.0: resampling, drift correction, loudness normalisation / AGC /
+  limiter / EQ / noise reduction / time-stretch, automatic (content-based) cross-file
+  synchronisation, codec capability / quality-preset / VBR policy frameworks, rendering
+  multiple mix buses in one pass, and audio CLI flags beyond `--audio-plan`.
 - The 4-channel wireless-mic layout assumes independent mono tracks; stereo and mono
   layouts are deliberately not aligned by `--channel-sync`.
 
 Implementation details — module responsibilities, invariants, reason codes, and the
 specific internal APIs that are not stable public interfaces — are documented in
-[Architecture](docs/design/architecture.md) §6.1 and in the
-[v0.7.1 release notes](docs/release_notes_v0.7.1.md).
+[Architecture](docs/design/architecture.md) §6.1 (v0.7.1) and §6.6 (v0.8.0), and in the
+[v0.7.1 release notes](docs/release_notes_v0.7.1.md) plus the
+[v0.8.0 release notes](docs/release_notes_v0.8.0.md).
+
+### Explicit audio output (`--audio-plan`)
+
+`--audio-plan <file.json>` is opt-in and the only audio CLI surface. Without it nothing
+below is reachable. An empty request (for example only an `encode` block) is treated as
+"not enabled", so the default path is structurally untouched.
+
+```json
+{
+  "version": 1,
+  "encode":    { "format": "opus", "bitrate": "96k" },
+  "channels":  { "select": ["source:s1:c0", "clip001.wav:s0:c0"] },
+  "alignment": "auto",
+  "sync":      { "reference": "source:s1:c0" },
+  "mapping":   { "mode": "grouped", "group_size": 2 },
+  "external":  {},
+  "note":      "wireless mic CH1 -> Opus, external recorder appended"
+}
+```
+
+| Key | Meaning | Default |
+|---|---|---|
+| `encode` | Output codec (`aac` / `opus` / `pcm` / `flac`) and `bitrate` (lossy only) | inherited from the source |
+| `channels.select` / `exclude` / `map` | Which channels are kept and in what output order | all, input order |
+| `alignment` | `auto` / `enabled` / `disabled`; `auto` enables alignment for PCM input and leaves compressed input untouched | `auto` |
+| `sync.reference` | The channel alignment is measured against. **Never guessed** — without it, alignment is permitted but nothing is shifted | none |
+| `mapping` | Output stream layout for external audio: `source` / `independent` / `grouped` (+`group_size`) | follow each input's own streams |
+| `external` | Discover audio files named after the clip in the same directory and append them | not enabled |
+
+Behaviour worth knowing:
+
+- **PCM input keeps PCM output**; compressed input keeps its own codec and bitrate. A
+  manual `encode` overrides that, per output stream.
+- **Compressed input is never decoded just to align it.** Asking for alignment explicitly
+  emits a warning and takes the decode → PCM → align → re-encode path.
+- **A bitrate on a lossless output is refused**, not ignored.
+- **Mapping is preserved**: alignment and re-encoding never reorder, merge or drop
+  channels. Multi-channel external files are split/grouped only as the `mapping` key asks,
+  and a partial group keeps its remaining channels (`3CH` + `group_size 2` → `2CH + 1CH`).
+- **Once alignment actually shifts samples, every output stream is rendered on one shared
+  window** — stream copying cannot express a shift, so it is dropped for that output.
+- External audio must be named after the clip: `clip001.wav`, `clip001_01.aac`,
+  `clip001-rec.wav` match `clip001.MP4`; `clip001abc.wav` and `random_clip001.wav` do not.
+  All matches are appended in a deterministic order (exact stem, then numeric index, then
+  other suffixes; numeric runs compare as numbers, so `clip001_2` precedes `clip001_10`).
+- `--audio-plan` is supported on the classic software path (`--encoder x265` / `svtav1`);
+  hardware backends and the Sony/DJI preservation paths reject it explicitly (exit code 2)
+  instead of ignoring it, and it conflicts with `--channel-sync` (also exit code 2).
 
 ## Hardware Decode
 
@@ -374,22 +434,25 @@ python tests\full_autotest.py --level full        # L3: + real pipeline integrat
 python tests\full_autotest.py --level all         # same as --level full
 ```
 
-The frozen baseline recorded for the current release (v0.7.1, after the RC fixes) is:
+The frozen baseline recorded for the current release (v0.8.0) is:
 
 ```text
-L1 unit           390 PASS / 0 FAIL
-L3 --level full   509 PASS / 0 FAIL   (unit 390 + toolchain 16 + full 103)
+L1 unit           590 PASS / 0 FAIL
+L3 --level full   856 PASS / 0 FAIL   (unit 590 + toolchain 16 + full 250)
 ```
 
 These numbers are assertion counts from the automated regression suite at the release
 freeze. They are not a new full production transcoding benchmark: the release was cut
 without a fresh end-to-end encode/transcode campaign on production material.
 
-On current `main` the L1 suite reports 511 PASS / 0 FAIL and `--level full` reports
-703 PASS / 0 FAIL, the difference being work merged after the v0.7.1 tag
-(arbitrary-reference audio delay correction, then Phase 4A selective MP4 audio
-retention, then Phase 4B audio encoding and output composition, then Phase 4C
-production integration). Any change must be re-checked for new failures.
+Previous baselines, for comparison:
+
+```text
+v0.7.1 freeze                  unit 390 / full  509
+after v0.7.1 tag (Phase 4A/4B/4C)  unit 511 / full  728
+```
+
+Any change must be re-checked for new failures.
 
 ### Explicit audio output (`--audio-plan`)
 
@@ -401,16 +464,20 @@ video, which is stream-copied and therefore bit-identical to the default path.
 ```json
 {
   "version": 1,
-  "encode": { "format": "aac" },
-  "channels": { "select": ["source:s1:c0", "source:s2:c0"] }
+  "encode": { "format": "opus", "bitrate": "96k" },
+  "channels": { "select": ["source:s1:c0", "source:s2:c0"] },
+  "external": {}
 }
 ```
 
-Channel ids use the existing audio identity (`<source>:s<stream>:c<channel>`).
-Leaving `channels` out means "select everything", which makes the plan a default
-plan: the execution path resolves to `NONE` and nothing changes. Unknown keys,
-unknown versions and unknown formats are errors, and hardware backends, Sony and
-DJI preservation reject an audio plan explicitly rather than ignoring it.
+Channel ids use the existing audio identity (`<source>:s<stream>:c<channel>`); external
+files use their file name as the source id (`clip001.wav:s0:c0`). Leaving `channels` out
+(and not asking for `external`, `alignment` or `mapping`) means "select everything",
+which makes the plan a default plan: the execution path resolves to `NONE` and nothing
+changes. Unknown keys, unknown versions and unknown formats are errors, and hardware
+backends, Sony and DJI preservation reject an audio plan explicitly rather than ignoring
+it. See [Explicit audio output](#explicit-audio-output---audio-plan) above for the full
+key list and behaviour.
 
 `tests/full_autotest.py` is a thin compatibility entry point: the CLI, exit code and
 report format are unchanged, while the implementation lives in the `tests/selftest/`
@@ -433,16 +500,18 @@ tests/selftest/
 │   ├── audio_sync.py            arbitrary-reference delay correction
 │   ├── audio_retention.py       Phase 4A: execution path + selective MP4 retention
 │   ├── audio_encode.py          Phase 4B: PCM → encoded audio (EncodedAudioOutput)
-│   ├── audio_request.py         Phase 4C: --audio-plan JSON → existing AudioPlan
-│   └── output_compose.py        Phase 4B/4C: video + audio → final container
+│   ├── production_output.py     Phase 4C: --audio-plan through the real 1kt.py entry
+│   ├── audio_format.py          v0.8.0: format policy, alignment, codec inheritance
+│   ├── audio_external.py        v0.8.0: external discovery rules + mapping matrix
 │   ├── audio_integration.py     L3 audio integration on real material
 │   ├── pipeline.py              L3 full pipeline + fault injection
 │   ├── hardware.py              L3 channel-sync end to end
 │   ├── toolchain.py             L2 tool / capability probing
 │   └── cli.py                   CLI contract
 ├── reporting/       result aggregation and report writing
-└── (production coordination lives outside this package: `core/audio_encode.py`,
-    `core/output_compose.py`, `core/audio_request.py`, `production/output.py`)
+└── (production coordination lives outside this package: `core/audio_request.py`,
+    `core/audio_format.py`, `core/audio_external.py`,
+    `core/audio_output_structure.py`, `production/output.py`)
 ```
 
 `paths` is the only module holding mutable test state (`RESULTS` / `CURRENT_LEVEL`).
@@ -469,7 +538,7 @@ Targeted self-checks: `python tests\run_selfcheck.py --encoder nvenc|qsv|x265` a
 ├── 1kt.py                  Main CLI entry point (orchestration)
 ├── watchfolder.py          Polling batch entry point
 ├── start.bat               Double-click launcher
-├── VERSION                 Single source of the version number (0.7.1)
+├── VERSION                 Single source of the version number (0.8.0)
 ├── *.json                  Encoder profile / scaling configurations
 ├── core/                   Runtime core: pipeline, probing, planning, audio, dashboard
 ├── encoders/               Encoder backends, capability probing, hardware decode, integrity gate
@@ -488,7 +557,7 @@ Targeted self-checks: `python tests\run_selfcheck.py --encoder nvenc|qsv|x265` a
 | Path | Purpose |
 |---|---|
 | `1kt.py` | Command-line entry point; argument parsing and per-file orchestration. |
-| `core/` | Backend-agnostic runtime logic: configuration, probing, source classification, scaling, batching, channel sync, the v0.7.1 audio modules, logging, dashboard. |
+| `core/` | Backend-agnostic runtime logic: configuration, probing, source classification, scaling, batching, channel sync, the v0.7.1 audio modules and the v0.8.0 format/external-audio policy modules, logging, dashboard. |
 | `encoders/` | Backend implementations (NVEncC, QSVEncC, x265, SVT-AV1), capability tables, hardware-decode routing, integrity gate. |
 | `preservation/` | Sony and DJI preservation pipelines, container/ISO-BMFF handling, validation checkers, quality sampling. |
 | `production/` | Cross-domain orchestration: turns a video artifact plus an audio plan into the final container. Belongs to neither the audio nor the video domain. |
@@ -507,7 +576,7 @@ by git; `dist/` holds release artifacts built locally.
 - [Documentation index](docs/README.md) — classified index of everything under `docs/`.
 - [Architecture](docs/design/architecture.md) — end-to-end data flow, invariants, module map. Start here to understand how the code runs.
 - [v0.7.1 release notes](docs/release_notes_v0.7.1.md) — the audio model and PCM pipeline, phase by phase.
-- [Next-cycle release notes](docs/release_notes_next.md) — arbitrary-reference audio delay correction (implemented on `main`, unpublished).
+- [v0.8.0 release notes](docs/release_notes_v0.8.0.md) — arbitrary-reference delay correction, Phase 4A/4B/4C output integration, and Phase 5 format-aware alignment + external audio. Published with tag `v0.8.0`.
 - [v0.6.1 release notes](docs/release_notes_v0.6.1.md) — channel-sync streaming memory fix and AV1 colour metadata fix.
 - [Channel-sync P1 design](docs/design/channel_sync_p1.md) — algorithm, thresholds, degradation rules, fixture calibration.
 - [Hardware decode deliverables](docs/hardware-decode/README.md) — integration test matrix, final report, patches, toolchain provenance.
@@ -517,21 +586,20 @@ by git; `dist/` holds release artifacts built locally.
 
 ## Release
 
-Current release: **v0.7.1**
+Current release: **v0.8.0**
 
-- [GitHub release v0.7.1](https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.7.1)
-  — published as a GitHub release without a binary asset.
-- [Release notes v0.7.1](docs/release_notes_v0.7.1.md) — frozen with the tag; the release
+- [GitHub release v0.8.0](https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.8.0)
+  — published with a self-contained Windows package.
+- [Release notes v0.8.0](docs/release_notes_v0.8.0.md) — frozen with the tag; the release
   notes file is not rewritten after publication.
-- `v0.7.1-rc1` is the release candidate tag and points at the same commit as `v0.7.1`; it
-  is not a separate release.
-- The GitHub release entries are published with GitHub's "pre-release" flag set; v0.7.1 is
-  nevertheless the current release of the project, matching `VERSION` and the `v0.7.1` tag.
+- The GitHub release entries are published with GitHub's "pre-release" flag set; v0.8.0 is
+  nevertheless the current release of the project, matching `VERSION` and the `v0.8.0` tag.
 
 Older releases with downloadable self-contained packages:
 
 | Version | Download | Notes |
 |---|---|---|
+| v0.8.0 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.8.0/1KeyTranscoder-v0.8.0-win64-selfcontained.zip) | Format-aware alignment, codec inheritance, external audio discovery + mapping. |
 | v0.6.1 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/1KeyTranscoder-v0.6.1-win64-selfcontained.zip) | Channel-sync streaming memory fix; package still available. |
 | v0.5.1 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.5.1/1KeyTranscoder-v0.5.1-win64-selfcontained.zip) | AV1 line (software + hardware AV1). |
 | v0.4.2 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.4.2/1KeyTranscoder-v0.4.2-win64-selfcontained.zip) | HEVC/265 line. |
@@ -546,22 +614,31 @@ are assigned.
 
 | Stage | Item |
 |---|---|
-| Phase 4A | Selective MP4 audio retention — keeping chosen audio tracks in the MP4 container instead of the current whole-stream copy. |
-| Phase 4B | Audio encode / mux integration — encoding the rendered PCM and writing it into the output container, replacing the WAV-only output kind. |
 | Later | Automatic cross-file synchronization — deriving delays across files rather than per file. |
 | Later | Drift correction — correcting slowly varying offsets (currently detected as `non_constant` and refused) instead of constant integer shifts. |
+| Later | Resampling and loudness handling — deliberately absent; sample rates must match and no dynamics processing exists. |
 
-Arbitrary-reference delay correction has been implemented on `main` after the v0.7.1 tag
-and is documented in [release_notes_next.md](docs/release_notes_next.md); no version number
-has been assigned to it.
+Selective MP4 audio retention (Phase 4A), audio encode/mux integration (Phase 4B),
+production integration (Phase 4C) and format-aware alignment plus external audio
+(Phase 5) are implemented and shipped in v0.8.0; see the
+[v0.8.0 release notes](docs/release_notes_v0.8.0.md).
 
 ## Limitations
 
 - **Platform**: Windows only; no other platform is tested.
-- **Audio CLI**: the v0.7.1 audio pipeline has no command-line interface; it is reachable
-  only through the internal API.
-- **Audio output**: PCM results can be rendered to WAV but not yet encoded and muxed into
-  the output MP4; selective audio retention in MP4 is not implemented.
+- **Audio CLI**: `--audio-plan` is the only audio flag. Everything else in the audio
+  pipeline is reachable only through the internal API.
+- **Audio plan availability**: `--audio-plan` works on the classic software path
+  (`--encoder x265` / `svtav1`). Hardware backends and the Sony/DJI preservation pipelines
+  reject it with exit code 2 rather than ignoring it, and it cannot be combined with
+  `--channel-sync`.
+- **Alignment**: only constant integer sample offsets exist. A reference channel must be
+  named explicitly — the tool never guesses one, so "alignment: auto" on PCM material only
+  makes the pipeline eligible to align. Compressed input requires an explicit request, is
+  decoded and re-encoded, and cannot be aligned by shifting packet timestamps.
+- **Output structure**: external audio follows the `mapping` key exactly. A group that is
+  not a whole input stream is rebuilt from PCM, and once alignment shifts samples every
+  output stream is rendered (stream copying cannot carry a shift).
 - **Offset model**: only constant integer sample offsets are supported. Drift correction,
   resampling and time-stretch do not exist; a slow drift is detected and the track is left
   untouched rather than corrected.
@@ -588,8 +665,7 @@ has been assigned to it.
   internal or reserved and are not guaranteed to keep their current semantics; the
   authoritative list is in
   [architecture.md](docs/design/architecture.md) §6.1 and
-  [release_notes_v0.7.1.md](docs/release_notes_v0.7.1.md) §32.
-- **Encoder profile values**: the numbers in the `*.json` profiles are measured
+  [release_notes_v0.7.1.md](docs/release_notes_v0.7.1.md) §32.- **Encoder profile values**: the numbers in the `*.json` profiles are measured
   calibrations. Changing them requires a test-set regression run.
 
 ## Contributions

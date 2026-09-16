@@ -104,21 +104,41 @@ def l1_audio_encode() -> None:
     )
 
     # --- 1. 格式表: 显式、极少数、不猜 --------------------------------
-    record("p4b.format 只有 3 个显式格式 (不是 codec framework)",
+    # v0.8.0 起这张表多了一项 (`OPUS`): "本阶段至少支持 AAC / Opus" 是硬
+    # 要求, 而扩充格式在这个设计里就是**改这张表** (不是引入能力框架)。
+    record("p4b.format 只有 4 个显式格式 (不是 codec framework)",
            set(AudioEncodeFormat) == {
-               AudioEncodeFormat.AAC, AudioEncodeFormat.PCM,
-               AudioEncodeFormat.FLAC,
+               AudioEncodeFormat.AAC, AudioEncodeFormat.OPUS,
+               AudioEncodeFormat.PCM, AudioEncodeFormat.FLAC,
            })
     record("p4b.format 映射明确 (encoder/container/suffix/lossless)",
            AudioEncodeFormat.AAC.encoder == "aac"
-           and AudioEncodeFormat.AAC.container == "adts"
-           and AudioEncodeFormat.AAC.suffix == ".aac"
+           # v0.8.0: AAC 的容器由裸 ADTS 改为 MP4 家族 —— ADTS 无法携带
+           # 编码器 priming, 实测 "PCM -> AAC(ADTS) -> 解码" 会让内容整体
+           # 后移 1024 样本, 把 alignment 结果吃掉。断言强度不变, 只是
+           # 被断言的容器/后缀换成了新的真实值。
+           and AudioEncodeFormat.AAC.container == "mp4"
+           and AudioEncodeFormat.AAC.suffix == ".m4a"
            and AudioEncodeFormat.AAC.lossless is False
+           and AudioEncodeFormat.OPUS.encoder == "libopus"
+           and AudioEncodeFormat.OPUS.container == "opus"
+           and AudioEncodeFormat.OPUS.suffix == ".opus"
+           and AudioEncodeFormat.OPUS.lossless is False
            and AudioEncodeFormat.PCM.encoder == "pcm_s16le"
            and AudioEncodeFormat.PCM.lossless is True
            and AudioEncodeFormat.FLAC.encoder == "flac"
            and AudioEncodeFormat.FLAC.lossless is True,
            f"{ {f.value: (f.encoder, f.container, f.suffix, f.lossless) for f in AudioEncodeFormat} }")
+    record("p4b.format 只有有损格式接受 bitrate (lossless + bitrate 一律拒绝)",
+           AudioEncodeFormat.AAC.accepts_bitrate
+           and AudioEncodeFormat.OPUS.accepts_bitrate
+           and not AudioEncodeFormat.PCM.accepts_bitrate
+           and not AudioEncodeFormat.FLAC.accepts_bitrate)
+    record("p4b.format encoder_codec 是编码器产出的 codec 名 (继承判定用)",
+           AudioEncodeFormat.AAC.encoder_codec == "aac"
+           and AudioEncodeFormat.OPUS.encoder_codec == "opus"
+           and AudioEncodeFormat.FLAC.encoder_codec == "flac"
+           and AudioEncodeFormat.PCM.encoder_codec == "pcm_s16le")
     record("p4b.format 宽松解析 + 未知值回退默认 (不抛)",
            AudioEncodeFormat.coerce("AAC") is AudioEncodeFormat.AAC
            and AudioEncodeFormat.coerce(" flac ") is AudioEncodeFormat.FLAC
@@ -669,7 +689,7 @@ def l3_audio_encode() -> None:
     # =====================================================================
     enc_aac = encode_audio_from_plan(
         routed, ffmpeg=FFMPEG, work_dir=d / "w_aac",
-        output_path=d / "route_aac.aac",
+        output_path=d / "route_aac.m4a",
         audio_format=AudioFormatSpec(format=AudioEncodeFormat.AAC),
         chunk_frames=4096, overwrite=True,
     )
@@ -693,7 +713,7 @@ def l3_audio_encode() -> None:
                f"{out_aac.duration_seconds:.4f} vs {expected_sec:.4f}")
 
         # 真正 decode, 不只看 rc
-        decoded = _decode_mono(d / "route_aac.aac", 0)
+        decoded = _decode_mono(d / "route_aac.m4a", 0)
         record("l3.p4b.aac decode 回来的样本数合理 (真正解码验证)",
                decoded is not None and len(decoded) > 40000
                and abs(len(decoded) - out_aac.expected_frames) < 4096,

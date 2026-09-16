@@ -9,8 +9,14 @@ analysis. The CSV layer depends on its exact (summary, streams)
 return structure.
 
     probe_source() -> (summary dict, raw stream list)
+    probe_streams() -> raw stream list only (audio-only sources, v0.8.0)
     build_source_info() -> SourceInfo   (adapter, incl. ColorInfo)
     build_audio_probe() -> AudioProbeResult  (v0.7.1 adapter, core.audio_probe)
+
+`probe_streams()` shares `STREAM_PROBE_ENTRIES` with `probe_source()` on
+purpose: an external WAV/AAC/Opus file must yield stream dicts of exactly the
+same shape as a container source, so the audio model never sees a second
+codec vocabulary and there is no second "codec probe" to drift.
 """
 
 from __future__ import annotations
@@ -143,6 +149,65 @@ def _side_data_color(video: dict[str, Any]) -> tuple[str, str]:
     return master_display, max_cll
 
 
+#: `-show_entries` field list shared by `probe_source()` and `probe_streams()`.
+#: Kept as one constant so the two entries can never drift apart: the raw
+#: stream dicts an external audio file produces must be shape-identical to the
+#: ones a container source produces.
+STREAM_PROBE_ENTRIES = (
+    "format="
+    "format_name,format_long_name,duration,size,bit_rate,"
+    "start_time,probe_score:"
+    "stream="
+    "index,codec_type,codec_name,codec_long_name,profile,"
+    "codec_tag_string,codec_tag,width,height,pix_fmt,"
+    "color_range,color_space,color_transfer,color_primaries,"
+    "field_order,r_frame_rate,avg_frame_rate,time_base,start_time,"
+    "duration,bit_rate,nb_frames,channels,sample_rate,sample_fmt,"
+    "channel_layout,bits_per_raw_sample,bits_per_coded_sample,"
+    "side_data_list:"
+    "disposition:"
+    # v0.7.1: 音频模型需要 language/title 等流级标签。仅**新增**
+    # 一个 `tags` 键, 既有键与 CSV 字段白名单不变 (旧路径行为
+    # 不受影响, 见 core/audio_models.py 与 §14)。
+    "stream_tags"
+)
+
+
+def probe_streams(
+    ffprobe: Path,
+    src: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Raw (format, streams) for **any** media file, video stream optional.
+
+    `probe_source()` refuses a source without a video stream (it is the
+    production video probe and every consumer of its summary needs video
+    facts). External audio files have no video stream, so this entry returns
+    the same raw structures without that requirement — it is the same ffprobe
+    invocation, not a second probe implementation.
+    """
+    cmd = [
+        str(ffprobe),
+        "-v", "error",
+        "-show_entries", STREAM_PROBE_ENTRIES,
+        "-of", "json",
+        str(src),
+    ]
+    result = run_capture(cmd)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"ffprobe failed ({result.returncode}): "
+            f"{result.stderr.strip() or 'no stderr'}"
+        )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Cannot parse ffprobe JSON: {exc}") from exc
+    streams = payload.get("streams", [])
+    if not streams:
+        raise RuntimeError("ffprobe found no streams.")
+    return payload.get("format", {}) or {}, streams
+
+
 def probe_source(
     ffprobe: Path,
     src: Path,
@@ -156,25 +221,7 @@ def probe_source(
     cmd = [
         str(ffprobe),
         "-v", "error",
-        "-show_entries",
-        (
-            "format="
-            "format_name,format_long_name,duration,size,bit_rate,"
-            "start_time,probe_score:"
-            "stream="
-            "index,codec_type,codec_name,codec_long_name,profile,"
-            "codec_tag_string,codec_tag,width,height,pix_fmt,"
-            "color_range,color_space,color_transfer,color_primaries,"
-            "field_order,r_frame_rate,avg_frame_rate,time_base,start_time,"
-            "duration,bit_rate,nb_frames,channels,sample_rate,sample_fmt,"
-            "channel_layout,bits_per_raw_sample,bits_per_coded_sample,"
-            "side_data_list:"
-            "disposition:"
-            # v0.7.1: 音频模型需要 language/title 等流级标签。仅**新增**
-            # 一个 `tags` 键, 既有键与 CSV 字段白名单不变 (旧路径行为
-            # 不受影响, 见 core/audio_models.py 与 §14)。
-            "stream_tags"
-        ),
+        "-show_entries", STREAM_PROBE_ENTRIES,
         "-of", "json",
         str(src),
     ]

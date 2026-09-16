@@ -1,16 +1,20 @@
-# 下一开发周期 — 任意 reference 延迟矫正 + Phase 4A/4B/4C 音频输出
+# v0.8.0 发布说明 — 音频输出接入生产管线 + 格式感知 + 外挂音频
 
-> **状态**：已实现（**尚未发布**，未分配版本号；不属于 v0.7.1）
+> **状态**：**已发布**（tag `v0.8.0`；`VERSION` = `0.8.0`）
 > **基线**：`v0.7.1`（tag `v0.7.1`，commit `e613b07`）
 > **范围**：
 > * 任意 reference 的**恒定**样本偏移矫正（第 1–10 节）；
 > * Phase 4A 选择性 MP4 音频保留（第 11–17 节）；
 > * Phase 4B 音频编码 + 最终输出编排（第 18–26 节）；
-> * Phase 4C 音频输出接入生产入口（第 27–34 节）。
+> * Phase 4C 音频输出接入生产入口（第 27–34 节）；
+> * Phase 5 格式感知 alignment + 编码继承 + 外挂音频（第 35–47 节）。
 >
-> drift correction / resampling / loudness / 多 codec 策略
-> **均未实现**；CLI 只新增 `--audio-plan` 一个参数。
+> drift correction / resampling / loudness / 自动多文件同步 / P5
+> **均未实现**；CLI 只新增 `--audio-plan` 一个参数（v0.8.0 没有新增任何参数）。
 >
+> ⚠️ **文件名历史**：本文件在 v0.8.0 发布前叫 `release_notes_next.md`（"下一
+> 开发周期，未分配版本号"）。随 tag `v0.8.0` 改名为现在这个名字并冻结为
+> **v0.8.0 的发布说明** —— 内容没有改写，只是终于知道自己叫什么。
 > v0.7.1 的发布说明在 [`release_notes_v0.7.1.md`](release_notes_v0.7.1.md)，
 > 已随 tag `v0.7.1` 冻结，**本文件不改写其任何语义**。
 
@@ -642,4 +646,249 @@ drift correction / resampling / loudness / LUFS / AGC / limiter / compressor
 次视频流的容器策略（交给 preservation/）
 Phase 5 的任何内容
 ```
+
+---
+
+# Phase 5 — 格式感知 alignment + 编码继承 + 外挂音频
+
+## 35. 解决的问题
+
+Phase 4C 之后音频已经能进生产输出，但三件事仍然靠人肉约定：
+
+```text
+1. 输入是 PCM 还是 compressed?   没有人显式判定 —— 对齐与编码全靠调用方自觉
+2. 输出该用什么 codec / 码率?     AudioFormatSpec 默认 AAC, 于是 PCM 输入也会被
+                                 悄悄转成 AAC（§6 明确禁止这件事）
+3. 摄影机旁边的独立录音文件?      必须手工写进计划文件, 没有任何发现规则
+```
+
+Phase 5 把这三件事变成**确定性规则 + 独立可测的模块**：
+
+```text
+core/audio_format.py            输入格式分类 + alignment 策略 + 输出编码决议
+core/audio_external.py          外挂音频发现（文件名规则）+ 并入既有 AudioSource
+core/audio_output_structure.py  有效映射 -> 输出流结构（几条流, 各含哪些声道）
+```
+
+三个模块都只读 `AudioPlan` / `AudioStream` / `effective_mapping()` 与既有的
+`output_tracks()`：**不**读 PCM、**不**拼 argv、**不**起进程、**不**认识
+`encoders/` 与 `preservation/`（AST 断言钉住）。视频域与元数据后端**一行未改**。
+
+## 36. 输入格式分类
+
+判据只有一条：ffprobe 的 `codec_name`。
+
+```text
+pcm_*（pcm_s16le / pcm_s24le / pcm_s32le / pcm_f32le / pcm_f64le / pcm_s24be …）-> PCM
+其它一切 audio codec（aac / opus / flac / mp3 / vorbis / ac3 / eac3 / dts …）    -> COMPRESSED
+未知或缺失 codec                                                                  -> COMPRESSED（保守）
+```
+
+没有第二套 codec probe：外挂文件走 `core.probe.probe_streams()`，与
+`probe_source()` **共用同一个 `-show_entries` 常量**，因此外挂来源的 raw stream
+形状与容器来源逐字段一致（唯一区别是前者允许没有视频流）。
+
+## 37. alignment 策略
+
+`resolve_alignment()` 是纯函数，判定表穷举：
+
+| requested | 参与来源格式 | enabled | reason |
+|---|---|---|---|
+| `disabled` | 任意 | False | `alignment_disabled_by_request` |
+| `enabled` | 全 PCM | True | `alignment_enabled_pcm` |
+| `enabled` | 含 compressed（含混合） | True + **warning** | `alignment_enabled_compressed` |
+| `auto` | 全 PCM | True | `alignment_default_pcm` |
+| `auto` | 含 compressed | False | `alignment_default_compressed` / `_mixed` |
+
+* **`enabled` ≠ 自动猜 reference**。reference 仍然只能由
+  `SyncPlan.reference_channel_id` 显式给出；没有 reference 时 alignment 只是
+  "允许进入图"，不产生 offset，也不改动计划。
+* compressed 被显式要求 alignment 时给出 warning 原文，并走
+  **decode → PCM → align → 重编码**；禁止在压缩包上"伪造时间戳平移"。
+* 混合（PCM + compressed）在 `auto` 下 DISABLED：compressed 一侧有否决权。
+
+## 38. 输出编码的优先级链
+
+```text
+manual override  >  source-derived defaults  >  encoder default
+```
+
+* 请求解析时记录 `ExplicitFormat`（用户真的拧过哪些旋钮），因此 `{"encode":
+  {"bitrate": "128k"}}` 里的 format 是"没说"，而不是"要 AAC"。
+* **PCM 输入默认输出 PCM**；compressed 保持 source codec + source bitrate；
+  `pcm_*`→PCM、`aac`→AAC、`opus`→Opus、`flac`→FLAC；表里没有的 codec 退回
+  encoder default 并记 `audio_format_inherit_unavailable` warning。
+* codec 继承**按输出流**做：一条 AAC 外挂录音与一条 PCM 源在同一份输出里各自
+  保持自己的 codec。
+* **lossless 输出不允许 bitrate**：PCM/FLAC 带 `-b:a` 明确拒绝
+  （`audio_format_bitrate_not_applicable`）。
+* 采样率永远来自 `AudioTimeline`，**不偷偷 resample**。
+
+## 39. 外挂音频发现
+
+```text
+audio filename stem 必须以 video stem 精确开头（case-insensitive）
+且 video stem 之后的第一个字符必须是 结束 / "-" / "_"
+只扫描视频所在的**那一个**目录, 只考虑音频扩展名白名单（不含 .mp4/.mov）
+```
+
+排序完全确定：
+
+```text
+rank 0  主干完全相同          clip001.wav
+rank 1  纯数字序号（归一化）  clip001_1.wav / clip001_01.wav / clip001_001.wav
+rank 2  其它合法后缀          clip001-rec.wav / clip001_audio.wav
+最终 tie-break = 完整文件名的 case-insensitive lexical order
+```
+
+* `_1` / `_01` / `_001` 的序号都归一化为 1，但**仍然是不同候选**；顺序只由
+  文件名决定，与文件系统枚举顺序无关。
+* **多候选全部纳入**；**没有候选不报错**，视频照常用自己的音频。
+* 外挂来源的身份就是**带扩展名的文件名**，并且一进来就是普通的
+  `AudioSource` / `AudioStream` —— 没有第二套模型。
+
+## 40. 输出流结构
+
+```text
+主来源声道    -> 按既有输出单元切分（相邻且同一条源流 = 一条输出流）
+外挂来源声道  -> 按结构策略切分 (manual > input source mapping > default)
+```
+
+```text
+SOURCE (默认)  跟随每个输入来源自身的流结构     -> 4 个 mono 文件 = 4 × mono
+INDEPENDENT    一个声道 = 一条输出流            -> 4CH 外挂 = 4 × mono
+GROUPED(n)     连续 n 声道 = 一条输出流, 跨文件继续成组
+                                               -> 4CH + 2 = 2 × stereo
+                                               -> 8CH + 2 = 4 × stereo
+                                               -> 3CH + 2 = 2CH + 1CH（剩余保留）
+```
+
+**不变量**：`Σ len(group) == len(effective_mapping)`，做不到即报
+`audio_grouping_channel_lost`，绝不"部分成功然后偷偷丢声道"。主来源的输出结构
+**不被本模块改变** —— 这是"mapping 默认保持"的结构性保证。
+
+## 41. alignment 与输出结构的关系（本阶段最重要的一条）
+
+一旦真的产生了**非零 offset**，整份输出必须共用**同一份 render window**：
+
+```text
+-map + stream copy  = 把源字节原样搬进容器, 没有"时间原点"可言
+带 offset 的声道    = 按统一 timeline 重新取样, window 起点可能不是 0
+                      （一条 target 前移 480 样本 -> union window 从 -480 开始）
+```
+
+两者混在同一个容器里就是两条流各有各的原点，表现出来恰好是"对齐没生效"。
+因此一旦有非零 offset：放弃 stream copy、所有输出流共用
+`core.audio_encode.shared_render_window()`（向 `AudioTimeline` 要一份 window）
+渲染、**组数与每组声道保持不变**。同理 `_stream_copyable()` 现在把"带非零已
+应用 offset"也算作不可 copy。
+
+## 42. AAC 容器从 ADTS 改为 MP4 家族（正确性修正）
+
+```text
+PCM -> AAC(ADTS) -> 解码    实测内容整体后移 1024 样本（编码器 priming, ADTS 无法携带）
+PCM -> AAC(MP4)  -> 解码    实测内容位置与输入一致（priming 写进 edit list）
+PCM -> Opus(Ogg) -> 解码    实测一致（pre-skip）
+```
+
+alignment 是样本级操作；若重编码这一步自己就把内容挪 1024 样本，"重编码对齐"
+就没有意义。同时 `_probe_audio()` 不再把 `nb_frames` 当样本数：MP4 家族的音频流
+报的是 **packet 数**，因此现在以 `duration × sample_rate` 为权威样本数。
+
+## 43. 请求 schema 的加法式扩展（version 仍为 1）
+
+```json
+{
+  "version": 1,
+  "encode":    { "format": "opus", "bitrate": "96k" },
+  "channels":  { "select": [...], "exclude": [...], "map": [...] },
+  "alignment": "auto" | "enabled" | "disabled",
+  "sync":      { "reference": "<channel_id>" },
+  "mapping":   { "mode": "source" | "independent" | "grouped", "group_size": 2 },
+  "external":  {},
+  "note":      "…"
+}
+```
+
+四个新键都是**可选**的：旧文件语义完全不变，因此版本号仍是 1（版本号守的是
+不兼容变更）。未知键依然一律拒绝。**CLI 没有新增参数** —— `--audio-plan` 仍是
+唯一的音频入口。
+
+## 44. 测试
+
+| 套件 | 级别 | 断言数 | 覆盖 |
+|---|---|---|---|
+| `audio format/alignment v0.8 (Phase 5)` | L1 | 40 | 格式分类表 / alignment 决策表（含 compressed warning 原文）/ 编码优先级链 / PCM+bitrate 拒绝 / 策略层架构审计 |
+| `audio format/alignment v0.8 (Phase 5)` | L3 | 33 | 真实 ffmpeg：PCM 默认允许对齐、compressed 默认原样保留、AAC/Opus 显式对齐（真实 480 样本延迟 + 互相关残差 0）、手动 bitrate 真的到达编码器、只给 bitrate 也明确拒绝、视频基本流 sha256 不变 |
+| `audio external v0.8 (Phase 5)` | L1 | 36 | §18 文件名规则表 / natural sort / 前导零 / 确定性 tie-break / 多候选 / 无候选 / §36 Case A–D / 奇数剩余 / 声道守恒 / 策略解析 / 架构审计 |
+| `audio external v0.8 (Phase 5)` | L3 | 16 | 真实 WAV/AAC/Opus 被发现并入 / 真实 1kt.py 端到端 / 4-6-8-3CH × mapping 矩阵 / 声道守恒 / 视频 hash 不变 |
+
+实测证据（可直接复查）：
+
+```text
+PCM + auto                    alignment_default_pcm, applied=0（不猜 reference）
+AAC + auto                    alignment_default_compressed, 无 warning, 流原样 copy
+Opus 目标 + 显式 alignment     offset=480（注入 480）, 重编码后 lag=0
+AAC 目标 + 显式 alignment      offset=1504（注入 480 + AAC 解码 priming 1024）, lag=0
+4CH 外挂 + independent         4 × mono
+4CH 外挂 + grouped(2)          2 × stereo
+6CH / 8CH + grouped(2)         3 × stereo / 4 × stereo
+3CH + grouped(2)               2CH + 1CH（不丢不复制）
+视频基本流 sha256               每种音频处理下都与默认路径一致
+```
+
+## 45. 本阶段新增的 reason / warning 契约
+
+```text
+audio_alignment_no_channels
+audio_format_bitrate_not_applicable
+audio_format_inherit_unavailable              (warning)
+audio_mapping_policy_invalid
+audio_grouping_channel_lost
+external_video_stem_empty
+external_directory_missing / external_directory_unreadable
+external_probe_failed
+production_alignment_failed
+production_group_input_unknown
+```
+
+## 46. 明确未实现（Phase 5 边界）
+
+```text
+drift correction / resampling / loudness / LUFS / AGC / limiter / compressor
+自动多文件同步（外挂音频只按文件名规则发现, 不做内容匹配）
+quality / preset / VBR 策略框架, codec 能力数据库
+多 mixer sink 的输出结构（混音图仍然只产出一条流）
+硬件后端与 Sony/DJI 保留管线上的音频计划（仍然明确报错）
+P5
+```
+
+## 47. 版本与发布
+
+```text
+VERSION                     0.7.1 -> 0.8.0
+tag                         v0.8.0（v0.7.0 / v0.7.1-rc1 / v0.7.1 均未改动）
+package                     release/build_release.py（既有打包脚本, 未引入新系统）
+                            新增顶层目录 production/ 进包（此前漏掉会让 1kt.py 起不来）
+```
+
+功能版本而不是补丁版本：这是**一整块能力**（格式感知 alignment、compressed
+重编码、外挂音频发现与 mapping），不是 bugfix 集合。
+
+回归计数（v0.8.0 冻结值，`python tests\full_autotest.py --level full`）：
+
+```text
+unit       590 PASS / 0 FAIL
+toolchain   16 PASS / 0 FAIL
+full       250 PASS / 0 FAIL
+--------------------------------
+合计       856 PASS / 0 FAIL
+```
+
+相对 Phase 4C 基线（unit 511 / full 728）新增 **128** 条断言，**0** 条 FAIL。
+唯一"名字变了"的用例是 `p4b.format 只有 3 个显式格式` → `只有 4 个显式格式`
+（本阶段按 §9 加入 `OPUS`），它同时被**加强**：现在还会断言 Opus 的
+encoder/container/suffix 以及"只有有损格式接受 bitrate"。其余 727 条断言
+逐条仍在且全部通过（由 `work/tools/p5_reconcile.py` 对
+`work/_after/report_p4c_final.json` 逐项比对得出）。
 

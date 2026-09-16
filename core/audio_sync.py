@@ -711,7 +711,8 @@ class SyncEstimateResult:
         (它的 offset 恒为 0, 也不允许被二次修正);
       * `reference_channel_id` 是本次任务的坐标系原点 —— 所有
         `offsets()` 都是相对它的值, 换 reference 即整体平移 (见
-        `docs/release_notes_next.md` §6);
+        `docs/release_notes_v0.8.0.md` §6; 该文件发布前名为
+        `release_notes_next.md`);
       * `algo_version` 记录产出这些 offset 的估计算法版本 (既有
         `core/sync_estimate` 的标定版本), 便于事后追溯。
     """

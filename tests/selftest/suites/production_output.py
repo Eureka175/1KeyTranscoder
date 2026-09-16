@@ -191,8 +191,15 @@ def l1_production_output() -> None:
            _reason({"encode": {"loudness": True}})
            == REASON_AUDIO_REQUEST_INVALID)
     record("p4c.request 未知 format -> 报错 (不是静默回退)",
-           _reason({"encode": {"format": "opus"}})
+           # ⚠️ v0.8.0: `opus` 现在是**合法**格式 (§9 要求至少 AAC/Opus),
+           # 因此这条用例换成真正不在表里的 codec —— 断言强度不变, 只是
+           # 被否定的取值从"当时不支持"变成"始终不在表里"。
+           _reason({"encode": {"format": "mp3"}})
            == REASON_AUDIO_REQUEST_INVALID)
+    record("p4c.request opus 成为合法格式 (v0.8.0)",
+           parse_audio_request(
+               {"encode": {"format": "opus", "bitrate": "96k"}}
+           ).encode.format is AudioEncodeFormat.OPUS)
     record("p4c.request map 与 select 集合不一致 -> 报错",
            _reason({"channels": {"select": ["a"], "map": ["b"]}})
            == "audio_request_selection")
