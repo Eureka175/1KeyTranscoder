@@ -43,7 +43,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
         audio_encode, audio_external, audio_format, audio_integration,
         audio_mix, audio_model, audio_retention, audio_route,
         audio_selection, audio_sync, audio_timeline, channel_sync, cli,
-        codecs, core, hardware, pipeline, production_output, toolchain,
+        codecs, core, hardware, hardware_audio, pipeline, production_output,
+        toolchain,
     )
 
     return {
@@ -80,6 +81,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
              audio_format.l1_audio_format),
             ("audio external v0.8 (Phase 5)",
              audio_external.l1_audio_external),
+            ("hardware audio plan (post-v0.8.0)",
+             hardware_audio.l1_hardware_audio),
             ("av1", codecs.l1_av1),
             ("cli v0.6.2", cli.l1_cli_v062),
         ],
@@ -107,6 +110,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
              audio_format.l3_audio_format),
             ("audio external v0.8 (Phase 5)",
              audio_external.l3_audio_external),
+            ("hardware audio plan (post-v0.8.0)",
+             hardware_audio.l3_hardware_audio),
         ],
     }
 

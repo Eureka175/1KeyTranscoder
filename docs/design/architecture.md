@@ -1272,6 +1272,178 @@ P5
 
 ---
 
+## 6.7 硬件后端接入 `--audio-plan`（**post-v0.8.0**）
+
+> **版本边界**：v0.8.0 已发布（tag `v0.8.0` = `3b4cf17`）。本节是 v0.8.0
+> **之后**的增量：`--audio-plan` 从"仅经典软件路径"扩展到 NVENC / QSV。
+> 版本号与 tag **未改动**, 发布另行决定。
+
+### 6.7.1 目标与结论
+
+```text
+x265    + --audio-plan   PASS（4C 起）
+svtav1  + --audio-plan   PASS（4C 起）
+nvenc   + --audio-plan   PASS（本节）
+qsv     + --audio-plan   PASS（本节）
+qsv-av1 + --audio-plan   PASS（本节）
+nvenc-av1 + --audio-plan 本机无法创建 AV1 编码器（既有限制, 与音频无关, 见 §6.7.7）
+Sony / DJI + --audio-plan 仍然不支持: 逐文件明确拒绝（不扩大范围）
+```
+
+原则: **视频后端能产出一个独立的视频产物, 就应该能与音频产物组合**。
+
+### 6.7.2 架构: 一条单向的"接手"契约
+
+硬件批量层 (`core/batch_hw.py`) 与音频域之间**没有**任何直接依赖。两侧唯一的
+接缝是一个视频侧定义的、**不含音频词汇**的回调契约:
+
+```text
+@dataclass(frozen=True)
+class VideoHandoff:            # 视频侧定义
+    source: Path               # 原始输入
+    video: Path                # 本层刚产出的**视频产物**
+    output: Path               # 期望的最终文件
+    work_dir: Path
+    file_logger: Any = None    # per-file 日志句柄
+
+@dataclass
+class HandoffOutcome:          # 接手方回填
+    ok: bool; applied: bool; detail: str; errors: list[str]
+
+VideoHandoffHook = Callable[[VideoHandoff], HandoffOutcome]
+```
+
+`encode_one_hw_classic(..., video_handoff=None)`:
+
+* **未注册**（默认）→ 行为与以前**逐字相同** (`--audio-copy`, 一趟 video+audio);
+* **已注册** → `audio_copy=False` (只产出视频), 编码成功后**不改名到 `dst`**,
+  而是把 `VideoHandoff` 交给接手方:
+  * `applied=True` → 最终文件已写好, 删掉中间产物, 照常 postprobe;
+  * `applied=False` → 接手方判定"无事可做"(空计划), 中间产物**原样**改名成
+    `dst` —— 退化为既有行为, 而不是另拼一条命令;
+  * `ok=False` → **明确失败** (计划被拒绝时绝不忽略计划继续输出)。
+
+接手的实现在 `1kt.py` (`_audio_plan_handoff`), 它调用 `production.output`。
+因此依赖方向仍然是:
+
+```text
+production orchestration (1kt.py -> production.output)
+        |
+        +-- Video Encode Backend (NVENC / QSV / x265 / SVT-AV1)  —— 不认识音频
+        +-- Audio Backend      (AudioPlan -> AudioOutput)        —— 不认识视频后端
+        +-- Output Composer    (两者 -> 最终容器)
+```
+
+**为什么用回调而不是让 `batch_hw` 直接调音频**: 后者会把硬件批量层变成音频域的
+调用方, 硬解/硬编路径就会被音频计划的存在牵动。回调把方向反过来 —— 视频侧只
+提供"我产出好了", 谁来接手、做什么, 由生产编排层决定。回归用 AST 断言长期钉住:
+`core/batch_hw.py` 与 `encoders/*` 里 `core.audio_*` import = 0, 且**代码层面**
+不出现音频域内部类型名。
+
+### 6.7.3 一个实现, 两种后端
+
+软件路径与硬件接手方调用**同一个** `_apply_audio_plan()`（`1kt.py`）, 它内部
+只通过 `production.output` 触达音频域。这不是为了省代码, 而是 §26 的要求:
+
+> 同一个 `AudioPlan` 换视频后端, 音频结果必须一致。
+
+两条路径各写一遍是唯一能破坏这个性质的方式。回归断言:
+`1kt.py` 里 `produce_audio_output` 只有**一个**调用点; 同一个计划在
+x265 / svtav1 / nvenc / qsv 上产出的音频结构签名 (codec, 声道数, 采样率, 顺序)
+完全相同。
+
+### 6.7.4 执行顺序
+
+```text
+hardware decode (--hw-decode 决定, 与音频计划无关)
+    -> NVENC / QSV video encode  (audio_copy=False)
+    -> video artifact (.part.mov, 纯视频 MP4)
+         |
+AudioPlan -> Audio Backend -> audio artifact(s)
+         |
+    OutputComposer -> final MP4 -> os.replace 到 dst
+```
+
+`--check full` 的 PSNR/SSIM 质量门在视频产物上照常执行, **先过门再接手**;
+`--channel-sync` 与 `--audio-plan` 在 CLI 层互斥, 因此接手路径里不存在第二条
+改音频的路径。
+
+### 6.7.5 视频完整性
+
+硬件编码器在同一素材上是确定性的 (本机实测 NVENC / QSV 连跑两次视频基本流
+sha256 相同), 因此这里可以用最强判据:
+
+```text
+同一素材, 默认路径 vs --audio-plan -> 视频基本流 sha256 **完全相同**
+```
+
+实测 (FAST 档, 320x240, 同一个 4CH 素材):
+
+```text
+nvenc  e09fe9d62eb8c9d1…  默认 / +PCM / +AAC / +外挂 / +对齐   全部一致
+qsv    dc4ff4b78669986d…  默认 / +PCM / +AAC                    全部一致
+硬件解码下 (--hw-decode auto):
+nvenc  108d493d9d5a5580…  默认 / +计划                           全部一致
+qsv    02b37a852f440471…  默认 / +计划                           全部一致
+```
+
+同时逐案断言 `codec / width / height / fps` 不变。
+
+### 6.7.6 硬件解码不受影响
+
+`--hw-decode auto` 的路由 (`encoders/hwdecode.route_decode`) 完全不受音频计划影响。
+实测 (HEVC 4:2:0 10-bit 素材, 白名单组合):
+
+```text
+[HWDEC] decode route: backend=nvenc codec=hevc 4:2:0/10bit policy=auto
+        -> HARDWARE (reader=avhw, reason=proven_combination)
+```
+
+加载了带 `--audio-plan` 的运行后日志里**仍然是 HARDWARE**, 并且视频基本流与
+"硬件解码 + 无计划"逐字节一致。即: **AudioPlan 不会把硬件解码踢回软解**。
+
+### 6.7.7 已知限制与实测证据
+
+```text
+nvenc-av1 : 编码器无法创建 —— NVEncC raw log:
+            "Max bitrate is lowered 80000 -> 66666 due to level 6.1 restriction."
+            "nvenc : Error on nvEncInitializeEncoder: 8 (Invalid Level.)"
+            "Failed to create encoder"
+            触发条件是 nvenc_av1.json 的 level=6.1 与本机 NVENC AV1 编码器不兼容,
+            **加不加 --audio-plan 结果完全相同** —— 属于既有的 AV1 profile/驱动
+            限制, 本阶段不修改 AV1 架构 (回归同时断言"有计划"与"无计划"都失败)。
+qsv-av1   : 正常 (av1 视频 + 计划音频真实产出)。
+Sony/DJI  : 不支持 (见下)。
+```
+
+### 6.7.8 Sony / DJI: 逐文件明确拒绝
+
+保留管线的音频处理方式与音频域不同, 本阶段**不**重构它们。带计划遇到这类素材时:
+
+```text
+ERROR | [AUDIO-FAIL] <src> | the explicit audio plan is not implemented on the
+        Sony preservation path; run this file without --audio-plan or use the
+        classic software path
+-> 该文件 failed, 记入 failed_files.json, 不产出任何文件
+```
+
+规则被抽成 `core.batch_hw.audio_plan_refusal(streams, handoff)`, 因此可以用
+**真实 Sony 素材**直接断言 (识别为 Sony + 有接手方 → 拒绝; 无接手方 → 不拒绝)。
+"没有计划时毫无变化"因此也是被断言的事实, 而不是承诺。
+
+### 6.7.9 用户文档
+
+`docs/audio_plan.md` —— 面向使用者的正式文档 (是什么 / 默认行为 / 各后端支持 /
+可运行 JSON 示例 / 选择与排序 / 编码继承与"何时不会重编码" / alignment /
+mapping / 外挂音频命名规则 / 硬件用法 / 限制 / 排错)。
+
+回归额外保证**文档不会腐烂**: `docs/audio_plan.md` 里每个 ```json 代码块都必须
+能被**真实**请求解析器 (`core.audio_request.parse_audio_request`) 解析通过。
+这条断言在写作过程中真的抓到了两个文档缺陷 (一个带 `...` 占位的伪 JSON、一个
+`map` 与 `select` 集合不一致的示例), 因此它是有价值的检查而不是形式主义。
+
+---
+
 ## 7. 编码后验证：`--check` 三级
 
 | 级别 | Sony | DJI |

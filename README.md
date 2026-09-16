@@ -132,7 +132,7 @@ Current release: **v0.8.0** (`VERSION` = `0.8.0`, tag `v0.8.0`).
 | Audio execution-path resolution (`NONE` / `STREAM_COPY` / `PCM_ROUTE` / `PCM_MIX`) | Available (Phase 4A; internal API) |
 | Selective MP4 audio retention (keep / drop / reorder original audio streams) | Available through the CLI (`--audio-plan`). Channel-filter and mixing outputs are **refused** rather than faked as stream copy |
 | Audio encoding (AAC / Opus / PCM / FLAC) of routed or mixed PCM | Available through the CLI (`--audio-plan`) |
-| Final output composition (video + encoded audio → MP4) | Wired into the production entry point for the classic software path (`1kt.py --encoder x265\|svtav1`, opt-in via `--audio-plan`). Hardware backends, Sony and DJI preservation **reject** an audio plan explicitly rather than ignoring it |
+| Final output composition (video + encoded audio → MP4) | Wired into the production entry point for the classic software path (`1kt.py --encoder x265\|svtav1`) **and the hardware backends** (`nvenc` / `qsv` / `qsv-av1`), opt-in via `--audio-plan`. Sony and DJI preservation **reject** an audio plan per file rather than ignoring it |
 | Format-aware alignment (PCM default on, compressed default off, explicit compressed → decode/re-encode with warning) | Available through the CLI (`--audio-plan`: `alignment`, `sync.reference`) |
 | Codec / bitrate inheritance (`manual > source > encoder default`) | Available through the CLI (`--audio-plan`: `encode`) |
 | External audio discovery (`clip001.wav`, `clip001_01.aac`, …) and mapping-driven track layout | Available through the CLI (`--audio-plan`: `external`, `mapping`) |
@@ -338,6 +338,10 @@ specific internal APIs that are not stable public interfaces — are documented 
 below is reachable. An empty request (for example only an `encode` block) is treated as
 "not enabled", so the default path is structurally untouched.
 
+**Full user guide: [`docs/audio_plan.md`](docs/audio_plan.md)** — worked examples,
+per-backend support, external-audio naming rules and troubleshooting. The summary below
+is deliberately short.
+
 ```json
 {
   "version": 1,
@@ -376,9 +380,14 @@ Behaviour worth knowing:
   `clip001-rec.wav` match `clip001.MP4`; `clip001abc.wav` and `random_clip001.wav` do not.
   All matches are appended in a deterministic order (exact stem, then numeric index, then
   other suffixes; numeric runs compare as numbers, so `clip001_2` precedes `clip001_10`).
-- `--audio-plan` is supported on the classic software path (`--encoder x265` / `svtav1`);
-  hardware backends and the Sony/DJI preservation paths reject it explicitly (exit code 2)
-  instead of ignoring it, and it conflicts with `--channel-sync` (also exit code 2).
+- `--audio-plan` is supported on the classic software path (`--encoder x265` / `svtav1`)
+  and on the hardware backends (`nvenc` / `qsv` / `qsv-av1`, and `nvenc-av1` where that
+  encoder can be created). On hardware backends the video is still encoded by NVENC/QSV
+  into a video-only artifact and the audio is produced by the independent audio backend;
+  hardware decode stays available. Sony/DJI preservation paths reject an audio plan
+  **per file** with an explicit error instead of ignoring it, and `--audio-plan` cannot be
+  combined with `--channel-sync` (exit code 2).
+- See [`docs/audio_plan.md`](docs/audio_plan.md) for the user guide.
 
 ## Hardware Decode
 
@@ -458,8 +467,9 @@ Any change must be re-checked for new failures.
 
 The default audio path is unchanged: without `--audio-plan` the tool still does
 `-map 0` + `-c:a copy`. With an explicit plan (JSON) the classic software path
-(x265 / SVT-AV1) encodes or retains the audio you select and composes it with the
-video, which is stream-copied and therefore bit-identical to the default path.
+(x265 / SVT-AV1) and the hardware backends (NVENC / QSV) encode or retain the audio
+you select and compose it with the video, which is stream-copied and therefore
+bit-identical to the default path.
 
 ```json
 {
@@ -574,6 +584,7 @@ by git; `dist/` holds release artifacts built locally.
 ## Documentation
 
 - [Documentation index](docs/README.md) — classified index of everything under `docs/`.
+- [Audio plan user guide](docs/audio_plan.md) — how to use `--audio-plan`: worked JSON examples, per-backend support, external-audio naming rules, limitations and troubleshooting.
 - [Architecture](docs/design/architecture.md) — end-to-end data flow, invariants, module map. Start here to understand how the code runs.
 - [v0.7.1 release notes](docs/release_notes_v0.7.1.md) — the audio model and PCM pipeline, phase by phase.
 - [v0.8.0 release notes](docs/release_notes_v0.8.0.md) — arbitrary-reference delay correction, Phase 4A/4B/4C output integration, and Phase 5 format-aware alignment + external audio. Published with tag `v0.8.0`.
@@ -634,8 +645,9 @@ production integration (Phase 4C) and format-aware alignment plus external audio
 - **Audio CLI**: `--audio-plan` is the only audio flag. Everything else in the audio
   pipeline is reachable only through the internal API.
 - **Audio plan availability**: `--audio-plan` works on the classic software path
-  (`--encoder x265` / `svtav1`). Hardware backends and the Sony/DJI preservation pipelines
-  reject it with exit code 2 rather than ignoring it, and it cannot be combined with
+  (`--encoder x265` / `svtav1`) and on the hardware backends (`nvenc` / `qsv` / `qsv-av1`,
+  and `nvenc-av1` where that encoder can be created). The Sony/DJI preservation pipelines
+  reject it **per file** rather than ignoring it, and it cannot be combined with
   `--channel-sync`.
 - **Alignment**: only constant integer sample offsets exist. A reference channel must be
   named explicitly — the tool never guesses one, so "alignment: auto" on PCM material only

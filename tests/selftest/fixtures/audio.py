@@ -317,3 +317,25 @@ def _video_elementary_hash(path: Path) -> str:
         return ""
     text = (r.stdout or "").strip()
     return text.split("=")[-1] if "=" in text else text
+
+
+def _make_av_10bit(
+    dst: Path, *, seconds: int = 1, size: str = "320x240", rate: int = 10,
+) -> bool:
+    """`video(HEVC 4:2:0 10-bit) + 1 条 mono PCM` 的确定性 MP4。
+
+    硬件**解码**白名单只认 runtime-proven 的 `(backend, codec, chroma, depth)`
+    组合 —— nvenc/qsv 各有一条 4:2:0/10bit 的 HEVC 记录, 因此"硬件解码仍然可用"
+    这件事只能用 10-bit HEVC 素材来验证 (这不是测试偏好, 是白名单的事实)。
+    """
+    from ..paths import FFMPEG, sh
+
+    r = sh(FFMPEG, "-v", "error", "-y",
+           "-f", "lavfi", "-i",
+           f"testsrc2=size={size}:rate={rate}:duration={seconds}",
+           "-f", "lavfi", "-i",
+           f"sine=frequency=440:sample_rate=48000:duration={seconds}",
+           "-map", "0:v", "-map", "1:a",
+           "-c:v", "libx265", "-preset", "ultrafast", "-pix_fmt",
+           "yuv420p10le", "-c:a", "pcm_s16le", "-ac", "1", dst, timeout=900)
+    return dst.is_file() and dst.stat().st_size > 0 and r.returncode == 0

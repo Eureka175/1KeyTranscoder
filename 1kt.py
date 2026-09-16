@@ -339,6 +339,143 @@ def log_encode_header(
     )
 
 
+def _apply_audio_plan(
+    *,
+    src: Path,
+    video: Path,
+    video_container: str,
+    dst: Path,
+    work_dir: Path,
+    audio_plan_request,
+    ffmpeg: Path,
+    ffprobe: Path,
+    logger: logging.Logger,
+    file_logger: logging.Logger,
+) -> tuple[bool, bool, str]:
+    """显式音频计划: **一个**实现, 软件与硬件后端共用 (v0.8.0+)。
+
+    返回 `(ok, applied, detail)`:
+
+    * `ok=False`  -> 计划被拒绝/编排失败。调用方必须**明确失败**, 绝不忽略计划
+                     继续输出 (否则用户会以为计划生效了);
+    * `applied=True`  -> 最终文件已经写好;
+    * `applied=False` -> "没有要做的事"(空计划), 调用方保持既有路径原样。
+
+    为什么软件与硬件必须共用这一个函数: §11/§26 要求"同一个 AudioPlan, 换视频
+    后端不得改变音频结果"。两条路径各写一遍是唯一能破坏这个性质的方式。
+
+    ⚠️ 本函数是 `1kt.py` 里**唯一**触达音频域的地方, 且只通过
+    `production.output` —— 生产入口不认识 `AudioPlan` / `AudioTimeline` /
+    `AudioEncoder`, 只转交一个不透明的请求对象。
+    """
+    from production.output import (
+        VideoOutputArtifact,
+        produce_audio_output,
+        resolve_source_audio_plan,
+    )
+
+    try:
+        candidate = resolve_source_audio_plan(
+            ffprobe, src, audio_plan_request, source_id=AUDIO_SOURCE_ID,
+        )
+    except Exception as exc:                         # noqa: BLE001
+        logger.error("[AUDIO-FAIL] %s | %s", src, exc)
+        file_logger.error("AUDIO PLAN REJECTED | %s", exc)
+        return False, False, str(exc)
+
+    outcome = produce_audio_output(
+        plan=candidate,
+        video=VideoOutputArtifact(
+            path=str(video), container=video_container, label="encoded",
+        ),
+        output_path=dst,
+        audio_source=src,
+        ffmpeg=ffmpeg,
+        ffprobe=ffprobe,
+        work_dir=work_dir,
+        request=audio_plan_request,
+        log=lambda msg: logger.info("[AUDIO] %s | %s", src.name, msg),
+    )
+    file_logger.info(
+        "AUDIO_OUTPUT | %s | %s",
+        outcome.path.value,
+        json.dumps(outcome.summary(), ensure_ascii=False),
+    )
+    if not outcome.ok:
+        logger.error(
+            "[AUDIO-FAIL] %s | %s | %s",
+            src, outcome.reasons,
+            [e.get("detail") for e in outcome.errors],
+        )
+        file_logger.error(
+            "AUDIO OUTPUT FAILED | %s",
+            json.dumps(outcome.errors, ensure_ascii=False),
+        )
+        return False, False, ", ".join(outcome.reasons)
+    if outcome.applied and Path(outcome.output_path) != dst:
+        # Composer 写到了别处: 不猜, 明确报错 (调用方会删掉中间产物)。
+        file_logger.error(
+            "AUDIO OUTPUT PATH MISMATCH | %s != %s",
+            outcome.output_path, dst,
+        )
+        return False, False, "audio output path mismatch"
+    return True, bool(outcome.applied), outcome.path.value
+
+
+def _audio_plan_handoff(
+    *,
+    audio_plan_request,
+    ffmpeg: Path,
+    ffprobe: Path,
+    logger: logging.Logger,
+) -> Any:
+    """给硬件批量层用的"接手最终输出"钩子 (v0.8.0+)。
+
+    硬件批量层只传一个 `VideoHandoff` (源 / 视频产物 / 目标 / 工作目录), 不知道
+    音频的存在; 音频域也完全不知道视频是 NVENC 还是 QSV 编的。两侧因此保持
+    零耦合:
+
+        NVENC / QSV  ->  VideoHandoff  ->  (本钩子)  ->  production.output
+
+    钩子内部与软件路径调用**同一个** `_apply_audio_plan`, 所以同一个计划在
+    x265 / SVT-AV1 / NVENC / QSV 上必须得到相同的音频结构。
+    """
+    if audio_plan_request is None:
+        return None
+
+    def hook(request: Any) -> Any:
+        from core.batch_hw import HandoffOutcome
+
+        file_logger = getattr(request, "file_logger", None) or logger
+        try:
+            ok, applied, detail = _apply_audio_plan(
+                src=request.source,
+                video=request.video,
+                video_container="mp4",
+                dst=request.output,
+                work_dir=request.work_dir / "audio",
+                audio_plan_request=audio_plan_request,
+                ffmpeg=ffmpeg,
+                ffprobe=ffprobe,
+                logger=logger,
+                file_logger=file_logger,
+            )
+        except Exception as exc:                     # noqa: BLE001
+            logger.exception("[AUDIO-FAIL] %s", request.source)
+            return HandoffOutcome(
+                ok=False, applied=False,
+                detail=f"{type(exc).__name__}: {exc}",
+                errors=[str(exc)],
+            )
+        return HandoffOutcome(
+            ok=ok, applied=applied,
+            detail=detail if (not ok or applied) else "audio plan disabled",
+            errors=[] if ok else [detail],
+        )
+
+    return hook
+
+
 def encode_one(
     *,
     src: Path,
@@ -446,57 +583,19 @@ def encode_one(
     # 格式策略与编排全部收在 `production.output` 之后, 生产入口只传
     # "源 + 请求"(请求对象对它是**不透明**的)。
     if audio_plan_request is not None:
-        from production.output import (
-            VideoOutputArtifact,
-            produce_audio_output,
-            resolve_source_audio_plan,
-        )
-
-        try:
-            candidate = resolve_source_audio_plan(
-                ffprobe, src, audio_plan_request, source_id=AUDIO_SOURCE_ID,
-            )
-        except Exception as exc:                     # noqa: BLE001
-            logger.error("[AUDIO-FAIL] %s | %s", src, exc)
-            file_logger.error("AUDIO PLAN REJECTED | %s", exc)
-            safe_unlink(part_dst)
-            return "failed"
-
-        outcome = produce_audio_output(
-            plan=candidate,
-            video=VideoOutputArtifact(
-                path=str(part_dst), container="", label="encoded",
-            ),
-            output_path=dst,
-            audio_source=src,
-            ffmpeg=ffmpeg,
-            ffprobe=ffprobe,
+        audio_ok, audio_applied, _detail = _apply_audio_plan(
+            src=src, video=part_dst, video_container="",
+            dst=dst,
             work_dir=(work_dir or part_dst.parent) / "audio",
-            request=audio_plan_request,
-            log=lambda msg: logger.info("[AUDIO] %s | %s", src.name, msg),
+            audio_plan_request=audio_plan_request,
+            ffmpeg=ffmpeg, ffprobe=ffprobe,
+            logger=logger, file_logger=file_logger,
         )
-        file_logger.info(
-            "AUDIO_OUTPUT | %s | %s",
-            outcome.path.value,
-            json.dumps(outcome.summary(), ensure_ascii=False),
-        )
-        if not outcome.ok:
-            logger.error(
-                "[AUDIO-FAIL] %s | %s | %s",
-                src, outcome.reasons,
-                [e.get("detail") for e in outcome.errors],
-            )
-            file_logger.error(
-                "AUDIO OUTPUT FAILED | %s", json.dumps(
-                    outcome.errors, ensure_ascii=False,
-                ),
-            )
+        if not audio_ok:
             safe_unlink(part_dst)
             return "failed"
-        if outcome.applied:
+        if audio_applied:
             # Composer 已经写出最终文件; 视频中间产物不再需要。
-            if Path(outcome.output_path) != dst:
-                safe_unlink(outcome.output_path)
             safe_unlink(part_dst)
             postprobe_and_log(
                 src=src, dst=dst, preset=preset, elapsed=elapsed,
@@ -1676,9 +1775,10 @@ def main() -> int:
         or getattr(args, "channel_sync_transparent", False)
     )
 
-    # 显式音频计划 (Phase 4C): 只在**经典软件路径**上接入。其余路径
-    # (硬件后端 / Sony / DJI 保留管线) 有自己的音频处理方式, 本阶段不去
-    # 重构它们; 因此明确报错, 绝不"静默忽略用户显式给出的计划"。
+    # 显式音频计划 (v0.8.0+): 经典软件路径 (x265 / svtav1) 与硬件后端
+    # (nvenc / qsv, 含 AV1) 都支持; Sony / DJI 保留管线有自己的音频处理方式,
+    # 本阶段不去重构它们 —— 那些**文件**会被逐文件明确拒绝 (见 core/batch_hw),
+    # 绝不"静默忽略用户显式给出的计划"。
     audio_plan_request = None
     if getattr(args, "audio_plan", None):
         from production.output import load_audio_plan_request
@@ -1687,14 +1787,6 @@ def main() -> int:
             audio_plan_request = load_audio_plan_request(args.audio_plan)
         except Exception as exc:                     # noqa: BLE001
             print(f"[FATAL] --audio-plan: {exc}", file=sys.stderr)
-            return 2
-        if is_hardware:
-            print(
-                "[FATAL] --audio-plan is only supported on the classic "
-                "software path (x265 / svtav1); it is not implemented for "
-                "the hardware backends.",
-                file=sys.stderr,
-            )
             return 2
         if channel_sync_enabled:
             print(
@@ -1716,6 +1808,13 @@ def main() -> int:
         verbose=bool(args.verbose),
         fresh=bool(args.fresh_log),
     )
+    if audio_plan_request is not None and is_hardware:
+        logger.warning(
+            "[AUDIO] --audio-plan on a hardware backend: the video artifact "
+            "is produced video-only and the audio is composed separately; "
+            "Sony/DJI sources will be refused per file (not implemented on "
+            "the preservation paths)"
+        )
 
     if is_hardware:
         if args.experimental_multihw:
@@ -2014,6 +2113,12 @@ def main() -> int:
             dry_run=args.dry_run,
             failed_path=failed_path,
             status=status,
+            video_handoff=_audio_plan_handoff(
+                audio_plan_request=audio_plan_request,
+                ffmpeg=ffmpeg,
+                ffprobe=ffprobe,
+                logger=logger,
+            ),
         )
 
         if args.experimental_multihw:

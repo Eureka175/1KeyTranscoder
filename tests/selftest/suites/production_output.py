@@ -312,17 +312,80 @@ def l1_production_output() -> None:
            not entry_audio, f"{entry_audio}")
 
     entry_source = open(entry, encoding="utf-8").read()
-    used = sorted(
-        t for t in (
-            "AudioMixer", "AudioPCMReader", "ChannelTimeline",
-            "AudioRetentionSpec", "AudioExecutionPath", "EncodedAudioOutput",
-            "AudioEncoder",
-        ) if t in entry_source
-    )
-    record("p4c.arch 1kt.py 不出现音频域内部类型名", not used, f"{used}")
+    # ⚠️ v0.8.0+ : 这里由"字符串扫描"改为 **AST 标识符扫描**。
+    # 原因: 边界本身需要被写进文档字符串解释 (例如 `_apply_audio_plan` 的
+    # "生产入口不认识 AudioPlan / AudioEncoder, 只转交一个不透明的请求对象"),
+    # 而字符串扫描会把"声明边界"误判成"越过边界"。新判据更强也更准:
+    # 只看代码里真正被引用的名字 (Name / Attribute / import alias),
+    # 注释与文档字符串 (Constant) 不计入 —— 因此"真的用了内部类型"依然会被
+    # 抓到, 而"写明不使用"不会被误伤。
+    used = _audio_internal_identifiers(entry_source)
+    record("p4c.arch 1kt.py 不出现音频域内部类型名 (代码层面, 非注释)",
+           not used, f"{used}")
     record("p4c.arch 1kt.py 只通过 production.output 触达音频",
            "from production.output" in entry_source,
            "entry imports production.output")
+
+    # --- 7. 使用文档里的 JSON 示例必须是**真 schema** ---------------------
+    # `docs/audio_plan.md` 是给用户看的; 里面的每个 JSON 块都能被真实的请求
+    # 解析器解析, 才算"来自当前实际 schema"而不是文档作者想象的字段。
+    doc = ROOT / "docs" / "audio_plan.md"
+    if doc.is_file():
+        blocks = _json_blocks(doc.read_text(encoding="utf-8"))
+        bad: list[str] = []
+        for index, block in enumerate(blocks):
+            try:
+                parse_audio_request(json.loads(block))
+            except Exception as exc:                 # noqa: BLE001
+                bad.append(f"#{index}: {exc}")
+        record("p4c.doc docs/audio_plan.md 的 JSON 示例全部通过真实 schema 解析",
+               bool(blocks) and not bad,
+               f"{len(blocks)} blocks, bad={bad}")
+        record("p4c.doc 文档覆盖了全部四个可选键 + 选择三件套",
+               all(key in doc.read_text(encoding="utf-8")
+                   for key in ('"select"', '"exclude"', '"map"',
+                               '"alignment"', '"sync"', '"mapping"',
+                               '"external"', '"encode"')),
+               "keys documented")
+
+
+def _json_blocks(source: str) -> list[str]:
+    """从 Markdown 里取出所有 ```json 代码块 (文档契约测试用)。"""
+    blocks: list[str] = []
+    inside = False
+    current: list[str] = []
+    for line in source.splitlines():
+        if line.strip().startswith("```"):
+            if inside:
+                blocks.append("\n".join(current))
+                current = []
+                inside = False
+                continue
+            inside = line.strip().lower() in ("```json", "```jsonc")
+            continue
+        if inside:
+            current.append(line)
+    return blocks
+
+
+def _audio_internal_identifiers(source: str) -> list[str]:
+    """源码里被引用的音频域内部类型名 (AST 标识符, 排除注释/文档字符串)。"""
+    import ast as _ast_mod
+
+    wanted = {
+        "AudioMixer", "AudioPCMReader", "ChannelTimeline",
+        "AudioRetentionSpec", "AudioExecutionPath", "EncodedAudioOutput",
+        "AudioEncoder", "AudioPlan", "AudioTimeline",
+    }
+    used: set[str] = set()
+    for node in _ast_mod.walk(_ast_mod.parse(source)):
+        if isinstance(node, _ast_mod.Name):
+            used.add(node.id)
+        elif isinstance(node, _ast_mod.Attribute):
+            used.add(node.attr)
+        elif isinstance(node, _ast_mod.alias):
+            used.add((node.asname or node.name).split(".")[-1])
+    return sorted(used & wanted)
 
 
 def _public_args(path: str) -> set[str]:
@@ -728,20 +791,30 @@ def l3_production_output() -> None:
            and _video_hash(empty_out) == baseline_vhash,
            "hash compared")
 
-    # --- Test 9: --audio-plan 与不支持的路径明确冲突 ---------------------
-    hardware_conflict = sh(
+    # --- Test 9: 硬件后端与计划的组合行为 --------------------------------
+    # ⚠️ post-v0.8.0: 硬件后端 (NVENC/QSV) **已支持** `--audio-plan`, 因此
+    # 这条用例从"硬件必须报错"改为"硬件被接受 + 计划真的生效, 且不适用于
+    # 该文件的计划仍然逐文件明确失败"。
+    hw_dir = d / "out_hw_conflict"
+    hardware_run = sh(
         __import__("sys").executable, ROOT / "1kt.py",
-        "--input", src_dir, "--output", d / "out_conflict",
-        "--encoder", "nvenc", "--audio-plan", str(keep_two),
-        "--headless", timeout=600,
+        "--input", src_dir, "--output", hw_dir,
+        "--encoder", "nvenc", "--preset", "FAST",
+        "--audio-plan", str(keep_two),
+        "--headless", timeout=1800,
     )
-    combined = (hardware_conflict.stdout or "") + (
-        hardware_conflict.stderr or ""
-    )
-    record("l3.p4c.T9 --audio-plan 用于硬件后端时明确报错 (不静默忽略)",
-           hardware_conflict.returncode != 0
-           and "only supported on the classic software path" in combined,
-           f"rc={hardware_conflict.returncode}")
+    combined = (hardware_run.stdout or "") + (hardware_run.stderr or "")
+    hw_clip = hw_dir / "clip.MP4"
+    hw_audio = _audio_of(hw_clip) if hw_clip.is_file() else []
+    record("l3.p4c.T9 硬件后端接受 --audio-plan (不再启动即拒绝)",
+           "only supported on the classic software path" not in combined
+           and hw_clip.is_file() and len(hw_audio) == 2,
+           f"rc={hardware_run.returncode} tracks={len(hw_audio)}")
+    record("l3.p4c.T9 硬件后端上计划不适用该文件时逐文件明确失败 (不静默忽略)",
+           "audio_stream_not_found" in combined
+           and "[AUDIO-FAIL]" in combined
+           and not (hw_dir / "quad.MP4").is_file(),
+           f"rc={hardware_run.returncode}")
 
     sync_conflict = sh(
         __import__("sys").executable, ROOT / "1kt.py",

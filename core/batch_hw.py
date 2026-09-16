@@ -94,6 +94,61 @@ from preservation import dji
 
 StatusCb = Callable[[str, str], None]
 
+
+@dataclass(frozen=True)
+class VideoHandoff:
+    """本层刚产出**视频产物**后, 交给外部完成最终文件的请求 (v0.8.0+)。
+
+    这是**视频侧的单向契约**: 硬件批量层只知道自己产出了一个"画面已经在里面
+    的独立文件", 以及"最终该写到哪里"。它不知道音频、不知道 `AudioPlan`、
+    也不知道对方会用这个产物做什么 —— 因此 NVENC / QSV / 硬件解码都不需要
+    认识音频域 (由回归的 AST 断言钉住)。
+
+    注册了 handoff 时本层的行为只有两处不同:
+
+    * 编码命令**不带** `--audio-copy` —— 产物必须是纯视频, 否则最终容器里会
+      多出一条没人要的音轨;
+    * 编码成功后**不**把 `.part.mov` 改名成 `dst`, 而是把 finalize 交给对方。
+    """
+
+    source: Path
+    video: Path
+    output: Path
+    work_dir: Path
+    #: 该文件的 per-file logger (接手方写自己的 per-file 行时用; 可以为 None)
+    file_logger: Any = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source": str(self.source),
+            "video": str(self.video),
+            "output": str(self.output),
+            "work_dir": str(self.work_dir),
+        }
+
+
+@dataclass
+class HandoffOutcome:
+    """handoff 的执行结果 (视频侧只读取这三个字段)。"""
+
+    ok: bool = True
+    applied: bool = False
+    detail: str = ""
+    errors: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "ok": bool(self.ok),
+            "applied": bool(self.applied),
+            "detail": self.detail,
+            "errors": list(self.errors),
+        }
+
+
+#: 每文件编码完成后的可选后处理钩子 (视频侧唯一的"外部接手"接缝)。
+VideoHandoffHook = Callable[[VideoHandoff], HandoffOutcome]
+
+
 # Reader identity each tool prints in "Input Info" when it really built
 # the requested reader. Asserted by the integrity gate: a requested
 # `avhw` that silently became `avsw` must never count as a hardware pass.
@@ -572,6 +627,33 @@ def hw_encode_with_fallback(
     raise RuntimeError("[FATAL] downgrade ladder exhausted")
 
 
+def audio_plan_refusal(
+    source_streams: list[dict[str, Any]],
+    video_handoff: VideoHandoffHook | None,
+) -> str | None:
+    """该文件在注册了接手方时是否必须被拒绝? 返回原因 (`None` = 不拒绝)。
+
+    只有 Sony / DJI 保留路径会被拒: 它们有自己的音频处理方式, 本阶段**不**
+    重构它们。让它们照常跑就等于"用户显式给出的计划被静默忽略", 因此这里
+    明确失败 (与软件路径对不支持的路径 rc=2 拒绝同义)。
+
+    抽成独立函数是为了让这条规则可以被**真实素材**直接断言, 而不是只能靠
+    跑一遍完整管线去间接观察。
+    """
+    if video_handoff is None:
+        return None
+    sony = is_sony_source(source_streams)
+    dji = is_dji_source(source_streams)
+    if not (sony or dji):
+        return None
+    kind = "Sony" if sony else "DJI"
+    return (
+        f"the explicit audio plan is not implemented on the {kind} "
+        "preservation path; run this file without --audio-plan or use the "
+        "classic software path"
+    )
+
+
 # ---------------------------------------------------------------------------
 # preparation + headers
 # ---------------------------------------------------------------------------
@@ -1045,13 +1127,21 @@ def encode_one_hw_classic(
     status_cb: StatusCb | None = None,
     show_progress: bool = True,
     throughput_cb: Callable[[float], None] | None = None,
+    video_handoff: VideoHandoffHook | None = None,
 ) -> str:
     """Non-Sony material: video + audio only, single-tool single pass.
     At check_level='full' the PSNR/SSIM sample gates delivery (FAIL
     deletes the part file and fails the batch entry); with channel_sync
-    the fixed audio replaces the copied audio post-encode."""
+    the fixed audio replaces the copied audio post-encode.
+
+    With ``video_handoff`` the encode produces a **video-only** artifact
+    and the caller's hook owns the final file (v0.8.0+: that is how an
+    explicit audio plan is applied on hardware backends). Without it
+    nothing here changes."""
     part_dst = dst.with_name(dst.stem + ".part.mov")
     safe_unlink(part_dst)
+    # 有接手方 -> 只产出视频; 没有 -> 既有的一趟 video+audio copy 行为。
+    audio_copy = video_handoff is None
 
     planned, needs_downgrade = plan_initial_format(
         backend.caps, backend.kind, src_info.chroma, src_info.bit_depth, backend.codec
@@ -1071,7 +1161,7 @@ def encode_one_hw_classic(
     if dry_run:
         cmd, _, _ = backend.command(
             src, part_dst, profile, planned[0], planned[1],
-            vfr, audio_copy=True, color=src_info.color,
+            vfr, audio_copy=audio_copy, color=src_info.color,
         )
         file_logger.info(
             "DRY-RUN | no encode performed | %s",
@@ -1090,7 +1180,7 @@ def encode_one_hw_classic(
             profile=profile, src_info=src_info, vfr=vfr,
             work_dir=work_dir,
             total_frames=source_summary["total_frames"],
-            ffprobe=ffprobe, audio_copy=True, do_frame_check=False,
+            ffprobe=ffprobe, audio_copy=audio_copy, do_frame_check=False,
             no_downgrade=no_downgrade, gpac=gpac,
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
             logger=logger, file_logger=file_logger,
@@ -1135,6 +1225,20 @@ def encode_one_hw_classic(
             )
             safe_unlink(part_dst)
             return "failed"
+
+    # ---- 可选的"外部接手最终输出" (v0.8.0+: 显式音频计划) --------------
+    # 视频侧到这里已经交付了一个**视频产物**; 接下来怎么做是接手方的事。
+    # 注册了 handoff 时 channel_sync 不参与 (CLI 层面两者互斥), 因此这里
+    # 明确按"接手方拥有最终文件"的语义走, 不留下第二条改音频的路径。
+    if video_handoff is not None:
+        return _finish_with_handoff(
+            handoff=video_handoff, src=src, dst=dst, part_dst=part_dst,
+            work_dir=work_dir, preset=preset, started=started,
+            source_summary=source_summary, used=used, warnings=warnings,
+            ffprobe=ffprobe, postprobe_csv=postprobe_csv,
+            postprobe_stream_csv=postprobe_stream_csv,
+            logger=logger, file_logger=file_logger,
+        )
 
     # 自动延时补偿 (经典路径): 修正后的音频轨替换拷贝音频
     if channel_sync and ffmpeg is not None:
@@ -1196,6 +1300,83 @@ def encode_one_hw_classic(
         used[0], used[1], len(warnings),
     )
 
+    postprobe_and_log(
+        src=src, dst=dst, preset=preset, elapsed=elapsed,
+        source_summary=source_summary, ffprobe=ffprobe,
+        postprobe_csv=postprobe_csv,
+        postprobe_stream_csv=postprobe_stream_csv,
+        logger=logger, file_logger=file_logger,
+    )
+    return "done"
+
+
+def _finish_with_handoff(
+    *,
+    handoff: VideoHandoffHook,
+    src: Path,
+    dst: Path,
+    part_dst: Path,
+    work_dir: Path,
+    preset: str,
+    started: float,
+    source_summary: dict[str, Any],
+    used: tuple[str, int],
+    warnings: list[str],
+    ffprobe: Path,
+    postprobe_csv: Path,
+    postprobe_stream_csv: Path,
+    logger: logging.Logger,
+    file_logger: logging.Logger,
+) -> str:
+    """视频产物已就绪 -> 由 handoff 写出最终文件 (v0.8.0+)。
+
+    语义 (与软件路径的音频步骤逐条一致):
+
+    * `applied=True`  -> 接手方已经写出 `dst`; 中间产物删掉, 照常 postprobe;
+    * `applied=False` -> 接手方判定"没有要做的事"(例如空计划), **原样**把
+      中间产物改名成 `dst` —— 也就是退化为既有行为, 而不是另拼一条命令;
+    * `ok=False`      -> **明确失败**。音频计划被拒绝时绝不"忽略计划继续输出"
+      (那会让用户以为计划生效了)。
+    """
+    outcome = handoff(VideoHandoff(
+        source=src, video=part_dst, output=dst, work_dir=work_dir,
+        file_logger=file_logger,
+    ))
+    file_logger.info(
+        "VIDEO_HANDOFF | ok=%s applied=%s | %s",
+        outcome.ok, outcome.applied, outcome.detail or "-",
+    )
+    for problem in outcome.errors:
+        file_logger.error("VIDEO_HANDOFF ERROR | %s", problem)
+
+    if not outcome.ok:
+        logger.error(
+            "[FAIL] post-encode step | %s | %s",
+            src, outcome.detail or "see per-file log",
+        )
+        safe_unlink(part_dst)
+        return "failed"
+
+    if outcome.applied:
+        if not dst.is_file() or dst.stat().st_size <= 0:
+            logger.error("[FAIL] post-encode step produced no output | %s", src)
+            safe_unlink(part_dst)
+            return "failed"
+        safe_unlink(part_dst)
+    else:
+        try:
+            os.replace(part_dst, dst)
+        except OSError as exc:
+            logger.error("[RENAME-FAIL] %s -> %s | %s", part_dst, dst, exc)
+            file_logger.exception("RENAME FAILED")
+            safe_unlink(part_dst)
+            return "failed"
+
+    elapsed = time.monotonic() - started
+    file_logger.info(
+        "ENCODE_FORMAT | %s/%s | warnings=%d",
+        used[0], used[1], len(warnings),
+    )
     postprobe_and_log(
         src=src, dst=dst, preset=preset, elapsed=elapsed,
         source_summary=source_summary, ffprobe=ffprobe,
@@ -1605,6 +1786,10 @@ class BatchCtx:
     failed_path: Path | None = None
     status: DashboardStatus | None = None
     show_progress: bool = True
+    #: v0.8.0+: 每文件编码完成后的可选接手方 (见 `VideoHandoff`)。
+    #: 注册后经典硬件路径只产出**视频产物**, 由接手方写出最终文件。
+    #: 视频侧不知道接手方是谁, 也不知道它做什么。
+    video_handoff: VideoHandoffHook | None = None
     warnings_total: list[str] = field(default_factory=list)
     # (backend_name, encode_fps) samples collected by workers, read by
     # the adaptive wave scheduler between waves
@@ -1673,6 +1858,24 @@ def process_file_hw(
         if ctx.check_level == "full"
         else None
     )
+
+    # 注册了接手方 (显式音频计划) 时, Sony / DJI 保留路径**明确拒绝该文件**:
+    # 那两条管线有自己的音频处理方式, 让它们照常跑就等于"计划被静默忽略"。
+    # 失败原因直接给出, 不降级、不回退 (与软件路径 rc=2 的拒绝同义)。
+    refusal = audio_plan_refusal(source_streams, ctx.video_handoff)
+    if refusal is not None:
+        kind = "Sony" if is_sony_source(source_streams) else "DJI"
+        logger.error("[AUDIO-FAIL] %s | %s", src, refusal)
+        file_logger.error("AUDIO PLAN REFUSED | %s | %s", kind, refusal)
+        if ctx.status is not None:
+            ctx.status.finish(src, "failed")
+        if ctx.failed_path is not None:
+            record_failure(
+                ctx.failed_path,
+                source=src, preset=ctx.preset, backend_name=backend.name,
+                stage="audio-plan", error=refusal, log_path=str(file_log),
+            )
+        return "failed"
 
     if is_sony_source(source_streams):
         result = encode_one_sony_hw(
@@ -1778,6 +1981,7 @@ def process_file_hw(
             throughput_cb=lambda fps: ctx.throughput.append(
                 (backend.name, fps)
             ),
+            video_handoff=ctx.video_handoff,
         )
 
     if result == "failed" and ctx.failed_path is not None:
