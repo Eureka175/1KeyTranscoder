@@ -110,6 +110,29 @@ copies without losing the motion and lens metadata that post-processing tools
   part of the release package, so hardware decode is unavailable in a release
   installation by design.
 
+### x265 encoding profiles
+
+The x265 backend is not one preset with a speed knob. It ships four profiles — `uhq`,
+`hq`, `small`, `fast` — that are four different production strategies, each calibrated
+against a different constrained resource:
+
+| Profile | Objective |
+|---|---|
+| `uhq` | Quality ceiling / extreme offline — the high-quality reference baseline |
+| `hq` | High-quality final output at a reduced, production-viable computation cost |
+| `small` | Storage efficiency — more computation spent deliberately to make files smaller |
+| `fast` | Production throughput — compression efficiency per unit of encoding time |
+
+They are not a quality ladder: `uhq → hq → small → fast` does **not** mean "better →
+worse". They were calibrated on real Sony XAVC HS 4K60 10-bit 4:2:0 150 Mbps LongGOP
+material plus a corpus of noisy/clean, handheld/stable, indoor/outdoor and long-form
+clips, and `fast` / `small` were tuned against NVENC UHQ as an external real-world anchor
+rather than against an abstract ideal.
+
+Design methodology — goals, computation pruning, the FAST ↔ SMALL relationship,
+marginal-value parameter decisions and the current parameter set:
+[docs/x265-profile-design.md](docs/x265-profile-design.md).
+
 ## Current Status
 
 Current release: **v0.8.0** (`VERSION` = `0.8.0`, tag `v0.8.0`).
@@ -584,6 +607,7 @@ by git; `dist/` holds release artifacts built locally.
 ## Documentation
 
 - [Documentation index](docs/README.md) — classified index of everything under `docs/`.
+- [x265 profile design](docs/x265-profile-design.md) — why there are four profiles, how each was derived, the FAST ↔ SMALL calibration, the NVENC anchor, and the current parameter set.
 - [Audio plan user guide](docs/audio_plan.md) — how to use `--audio-plan`: worked JSON examples, per-backend support, external-audio naming rules, limitations and troubleshooting.
 - [Architecture](docs/design/architecture.md) — end-to-end data flow, invariants, module map. Start here to understand how the code runs.
 - [v0.7.1 release notes](docs/release_notes_v0.7.1.md) — the audio model and PCM pipeline, phase by phase.

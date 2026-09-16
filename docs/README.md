@@ -9,6 +9,7 @@
 | 看**评估汇总与决策记录** | [[`FINAL_REPORT.md`](FINAL_REPORT.md)](FINAL_REPORT.md)（注意其头部状态横幅） |
 | 查**某后端为什么这样选、参数怎么定的** | [`evaluation/`](evaluation/)（先看该目录索引表里的"状态"列） |
 | 查**某个子系统的设计**（硬件后端 / channel-sync / 4:2:2） | [`design/`](design/) |
+| 搞清楚 **x265 四个档位为什么这样设计**（生产目标 / 计算剪枝 / NVENC 锚点） | [`x265-profile-design.md`](x265-profile-design.md) ★ 档位设计方法论 |
 | 看**硬件解码 integration 的测试矩阵与最终判定** | [`hardware-decode/`](hardware-decode/) ★ 主交付物是 [`integration-test-matrix.md`](hardware-decode/integration-test-matrix.md) |
 | 找**厂商官方文档 / 上游源码 / GPU 能力探测** | [`reference/README.md`](reference/README.md) |
 | 查**已封存的历史调查**（硬件解码 Phase 1 等） | [`../olddocs/docs/`](../olddocs/docs/) ★ **先读 [`../olddocs/README.md`](../olddocs/README.md) 的状态标注** |
@@ -115,6 +116,7 @@ F:\1KeyTranscoder\
 | [`hardware_backend_design.md`](design/hardware_backend_design.md) | 硬件后端（NVEncC/QSVEncC）设计定稿，含踩坑结论（5.x 节）。**§4.5/§9/§10.2/附录 B 部分已被后续代码推翻**（默认后端、已删除的 `--auto-downgrade`、控制台询问），以 [`architecture.md`](design/architecture.md) 为准；§5/§6/§7 实测矩阵仍有效 |
 | [`implementation_report.md`](design/implementation_report.md) | 实施报告：降级链与回退路径的故障演练记录（§15 DJI 专线）。**§1/§4/§11 的模块名与开关已过时**；§12–§15 与现行代码一致 |
 | [`hevc_422_rext_compatibility.md`](design/hevc_422_rext_compatibility.md) | HEVC 4:2:2 Rext 输出形态、播放兼容矩阵与归档建议 |
+| **[`x265-profile-design.md`](x265-profile-design.md)** | **★ x265 档位设计方法论**（设计文档，按约定存放于 `docs/` 根）：为何单个 profile 不够、speed/quality/size 三维约束、UHQ 质量上限与参考基线、HQ 的选择性计算剪枝、FAST 的单位时间压缩效率、SMALL 的存储效率、**FAST ⇄ SMALL 相互校准**、NVENC UHQ 作为**外部现实锚点**、真实 Sony 4K60 10-bit 4:2:0 LongGOP corpus 驱动、边际收益决策逻辑、四个档位的 lineage。**附录 A 逐键抄录 `x265.json` / `x265_scaling.json` 当前值** |
 | [`channel_sync_p1.md`](design/channel_sync_p1.md) | **`--channel-sync` P1 设计文档**（algo 2.3.0-p1）：算法、阈值、轨道级降级、fixture 标定、测试矩阵。与 `core/channel_sync.py::DEFAULTS` 逐键一致 |
 | ~~`INTEGRATION_REPORT.md`~~ | 已移入归档：见 [`../olddocs/docs/INTEGRATION_REPORT.md`](../olddocs/docs/INTEGRATION_REPORT.md)（⚠️ 部分过期：§A 模块清单已被 [`architecture.md`](design/architecture.md) 取代，§D 时序结论仍有效） |
 
