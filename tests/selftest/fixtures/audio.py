@@ -147,18 +147,24 @@ def _sync_content(
 
 def _make_av(
     dst: Path, streams: int = 4, *, seconds: int = 1,
+    size: str = "1280x720", rate: int = 10,
 ) -> bool:
     """`video(h264) + N 条 mono PCM s16le`, 每条音轨用不同频率的 sine。
 
     容器 index 与音频序号故意错开 (video=0, audio=1..N), 与真实 A7M5 形态
     一致 —— 用来钉住"`-map` 选择器用 `audio_position`, 不是 `stream_index`"。
+
+    ⚠️ 默认 **1280x720**: 这条 fixture 也会被**真实生产入口** (`1kt.py`)
+    消费, 而生产 x265 profile 带 `ctu=64` + `level-idc=6.2`, 对小于一个
+    CTU 的画面会直接报 "Picture size must be at least one CTU"。因此尺寸
+    必须是真的能编码的画面, 不能是 64x36 那种"只够 ffprobe 看"的占位。
     """
     from ..paths import FFMPEG, sh
 
     args: list[str] = [
         "-v", "error", "-y",
         "-f", "lavfi", "-i",
-        f"color=c=black:s=64x36:r=10:d={seconds}",
+        f"color=c=black:s={size}:r={rate}:d={seconds}",
     ]
     for i in range(streams):
         args += [
@@ -176,11 +182,14 @@ def _make_av(
 
 def _make_av_channels(
     dst: Path, channels: int, *, seconds: int = 1,
+    size: str = "1280x720", rate: int = 10,
 ) -> bool:
     """`video(h264) + 1 条 N 声道 PCM s16le` 的确定性 MOV。
 
     用于验证"取单条流的**部分**声道": 只有真正的多声道流才能构造这个场景
     —— mono 流取第 0 声道其实就是整流 (那是 copy, 不是子集)。
+
+    ⚠️ 尺寸同样必须是真能编码的画面 (理由见 `_make_av`)。
     """
     from ..paths import FFMPEG, sh
 
@@ -189,7 +198,7 @@ def _make_av_channels(
     args = [
         "-v", "error", "-y",
         "-f", "lavfi", "-i",
-        f"color=c=black:s=64x36:r=10:d={seconds}",
+        f"color=c=black:s={size}:r={rate}:d={seconds}",
         "-f", "lavfi", "-i",
         f"sine=frequency=440:sample_rate=48000:duration={seconds}",
         "-map", "0:v", "-map", "1:a",

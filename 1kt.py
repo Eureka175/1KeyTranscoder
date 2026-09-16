@@ -81,6 +81,10 @@ EXPERIMENTAL_BANNER = (
     + "=" * 72
 )
 
+#: `--audio-plan` 里选择器使用的**来源身份**。取固定名而不是文件名主干,
+#: 这样同一份计划文件对整批素材都可读、可复现 ("source:s1:c0")。
+AUDIO_SOURCE_ID = "source"
+
 
 # ---------------------------------------------------------------------------
 # x265 legacy path (manual --encoder x265 only; never auto-selected)
@@ -354,6 +358,7 @@ def encode_one(
     quality_csv: Path | None = None,
     channel_sync: bool = False,
     channel_sync_opts: dict[str, Any] | None = None,
+    audio_plan_request=None,
     gpac: Any = None,
     work_dir: Path | None = None,
     logger: logging.Logger,
@@ -362,7 +367,11 @@ def encode_one(
 ) -> str:
     """Classic single-pass (x265/svtav1 software backends). At
     check_level='full' the PSNR/SSIM sample gates delivery; with
-    channel_sync the fixed audio replaces the copied audio post-encode."""
+    channel_sync the fixed audio replaces the copied audio post-encode.
+
+    With an explicit audio plan the same encoder command is derived into a
+    video-only one and the audio is produced separately, then composed at the
+    end (Phase 4C). Without a plan nothing here changes."""
     from core.paths import safe_unlink
 
     safe_unlink(part_dst)
@@ -373,6 +382,12 @@ def encode_one(
         ffmpeg, src, part_dst, profile, prepared.effective,
         source_summary["video_streams"], prepared.src_info,
     )
+    # 显式音频计划: 视频产物必须独立, 否则 Composer 没有可编排的视频输入。
+    # 派生只去掉音频 token, 不碰任何编码参数 (视频 bitstream 因此不变)。
+    if audio_plan_request is not None:
+        from production.output import derive_video_only_command
+
+        cmd = derive_video_only_command(cmd)
     log_encode_header(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
         prepared=prepared, engine=engine,
@@ -424,6 +439,74 @@ def encode_one(
             file_logger.error("QUALITY SAMPLE FAILED | %s", q["detail"])
             safe_unlink(part_dst)
             return "failed"
+
+    # 显式音频计划 (Phase 4C): 音频与视频是**平行**分支 —— 视频已在上一步
+    # 编码完成, 这里只负责把音频域的产物与它组装成最终输出。
+    # ⚠️ `1kt.py` **不** import 任何 `core.audio_*` 模块: 音频域的计划解析与
+    # 编排全部收在 `production.output` 之后, 生产入口只传"源 + 请求"。
+    if audio_plan_request is not None:
+        from production.output import (
+            VideoOutputArtifact,
+            produce_audio_output,
+            resolve_source_audio_plan,
+        )
+
+        try:
+            candidate = resolve_source_audio_plan(
+                ffprobe, src, audio_plan_request, source_id=AUDIO_SOURCE_ID,
+            )
+        except Exception as exc:                     # noqa: BLE001
+            logger.error("[AUDIO-FAIL] %s | %s", src, exc)
+            file_logger.error("AUDIO PLAN REJECTED | %s", exc)
+            safe_unlink(part_dst)
+            return "failed"
+
+        outcome = produce_audio_output(
+            plan=candidate,
+            video=VideoOutputArtifact(
+                path=str(part_dst), container="", label="encoded",
+            ),
+            output_path=dst,
+            audio_source=src,
+            ffmpeg=ffmpeg,
+            ffprobe=ffprobe,
+            work_dir=(work_dir or part_dst.parent) / "audio",
+            audio_format=audio_plan_request.encode,
+            log=lambda msg: logger.info("[AUDIO] %s | %s", src.name, msg),
+        )
+        file_logger.info(
+            "AUDIO_OUTPUT | %s | %s",
+            outcome.path.value,
+            json.dumps(outcome.summary(), ensure_ascii=False),
+        )
+        if not outcome.ok:
+            logger.error(
+                "[AUDIO-FAIL] %s | %s | %s",
+                src, outcome.reasons,
+                [e.get("detail") for e in outcome.errors],
+            )
+            file_logger.error(
+                "AUDIO OUTPUT FAILED | %s", json.dumps(
+                    outcome.errors, ensure_ascii=False,
+                ),
+            )
+            safe_unlink(part_dst)
+            return "failed"
+        if outcome.applied:
+            # Composer 已经写出最终文件; 视频中间产物不再需要。
+            if Path(outcome.output_path) != dst:
+                safe_unlink(outcome.output_path)
+            safe_unlink(part_dst)
+            postprobe_and_log(
+                src=src, dst=dst, preset=preset, elapsed=elapsed,
+                source_summary=source_summary, ffprobe=ffprobe,
+                postprobe_csv=postprobe_csv,
+                postprobe_stream_csv=postprobe_stream_csv,
+                logger=logger, file_logger=file_logger,
+            )
+            safe_unlink(ffmpeg_log)
+            return "done"
+        # applied=False = 计划为空 -> 既有路径原样继续 (不做任何改动)。
 
     # 自动延时补偿 (经典路径): 修正后的音频轨替换拷贝音频
     if channel_sync:
@@ -988,6 +1071,19 @@ def parse_args() -> argparse.Namespace:
             "编码, 视频与所有非音频流 stream copy, 仅对需要修正的音频轨重新"
             "生成, untouched 轨保持原始内容; 全部已对齐时输出与源文件字节级"
             "一致 (SHA256 相同); 文件级失败时输出为源文件原样拷贝。"
+        ),
+    )
+    parser.add_argument(
+        "--audio-plan",
+        default=None,
+        help=(
+            "显式音频输出计划 (JSON 文件). **默认不启用**: 不指定时音频"
+            "完全按既有路径处理 (-map 0 + -c:a copy). 计划文件用既有声道"
+            "身份 (\"<source>:s<stream>:c<channel>\") 表达选择/排除/排序, "
+            "可选的 encode 块选择输出编码 (aac / pcm / flac). 选择为空时"
+            "该文件等于不启用 (计划被判为默认计划, 走既有路径). 仅经典软件"
+            "路径 (x265 / svtav1) 支持; 硬件后端与 Sony/DJI 保留管线会明确"
+            "报错, 不会静默忽略."
         ),
     )
     parser.add_argument(
@@ -1573,6 +1669,39 @@ def main() -> int:
         or getattr(args, "channel_sync_transparent", False)
     )
 
+    # 显式音频计划 (Phase 4C): 只在**经典软件路径**上接入。其余路径
+    # (硬件后端 / Sony / DJI 保留管线) 有自己的音频处理方式, 本阶段不去
+    # 重构它们; 因此明确报错, 绝不"静默忽略用户显式给出的计划"。
+    audio_plan_request = None
+    if getattr(args, "audio_plan", None):
+        from production.output import load_audio_plan_request
+
+        try:
+            audio_plan_request = load_audio_plan_request(args.audio_plan)
+        except Exception as exc:                     # noqa: BLE001
+            print(f"[FATAL] --audio-plan: {exc}", file=sys.stderr)
+            return 2
+        if is_hardware:
+            print(
+                "[FATAL] --audio-plan is only supported on the classic "
+                "software path (x265 / svtav1); it is not implemented for "
+                "the hardware backends.",
+                file=sys.stderr,
+            )
+            return 2
+        if channel_sync_enabled:
+            print(
+                "[FATAL] --audio-plan and --channel-sync/--channel-sync-"
+                "transparent both decide the final audio; use one of them.",
+                file=sys.stderr,
+            )
+            return 2
+        if audio_plan_request.is_empty:
+            # 只有编码格式、没有任何选择意图 -> 计划解析出来就是**默认计划**,
+            # 执行图会是 NONE。此时直接当"未启用", 从而连"视频专用命令派生"
+            # 都不会发生: 走的完全是既有路径, 零浪费。
+            audio_plan_request = None
+
     work_root = output_root / ".1ktwork"
     logger = setup_logger(
         total_log,
@@ -1830,6 +1959,7 @@ def main() -> int:
                         quality_csv=quality_csv,
                         channel_sync=channel_sync_enabled,
                         channel_sync_opts=channel_sync_opts,
+                        audio_plan_request=audio_plan_request,
                         gpac=gpac,
                         work_dir=work_root / job_id_for(src),
                         logger=logger,

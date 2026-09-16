@@ -43,7 +43,7 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
         audio_encode, audio_integration, audio_mix, audio_model,
         audio_retention, audio_route, audio_selection, audio_sync,
         audio_timeline, channel_sync, cli, codecs, core, hardware, pipeline,
-        toolchain,
+        production_output, toolchain,
     )
 
     return {
@@ -74,6 +74,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
              audio_retention.l1_audio_retention),
             ("audio encode/compose v0.8 (Phase 4B)",
              audio_encode.l1_audio_encode),
+            ("audio production output v0.8 (Phase 4C)",
+             production_output.l1_production_output),
             ("av1", codecs.l1_av1),
             ("cli v0.6.2", cli.l1_cli_v062),
         ],
@@ -95,6 +97,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
              audio_retention.l3_audio_retention),
             ("audio encode/compose v0.8 (Phase 4B)",
              audio_encode.l3_audio_encode),
+            ("audio production output v0.8 (Phase 4C)",
+             production_output.l3_production_output),
         ],
     }
 

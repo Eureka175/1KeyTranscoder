@@ -1,14 +1,15 @@
-# 下一开发周期 — 任意 reference 延迟矫正 + Phase 4A/4B 音频输出
+# 下一开发周期 — 任意 reference 延迟矫正 + Phase 4A/4B/4C 音频输出
 
 > **状态**：已实现（**尚未发布**，未分配版本号；不属于 v0.7.1）
 > **基线**：`v0.7.1`（tag `v0.7.1`，commit `e613b07`）
 > **范围**：
 > * 任意 reference 的**恒定**样本偏移矫正（第 1–10 节）；
 > * Phase 4A 选择性 MP4 音频保留（第 11–17 节）；
-> * Phase 4B 音频编码 + 最终输出编排（第 18–25 节）。
+> * Phase 4B 音频编码 + 最终输出编排（第 18–26 节）；
+> * Phase 4C 音频输出接入生产入口（第 27–34 节）。
 >
-> drift correction / resampling / loudness / 多 codec 策略 / 新 CLI
-> **均未实现**。
+> drift correction / resampling / loudness / 多 codec 策略
+> **均未实现**；CLI 只新增 `--audio-plan` 一个参数。
 >
 > v0.7.1 的发布说明在 [`release_notes_v0.7.1.md`](release_notes_v0.7.1.md)，
 > 已随 tag `v0.7.1` 冻结，**本文件不改写其任何语义**。
@@ -506,7 +507,138 @@ drift correction
 resampling
 loudness / LUFS / AGC / limiter / compressor / EQ
 多 codec 策略框架 / bitrate 框架 / quality preset 框架
-新 CLI（仍为库级能力）
+新 CLI（除 Phase 4C 的单个 --audio-plan 之外, 仍为库级能力）
+次视频流的容器策略（交给 preservation/）
+Phase 5 的任何内容
+```
+
+---
+
+# Phase 4C — 音频输出接入生产入口
+
+## 27. 解决的问题
+
+Phase 4A/4B 交付了完整音频输出能力, 但生产入口 `1kt.py` 完全触达不到 ——
+`core.audio_*` 在生产代码里**零调用者**。Phase 4C 把它接进真实生产管线,
+同时不破坏默认路径。
+
+## 28. 生产图（平行分支, 不是串行）
+
+```text
+CLI
+ ├───────────────┐
+ ▼               ▼
+Video Pipeline   Audio Planning (--audio-plan)
+(既有编码)        │
+ │          AudioExecutionPath
+ │            ├─ NONE        -> 什么都不做
+ │            ├─ STREAM_COPY -> 整流保留选择器
+ │            └─ PCM_ROUTE/MIX -> 渲染 + 编码
+ │                    ↓
+ │              EncodedAudioOutput
+ ▼                    │
+VideoOutputArtifact ──┘
+ └────────┬───────────┘
+          ▼
+    OutputComposer
+          ↓
+    final container
+```
+
+## 29. CLI：只新增一个参数
+
+```text
+--audio-plan <json 文件>          (默认不启用)
+```
+
+计划文件形状 (只有这些键; 未知键一律报错):
+
+```json
+{
+  "version": 1,
+  "encode": { "format": "aac" },
+  "channels": {
+    "select":  ["source:s1:c0", "source:s2:c0"],
+    "exclude": [],
+    "map":     ["source:s2:c0", "source:s1:c0"]
+  },
+  "note": "无线麦 -> AAC"
+}
+```
+
+* 声道身份用**既有** `AudioChannel.id` (`"<source>:s<stream>:c<channel>"`),
+  与真实 ffprobe 事实一一对应; 不引入第二套身份;
+* `map` 必须与 `select` 是同一集合 (只排序, 不增删);
+* 选择为空 -> 默认计划 -> 执行图 `NONE` -> 等于不启用;
+* 仅经典软件路径 (x265 / svtav1) 支持; 硬件后端 / Sony / DJI **明确报错**;
+* 与 `--channel-sync` 同时给出**明确报错**。
+
+CLI 不出现 `PCM_ROUTE` / `PCM_MIX` / `AudioTimeline` /
+`AudioExecutionPath` / `AudioRetentionSpec` 等内部词 —— 用户表达"要什么",
+不表达"走哪条代码路径"。
+
+## 30. 为什么 `1kt.py` 不 import 音频模块
+
+`1kt.py` 只 import `production.output`; 计划解析 (`resolve_source_audio_plan`)、
+请求加载 (`load_audio_plan_request`)、编排 (`produce_audio_output`) 全部收在
+该边界之后。因此 `1kt.py` 里**没有**任何 `core.audio_*`, 也没有
+`AudioMixer` / `AudioPCMReader` / `AudioTimeline` 这类内部类型名 —— 由架构
+断言逐条钉住 (含**函数内** import, 它们同样是耦合)。
+
+## 31. 视频专用命令派生
+
+生产软件路径的命令是 `-map 0` + `-c:a copy` 一次成型; Composer 需要独立视频
+产物。做法是**派生**: 只去掉音频 token (`-map 0`, `-c:a/-c:s/-c:d/-c:t`)
+并补 `-an`, **不重写任何编码参数**。回归用视频基本流 sha256 证明"视频没变"。
+
+## 32. 测试
+
+| 级别 | 用例数 | 内容 |
+|---|---|---|
+| L1 `audio production output v0.8 (Phase 4C)` | 25 | 命令派生、请求解析、`applied` 语义、架构审计 |
+| L3 `audio production output v0.8 (Phase 4C)` | 25 | **真实 `1kt.py`**: 默认路径、整流保留、PCM route、PCM mix、sync、视频身份、失败路径 |
+
+L3 的关键证据（全部实测, 生产入口 `python 1kt.py … --encoder x265`）:
+
+```text
+T1 默认路径        rc=0, 4 条音轨保持不变, 视频基准 hash 可得
+T2 STREAM_COPY     选 2 条 / 重排 -> 输出 2 条音轨, 逐条可解码
+T3 PCM_ROUTE       4CH 取 2 声道 -> 输出 2 声道, 可解码 48000 帧
+T4 PCM_MIX         path=pcm_mix, 身份 mixN, gain 保留 (peak=0.0924)
+T5 sync            估计 -> 应用 -> 编码 -> 容器, 4 条音轨逐条可解码
+T6 视频身份 ⚠️     同素材下基本流 sha256 与默认路径**完全一致**
+                   6a242623cae1a097 (default / keep / mix / sync 全等)
+                   4CH 素材另有独立基准 147b7a7dac12d803 (加计划后不变)
+T7 计划非法        选不存在的声道 / 未知键 -> 明确失败, 不产出半成品
+T8 空选择计划      rc=0, 与默认路径一致 (4 轨), 视频 hash 不变
+T9 路径冲突        硬件后端 / 与 --channel-sync 同用 -> rc=2 明确报错
+```
+
+总计 `--level unit` **511 PASS / 0 FAIL**、`--level full` **703 PASS /
+0 FAIL**（本阶段前基线 486 / 678；重构前 421 / 545）。
+
+## 33. 本阶段新增的 reason codes（稳定契约）
+
+```text
+audio_request_missing                     (core/audio_request)
+audio_request_parse
+audio_request_version
+audio_request_invalid
+audio_request_selection
+
+production_audio_plan_invalid             (production/output)
+production_audio_retain_invalid
+production_audio_selector_mismatch
+production_verify_failed
+```
+
+## 34. 明确未实现（Phase 4C 边界）
+
+```text
+drift correction / resampling / loudness / LUFS / AGC / limiter / compressor
+自动多文件同步
+多 codec 能力框架 / bitrate 框架 / quality preset 框架
+硬件后端与 Sony/DJI 保留管线上的音频计划（明确报错, 未实现）
 次视频流的容器策略（交给 preservation/）
 Phase 5 的任何内容
 ```

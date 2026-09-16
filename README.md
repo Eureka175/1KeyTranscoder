@@ -122,19 +122,22 @@ Current release: **v0.7.1** (`VERSION` = `0.7.1`, tag `v0.7.1`).
 | PCM mixing (N→1, linear gain, clipping detection) | Available (internal API, no CLI) |
 | Arbitrary-reference delay correction | Implemented on `main`; **not part of the v0.7.1 release** and not documented in its release notes |
 | Audio execution-path resolution (`NONE` / `STREAM_COPY` / `PCM_ROUTE` / `PCM_MIX`) | Implemented on `main` (Phase 4A; internal API) |
-| Selective MP4 audio retention (keep / drop / reorder original audio streams) | Implemented on `main` (Phase 4A; internal API, no CLI). Channel-filter and mixing outputs are **refused** rather than faked as stream copy |
-| Audio encoding (AAC / PCM / FLAC) of routed or mixed PCM | Implemented on `main` (Phase 4B; internal API, no CLI) |
-| Final output composition (video + encoded audio → MP4) | Implemented on `main` (Phase 4B; `core/output_compose.py`, internal API). Video is always stream-copied; the composer never re-encodes it |
+| Selective MP4 audio retention (keep / drop / reorder original audio streams) | Available through the CLI (`--audio-plan`, Phase 4C). Channel-filter and mixing outputs are **refused** rather than faked as stream copy |
+| Audio encoding (AAC / PCM / FLAC) of routed or mixed PCM | Available through the CLI (`--audio-plan`, Phase 4C) |
+| Final output composition (video + encoded audio → MP4) | Wired into the production entry point for the classic software path (`1kt.py --encoder x265\|svtav1`, opt-in via `--audio-plan`). Hardware backends, Sony and DJI preservation **reject** an audio plan explicitly rather than ignoring it |
 | Automatic cross-file synchronization | Not implemented |
 | Drift correction / resampling | Not implemented |
-| Audio CLI flags (`--audio-tracks`, `--audio-map`, `--audio-codec`) | Not implemented |
+| Audio CLI flags beyond `--audio-plan` (`--audio-tracks`, `--audio-map`, `--audio-codec`) | Not implemented |
 
-"Internal layer" means the code exists, is unit- and integration-tested, and is reached
-only by explicit API calls such as `core.audio_process.run_audio_render()`,
+The audio model, selection layer, timeline, retention and encoding are unit- and
+integration-tested. Phase 4C wires them into the production entry point for the
+classic software path, opt-in through the single `--audio-plan` flag; the default
+path is not changed. The only audio surface reachable from `1kt.py` is
+`production.output`, and anything below that is an explicit API call such as
+`core.audio_process.run_audio_render()`,
 `core.audio_retention.build_audio_retention()`,
 `core.audio_encode.encode_audio_from_plan()` or
-`core.output_compose.OutputComposer.compose()`. The default
-production path is not changed and no new command-line flag is exposed.
+`core.output_compose.OutputComposer.compose()`.
 
 ## Requirements
 
@@ -382,11 +385,32 @@ These numbers are assertion counts from the automated regression suite at the re
 freeze. They are not a new full production transcoding benchmark: the release was cut
 without a fresh end-to-end encode/transcode campaign on production material.
 
-On current `main` the L1 suite reports 486 PASS / 0 FAIL and `--level full` reports
-678 PASS / 0 FAIL, the difference being work merged after the v0.7.1 tag
+On current `main` the L1 suite reports 511 PASS / 0 FAIL and `--level full` reports
+703 PASS / 0 FAIL, the difference being work merged after the v0.7.1 tag
 (arbitrary-reference audio delay correction, then Phase 4A selective MP4 audio
-retention, then Phase 4B audio encoding and output composition). Any change must be
-re-checked for new failures.
+retention, then Phase 4B audio encoding and output composition, then Phase 4C
+production integration). Any change must be re-checked for new failures.
+
+### Explicit audio output (`--audio-plan`)
+
+The default audio path is unchanged: without `--audio-plan` the tool still does
+`-map 0` + `-c:a copy`. With an explicit plan (JSON) the classic software path
+(x265 / SVT-AV1) encodes or retains the audio you select and composes it with the
+video, which is stream-copied and therefore bit-identical to the default path.
+
+```json
+{
+  "version": 1,
+  "encode": { "format": "aac" },
+  "channels": { "select": ["source:s1:c0", "source:s2:c0"] }
+}
+```
+
+Channel ids use the existing audio identity (`<source>:s<stream>:c<channel>`).
+Leaving `channels` out means "select everything", which makes the plan a default
+plan: the execution path resolves to `NONE` and nothing changes. Unknown keys,
+unknown versions and unknown formats are errors, and hardware backends, Sony and
+DJI preservation reject an audio plan explicitly rather than ignoring it.
 
 `tests/full_autotest.py` is a thin compatibility entry point: the CLI, exit code and
 report format are unchanged, while the implementation lives in the `tests/selftest/`
@@ -409,6 +433,8 @@ tests/selftest/
 │   ├── audio_sync.py            arbitrary-reference delay correction
 │   ├── audio_retention.py       Phase 4A: execution path + selective MP4 retention
 │   ├── audio_encode.py          Phase 4B: PCM → encoded audio (EncodedAudioOutput)
+│   ├── audio_request.py         Phase 4C: --audio-plan JSON → existing AudioPlan
+│   └── output_compose.py        Phase 4B/4C: video + audio → final container
 │   ├── audio_integration.py     L3 audio integration on real material
 │   ├── pipeline.py              L3 full pipeline + fault injection
 │   ├── hardware.py              L3 channel-sync end to end
@@ -416,7 +442,7 @@ tests/selftest/
 │   └── cli.py                   CLI contract
 ├── reporting/       result aggregation and report writing
 └── (production coordination lives outside this package: `core/audio_encode.py`,
-    `core/output_compose.py`)
+    `core/output_compose.py`, `core/audio_request.py`, `production/output.py`)
 ```
 
 `paths` is the only module holding mutable test state (`RESULTS` / `CURRENT_LEVEL`).
@@ -448,6 +474,7 @@ Targeted self-checks: `python tests\run_selfcheck.py --encoder nvenc|qsv|x265` a
 ├── core/                   Runtime core: pipeline, probing, planning, audio, dashboard
 ├── encoders/               Encoder backends, capability probing, hardware decode, integrity gate
 ├── preservation/           Sony / DJI metadata preservation, validation, quality sampling
+├── production/             Cross-domain orchestration: audio output → final container
 ├── release/                Release packaging and package verification tools
 ├── tests/                  Automated test suites (incl. tests/hwdecode/)
 ├── docs/                   Design, evaluation, release and reference documentation
@@ -464,6 +491,7 @@ Targeted self-checks: `python tests\run_selfcheck.py --encoder nvenc|qsv|x265` a
 | `core/` | Backend-agnostic runtime logic: configuration, probing, source classification, scaling, batching, channel sync, the v0.7.1 audio modules, logging, dashboard. |
 | `encoders/` | Backend implementations (NVEncC, QSVEncC, x265, SVT-AV1), capability tables, hardware-decode routing, integrity gate. |
 | `preservation/` | Sony and DJI preservation pipelines, container/ISO-BMFF handling, validation checkers, quality sampling. |
+| `production/` | Cross-domain orchestration: turns a video artifact plus an audio plan into the final container. Belongs to neither the audio nor the video domain. |
 | `release/` | `build_release.py` (allowlist-based packaging) and `verify_package.py`. |
 | `tests/` | `full_autotest.py` (thin entry point: unit / toolchain / full), the `tests/selftest/` runner + fixtures + suites, targeted self-checks, fixtures, and the hardware-decode matrix in `tests/hwdecode/`. |
 | `docs/` | Design documents, evaluation reports, release notes, third-party reference archive. |

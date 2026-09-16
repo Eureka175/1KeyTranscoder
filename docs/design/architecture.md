@@ -903,6 +903,147 @@ output_compose_verify_failed
 
 ---
 
+## 6.5 Phase 4C：音频输出接入生产入口（**不属于 v0.7.1**）
+
+> ⚠️ **版本边界**：v0.7.1 已发布（tag `v0.7.1` = `e613b07`）。本节是 v0.7.1
+> **之后**的增量。6.1.x 冻结已发布行为，6.2 arbitrary-reference，6.3 Phase 4A，
+> 6.4 Phase 4B，本节是 Phase 4C。
+
+### 6.5.1 解决的问题
+
+Phase 4A/4B 交付了完整音频输出能力, 但生产入口 `1kt.py` **完全触达不到**
+它们 —— `core.audio_*` 在生产代码里零调用者, 能力停在库级。Phase 4C 把它
+接进真实生产管线, 同时**不破坏默认路径**。
+
+### 6.5.2 生产图（音频与视频是平行分支）
+
+```text
+CLI / config
+      │
+      ├────────────────────┐
+      ▼                    ▼
+Video Pipeline        Audio Planning
+(既有编码路径)         (--audio-plan)
+      │                    │
+      │               AudioExecutionPath
+      │                 ├─ NONE        -> 什么都不做
+      │                 ├─ STREAM_COPY -> 委托既有 retained stream copy 路径
+      │                 └─ PCM_ROUTE/MIX
+      │                        ↓
+      │                   Audio Encoding
+      │                        ↓
+      │                 EncodedAudioOutput
+      ▼                    │
+VideoOutputArtifact  ──────┘
+      │
+      ▼
+  OutputComposer
+      ↓
+  final container
+```
+
+**不是** `Video Pipeline -> Audio Pipeline`: 视频照既有路径编码成独立产物,
+音频独立决定, 两者只在 Composer 汇合。
+
+### 6.5.3 三层职责
+
+| 层 | 位置 | 只做什么 |
+|---|---|---|
+| 跨域编排 | `production/output.py` | 执行图分流、调用既有音频 API、调用 Composer |
+| 输入适配 | `core/audio_request.py` | `--audio-plan` JSON -> **既有** `AudioPlan` |
+| 容器编排 | `core/output_compose.py` | stream mapping / ordering / container / metadata |
+
+`production/output.py` **不认识** `AudioMixer` / `AudioPCMReader` /
+`ChannelTimeline`; 它只调用公开 API (`core.audio_probe` 出计划、
+`core.audio_execution` 判定、`core.audio_encode` 编码、
+`core.audio_retention` 出整流规格、`core.output_compose` 组装)。
+
+### 6.5.4 执行图仍然是唯一权威
+
+编排层**不写**任何 `if mix / if route / if copy`。分流完全由
+`resolve_audio_execution_path()` 的结果决定:
+
+```text
+NONE         -> 立即返回 applied=False, 一个字节都不碰
+STREAM_COPY  -> build_audio_retention() 的选择器 (相对源文件的 0:a:N)
+PCM_ROUTE    -> encode_audio_from_plan() (内部复用 run_audio_render)
+PCM_MIX      -> 同上 + mix_bus
+```
+
+`NONE` 的语义是"什么都不做", 而不是"重新拼一遍默认 argv" —— 生产默认路径
+因此**结构上**不可能被改变。
+
+### 6.5.5 视频产物与"视频专用命令派生"
+
+Phase 4B 的 Composer 需要"一个已经落盘的视频产物"。生产软件路径
+(`encoders/x265.py` / `svtav1.py`) 的命令是 `-map 0` + `-c:a copy` 一次成型,
+因此显式音频计划下必须先把视频独立出来。做法是**派生**: 从同一条命令里只
+去掉音频相关 token (`-map 0`、`-c:a/-c:s/-c:d/-c:t` 及其取值) 并补 `-an`,
+**不重写任何编码参数**。回归用视频基本流 sha256 钉住"视频没变"。
+
+⚠️ 派生刻意是**区间式**的: 只处理"全流映射"形态; 若命令形态超出范围, 抛错
+而不是产出一条可能同时编了音频的命令。
+
+### 6.5.6 整流保留的输入序号
+
+`AudioRetentionSpec` 的选择器是相对**源文件**的 (`0:a:N`), 而 Composer 的
+第 0 个输入是视频产物。因此编排层把源文件作为**额外输入**给出, 并用
+`selector_map={"0": "1"}` 把选择器前缀重映射到实际输入序号。本层只重映射
+前缀, 不解释流语义。
+
+### 6.5.7 CLI 暴露
+
+只新增**一个**参数:
+
+```text
+--audio-plan <json 文件>        (默认不启用)
+```
+
+* 默认(不指定) = 既有 `-map 0` + `-c:a copy`, 完全不变;
+* 计划文件用既有声道身份 `"<source>:s<stream>:c<channel>"` 表达 select /
+  exclude / map, 可选 `encode.format` (aac / pcm / flac);
+* 选择为空 -> 计划被判为默认计划 -> 执行图 `NONE` -> 等于不启用;
+* 未知键 / 未知版本 / 未知 format / map 与 select 集合不一致 -> **明确报错**
+  (绝不静默忽略用户显式给出的计划);
+* 仅经典软件路径 (x265 / svtav1) 支持; 硬件后端与 Sony/DJI 保留管线
+  **明确报错**(`rc=2`), 不静默忽略;
+* `--audio-plan` 与 `--channel-sync` 同时给出 -> 明确报错(两者都决定最终
+  音频)。
+
+CLI **不暴露**内部实现: 参数里没有 `PCM_ROUTE` / `PCM_MIX` /
+`AudioTimeline` / `AudioExecutionPath` / `AudioRetentionSpec` 这些词。
+
+`1kt.py` **不 import 任何 `core.audio_*`**: 计划解析、编排与组装全部收在
+`production/output.py` 之后 (架构断言钉住, 含函数内 import)。
+
+### 6.5.8 本阶段新增的 reason codes（稳定契约）
+
+```text
+audio_request_missing                     (core/audio_request)
+audio_request_parse
+audio_request_version
+audio_request_invalid
+audio_request_selection
+
+production_audio_plan_invalid             (production/output)
+production_audio_retain_invalid
+production_audio_selector_mismatch
+production_verify_failed
+```
+
+### 6.5.9 明确边界（Phase 4C **不**做）
+
+```text
+drift correction / resampling / loudness / LUFS / AGC / limiter / compressor
+自动多文件同步
+多 codec 能力框架 / bitrate 框架 / quality preset 框架
+次视频流的容器策略 (交给 preservation/)
+硬件后端与 Sony/DJI 保留管线上的音频计划 (明确报错, 未实现)
+Phase 5 的任何内容
+```
+
+---
+
 ## 7. 编码后验证：`--check` 三级
 
 | 级别 | Sony | DJI |
