@@ -592,14 +592,19 @@ Current release: **v0.8.0**
   — published with a self-contained Windows package.
 - [Release notes v0.8.0](docs/release_notes_v0.8.0.md) — frozen with the tag; the release
   notes file is not rewritten after publication.
-- The GitHub release entries are published with GitHub's "pre-release" flag set; v0.8.0 is
-  nevertheless the current release of the project, matching `VERSION` and the `v0.8.0` tag.
+- Self-contained Windows package:
+  [1KeyTranscoder-v0.8.0-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.8.0/1KeyTranscoder-v0.8.0-win64-selfcontained.zip)
+  (`sha256 7eb98a8077bda09f5c7e074198e83fc84aee0782204580923a52de5fe0f5c0ba`,
+  522 file records, verified by `release/verify_package.py` — 62/62 checks PASS).
+- v0.8.0 is published as a normal (non-pre-release) GitHub release, so it is the
+  repository's "Latest release". The entries before it were published with GitHub's
+  "pre-release" flag set; they are still the releases of their own versions and match
+  their `VERSION` files and tags.
 
 Older releases with downloadable self-contained packages:
 
 | Version | Download | Notes |
 |---|---|---|
-| v0.8.0 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.8.0/1KeyTranscoder-v0.8.0-win64-selfcontained.zip) | Format-aware alignment, codec inheritance, external audio discovery + mapping. |
 | v0.6.1 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/1KeyTranscoder-v0.6.1-win64-selfcontained.zip) | Channel-sync streaming memory fix; package still available. |
 | v0.5.1 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.5.1/1KeyTranscoder-v0.5.1-win64-selfcontained.zip) | AV1 line (software + hardware AV1). |
 | v0.4.2 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.4.2/1KeyTranscoder-v0.4.2-win64-selfcontained.zip) | HEVC/265 line. |
