@@ -821,7 +821,7 @@ alignment 是样本级操作；若重编码这一步自己就把内容挪 1024 �
 | `audio format/alignment v0.8 (Phase 5)` | L1 | 40 | 格式分类表 / alignment 决策表（含 compressed warning 原文）/ 编码优先级链 / PCM+bitrate 拒绝 / 策略层架构审计 |
 | `audio format/alignment v0.8 (Phase 5)` | L3 | 33 | 真实 ffmpeg：PCM 默认允许对齐、compressed 默认原样保留、AAC/Opus 显式对齐（真实 480 样本延迟 + 互相关残差 0）、手动 bitrate 真的到达编码器、只给 bitrate 也明确拒绝、视频基本流 sha256 不变 |
 | `audio external v0.8 (Phase 5)` | L1 | 36 | §18 文件名规则表 / natural sort / 前导零 / 确定性 tie-break / 多候选 / 无候选 / §36 Case A–D / 奇数剩余 / 声道守恒 / 策略解析 / 架构审计 |
-| `audio external v0.8 (Phase 5)` | L3 | 16 | 真实 WAV/AAC/Opus 被发现并入 / 真实 1kt.py 端到端 / 4-6-8-3CH × mapping 矩阵 / 声道守恒 / 视频 hash 不变 |
+| `audio external v0.8 (Phase 5)` | L3 | 19 | 真实 WAV/AAC/Opus 被发现并入 / 真实 1kt.py 端到端 / 4-6-8-3CH × mapping 矩阵 / 声道守恒 / 外挂 PCM WAV 作为 alignment 目标（真实 480 样本延迟 + 残差 0）/ 视频 hash 不变 |
 
 实测证据（可直接复查）：
 
@@ -880,15 +880,20 @@ package                     release/build_release.py（既有打包脚本, 未�
 ```text
 unit       590 PASS / 0 FAIL
 toolchain   16 PASS / 0 FAIL
-full       250 PASS / 0 FAIL
+full       253 PASS / 0 FAIL
 --------------------------------
-合计       856 PASS / 0 FAIL
+合计       859 PASS / 0 FAIL
 ```
 
-相对 Phase 4C 基线（unit 511 / full 728）新增 **128** 条断言，**0** 条 FAIL。
+相对 Phase 4C 基线（unit 511 / full 728）新增 **131** 条断言，**0** 条 FAIL。
 唯一"名字变了"的用例是 `p4b.format 只有 3 个显式格式` → `只有 4 个显式格式`
 （本阶段按 §9 加入 `OPUS`），它同时被**加强**：现在还会断言 Opus 的
 encoder/container/suffix 以及"只有有损格式接受 bitrate"。其余 727 条断言
 逐条仍在且全部通过（由 `work/tools/p5_reconcile.py` 对
 `work/_after/report_p4c_final.json` 逐项比对得出）。
+
+> ⚠️ 发布顺序说明：tag `v0.8.0` 指向 `3b4cf17`（打包用的那个 commit，当时
+> full = 856 PASS / 0 FAIL）。随后在 `main` 上补了 3 条"外挂 PCM 作为 alignment
+> 目标"的生产路径断言（full = 859 PASS / 0 FAIL），tag 未移动 —— 发布包记录的
+> commit 就是它被构建时的那个 commit。
 

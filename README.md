@@ -438,7 +438,7 @@ The frozen baseline recorded for the current release (v0.8.0) is:
 
 ```text
 L1 unit           590 PASS / 0 FAIL
-L3 --level full   856 PASS / 0 FAIL   (unit 590 + toolchain 16 + full 250)
+L3 --level full   859 PASS / 0 FAIL   (unit 590 + toolchain 16 + full 253)
 ```
 
 These numbers are assertion counts from the automated regression suite at the release

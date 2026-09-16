@@ -24,11 +24,47 @@ from ..fixtures.audio import (
     _make_audio_file,
     _make_av,
     _make_video_only,
+    _sync_content,
     _video_elementary_hash,
 )
 from ..paths import (
     FFPROBE, FFMPEG, IN_DIR, ROOT, ffprobe_json, record, section, sh,
 )
+
+
+def _decode_mono(path: Path, position: int, tag: str = "p5e") -> Any:
+    import numpy as np
+
+    out = path.with_suffix(path.suffix + f".{tag}{position}.raw")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    r = sh(FFMPEG, "-v", "error", "-y", "-i", path,
+           "-map", f"0:a:{position}", "-vn", "-ac", "1",
+           "-f", "f32le", "-ar", "48000", out, timeout=600)
+    if r.returncode != 0 or not out.is_file():
+        return None
+    return np.fromfile(out, dtype="<f4")
+
+
+def _best_lag(a: Any, b: Any, *, max_lag: int = 64) -> int | None:
+    """`a` 相对 `b` 的最佳整数滞后 (样本); 数据不足返回 None。"""
+    import numpy as np
+
+    if a is None or b is None:
+        return None
+    n = min(len(a), len(b))
+    if n < 4 * max_lag + 8:
+        return None
+    lo, hi = int(n * 0.3), int(n * 0.7)
+    win = a[lo:hi]
+    best, best_lag = None, 0
+    for lag in range(-max_lag, max_lag + 1):
+        start = lo + lag
+        if start < 0 or start + len(win) > n:
+            continue
+        score = float(np.dot(win, b[start:start + len(win)]))
+        if best is None or score > best:
+            best, best_lag = score, lag
+    return best_lag
 
 
 # ---------------------------------------------------------------------------
@@ -616,6 +652,50 @@ def l3_audio_external() -> None:
     # --- T5: 外挂来源也能作为 alignment 的参考或目标 (§39) --------------
     from core.audio_external import append_external_sources
     from core.audio_probe import audio_probe_external
+
+    # (a) 外挂 **PCM** 作为 alignment 目标: 两个外挂 WAV, 目标晚到 480 样本。
+    #     这是"外挂 WAV 也能当 target"的生产路径证据 (策略层只说 PCM 默认
+    #     允许对齐, 真正移动样本的是 render)。
+    sync_dir = d / "sync_pcm"
+    sync_dir.mkdir(parents=True, exist_ok=True)
+    ref_wav = sync_dir / "clip_ref.wav"
+    tgt_wav = sync_dir / "clip_tgt.wav"
+    _sync_content(ref_wav, 0, samples=48000)
+    _sync_content(tgt_wav, 480, samples=48000)
+    _make_video_only(sync_dir / "clip.MP4", seconds=1)
+    sync_request = parse_audio_request({
+        "external": {},
+        "alignment": "enabled",
+        "sync": {"reference": "clip_ref.wav:s0:c0"},
+    })
+    sync_plan = resolve_source_audio_plan(
+        FFPROBE, sync_dir / "clip.MP4", sync_request, source_id="source"
+    )
+    sync_out = d / "ext_pcm_sync.mp4"
+    oc_sync = produce_audio_output(
+        plan=sync_plan, video=VideoOutputArtifact(
+            path=str(sync_dir / "clip.MP4")),
+        output_path=sync_out, ffmpeg=FFMPEG, ffprobe=FFPROBE,
+        work_dir=d / "sync_pcm_work", audio_source=sync_dir / "clip.MP4",
+        request=sync_request,
+    )
+    record("p5.ext.T5 外挂 PCM WAV 作为 alignment 目标: 估计出 480 样本",
+           oc_sync.ok and oc_sync.applied
+           and oc_sync.alignment_applied == 1
+           and abs(float(oc_sync.alignment_offsets.get(
+               "clip_tgt.wav:s0:c0", 0.0)) - 480.0) <= 1.0,
+           f"{oc_sync.alignment_offsets} {oc_sync.summary()}")
+    sync_lag = _best_lag(_decode_mono(sync_out, 0, tag="p5x"),
+                         _decode_mono(sync_out, 1, tag="p5x"))
+    record("p5.ext.T5 对齐后两路 PCM 内容重合 (lag = 0 ±2)",
+           sync_lag is not None and abs(sync_lag) <= 2, f"lag={sync_lag}")
+    record("p5.ext.T5 外挂 PCM 对齐后仍是 PCM 输出 + 视频 hash 不变",
+           oc_sync.ok
+           and all(a["codec_name"].startswith("pcm_")
+                   for a in _audio_of(sync_out))
+           and _video_elementary_hash(sync_out)
+           == _video_elementary_hash(sync_dir / "clip.MP4"),
+           f"{[a['codec_name'] for a in _audio_of(sync_out)]}")
 
     pick_dir = d / "pick"
     pick_dir.mkdir(parents=True, exist_ok=True)
