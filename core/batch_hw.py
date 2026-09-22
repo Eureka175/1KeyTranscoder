@@ -90,9 +90,43 @@ from .probe import build_source_info, count_frames, probe_source
 
 from preservation.gpac import GpacContainerBackend
 from preservation.pipeline import run_sony_pipeline
-from preservation import dji
+from preservation import dji, isobmf
 
 StatusCb = Callable[[str, str], None]
+
+#: Container of every hardware video intermediate (`-f` for NVEncC /
+#: QSVEncC).  MOV is the encode *working* container: GPAC's MKV reader
+#: quantizes timestamps to milliseconds, so MKV is unusable here, and
+#: the intermediate must be one predictable container that every
+#: downstream stage (preservation rebuild, channel-sync re-mux) names
+#: explicitly.  The **final** container is a separate decision and
+#: follows the source — see ``core.paths.final_suffix_for`` and
+#: ``place_final``.  Stated here rather than left to the backend default
+#: so the two are never confused again.
+HW_VIDEO_CONTAINER = "mov"
+
+#: MOV is **not** available for AV1 — the muxer rejects it outright
+#: ("av1 only supported in MP4 and AVIF"), so an AV1 intermediate must
+#: be MP4.  This is a codec constraint, not a preference, and it is the
+#: same constraint that makes the software path use `.part.mp4` for
+#: SVT-AV1 (`1kt.py`) and `preservation/pipeline.py` pass an MP4
+#: `encoded_path` for AV1.  Keyed by codec so the rule lives in one
+#: place instead of being re-derived at each call site.
+_INTERMEDIATE_CONTAINER_BY_CODEC = {"av1": "mp4"}
+
+#: muxer name -> file extension for the hardware intermediate.
+_CONTAINER_SUFFIX = {"mov": ".mov", "mp4": ".mp4"}
+
+
+def intermediate_container(codec: str) -> str:
+    """``-f`` container for a hardware encode of ``codec``.
+
+    ``"mov"`` for everything except AV1; AV1 must be MP4 because the
+    MOV muxer refuses it (measured on the pinned tools: NVEncC 9.31 and
+    QSVEncC 8.26 both fail with ``av1 only supported in MP4 and AVIF``
+    and write 0 frames).
+    """
+    return _INTERMEDIATE_CONTAINER_BY_CODEC.get(codec, HW_VIDEO_CONTAINER)
 
 
 @dataclass(frozen=True)
@@ -462,6 +496,7 @@ def hw_encode_with_fallback(
         cmd, skipped, color_notes = backend.command(
             cur_input, output, profile, c, d, vfr, audio_copy, color,
             reader=reader,
+            container=intermediate_container(backend.codec),
         )
         if skipped and rung_idx == 0:
             emit_warning(
@@ -892,7 +927,11 @@ def encode_one_sony_hw(
 ) -> str:
     """Sony preservation path with a rigaya hardware encoder."""
     work_dir = work_root / job_id_for(src)
-    encoded_mov = work_dir / "video" / "encoded.mov"
+    # 中间产物后缀 = 实际容器 (HEVC -> .mov, AV1 -> .mp4, 见
+    # intermediate_container): 保留管线按路径读它, 名实不符会误导排查。
+    encoded_mov = work_dir / "video" / (
+        "encoded" + _CONTAINER_SUFFIX[intermediate_container(backend.codec)]
+    )
 
     planned, needs_downgrade = plan_initial_format(
         backend.caps, backend.kind, src_info.chroma, src_info.bit_depth, backend.codec
@@ -902,6 +941,7 @@ def encode_one_sony_hw(
         cmd, _, _ = backend.command(
             src, encoded_mov, profile, chroma, depth, vfr,
             audio_copy=False, color=src_info.color,
+            container=intermediate_container(backend.codec),
         )
         return cmd
 
@@ -1044,10 +1084,17 @@ def encode_one_sony_hw(
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     final = work_dir / "final" / "output.mov"
+    # 保留管线的工作容器永远是 MOV (GPAC / rtmd / nrtm / uuid 全部按此
+    # 验证)。最终容器跟随**源**: Sony MOV -> 直接改名 MOV; 一旦出现
+    # Sony MP4 源 -> validate 通过之后再做一次无损容器重封装。
+    # 顺序很重要: 校验比对的是 build 产物, 所以重封装放在校验之后,
+    # 且中间产物改名到 dst 之前失败不会留下半成品。
     try:
-        safe_unlink(dst)
-        os.replace(final, dst)
-    except OSError as exc:
+        place_final(
+            gpac=gpac, intermediate=final, dst=dst, work_dir=work_dir,
+            log=lambda msg: file_logger.info("CONTAINER | %s", msg),
+        )
+    except (OSError, RuntimeError) as exc:
         logger.error("[RENAME-FAIL] %s -> %s | %s", final, dst, exc)
         file_logger.exception("RENAME FAILED | elapsed=%.3f sec", elapsed)
         return "failed"
@@ -1138,7 +1185,12 @@ def encode_one_hw_classic(
     and the caller's hook owns the final file (v0.8.0+: that is how an
     explicit audio plan is applied on hardware backends). Without it
     nothing here changes."""
-    part_dst = dst.with_name(dst.stem + ".part.mov")
+    # 中间产物的后缀必须与实际容器一致 (见 intermediate_container):
+    # HEVC 是 MOV, AV1 只能是 MP4。此前后缀恒为 .mov, 而 AV1 编码器写的是
+    # MP4 —— 又一处"名实不符"。
+    part_dst = dst.with_name(
+        f"{dst.stem}.part{_CONTAINER_SUFFIX[intermediate_container(backend.codec)]}"
+    )
     safe_unlink(part_dst)
     # 有接手方 -> 只产出视频; 没有 -> 既有的一趟 video+audio copy 行为。
     audio_copy = video_handoff is None
@@ -1162,6 +1214,7 @@ def encode_one_hw_classic(
         cmd, _, _ = backend.command(
             src, part_dst, profile, planned[0], planned[1],
             vfr, audio_copy=audio_copy, color=src_info.color,
+            container=intermediate_container(backend.codec),
         )
         file_logger.info(
             "DRY-RUN | no encode performed | %s",
@@ -1201,8 +1254,7 @@ def encode_one_hw_classic(
         return "failed"
 
     # PSNR/SSIM quality sample (check=full) gates delivery: a corrupted
-    # encode must never land in the output tree.
-    if check_level == "full" and ffmpeg is not None:
+    # encode must never land in the output tree.    if check_level == "full" and ffmpeg is not None:
         from preservation.quality import run_quality_sample
 
         q = run_quality_sample(
@@ -1232,7 +1284,8 @@ def encode_one_hw_classic(
     # 明确按"接手方拥有最终文件"的语义走, 不留下第二条改音频的路径。
     if video_handoff is not None:
         return _finish_with_handoff(
-            handoff=video_handoff, src=src, dst=dst, part_dst=part_dst,
+            handoff=video_handoff, gpac=gpac, src=src, dst=dst,
+            part_dst=part_dst,
             work_dir=work_dir, preset=preset, started=started,
             source_summary=source_summary, used=used, warnings=warnings,
             ffprobe=ffprobe, postprobe_csv=postprobe_csv,
@@ -1286,11 +1339,17 @@ def encode_one_hw_classic(
             logger.warning("[SYNC-FAIL] %s | %s — 原音频照旧", src, exc)
             file_logger.exception("CHANNEL SYNC FAILED")
 
+    # 交付: 中间产物是 **MOV**, 最终容器跟随源。相同 -> 直接改名;
+    # 不同 (源为 MP4) -> 无损容器重封装, 绝不重新编码。
     try:
-        os.replace(part_dst, dst)
-    except OSError as exc:
+        place_final(
+            gpac=gpac, intermediate=part_dst, dst=dst,
+            work_dir=work_dir,
+            log=lambda msg: file_logger.info("CONTAINER | %s", msg),
+        )
+    except (OSError, RuntimeError) as exc:
         logger.error("[RENAME-FAIL] %s -> %s | %s", part_dst, dst, exc)
-        file_logger.exception("RENAME FAILED")
+        file_logger.exception("FINAL PLACEMENT FAILED")
         safe_unlink(part_dst)
         return "failed"
 
@@ -1313,6 +1372,7 @@ def encode_one_hw_classic(
 def _finish_with_handoff(
     *,
     handoff: VideoHandoffHook,
+    gpac: GpacContainerBackend,
     src: Path,
     dst: Path,
     part_dst: Path,
@@ -1364,11 +1424,17 @@ def _finish_with_handoff(
             return "failed"
         safe_unlink(part_dst)
     else:
+        # 接手方判定"无事可做" -> 退化为既有行为, 但中间产物是 MOV 而
+        # dst 的容器跟随源, 所以这里同样走"改名或无损重封装"。
         try:
-            os.replace(part_dst, dst)
-        except OSError as exc:
+            place_final(
+                gpac=gpac, intermediate=part_dst, dst=dst,
+                work_dir=work_dir,
+                log=lambda msg: file_logger.info("CONTAINER | %s", msg),
+            )
+        except (OSError, RuntimeError) as exc:
             logger.error("[RENAME-FAIL] %s -> %s | %s", part_dst, dst, exc)
-            file_logger.exception("RENAME FAILED")
+            file_logger.exception("FINAL PLACEMENT FAILED")
             safe_unlink(part_dst)
             return "failed"
 
@@ -1431,7 +1497,11 @@ def encode_one_dji_hw(
     GPAC 26.02: dropped by policy and logged, never silently.
     """
     work_dir = work_root / job_id_for(src)
-    encoded_mov = work_dir / "video" / "encoded.mov"
+    # 中间产物后缀 = 实际容器 (HEVC -> .mov, AV1 -> .mp4), 见
+    # intermediate_container。
+    encoded_mov = work_dir / "video" / (
+        "encoded" + _CONTAINER_SUFFIX[intermediate_container(backend.codec)]
+    )
     final = work_dir / "final" / "output.mov"
     report_path = work_dir / "report.json"
 
@@ -1459,6 +1529,7 @@ def encode_one_dji_hw(
         cmd, _, _ = backend.command(
             src, encoded_mov, profile, chroma, depth, vfr,
             audio_copy=False, color=src_info.color,
+            container=intermediate_container(backend.codec),
         )
         return cmd
 
@@ -1614,9 +1685,11 @@ def encode_one_dji_hw(
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     try:
-        safe_unlink(dst)
-        os.replace(final, dst)
-    except OSError as exc:
+        place_final(
+            gpac=gpac, intermediate=final, dst=dst, work_dir=work_dir,
+            log=lambda msg: file_logger.info("CONTAINER | %s", msg),
+        )
+    except (OSError, RuntimeError) as exc:
         logger.error("[RENAME-FAIL] %s -> %s | %s", final, dst, exc)
         file_logger.exception(
             "RENAME FAILED | elapsed=%.3f sec",
@@ -1748,6 +1821,166 @@ def _encoded_ok(
         return True
     except (OSError, ValueError, json.JSONDecodeError):
         return False
+
+
+# ---------------------------------------------------------------------------
+# final placement: rename, or lossless container re-mux
+# ---------------------------------------------------------------------------
+
+#: ISO-BMFF source extension -> output extension, i.e. the container
+#: *conversions* this project performs.  A conversion happens only when
+#: the encode intermediate's container differs from the one the final
+#: suffix asks for; re-muxing ISOBMFF -> ISOBMFF is a pure box rewrite.
+#: `None` marks "not an ISOBMFF source format" — MP4Box cannot read it,
+#: so it is never re-muxed and never silently re-labelled.
+_REMUX_SUFFIX = {
+    ".mov": ".MOV",
+    ".mp4": ".MP4",
+    ".m4v": ".M4V",
+}
+
+
+def _iso_media_kind(path: Path) -> str:
+    """``"isobmf"`` or ``"other"`` — can MP4Box read this file at all?
+
+    Deliberately *not* an attempt to tell MOV from MP4.  Neither
+    available tool can: NVEncC writes ftyp major brand ``mp42`` for
+    **both** ``-f mov`` and ``-f mp4`` (they differ only in the compat
+    brand list, ``mp42`` vs ``mp42/iso2/mp41``), and ffprobe maps both
+    to the single demuxer ``mov,mp4,m4a,3gp,3g2,mj2``.  Inventing a
+    distinguishing rule there would be a guess dressed up as a check.
+
+    What is knowable, and what actually matters for choosing the
+    conversion path, is whether the bytes are ISOBMFF (MP4Box reads and
+    rewrites the box tree) or something else such as Matroska (MP4Box
+    fails, so the caller must not pretend a re-mux is available).
+    """
+    try:
+        for box in isobmf.root_boxes(path):
+            if box.type == "ftyp":
+                return "isobmf"
+    except (OSError, ValueError):
+        return "other"
+    return "other"
+
+
+def remux_container_lossless(
+    *,
+    gpac: GpacContainerBackend,
+    src: Path,
+    dst: Path,
+    log: Callable[[str], None],
+) -> str:
+    """``src`` -> ``dst`` as a **container-only** re-mux (stream copy).
+
+    Every track is copied by its numeric id through GPAC/MP4Box, so the
+    elementary streams are byte-identical (verified: video ES SHA256 is
+    unchanged across the re-mux) and only the box structure changes.  No
+    decoder or encoder is involved.  The source movie timescale is
+    threaded through because GPAC otherwise resets it to the first
+    track's media timescale.
+
+    Returns a human-readable description for the file log.
+    """
+    movie_ts, tracks = dji.track_manifest(gpac, src)
+    if not tracks:
+        raise RuntimeError(f"no tracks in {src} to re-mux")
+    previous = gpac.movie_timescale
+    gpac.movie_timescale = movie_ts or previous
+    try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        gpac.mux_new(dst, [f"{src}#{t['id']}" for t in tracks])
+    finally:
+        gpac.movie_timescale = previous
+    return (
+        f"container-only re-mux: {src.name} ({len(tracks)} track(s), "
+        f"movie timescale {movie_ts}) -> {dst.name} "
+        f"[stream copy, no re-encode]"
+    )
+
+
+def place_final(
+    *,
+    gpac: GpacContainerBackend,
+    intermediate: Path,
+    dst: Path,
+    work_dir: Path,
+    log: Callable[[str], None],
+) -> None:
+    """Put the finished intermediate at ``dst`` with a matching container.
+
+    The hardware video intermediate is **always MOV** and the final
+    container follows the *source* (``core.paths.final_suffix_for``).
+    Two branches, decided on the file *suffix* — because that is the
+    only reliable statement available about which of the two ISOBMFF
+    flavours is wanted (see ``_iso_media_kind``):
+
+    * suffix already matches -> plain rename.  No re-mux: the MOV source
+      case must not pay for, or risk, a second box rewrite.
+    * suffix differs -> lossless container re-mux, built under
+      ``work_dir/final/`` and renamed into place only once complete, so
+      a half-written delivery is never visible at ``dst``.
+
+    A difference that *cannot* be re-muxed (non-ISOBMFF intermediate, no
+    GPAC backend) **raises** instead of renaming, because an ``.MP4``
+    that is not an MP4 is exactly the defect this function prevents.
+
+    Raises RuntimeError (callers turn it into a failed file); never
+    leaves a partial file at ``dst``.
+    """
+    want_suffix = _REMUX_SUFFIX.get(dst.suffix.lower())
+    src_suffix = intermediate.suffix.upper()
+    if want_suffix is not None and want_suffix == src_suffix:
+        safe_unlink(dst)
+        os.replace(intermediate, dst)
+        log(
+            f"final: renamed {intermediate.name} -> {dst.name} "
+            f"(container already {dst.suffix}, no re-mux)"
+        )
+        return
+
+    if want_suffix is None:
+        # Final container is one this project does not re-mux (MKV, TS,
+        # MXF…).  The historical behaviour was a bare rename; keep it,
+        # and say so rather than implying a conversion happened.
+        safe_unlink(dst)
+        os.replace(intermediate, dst)
+        log(
+            f"final: renamed {intermediate.name} -> {dst.name} "
+            f"({dst.suffix} is not a re-muxed container; bytes unchanged)"
+        )
+        return
+
+    if gpac is None:
+        raise RuntimeError(
+            f"container change to {dst.suffix} is needed for {dst.name} "
+            f"but no GPAC backend is available"
+        )
+    kind = _iso_media_kind(intermediate)
+    if kind != "isobmf":
+        raise RuntimeError(
+            f"container change to {dst.suffix} is needed for {dst.name} "
+            f"but {intermediate.name} is not ISOBMFF, so it cannot be "
+            f"re-muxed without re-encoding"
+        )
+
+    # Stage with the *target* suffix, not the source one: MP4Box selects
+    # the output file type (and therefore the `ftyp` major brand) from
+    # the -new path's extension.  Staging as `container.mov` and then
+    # renaming produced a file whose major brand was `qt  ` — i.e. an
+    # MP4 in name only, the very defect this function exists to prevent.
+    # Measured: `-new X.mp4` -> major `isom`; `-new X.mov` -> major
+    # `qt  `; both with the identical -add list.
+    staged = work_dir / "final" / f"container-remux{dst.suffix}"
+    safe_unlink(staged)
+    log(remux_container_lossless(
+        gpac=gpac, src=intermediate, dst=staged, log=log
+    ))
+    if not (staged.is_file() and staged.stat().st_size > 0):
+        raise RuntimeError(f"container re-mux produced no output: {staged}")
+    safe_unlink(dst)
+    os.replace(staged, dst)
+    log(f"final: {staged.name} -> {dst.name}")
 
 
 # ---------------------------------------------------------------------------

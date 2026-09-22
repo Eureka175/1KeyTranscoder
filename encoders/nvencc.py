@@ -13,9 +13,26 @@ codec/chroma/depth allowlist plus the frame-integrity gate, because the
 stock hardware reader loses frames silently on Sony timelines
 (docs/hardware-decode/integration-test-matrix.md, category C).
 
-Output is a video-only mp4 (explicit -f mp4; the preservation pipeline
-imports it with MP4Box and repairs the millisecond-timescale edit-list
-truncation from the exact stts table before validation).
+Output is a video-only **MOV** (explicit ``-f mov``, never MP4).  MOV is
+the hardware-encode *working* container: every consumer downstream
+(preservation rebuild, channel-sync remux) names this intermediate
+``*.mov``, and declaring one container while writing another is a defect
+even when the two are structurally close (see docs/container-format.md).
+
+The container is an explicit argument, not a guess.  ``-f mov`` and
+``-f mp4`` do **not** produce the same file even though both open with
+an ``ftyp``/``moov``/``mdat`` ISOBMFF layout — measured on NVEncC 9.31,
+``-f mp4`` writes ``ftyp`` major ``mp42`` with compat
+``mp42/iso2/mp41`` and a ``free`` filler box, while ``-f mov`` writes
+compat ``mp42`` only and a QuickTime ``wide`` filler box.  The values the
+pipeline actually reasons about (mvhd timescale 1000 + millisecond-
+quantized edit list, video mdhd 240000, tkhd, elst, stts) are identical,
+so the preservation pipeline's stts-based duration repair behaves the
+same either way; that was verified, not assumed (docs/container-format.md
+records the measurements).
+
+``-f mov`` still goes through libavformat's ``mov`` muxer, so the
+rigaya moov-at-EOF layout that MP4Box expects is unchanged.
 """
 
 from __future__ import annotations
@@ -151,12 +168,22 @@ class NvencBackend:
         audio_copy: bool = False,
         color: ColorInfo | None = None,
         reader: str = "avsw",
+        container: str = "mov",
     ) -> tuple[list[str], list[str], list[str]]:
+        """Full argv for one encode attempt.
+
+        ``container`` is the *actual* muxer format for ``-f`` (see the
+        module docstring: MOV is the hardware working container).  It is
+        a parameter rather than a constant so that the file suffix and
+        the real container can never drift apart again, and so a caller
+        that genuinely needs another container says so explicitly
+        instead of relying on the filename.
+        """
         args, skipped, notes = self.build_args(
             profile, chroma, depth, vfr, color, reader=reader
         )
         cmd = [str(self.tool), "-i", str(source), *args]
         if audio_copy:
             cmd += ["--audio-copy"]
-        cmd += ["-f", "mp4", "-o", str(output)]
+        cmd += ["-f", container, "-o", str(output)]
         return cmd, skipped, notes

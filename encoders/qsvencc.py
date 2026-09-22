@@ -17,6 +17,15 @@ printed in ``Input Info`` rather than trusting the command line.
 QSVEncC's hardware-decode patch is runtime-proven **on the pinned 8.26
 revision only**; releases 8.27–8.30 were not examined and are not
 claimed.
+
+Output is a video-only **MOV** (explicit ``-f mov``, never MP4), the
+same hardware working container as the NVEncC backend.  Both rigaya
+tools go through libavformat's ``mov`` muxer, so ``-f mov`` and
+``-f mp4`` share the muxer and differ only in the declared file type
+and filler box; the container is an explicit argument on both backends
+because every consumer downstream names the intermediate ``*.mov``.
+See ``encoders/nvencc.py`` and docs/container-format.md for the
+measurements.
 """
 
 from __future__ import annotations
@@ -146,12 +155,20 @@ class QsvBackend:
         audio_copy: bool = False,
         color: ColorInfo | None = None,
         reader: str = "avsw",
+        container: str = "mov",
     ) -> tuple[list[str], list[str], list[str]]:
+        """Full argv for one encode attempt.
+
+        ``container`` is the *actual* muxer format for ``-f`` (MOV is the
+        hardware working container, see the module docstring).  Explicit
+        parameter, not a constant, so the suffix and the real container
+        cannot drift apart again.
+        """
         args, skipped, notes = self.build_args(
             profile, chroma, depth, vfr, color, reader=reader
         )
         cmd = [str(self.tool), "-i", str(source), *args]
         if audio_copy:
             cmd += ["--audio-copy"]
-        cmd += ["-f", "mp4", "-o", str(output)]
+        cmd += ["-f", container, "-o", str(output)]
         return cmd, skipped, notes
