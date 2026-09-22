@@ -31,6 +31,7 @@ from core.batch_hw import (
     detect_vfr,
     hw_backend_for,
     is_dji_source,
+    place_final,
     run_hw_pool,
     run_multihw_pool,
     load_retry_list,
@@ -655,10 +656,18 @@ def encode_one(
             file_logger.exception("CHANNEL SYNC FAILED")
 
     try:
-        os.replace(part_dst, dst)
-    except OSError as exc:
+        place_final(
+            gpac=gpac, intermediate=part_dst, dst=dst,
+            work_dir=(work_dir or part_dst.parent),
+            log=lambda msg: file_logger.info("CONTAINER | %s", msg),
+        )
+    except (OSError, RuntimeError) as exc:
+        # 交付失败就是失败。这里**不**退化为"改个名算了": 中间产物容器与
+        # 目标容器不一致而转换又不可用时, 改名得到的就是"容器名实不符",
+        # 正是本次修复要消灭的缺陷, 静默改名只会把它藏起来。
         logger.error("[RENAME-FAIL] %s -> %s | %s", part_dst, dst, exc)
-        file_logger.exception("RENAME FAILED | elapsed=%.3f sec", elapsed)
+        file_logger.exception("FINAL PLACEMENT FAILED | elapsed=%.3f sec",
+                             elapsed)
         return "failed"
 
     postprobe_and_log(
@@ -850,10 +859,15 @@ def encode_one_sony(
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     final = work_dir / "final" / "output.mov"
+    # 保留管线的工作容器恒为 MOV; 最终容器跟随源 (见 place_final)。
+    # 校验已经在上面的 run_sony_pipeline 内完成, 容器重封装只搬 box,
+    # 不触碰视频基本流。
     try:
-        safe_unlink(dst)
-        os.replace(final, dst)
-    except OSError as exc:
+        place_final(
+            gpac=gpac, intermediate=final, dst=dst, work_dir=work_dir,
+            log=lambda msg: file_logger.info("CONTAINER | %s", msg),
+        )
+    except (OSError, RuntimeError) as exc:
         logger.error("[RENAME-FAIL] %s -> %s | %s", final, dst, exc)
         file_logger.exception("RENAME FAILED | elapsed=%.3f sec", elapsed)
         return "failed"
@@ -1049,9 +1063,11 @@ def encode_one_dji_x265(
     dst.parent.mkdir(parents=True, exist_ok=True)
     final = work_dir / "final" / "output.mov"
     try:
-        safe_unlink(dst)
-        os.replace(final, dst)
-    except OSError as exc:
+        place_final(
+            gpac=gpac, intermediate=final, dst=dst, work_dir=work_dir,
+            log=lambda msg: file_logger.info("CONTAINER | %s", msg),
+        )
+    except (OSError, RuntimeError) as exc:
         logger.error("[RENAME-FAIL] %s -> %s | %s", final, dst, exc)
         file_logger.exception(
             "RENAME FAILED | elapsed=%.3f sec",
@@ -1957,7 +1973,10 @@ def main() -> int:
                 dst = output_path_for(
                     src, input_root, output_root, preset, multiple_presets
                 )
-                # AV1 中间/临时文件必须是 MP4 (ffmpeg 9 MOV muxer 不接受 AV1)
+                # 中间产物的容器必须与实际写入的一致: SVT-AV1 走 ffmpeg,
+                # 而 ffmpeg 9 的 MOV muxer 不接受 AV1 -> 中间体只能是 MP4;
+                # x265 走 MOV。最终交付由 place_final 负责 (同名则改名,
+                # 容器不同则无损重封装)。
                 part_ext = ".part.mp4" if backend.name == "svtav1" else ".part.mov"
                 part_dst = dst.with_name(dst.stem + part_ext)
                 file_log = per_file_log_path(

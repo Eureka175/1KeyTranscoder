@@ -15,6 +15,32 @@ VIDEO_EXTS = {
     ".avi", ".m4v", ".wmv", ".webm", ".mpg", ".mpeg"
 }
 
+#: Final-output extension per *source* extension.  The default output
+#: container follows the input container: a `.MOV` source produces a
+#: `.MOV`, an `.MP4` source produces an `.MP4`.  Everything else keeps
+#: the historical `.MP4` output (that was the pre-existing behaviour for
+#: every extension, so nothing regresses) — the two ISOBMFF containers
+#: are the ones this project can re-mux losslessly in both directions,
+#: so they are the two it promises.  See docs/container-format.md.
+FINAL_SUFFIX_BY_SOURCE = {
+    ".mov": ".MOV",
+    ".mp4": ".MP4",
+}
+
+#: Used for every source extension without an explicit entry above.
+FINAL_SUFFIX_DEFAULT = ".MP4"
+
+
+def final_suffix_for(src: Path) -> str:
+    """Upper-cased output extension for ``src`` (see the table above).
+
+    Case: the extension is **upper-cased** (`foo.mov` and `foo.MOV` both
+    produce `foo.MOV`), matching the extension convention the project
+    already used when every output was `.MP4`.  Only the extension is
+    normalised, never the stem.
+    """
+    return FINAL_SUFFIX_BY_SOURCE.get(src.suffix.lower(), FINAL_SUFFIX_DEFAULT)
+
 
 def safe_unlink(path: Path) -> None:
     try:
@@ -49,9 +75,18 @@ def output_path_for(
     preset: str,
     multiple_presets: bool,
 ) -> Path:
-    """Final output path: original basename, uppercase .MP4 extension,
-    no suffixes. Source and output roots are distinct, so the source
-    can never be overwritten."""
+    """Final output path: original basename, extension from the source
+    container, no extra suffixes.  Source and output roots are distinct,
+    so the source can never be overwritten.
+
+    The extension is ``final_suffix_for(src)``: `.MOV` for MOV input,
+    `.MP4` for MP4 input (and for every other source extension).  The
+    caller is responsible for the *container* actually matching it —
+    ``core.batch_hw``/``1kt.py`` re-mux losslessly when the encode
+    intermediate (always MOV) does not match.  Resume and existing-output
+    detection key off this same path, so they follow the container change
+    automatically.
+    """
     relative = src.relative_to(input_root)
 
     if multiple_presets:
@@ -63,7 +98,7 @@ def output_path_for(
     return (
         root
         / relative.parent
-        / f"{relative.stem}.MP4"
+        / f"{relative.stem}{final_suffix_for(src)}"
     )
 
 
