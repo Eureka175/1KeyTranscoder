@@ -53,6 +53,7 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("caps", core.l1_caps),
             ("hw/plan/classify/flags", core.l1_hw),
             ("probe/paths", core.l1_probe_paths),
+            ("container/format policy", core.l1_container_format),
             ("classifier/scaling", core.l1_classifier_scaling),
             ("gpac/dji", core.l1_gpac_dji),
             ("x265 P0", codecs.l1_x265),
@@ -89,6 +90,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
         "toolchain": [("toolchain", toolchain.l2_toolchain)],
         "full": [
             ("pipeline", pipeline.l3_pipeline),
+            ("container format (hw MOV intermediate)",
+             hardware.l3_container_format),
             ("audio model probe v0.7.1",
              audio_integration.l3_audio_probe),
             ("audio select/map v0.7.1",

@@ -241,6 +241,90 @@ def l1_probe_paths() -> None:
            and len(job_id_for(src)) > 8)
 
 
+def l1_container_format() -> None:
+    """容器格式策略 (docs/container-format.md): 中间体 MOV + 最终跟随源。
+
+    纯策略断言, 不碰编码器 —— 真实编码/重封装的端到端断言在 L3
+    (`hardware.l3_container_format`)。
+    """
+    from core.batch_hw import (
+        HW_VIDEO_CONTAINER,
+        _iso_media_kind,
+        _REMUX_SUFFIX,
+        intermediate_container,
+    )
+    from core.paths import final_suffix_for, output_path_for
+    section("L1 container/format policy")
+
+    # 1. 最终容器跟随输入容器
+    cases = [
+        ("a.mov", ".MOV"), ("a.MOV", ".MOV"), ("A.Mov", ".MOV"),
+        ("a.mp4", ".MP4"), ("a.MP4", ".MP4"),
+        # 未显式承诺的扩展名沿用既有行为 (.MP4), 不悄悄换容器
+        ("a.mkv", ".MP4"), ("a.ts", ".MP4"), ("a.mxf", ".MP4"),
+    ]
+    got = {name: final_suffix_for(Path(name)) for name, _ in cases}
+    bad = [
+        f"{n}:{got[n]}!={want}" for n, want in cases if got[n] != want
+    ]
+    record("container.final_suffix 跟随输入", not bad,
+           f"got={got}" if bad else f"got={got}")
+
+    # 2. 真实输出路径 (大小写无关, 目录结构保留)
+    root_in, root_out = Path(r"F:\in"), Path(r"F:\out")
+    mov_out = output_path_for(
+        root_in / "sub" / "clip.mov", root_in, root_out, "HQ", False
+    )
+    mp4_out = output_path_for(
+        root_in / "sub" / "clip.MP4", root_in, root_out, "HQ", False
+    )
+    record("container.output_path MOV 输入 -> MOV 输出",
+           mov_out == root_out / "sub" / "clip.MOV", f"out={mov_out}")
+    record("container.output_path MP4 输入 -> MP4 输出",
+           mp4_out == root_out / "sub" / "clip.MP4", f"out={mp4_out}")
+    # 多 preset 目录维度不受影响
+    multi = output_path_for(
+        root_in / "clip.mov", root_in, root_out, "HQ", True
+    )
+    record("container.output_path 多 preset 目录保留",
+           multi == root_out / "HQ" / "clip.MOV", f"out={multi}")
+
+    # 3. 硬件工作容器: MOV —— 但 AV1 必须用 MP4 (MOV muxer 直接拒绝 AV1,
+    #    实测 NVEncC/QSVEncC 报 "av1 only supported in MP4 and AVIF")。
+    #    这是 codec 约束, 不是偏好, 所以断言按 codec 取值而不是断言常量。
+    record("container.hw 中间体容器 MOV (非 AV1)",
+           HW_VIDEO_CONTAINER == "mov"
+           and intermediate_container("hevc") == "mov",
+           f"HW_VIDEO_CONTAINER={HW_VIDEO_CONTAINER!r} "
+           f"hevc={intermediate_container('hevc')!r}")
+    record("container.hw AV1 中间体必须是 MP4",
+           intermediate_container("av1") == "mp4",
+           f"av1={intermediate_container('av1')!r}")
+    record("container.remux 表只含 ISOBMFF 容器",
+           set(_REMUX_SUFFIX) == {".mov", ".mp4", ".m4v"}
+           and _REMUX_SUFFIX[".mov"] == ".MOV"
+           and _REMUX_SUFFIX[".mp4"] == ".MP4",
+           f"table={_REMUX_SUFFIX}")
+
+    # 4. 区分"MP4Box 能否读" —— 只有真的 ISOBMFF 才允许重封装
+    with tempfile.TemporaryDirectory() as td:
+        tdp = Path(td)
+        isobmf = tdp / "real.mov"
+        isobmf.write_bytes(
+            (12).to_bytes(4, "big") + b"ftyp" + b"mp42"
+        )
+        mkv = tdp / "fake.mkv"
+        mkv.write_bytes(b"\x1a\x45\xdf\xa3" + b"\x00" * 32)
+        empty = tdp / "empty.bin"
+        empty.write_bytes(b"")
+        record("container.isobmf 判定 (ftyp / 非 ISOBMFF / 空文件)",
+               _iso_media_kind(isobmf) == "isobmf"
+               and _iso_media_kind(mkv) == "other"
+               and _iso_media_kind(empty) == "other",
+               f"mov={_iso_media_kind(isobmf)} "
+               f"mkv={_iso_media_kind(mkv)} empty={_iso_media_kind(empty)}")
+
+
 def l1_classifier_scaling() -> None:
     from core.models import SourceInfo
     from core.scaling import ScalingEngine, ceil_expression

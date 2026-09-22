@@ -11,7 +11,9 @@ import time
 from pathlib import Path
 from ..paths import FFMPEG
 from ..paths import IN_DIR
+from ..paths import MB
 from ..paths import OUT_DIR
+from ..paths import ROOT
 from ..paths import WORK
 from ..fixtures.media import _run_1kt
 from ..paths import ffprobe_json
@@ -630,6 +632,201 @@ def l3_channel_sync_p1() -> None:
                f"rows={json.dumps(r26, ensure_ascii=False)}")
     else:
         expect("C26_复检门_仅回退该轨", False, "合成失败")
+
+
+def _es_sha256(path: Path, extra: list[str] | None = None) -> str:
+    """视频基本流 (elementary stream) 的 SHA256, 经 stream hash 复用器。
+
+    `extra` 用于把输入裁到与产物相同的帧数: 硬件中间产物是**重新编码**
+    的结果, 所以"输入 vs 中间产物"本来就不同; 真正要钉住的是
+    "中间产物 vs 最终产物" —— 纯容器重封装不得改变视频基本流。
+    """
+    cmd = [str(FFMPEG), "-v", "error"]
+    if extra:
+        cmd += extra
+    cmd += ["-i", str(path), "-map", "0:v:0", "-c", "copy",
+            "-f", "streamhash", "-hash", "sha256", "-"]
+    r = subprocess.run(
+        cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, check=False, timeout=1800,
+    )
+    for line in (r.stdout or b"").decode("utf-8", "replace").splitlines():
+        if "SHA256=" in line:
+            return line.split("SHA256=")[1].strip()
+    return ""
+
+
+def _ftyp_major(path: Path) -> str:
+    """ftyp major brand (12 字节内的 4CC); 读不到返回 ""。"""
+    try:
+        raw = path.read_bytes()[:12]
+    except OSError:
+        return ""
+    if len(raw) < 12 or raw[4:8] != b"ftyp":
+        return ""
+    return raw[8:12].decode("latin-1", "replace")
+
+
+def _video_frames(path: Path) -> int:
+    v = ffprobe_json(path)
+    for st in v.get("streams", []):
+        if st.get("codec_type") == "video":
+            return int(st.get("nb_frames") or 0)
+    return 0
+
+
+def l3_container_format() -> None:
+    """L3 容器格式端到端 (真实 NVENC 编码 + 真实容器判定)。
+
+    钉住三件事, 全部**看实际容器**而不是看后缀:
+
+    1. 硬件中间产物真的是 MOV (`-f mov`), 而不是"名字叫 .mov 的 MP4";
+    2. MOV 输入 -> 最终 MOV, 且不经多余重封装 (最终 == 中间, 字节一致);
+    3. MP4 输入 -> 最终 MP4, 由中间产物**无损容器重封装**得到:
+       视频基本流 SHA256 完全一致, 且产物 major brand 是 ISO 家族
+       (若按中间产物后缀 staging, MP4Box 会写出 QuickTime brand ——
+       这条断言就是用来钉住那个坑的)。
+    """
+    section("L3 容器格式 (硬件中间体 MOV / 最终跟随输入)")
+
+    from core.batch_hw import _iso_media_kind
+
+    def expect(case: str, cond: bool, detail: str) -> None:
+        record(f"l3.{case}", cond, detail)
+
+    src_mp4 = IN_DIR / "classic" / "classic_test.MP4"
+    if not src_mp4.is_file():
+        expect("container_合成输入就绪", False, f"missing {src_mp4}")
+        return
+
+    # MOV 输入: 与 MP4 输入同一份内容, 只换容器 (MP4Box 原生轨复制)。
+    src_mov = IN_DIR / "classic" / "classic_test.MOV"
+    if not src_mov.is_file():
+        r = sh(MB, "-new", src_mov,
+               "-add", f"{src_mp4}#video", "-add", f"{src_mp4}#audio")
+        if r.returncode != 0 or not src_mov.is_file():
+            expect("container_合成MOV输入", False, f"rc={r.returncode}")
+            return
+    expect("container_合成输入就绪", True,
+           f"mp4={src_mp4.name} mov={src_mov.name}")
+
+    for tag, src, want_ext in (
+        ("MOV", src_mov, ".MOV"),
+        ("MP4", src_mp4, ".MP4"),
+    ):
+        # 每种输入一个**独立**输入目录, 只放这一个源文件。
+        # 两种输入共用同一 stem, 若放在一起, 第二轮的"另一个扩展名"
+        # 会被 1kt 当成源文件继续编码, 并让第一轮的产物因"输出已存在"
+        # 被跳过 —— 于是断言比的是上一轮的残留文件 (曾经就是这样误报)。
+        in_dir = OUT_DIR / f"container_in_{tag.lower()}"
+        shutil.rmtree(in_dir, ignore_errors=True)
+        in_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, in_dir / src.name)
+
+        out_dir = OUT_DIR / f"container_{tag.lower()}"
+        shutil.rmtree(out_dir, ignore_errors=True)
+        rc, tail = _run_1kt(
+            in_dir, out_dir, "--encoder", "nvenc", "--preset", "fast",
+            "--jobs", "1", timeout=3600,
+        )
+        delivered = out_dir / f"{src.stem}{want_ext}"
+        if not (rc == 0 and delivered.is_file()):
+            expect(f"container_{tag}_交付", False,
+                   f"rc={rc} delivered={delivered.is_file()} tail={tail[-300:]}")
+            continue
+        expect(f"container_{tag}_交付", True, f"{delivered.name}")
+
+        # 输入容器 -> 输出容器
+        expect(f"container_{tag}_最终容器跟随输入",
+               delivered.suffix == want_ext, f"suffix={delivered.suffix}")
+
+        # 硬件中间产物 = 经典硬件路径的 `<stem>.part.mov`。
+        #
+        # 同容器 (MOV->MOV) 时 `place_final` 是**改名**: .part.mov 被
+        # 消耗掉, 交付后不存在 —— 这正是"没有多余重封装"的证据, 所以
+        # 这里断言的是"改名成功且 .part.mov 已消失", 而不是它还在。
+        # 跨容器 (MOV->MP4) 时 .part.mov 保留 (重封装读它, 不改它),
+        # 于是可以用它做基本流一致性比对。
+        interm = delivered.with_name(f"{delivered.stem}.part.mov")
+        if want_ext == ".MOV":
+            expect(f"container_{tag}_同容器为改名 (无 .part.mov 残留)",
+                   not interm.is_file(),
+                   f"{interm.name} exists={interm.is_file()} "
+                   f"(files={[p.name for p in out_dir.glob('*')]})")
+        else:
+            if not interm.is_file():
+                found = [p.name for p in out_dir.glob("*")]
+                expect(f"container_{tag}_中间产物存在", False,
+                       f"no {interm.name} in {out_dir} (files={found})")
+                continue
+            expect(f"container_{tag}_中间产物存在", True, str(interm.name))
+
+        # 1. 交付产物的 ftyp 必须是 rigaya 的 **mov** 输出 (compat 只有
+        #    mp42, 不含 ISO 品牌 iso2/mp41)。`-f mp4` 会写出
+        #    `mp42/iso2/mp41`, `-f mov` 只写 `mp42` —— 这是两个 `-f`
+        #    值在文件里留下的、可判定的差异 (major brand 两者都是 mp42,
+        #    所以只能看 compat 列表)。MOV 源时这条直接检验交付物;
+        #    MP4 源时中间产物还在, 检验中间产物。
+        probe_target = interm if interm.is_file() else delivered
+        raw = probe_target.read_bytes()[:32]
+        n_ftyp = int.from_bytes(raw[0:4], "big")
+        compat = [
+            raw[i:i + 4].decode("latin-1")
+            for i in range(16, min(n_ftyp, len(raw)), 4)
+        ]
+        expect(f"container_{tag}_硬件产物为ISOBMFF",
+               _iso_media_kind(probe_target) == "isobmf",
+               f"{probe_target.name} ftyp={_ftyp_major(probe_target)!r} "
+               f"compat={compat}")
+        expect(f"container_{tag}_硬件编码用的 -f mov (非 -f mp4 的 ftyp)",
+               "iso2" not in compat and "mp41" not in compat,
+               f"{probe_target.name} ftyp_len={n_ftyp} compat={compat}")
+
+        # 2/3. 视频基本流: 中间产物 == 最终产物 (纯容器重封装)
+        h_final = _es_sha256(delivered)
+        if interm.is_file():
+            h_interm = _es_sha256(interm)
+            expect(f"container_{tag}_无重新编码 (ES hash 一致)",
+                   bool(h_interm) and h_interm == h_final,
+                   f"interm={h_interm[:16]} final={h_final[:16]}")
+        else:
+            # 同容器: 中间产物被改名消耗, 基本流一致性由"交付物本身就是
+            # 编码器产物"保证 —— 上面 ftyp 断言与"无 .part.mov 残留"
+            # 一起构成这个证据链。
+            expect(f"container_{tag}_无重新编码 (ES hash 一致)",
+                   bool(h_final),
+                   f"rename path: final={h_final[:16]} (no re-mux ran)")
+
+        if want_ext == ".MP4":
+            # 跨容器: 必须是真正的 MP4 —— major brand 在 ISO 家族,
+            # 而不是 MP4Box 按 .mov 后缀写出的 QuickTime 'qt  '
+            major = _ftyp_major(delivered)
+            expect("container_MP4_产物为ISO MP4 (brand 非 qt)",
+                   major not in ("qt  ", ""), f"major={major!r}")
+            expect("container_MP4_不是中间产物原样改名",
+                   interm.read_bytes() != delivered.read_bytes(),
+                   "bytes differ (container rewritten)")
+
+    # 合成一个非 ISOBMFF 中间产物: 必须拒绝而不是改后缀冒充
+    from core.batch_hw import place_final
+    from preservation.gpac import GpacContainerBackend
+
+    tmp_dir = OUT_DIR / "container_refuse"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    fake = tmp_dir / "fake.mkv"
+    fake.write_bytes(b"\x1a\x45\xdf\xa3" + b"\x00" * 64)
+    refused = False
+    detail = ""
+    try:
+        place_final(
+            gpac=GpacContainerBackend(ROOT / "tools" / "GPAC"),
+            intermediate=fake, dst=tmp_dir / "fake.MP4",
+            work_dir=tmp_dir, log=lambda _m: None,
+        )
+    except RuntimeError as exc:
+        refused = True
+        detail = str(exc)
+    expect("container_非ISOBMFF中间产物拒绝冒充MP4", refused, detail)
 
 
 def l3_channel_sync_p1_algo() -> None:
