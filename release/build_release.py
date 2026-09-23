@@ -28,7 +28,10 @@ wired up), `__pycache__/`.
 Safety rules (task book §3): refuses to build when tracked files are
 modified, when the working branch is not `main`, or when the VERSION
 file disagrees with the `v<version>` git tag. `--allow-dirty` records
-the deviation in the manifest instead of failing.
+the deviation in the manifest instead of failing; `--dev-build` also
+relaxes the branch/tag gate, and either way the manifest carries
+`official_release: false` / `development_build: true` so a development
+artifact is never indistinguishable from a release.
 """
 
 from __future__ import annotations
@@ -249,12 +252,18 @@ def build(args: argparse.Namespace) -> int:
         log(f"    {name}")
 
     problems = []
-    if branch != "main":
+    # An explicit development build is a *different* claim, not a bypass:
+    # it relaxes the branch/tag gate but records the deviation in the
+    # manifest (development_build=true, official_release=false) so the
+    # artifact can never be mistaken for an official release.  The dirty
+    # check is still reported (manifest `dirty`) and still refuses
+    # without one of the two relaxations.
+    if branch != "main" and not (args.dev_build or args.allow_dirty):
         problems.append(f"branch is {branch!r}, expected 'main'")
-    if dirty_lines and not args.allow_dirty:
+    if dirty_lines and not (args.allow_dirty or args.dev_build):
         problems.append(
             f"{len(dirty_lines)} tracked file(s) modified — commit or stash "
-            "first (use --allow-dirty only for development builds)"
+            "first (use --allow-dirty/--dev-build only for development builds)"
         )
     tag = f"v{version}"
     try:
@@ -262,17 +271,33 @@ def build(args: argparse.Namespace) -> int:
     except RuntimeError:
         tag_commit = ""
     if not tag_commit:
-        problems.append(f"tag {tag} does not exist")
-    elif tag_commit != commit and not args.allow_dirty:
+        if not (args.dev_build or args.allow_dirty):
+            problems.append(f"tag {tag} does not exist")
+    elif tag_commit != commit and not (args.dev_build or args.allow_dirty):
         problems.append(
             f"tag {tag} points at {tag_commit[:10]}, HEAD is {commit[:10]}"
         )
+    official = not args.dev_build and branch == "main" and bool(tag_commit) \
+        and tag_commit == commit and not dirty_lines
     if problems:
         log("")
         for p in problems:
             log(f"[STOP] {p}")
         log("Refusing to build (task book §3).")
         return 2
+    if not official:
+        log("")
+        log("[DEVELOPMENT BUILD] not an official release — "
+            "branch/tag/clean-tree gate not satisfied"
+            if not args.dev_build else
+            "[DEVELOPMENT BUILD] --dev-build: branch/tag gate relaxed")
+        if tag_commit and tag_commit != commit:
+            log(f"    tag {tag} points at {tag_commit[:10]}, "
+                f"HEAD is {commit[:10]}")
+        elif not tag_commit:
+            log(f"    tag {tag} does not exist")
+        if branch != "main":
+            log(f"    branch is {branch!r}, not 'main'")
 
     out_dir = Path(args.out_dir).resolve()
     pkg_name = f"1KeyTranscoder-v{version}-{args.platform}-selfcontained"
@@ -313,8 +338,14 @@ def build(args: argparse.Namespace) -> int:
         "git_describe": describe,
         "git_branch": branch,
         "git_tag": tag,
+        "git_tag_resolved": tag_commit,
         "dirty": bool(dirty_lines),
         "tracked_modified": dirty_lines,
+        # An artifact built off `main`/a matching tag with a clean tree is
+        # an official release; anything else is a development build and
+        # says so here, so it cannot be mistaken for one.
+        "official_release": official,
+        "development_build": not official,
         "build_time": build_time,
         "build_host": platform.node(),
         "platform": f"{platform.system().lower()}-{platform.machine()}",
@@ -380,6 +411,10 @@ def build(args: argparse.Namespace) -> int:
         log("")
         log("[WARNING] built from a DIRTY tree (--allow-dirty); "
             "manifest records dirty=true. NOT an official release.")
+    if not official:
+        log("")
+        log("[DEVELOPMENT BUILD] official_release=false — this artifact is "
+            "NOT a release; do not publish it as one.")
     return 0
 
 
@@ -398,6 +433,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--allow-dirty", action="store_true",
                     help="Development build: proceed despite a dirty tree "
                          "or a version/tag mismatch (recorded in manifest).")
+    ap.add_argument("--dev-build", action="store_true",
+                    help="Development build: additionally relax the "
+                         "branch=='main' and version/tag gate. The manifest "
+                         "records official_release=false, "
+                         "development_build=true.")
     args = ap.parse_args(argv)
     try:
         return build(args)
