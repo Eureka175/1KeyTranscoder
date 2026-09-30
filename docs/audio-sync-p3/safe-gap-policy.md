@@ -285,6 +285,62 @@ over 3 of 4 cases while a 4th exists — **not that the band changes.** C1306 10
 inside, which falls **inside** the 3-case range of 58.60–67.47 %, so the outside band is
 **numerically unchanged at 32.5–41.4 %**. A presentation gap, not a reproduction failure.
 
+### 6.2 The tolerance supplies half the headline — and the result survives anyway
+
+Pooled over all four cases (1 473 refused windows in 227 bounded gaps):
+
+| tolerance | ±0 | ±0.5 | ±1 | **±2 (P3.4)** | ±3 | ±5 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| pooled inside | **30.4 %** | 38.8 % | **53.2 %** | **61.5 %** | 68.4 % | 73.5 % |
+
+**The slack supplies 31 of the 61.5 points**, and the median exceedance beyond zero
+tolerance is only **2.29 samples**. The headline is very largely a statement about the
+tolerance.
+
+**But the falsifiable null runs the other way**, so the tolerance is not manufacturing the
+result. A straight ramp between the two neighbour values plus noise at the measured
+repeatability would put **99.9 %** inside at ±2 (and **75.6 %** even at ±0), because a smooth
+path between the endpoints is inside the interval by construction. The observed values —
+61.5 % and 30.4 % — sit **far below** those, and below the more forgiving 3.0-sample null at
+every tolerance. The refused estimates therefore track their neighbours' range **worse than
+smooth interpolation would**, which *rescues* P3.4's qualitative claim.
+
+**Recommended reading:** **±1** is what the measurement supports (repeatability 0.76 samples
++ at most 1 sample of rounding). **±2** is defensible only on the separate argument that a
+30 s window integrates *moving* audio — legitimate, but it should be argued, not assumed.
+**The honest figure is the band ~30–68 %; a single "59.5 %" is not defensible.**
+
+### 6.3 A supporting inference in P3.4 that does not survive its own criterion
+
+P3.4 §9 concludes: *"an estimate inside that range cannot be the error's source; the plan's
+carried shift is."* **The carried shift is one endpoint of that range**, so being inside it
+says nothing about an estimate's distance to it. Tested directly on the windows that count as
+inside at ±2:
+
+| case | inside | nearer the **carry** | nearer the **arrival** |
+| --- | ---: | ---: | ---: |
+| C1305 10 s | 109 | 46.8 % | 40.4 % |
+| **C1305 2.5 s** | 487 | 37.2 % | **52.2 %** |
+| C1306 10 s | 57 | **63.2 %** | 35.1 % |
+| C1306 2.5 s | 253 | 24.5 % | **39.1 %** |
+| **pooled** | **906** | **36.4 %** | **46.0 %** |
+
+Pooled, in-range selects for the **arrival** more often than the carry, and **the direction
+flips by corpus** — C1306 leans carry, **C1305 leans arrival, and C1305 is where the large
+events are.** Within a 3-sample deadband, **43.4 % of refused windows are within that
+deadband of neither endpoint**, and only 10.4 % / 13.8 % uniquely support carry / arrival.
+
+```text
+the criterion describes WHERE estimates lie
+it does not license WHICH value is wrong
+```
+
+**Scope, because it matters:** P3.4's *magnitude* evidence — gap-window error medians 3–10
+samples and p95 314–759, against 0.25–0.30 on carrying windows — is direct, same-axis, and
+independent of this rule, so **"gap policy is the dominant residual source" stands.** What
+falls is the supporting argument for which value is at fault. The verdict survives; the
+explanation narrows.
+
 ---
 
 ## 7. What P3.6 does not establish
