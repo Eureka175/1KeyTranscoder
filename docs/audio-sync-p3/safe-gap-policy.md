@@ -147,6 +147,39 @@ no_correction         perfect when the delay is genuinely ~0
 Forty-eight samples is one millisecond. A 670-sample error is **14 ms**; the worst
 `no_correction` case observed was 65 340 samples, **1.36 s**.
 
+### 4.5 `linear` is not uniformly the safer choice — the sign flips with gap position
+
+An appealing simplification is "carry when the gap is narrow, interpolate when it is wide".
+**The measurements do not support it.** The comparison between `linear` and a carry policy
+changes sign depending on **where inside the gap the discontinuity falls**:
+
+| where the discontinuity falls | better policy | measured |
+| --- | --- | --- |
+| at the gap's **closing edge** (adjacent to an accepted window) | **carry** | `current` error **0** vs `linear` **600** at amp 1200; and 1 vs 594 at amp 1188 |
+| in the gap **interior** | **`linear`** | ~**half** the carry error at every gap length from 1 to 20 windows |
+
+At a 10 s `step` with the discontinuity on the closing edge, a forward carry inherits the
+previous accepted window's value, which is still current — so it is *exactly right*, while
+`linear` interpolates toward the far side of a step and lands halfway up it. Move that same
+discontinuity into the middle of the gap and the ranking reverses.
+
+```text
+gap length (windows)   1      2      3      5     10     20
+current              1200   1200   1200   1200   1200   1200
+linear                600    400    600    600    545    571     (step at gap midpoint)
+```
+
+**The discriminator is unobservable.** Position of a discontinuity inside a gap is exactly
+what a gap conceals, so neither policy can be selected on evidence — only on an assumption
+about where movement tends to happen relative to refusals.
+
+### 4.6 Measurement precision does not help
+
+Sweeping the synthetic observation noise over σ = 0.0 / 0.76 / 2.0 samples moves the in-gap
+error by **a few samples out of 100–1900**. The gap problem is **deterministic given the gap
+structure**: it is missing information, not noisy information, and no improvement in
+estimator precision removes it. This forecloses an otherwise attractive direction.
+
 ---
 
 ## 5. The design constraint this supports
