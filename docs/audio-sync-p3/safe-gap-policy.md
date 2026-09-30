@@ -249,6 +249,40 @@ integer rounding alone contributes up to 1 — but the conclusion "the plan's ca
 is usually the outlier" is **SUPPORTED at ±2 and much weaker at ±0**. The figure should be
 quoted with its tolerance attached.
 
+### 6.1 A truncation trap that produces a false "correction"
+
+P3.6 reported this figure as unreproducible **twice**, with two different explanations, and
+**both were wrong**; Agent B found the real cause. It is recorded here because anyone
+recomputing the number from the persisted artifacts will hit it.
+
+`work/p3/p34/gap_residual.py:329` stores a **display-truncated** list:
+
+```python
+gap_runs.sort(key=lambda g: -abs(g["plan_error_at_start"]))   # line 320 — DESCENDING
+result["gap_runs"] = gap_runs[:60]                            # line 329
+```
+
+So the persisted `gap_runs` is the **top 60 runs by |plan error|**, while the aggregate
+`gap_run_verdicts` covers **all** runs. C1305 2.5 s has 91 runs, so 31 runs holding 177
+refused windows are absent (641 persisted vs 818 aggregated).
+
+**Summing the persisted list gives a biased answer, not merely an incomplete one.** Because
+the sort puts the largest errors first, the dropped runs are disproportionately those where
+the carried value was *closest* to its own diagnostic — the **inside** ones, 159 of the 177
+missing windows. The subset therefore **deflates** the inside fraction:
+
+```text
+487/331 = 59.5 %   P3.4's aggregate over ALL runs   <- CORRECT
+328/313 = 51.2 %   the truncated top-60 subset      <- TRUNCATION ARTEFACT, do not quote
+```
+
+The artefact is recorded with `do_not_quote: true` in
+`work/p3/p36/reports/p34-neighbour-verification.json`.
+
+The only fair criticism of P3.4 on this figure is narrower: its prose band covers **3 of its
+4 cases** (C1306 10 s is absent from its table), and including the fourth widens the outside
+band from "33–41 %" to **32.5–41.4 %**. A presentation gap, not a reproduction failure.
+
 ---
 
 ## 7. What P3.6 does not establish
