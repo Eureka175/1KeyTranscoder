@@ -30,6 +30,7 @@ __pycache__/
 # Local test media
 testsets/
 tools/
+1kt_calibrate/
 
 # Forensic reports / generated inspection logs
 metadata_forensics/
@@ -39,6 +40,12 @@ work/
 
 # Release build output (staging tree + archive + manifest)
 dist/
+
+# Deployable release staging tree handed to users: the unpacked self-contained build
+# plus its .zip (~1.8 GiB) and a copy of release-manifest.json. Regenerable from a
+# release build and far too large to version. Anchored so a directory of the same name
+# nested elsewhere is unaffected.
+/dist-deploy/
 
 # PyInstaller scratch tree (x265 calibration tooling)
 /build/
