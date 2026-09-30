@@ -280,8 +280,10 @@ The artefact is recorded with `do_not_quote: true` in
 `work/p3/p36/reports/p34-neighbour-verification.json`.
 
 The only fair criticism of P3.4 on this figure is narrower: its prose band covers **3 of its
-4 cases** (C1306 10 s is absent from its table), and including the fourth widens the outside
-band from "33–41 %" to **32.5–41.4 %**. A presentation gap, not a reproduction failure.
+4 cases** (C1306 10 s is absent from its table). The criticism is that the range is quoted
+over 3 of 4 cases while a 4th exists — **not that the band changes.** C1306 10 s is 60.64 %
+inside, which falls **inside** the 3-case range of 58.60–67.47 %, so the outside band is
+**numerically unchanged at 32.5–41.4 %**. A presentation gap, not a reproduction failure.
 
 ---
 
