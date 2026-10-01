@@ -109,10 +109,10 @@ wrap** that returns the chunk's last window: a plausible number from the wrong p
 
 ---
 
-## 6. Three silent defects found while building this
+## 6. Silent defects found while building this
 
-All three produced plausible numbers and no exception. They are recorded because that is the
-pattern this line of work keeps hitting.
+All of these produced plausible numbers and no exception. They are recorded because that is
+the pattern this line of work keeps hitting.
 
 ### 6.1 `hop_samples` conflated with `window_samples`
 
@@ -151,6 +151,58 @@ Slice arithmetic in the constant-shift test was wrong three separate times, each
 would have reported correct code as failing. The contract is now asserted per sample —
 `out[n] == in[n + shift(window_of(n))]`, zero-filled out of range — because that is the only
 formulation that is not itself an arithmetic claim.
+
+---
+
+### 6.4 A chunk with missing context guessed instead of raising — twice
+
+**Found by the failure-injection suite**, and it is the most serious defect of the phases so
+far because it produced a **wrong value with no error**.
+
+A chunk lying inside a gap, with no global gap extent supplied, fell back to the
+**chunk-local** extent:
+
+```text
+whole-stream decision      [167, 233, 300, 367]
+chunk-local fallback       [100, 100, 100, 100]     <- silently WRONG, no error
+```
+
+`linear` now raises `AudioSyncContextError` when the global extent is absent. Then, testing
+that fix, the **same defect appeared for the gap endpoint values**: a chunk that does not
+itself hold a gap's bounding trusted windows was reading a chunk-local *interior* window as
+if it were an endpoint. It now raises unless the endpoints are supplied or genuinely in view.
+
+Both are the same principle P3.7 established for `shifts[-1]`, stated as behaviour rather
+than as documentation: **required context must be present, not merely available in
+principle.** A wrong number with no error is the one outcome this design must not produce.
+
+The requirement is scoped to gaps whose endpoints *exist* — on a stream with no accepted
+window at all there is nothing to interpolate between and no endpoint is missing.
+
+Whole-stream decisions populate both maps themselves from the shifts they have just computed,
+so a caller deciding the full stream is not asked for context it can already see. The guard is
+precisely about **chunks**.
+
+---
+
+## 6a. Failure injection: 30 cases, zero silent-wrong
+
+Every case asserts the **resulting value**, never merely "did not raise" (§91):
+
+| outcome | count |
+| --- | ---: |
+| `VALUE_OK` — no error, correct value | 13 |
+| `RAISED` — the expected error type | 17 |
+| `SILENT_WRONG` — no error, wrong value | **0** |
+| `UNEXPECTED` — wrong error type | **0** |
+
+Covered: missing left endpoint, missing right endpoint, chunk inside a gap with and without
+context, empty gap, single-window gap, all-refused stream, mask/record length mismatch,
+negative context base, NaN and Inf delays, NaN and non-integer and 2-D and absurd-magnitude
+shift plans, integral float plans, zero-length plans, plan too short, plan too long, exact
+plan, hop not dividing the stream, empty stream, non-positive `window_samples` /
+`hop_samples` / `sample_rate`, a plan whose states disagree with its mask, unknown policy,
+and shifts large enough to push every read out of range.
 
 ---
 
