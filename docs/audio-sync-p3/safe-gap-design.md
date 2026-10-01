@@ -3,6 +3,10 @@
 **Status: research-only design. No production change is authorised.**
 `production = NOT READY`. `production integration = DEFERRED`.
 
+**Validated:** semantics `63/63` · known-truth matrix 132 cases · state machine **`VALIDATED`**
+(Q0–Q5 at 12 chunk sizes) · three chunk-dependency regressions · `current` reproduces the
+frozen plans with 0 mismatch.
+
 P3.7 does not try to recover the hidden trajectory. P3.6 established that it cannot be
 recovered, and that no policy can change the magnitude of the step across a large gap — it
 can only choose which edge that step lands on. P3.7 therefore asks the only question that
@@ -10,6 +14,25 @@ remains answerable:
 
 > When the system knows it does not know the in-gap delay, how should it represent that,
 > so that the unknown is not quietly converted into an invented trajectory?
+
+---
+
+## 0. The sharpest result, in two lines
+
+```text
+the applied correction can be IDENTICAL between two policies
+the epistemic claim cannot
+```
+
+On the audio fixture, `hold` and `current` produce **byte-identical shift sequences** across a
+gap containing a genuine 174-sample delay change — the previous value carried for four
+windows, then one jump. They differ **only** in that `hold` labels those windows
+`UNRESOLVED_GAP` (plus one `REENTRY`) while `current` labels every window `TRUSTED`. On the
+real corpora the same two policies differ in applied shift on **0.4–0.5 %** of windows — the
+leading gap only.
+
+So **the labelling fix is separable from the numerical behaviour**, which is why it is the
+one change the production proposal treats as prioritised.
 
 ---
 
@@ -68,6 +91,18 @@ TRUSTED ──measurement refused──▶ UNRESOLVED_GAP ──trusted measurem
 | `UNRESOLVED_GAP` | hold / fill 0 / interpolate-under-stated-assumption | reporting `resolved = True` | **explicit unresolved** |
 | `REENTRY` | resume applying measurements | retroactively amending the gap | resolved measurement, boundary flagged |
 
+**Validated end to end:** Q0–Q5 all PASS at 12 chunk sizes, comparing the exact state
+sequence, the exact shift sequence and every boundary — not merely the final state.
+
+### 2.3 State is a derivation, not a per-chunk decision
+
+The phase's most concrete engineering finding. With chunk size 1 the **shift** sequence is
+exactly chunk-invariant while a per-chunk **state** is not: a one-window chunk cannot know a
+gap preceded it, so it cannot label itself `REENTRY`. That is a property of *state*, not a
+policy defect. State must therefore be computed as a **pure function of the resolved mask**
+over the whole stream, after the shifts are decided. Doing so makes chunk invariance
+automatic and removes an entire bug class.
+
 ---
 
 ## 3. Candidates
@@ -98,6 +133,28 @@ contain.
 | **I3** | no direction reversal inside a gap | all six PASS |
 | **I5** | deterministic: same input → same output | all six PASS |
 | **I6** | chunk invariance | all six PASS **once bounded context is supplied** |
+
+### 4.0 The precise form of the `current` finding — do not overstate it
+
+The known-truth matrix (132 cases) separates three checks that must not be merged:
+
+| check | `current` |
+| --- | --- |
+| state sequence matches the mask-derived expectation | **132/132 correct** |
+| never labels a refused window `TRUSTED` | **132/132 correct** |
+| `resolved` flags backed by a measurement | **1/22** (only the no-gap case) |
+
+```text
+state sequence correct in every case    : True
+no fake TRUSTED window in any case      : True
+`resolved` flags correct in every case  : False
+```
+
+**`current`'s state machine is correct.** What fails is the separate `resolved` claim. The
+accurate statement is:
+
+> **`current` claims more knowledge than the evidence supports** — a semantic over-claim, not
+> an algorithmic error, and not a claim that `current` is unsafe in every respect.
 
 ### 4.1 Two invariants were redefined after measurement, and that is part of the result
 
