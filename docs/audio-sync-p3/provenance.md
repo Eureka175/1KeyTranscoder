@@ -7,9 +7,9 @@
 > `git log` cannot say whether the semantics engine changed. A conclusion bound to
 > "the engine" is bound to nothing. These hashes are the binding.
 
-Generated: `2026-10-01T19:05:07Z`  
+Generated: `2026-10-01T19:13:42Z`  
 Branch: `research/audio-sync-p3-production-semantics`  
-HEAD: `0f56f4a6f80ea75cfa354b176d0ff08c05268bb1` — fix(audio): make a truncated context mask raise instead of guessing  
+HEAD: `30b95dd15dc8253de2c23edb137f705dad0db90e` — docs(audio-sync): pin P3.8 implementation provenance into tracked docs  
 Upstream: `(none)`
 
 `work/` is gitignored, so **none of the implementation files below are committed.**
@@ -25,12 +25,15 @@ The hashes in this file are the only durable record of what was actually tested.
 | P3.8 frozen-plan gate | `work/p3/p38/reproduce_frozen.py` | 9,199 | `6E837471D1304E1A28C587F557BC69815690B296C103F099B58A74A1696B7D09` |
 | P3.8 overlapping-window geometry | `work/p3/p38/overlap_geometry.py` | 11,111 | `4494E9AED7175F4ECA218D087CAE4D2DEB1DC1AA37AC52041919C384BE8F1425` |
 | P3.8 window-grid seam | `work/p3/p38/window_grid_seam.py` | 6,018 | `C75AE758205DB7AAE42DB07627AEDF20572D074C1C66B68EB1AF295D8575DEC3` |
-| P3.8 memory check (attempt 1, superseded) | `work/p3/p38/memory_check.py` | 9,734 | `D227F44A85B0838397046901CD8CC2BF278F6CD35AB375D7B53E1C48EB7D3B6A` |
-| P3.8 memory check (with controls) | `work/p3/p38/memory_check2.py` | 8,775 | `2305D5095CC3FB76AA5EA0DCF8F0B2FF2B6BA1C51202DDEBC67733A64DAF57D4` |
+| P3.8 memory check (attempt 1, SUPERSEDED -- quarantined) | `work/archive/pending-delete/p38-closure/superseded/work/p3/p38/memory_check.py` | 9,734 | `D227F44A85B0838397046901CD8CC2BF278F6CD35AB375D7B53E1C48EB7D3B6A` |
+| P3.8 memory check (with working controls) | `work/p3/p38/memory_check2.py` | 11,787 | `5067465869E3D6C8F7B8AD2186B543F1787ECBDCDF96E3F50426AB856D55EFDA` |
+| P3.8 RSS helper consumed by the memory check | `work/p3/p38/memprobe.py` | 1,637 | `D9A4A5BE85E585E0383F124D7069D2BE26A8D58647095B1852283361187C3CE8` |
 | P3.8 memory probe | `work/p3/p38/memory_probe.py` | 9,115 | `A1CE2E1FDA833684ABCA5003A8DB13AD4E5503722181A97B982DE247443E4073` |
+| P3.8 offset across delay models | `work/p3/p38/offset_across_models.py` | 6,725 | `3A04671573D1E0E4FC88D522D58741EDB8F24FB99E2D3FB926D6E2C2ABD950A0` |
+| P3.8 archive/quarantine record | `work/p3/p38/coordinator/archive_quarantine.py` | 12,504 | `FD33B1C565A625443225A8C284CDFE8364E2D2CD66C1CAB9ADCC564EF382CEED` |
 | P3.8 evidence freeze | `work/p3/p38/coordinator/freeze.py` | 7,251 | `ED93A545180C41D7917C9CBAB1F7A771D65DBD5ACAE8681E1B1E82496D06BE3B` |
-| P3.8 provenance pinner | `work/p3/p38/coordinator/pin_provenance.py` | 12,754 | `BDB74E4D179AAD65FF2D75EA0E0ACD26CEC3EE99759EB4E1EDC07D885C2F12AA` |
-| P3.8 final git/regression audit | `work/p3/p38/coordinator/final_audit.py` | 7,564 | `D682ECE225CB9766DF1DC255242A26CEC4517F0560DC96DDC4AB4469FDE4E42E` |
+| P3.8 provenance pinner | `work/p3/p38/coordinator/pin_provenance.py` | 13,083 | `81923F57A6E974EB1B889114D5F34B142F3E3A6C9F03343C76CD95E9C95C7803` |
+| P3.8 final git/regression audit | `work/p3/p38/coordinator/final_audit.py` | 9,134 | `06EB399FA5DCD463A9165A8DDCECCAF016A6D039A77722867BF88F805A0056F9` |
 | Critical A/C window-centre audit | `work/p3/p38/coordinator/a_window_center_audit.py` | 16,592 | `AD39A7C3601C63B80919932FAAEEA8418C066A8C7ECBA4BDD83A2076817D44E9` |
 | Critical A/C confirmatory (real measure_window) | `work/p3/p38/coordinator/a_confirmatory_real_measure.py` | 9,188 | `81A9D5E99B95CFB0CE195F397C32A8A0B6703D22DFCAC6E634DF89A6FDEC5E88` |
 | Critical C mapping fixture | `work/p3/p38/coordinator/c_mapping_fixture.py` | 1,735 | `4FD2E1BE1AEC9BB4AD57E31537DD3124E0349D850C32D5E308B0A52834F9F618` |
@@ -106,13 +109,13 @@ agents' manifests as read back from disk, not a summary of them.
 ### Agent A (estimator E2E, Critical B)
 
 - root: `work/p3/p38/agent_a_closure`
-- files: 98, total 235,746,916 B
+- files: 17, total 500,462 B
 - `manifest.json` SHA-256: `6BDB6A141B364F39D471F1948F22E9FA8C8CA884E6ECB3E171F409C263F4A302`
 
 ### Agent B (adversarial review)
 
 - root: `work/p3/p38/agent_b_closure`
-- files: 29, total 349,908,257 B
+- files: 24, total 161,534,337 B
 - `manifest.json`: **absent**
 
 ### P3.8 first-pass Agent A
