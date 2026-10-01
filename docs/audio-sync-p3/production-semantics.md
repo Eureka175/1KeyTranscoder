@@ -287,6 +287,52 @@ Note what Agent B also observed: their own suite's *"30 cases, zero silent-wrong
 cover integer-overflow boundaries, a defaulted `GapContext.base`, or `window < hop`. A suite
 that passes is not the same as a suite that is complete.
 
+### 6.6 A truncated context mask was indistinguishable from a refused window
+
+**Agent A's proposal P38A-1**, and the **third instance of one defect family** in this
+module. `is_trusted()` returned `False` both for "this window was refused" and for "this window
+is outside the mask I was given", so a chunk treated a window it could not see exactly as one
+it knew to be refused:
+
+```text
+recs = [None, None, None, 400.0, 405.0]
+chunk = the first window only, mask = full_mask[:1]
+
+next  ->  [0]      should be [400]      a plausible number from a window it cannot see
+```
+
+Measured blast radius: confined to the two offline-only policies (`linear`, `next`); the four
+carry-style policies were exact at every look-ahead radius. The all-refused branch had the
+same root: `ctx.accepted.any()` answers "does the mask I was handed contain a trusted window",
+which equals "does the stream" **only when the mask spans the stream**.
+
+**Fixed** by adding `GapContext.stream_end` — this is what makes truncation *detectable*. A
+mask shorter than `stream_end` is a slice, and a slice cannot answer a stream-level question,
+so `stream_has_trust` is **demanded rather than defaulted**:
+
+```text
+truncated mask declared, no flag   ->  RAISED
+truncated mask + explicit flag     ->  decides (leading gap -> 0)
+full mask, leading gap             ->  next=400, hold=0, current=400   (no false positive)
+```
+
+Two guard versions written on the way to this were **too broad and fired on legitimate leading
+and trailing gaps** — which is why the rule is now stated as *"the mask is authoritative where
+it reaches; where it does not reach, `stream_end` decides whether that silence is the stream's
+end or a slice"*, rather than *"a missing neighbour is an error"*. Both wrong versions are
+recorded because either would have failed correct input.
+
+### 6.7 The pattern, stated once
+
+Across §6.4, §6.5, §6.6 and the `-1` wrap of P3.7, this is **one defect family**:
+
+> A chunk silently substituting a guess for context it cannot see.
+
+Every instance produced a plausible number and no exception. The fix is never a better
+default — it is to make the required context **explicit and mandatory**, so absence raises.
+Three of the four were found by an adversarial reader (Agent B's audit, Agent A's proposals),
+not by the module's own tests.
+
 ---
 
 ## 7. Frozen-plan reproduction gate: PASS
