@@ -101,11 +101,65 @@ wrap** that returns the chunk's last window: a plausible number from the wrong p
 `apply_shift_plan` reproduces every property of `core/sync_fix.py::shift_stream` that matters:
 
 - sample values copied bit-for-bit — no filtering, no interpolation, no arithmetic;
-- one output chunk in memory, so **peak memory is independent of stream duration**;
+- **peak memory independent of stream duration** — see §5.1, this was claimed, then measured
+  false, then fixed;
 - **no inter-chunk state**: a sample's shift is a pure function of its window index;
 - out-of-range reads zero-filled; output sample count == input count;
 - chunks are split internally at window boundaries, so emitted bytes are identical
-  regardless of `chunk_windows`.
+  regardless of `chunk_windows`;
+- the **stream-object path** accepts the production `core.sync_estimate.RawStream` through its
+  `read_into`, so a whole stream is never materialised.
+
+### 5.1 Peak memory: a claim that was wrong, and the fix
+
+The module docstring and an earlier revision of this document asserted peak memory was
+duration-independent. **Agent B's independent audit measured it false**, and the coordinator
+reproduced it: the output was built as one full-length array (`out = np.zeros(n)`), so peak
+RSS tracked the *output size*, not the chunk. Agent B measured 10.66 → **119.56 MB** across a
+60× duration sweep against `shift_stream` sitting **flat at ~10 MB** — a regression against the
+exact property P1 was built to guarantee.
+
+**Fixed** by adding a streamed output path: with a destination path (or a stream source),
+each chunk is written as it is produced, so peak memory is one chunk. The staged measurement
+shows the apply adding **+0.0 MB** at a 300 s stream versus **+139 MB** for the source alone.
+
+Two wrong turns are recorded because both would have shipped silently:
+
+1. the first measurement charged the *source array's own allocation* to the call, because the
+   baseline was taken before the source was built — the same first-touch confound Agent B
+   reported catching in its own first attempt;
+2. the control used `np.zeros`, which is calloc-backed and stays lazily untouched, so an
+   untouched allocation reports a **zero** working-set delta and the control measured nothing.
+
+### 5.2 The stream-object path: a silent 173× slowdown
+
+`np.asarray(src)` on a `RawStream` does **not** fail — it walks the sequence protocol one
+sample at a time. Correct values, no error, and:
+
+| duration | `shift_stream` (production) | `np.asarray` sequence walk | ratio |
+| --- | ---: | ---: | ---: |
+| 10 s | 0.003 s | 0.352 s | **86×** |
+| 60 s | 0.018 s | 3.073 s | **173×** |
+
+Agent B found it; the numbers above reproduce it. Fixed by handling the stream shape
+explicitly: one bulk `read_into` per (chunk, window-segment), which is contiguous under the
+contract. Now **1.1–1.6×** of the production scalar path, and byte-identical to the in-memory
+path at every duration tested.
+
+### 5.3 The contract, and two clamps that broke it
+
+The contract is the pure per-sample one:
+
+```text
+out[n] = in[n + shift(window_of(n))]      zero-filled where the read is out of range
+```
+
+Two attempts to "improve" the streamed read both broke it and are now regressions in the
+selftest: a naive sequence walk (§5.2), and a **"source-window-bounded" clamp** that refused
+reads crossing a source window boundary. The clamp looked principled — a window should only
+place samples it covers — but it contradicts `out[n] == in[n + shift]` and made the two paths
+disagree at window boundaries (measured: 40 differing samples on a 60 s stream). The stored
+rule is the contract; the source range is contiguous, so it is served by one bulk read.
 
 ---
 
@@ -203,6 +257,35 @@ shift plans, integral float plans, zero-length plans, plan too short, plan too l
 plan, hop not dividing the stream, empty stream, non-positive `window_samples` /
 `hop_samples` / `sample_rate`, a plan whose states disagree with its mask, unknown policy,
 and shifts large enough to push every read out of range.
+
+### 6.5 An overflow that silently mis-aligned the audio
+
+**Found by Agent B's independent audit and reproduced by the coordinator — the single most
+serious defect of this line of work**, because the result is indistinguishable from a correct
+one. The magnitude guard was `int(np.abs(arr).max()) > MAX_ABS_SHIFT_SAMPLES`, and two
+two's-complement paths made it impossible to trip:
+
+```text
+np.array([2**64 - 5], dtype=np.uint64)
+    -> .astype(int64) WRAPS to -5   ->  |−5| = 5  ->  passes
+    -> the stream is returned aligned 5 samples the WRONG WAY, no error, no warning
+
+np.array([-2**63], dtype=int64)          # INT64_MIN
+    -> np.abs(INT64_MIN) is itself NEGATIVE (overflow)
+    -> the comparison can never be true  ->  passes
+
+np.array([1e30])                         # float path
+    -> .astype(int64) is undefined       ->  silently becomes INT64_MIN
+```
+
+The guard now runs **before** any signed cast and **without `np.abs`**: a float plan is
+range-checked as float, an unsigned plan is range-checked as unsigned (it cannot be negative),
+and a signed plan gets explicit lower and upper bounds. All three cases raise, and the exact
+boundary is verified (±2³¹ accepted, ±2³¹+1 raises).
+
+Note what Agent B also observed: their own suite's *"30 cases, zero silent-wrong"* did **not**
+cover integer-overflow boundaries, a defaulted `GapContext.base`, or `window < hop`. A suite
+that passes is not the same as a suite that is complete.
 
 ---
 
