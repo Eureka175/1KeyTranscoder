@@ -7,9 +7,9 @@
 > `git log` cannot say whether the semantics engine changed. A conclusion bound to
 > "the engine" is bound to nothing. These hashes are the binding.
 
-Generated: `2026-10-02T09:55:19Z`  
+Generated: `2026-10-02T10:12:32Z`  
 Branch: `research/audio-sync-p3-production-semantics`  
-HEAD: `afefee2abf1235f3a62ca973d2cb63534780178c` — docs(audio-sync): refresh P3.8 provenance after the archive pass  
+HEAD: `2e96f7399fd3545fdd08f5315183db7aef7faac5` — docs(audio-sync): close the P3 research line and prepare the production handoff  
 Upstream: `(none)`
 
 `work/` is gitignored, so **none of the implementation files below are committed.**
@@ -32,11 +32,18 @@ The hashes in this file are the only durable record of what was actually tested.
 | P3.8 offset across delay models | `work/p3/p38/offset_across_models.py` | 6,725 | `3A04671573D1E0E4FC88D522D58741EDB8F24FB99E2D3FB926D6E2C2ABD950A0` |
 | P3.8 archive/quarantine record | `work/p3/p38/coordinator/archive_quarantine.py` | 12,504 | `FD33B1C565A625443225A8C284CDFE8364E2D2CD66C1CAB9ADCC564EF382CEED` |
 | P3.8 evidence freeze | `work/p3/p38/coordinator/freeze.py` | 7,251 | `ED93A545180C41D7917C9CBAB1F7A771D65DBD5ACAE8681E1B1E82496D06BE3B` |
-| P3.8 provenance pinner | `work/p3/p38/coordinator/pin_provenance.py` | 16,479 | `98279A02C368D2BAB9E931860F9C8A3CD28E5770D80028C036434523612CDC29` |
+| P3.8 provenance pinner | `work/p3/p38/coordinator/pin_provenance.py` | 17,138 | `E16C8AD3F2CF602AE3D1B311E2CA1ADA4EC488C5CAB2E8E7686613D548A8FF36` |
 | P3.8 final git/regression audit | `work/p3/p38/coordinator/final_audit.py` | 9,134 | `06EB399FA5DCD463A9165A8DDCECCAF016A6D039A77722867BF88F805A0056F9` |
 | Critical A/C window-centre audit | `work/p3/p38/coordinator/a_window_center_audit.py` | 16,592 | `AD39A7C3601C63B80919932FAAEEA8418C066A8C7ECBA4BDD83A2076817D44E9` |
 | Critical A/C confirmatory (real measure_window) | `work/p3/p38/coordinator/a_confirmatory_real_measure.py` | 9,188 | `81A9D5E99B95CFB0CE195F397C32A8A0B6703D22DFCAC6E634DF89A6FDEC5E88` |
 | Critical C mapping fixture | `work/p3/p38/coordinator/c_mapping_fixture.py` | 1,735 | `4FD2E1BE1AEC9BB4AD57E31537DD3124E0349D850C32D5E308B0A52834F9F618` |
+| P3.9 quarantine register generator | `work/p3/p38/coordinator/quarantine_register.py` | 9,503 | `67E27D5A9A1E0188B8F2410EA489820020C9167A47C470C6FCD86C40383D545A` |
+| P3.9 corpus integrity check | `work/p3/p39/corpus_integrity.py` | 3,953 | `E39B0AA5CC967307E59BAB49B585477A49E6BF82FB26F58AC30B302AFA64DA78` |
+| P3.9 prototype design options (A/B/C, unranked) | `work/p3/p39/prototype-design-options.md` | 22,092 | `2B2875AAABAA79E1F1209F1338A8C3F2B6E7A653CFA5BC29CDA21DFD385CA4CA` |
+| P3.9 real-apply validation design (DESIGNED, NOT RUN) | `work/p3/p39/P3.9-real-apply-validation.md` | 76,634 | `8F79ED9197F60A7931DBCD9F7641929937D250627BC4DA618CA3552E00E04DAF` |
+| P3.9 window coordinate contract (A/B/C, unchosen) | `work/p3/p39/window-coordinate-contract.md` | 45,638 | `8561D054B8EB39D24CB9E966122A263930CAE802EC531AFB44803C440B9052AE` |
+| P3.9 production readiness matrix | `work/p3/p39/production-readiness-matrix.md` | 6,925 | `379B722E38D9A2C1E1C9280F9F51865F3A74E46CC067A5220A33C442C078DFF6` |
+| P3.9 acceptance report | `work/p3/p39/P3.9-ACCEPTANCE-REPORT.md` | 17,958 | `2924AC3446524C9A58FD2C654EA438439D2DBEE48392AD55237F4F5620721770` |
 
 ## Validated-against surface (measurement, planning, correction)
 
@@ -67,19 +74,19 @@ hash. The commit says which tree the tracked part of the evidence came from.
 
 | semantic | version string | source of the version | file SHA-256 (short) | git commit |
 |---|---|---|---|---|
-| P3 gap semantics engine | `p38-semantics-1` | `work/p3/p38/semantics/gap_semantics.py` | `CE10F3FB68484CFE…` | `afefee2abf12` |
-| P3 measurement layer | `3.0.0-dev` | `work/p3/measure.py` | `037A00953E64CD10…` | `afefee2abf12` |
-| P3.2 planner / plan format | `p3-correction-1` | `work/p3/correct.py` | `300707AD2B48478E…` | `afefee2abf12` |
-| P3.8 failure-injection record | `p38-failure-injection-1` | `work/p3/p38/failure_injection.py` | `9C8896FA3E90ACE8…` | `afefee2abf12` |
-| P3.8 frozen-plan reproduction record | `p38-real-reproduction-1` | `work/p3/p38/reproduce_frozen.py` | `6E837471D1304E1A…` | `afefee2abf12` |
-| P3.8 evidence freeze record | `p38-evidence-freeze-1` | `work/p3/p38/coordinator/freeze.py` | `ED93A545180C41D7…` | `afefee2abf12` |
-| P3.8 memory re-measurement record | `p38-memory-2` | `work/p3/p38/memory_check2.py` | `5067465869E3D6C8…` | `afefee2abf12` |
-| P3.8 window/centre mapping fixture | `p38-a-confirmatory-1` | `work/p3/p38/coordinator/a_confirmatory_real_measure.py` | `81A9D5E99B95CFB0…` | `afefee2abf12` |
-| P3.8 window-grid seam record | `p38-window-seam-1` | `work/p3/p38/window_grid_seam.py` | `C75AE758205DB7AA…` | `afefee2abf12` |
-| P3.8 offset-across-models record | `p38-offset-models-1` | `work/p3/p38/offset_across_models.py` | `3A04671573D1E0E4…` | `afefee2abf12` |
-| P3.8 final git/regression audit | `p38-final-audit-1` | `work/p3/p38/coordinator/final_audit.py` | `06EB399FA5DCD463…` | `afefee2abf12` |
-| P3 engine self-test | `100 PASS / 0 FAIL` | `work/p3/p38/semantics/selftest.py` | `42E879400B05275C…` | `afefee2abf12` |
-| P3.8 overlapping-window geometry | `26 PASS / 0 FAIL` | `work/p3/p38/overlap_geometry.py` | `4494E9AED7175F4E…` | `afefee2abf12` |
+| P3 gap semantics engine | `p38-semantics-1` | `work/p3/p38/semantics/gap_semantics.py` | `CE10F3FB68484CFE…` | `2e96f7399fd3` |
+| P3 measurement layer | `3.0.0-dev` | `work/p3/measure.py` | `037A00953E64CD10…` | `2e96f7399fd3` |
+| P3.2 planner / plan format | `p3-correction-1` | `work/p3/correct.py` | `300707AD2B48478E…` | `2e96f7399fd3` |
+| P3.8 failure-injection record | `p38-failure-injection-1` | `work/p3/p38/failure_injection.py` | `9C8896FA3E90ACE8…` | `2e96f7399fd3` |
+| P3.8 frozen-plan reproduction record | `p38-real-reproduction-1` | `work/p3/p38/reproduce_frozen.py` | `6E837471D1304E1A…` | `2e96f7399fd3` |
+| P3.8 evidence freeze record | `p38-evidence-freeze-1` | `work/p3/p38/coordinator/freeze.py` | `ED93A545180C41D7…` | `2e96f7399fd3` |
+| P3.8 memory re-measurement record | `p38-memory-2` | `work/p3/p38/memory_check2.py` | `5067465869E3D6C8…` | `2e96f7399fd3` |
+| P3.8 window/centre mapping fixture | `p38-a-confirmatory-1` | `work/p3/p38/coordinator/a_confirmatory_real_measure.py` | `81A9D5E99B95CFB0…` | `2e96f7399fd3` |
+| P3.8 window-grid seam record | `p38-window-seam-1` | `work/p3/p38/window_grid_seam.py` | `C75AE758205DB7AA…` | `2e96f7399fd3` |
+| P3.8 offset-across-models record | `p38-offset-models-1` | `work/p3/p38/offset_across_models.py` | `3A04671573D1E0E4…` | `2e96f7399fd3` |
+| P3.8 final git/regression audit | `p38-final-audit-1` | `work/p3/p38/coordinator/final_audit.py` | `06EB399FA5DCD463…` | `2e96f7399fd3` |
+| P3 engine self-test | `100 PASS / 0 FAIL` | `work/p3/p38/semantics/selftest.py` | `42E879400B05275C…` | `2e96f7399fd3` |
+| P3.8 overlapping-window geometry | `26 PASS / 0 FAIL` | `work/p3/p38/overlap_geometry.py` | `4494E9AED7175F4E…` | `2e96f7399fd3` |
 
 The frozen P3.3 plans carry `version = p3-correction-1`; the P3.2 freeze carries
 `manifest_version = p32-validation-freeze-1` **and** its own `git_commit`
