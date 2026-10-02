@@ -7,9 +7,9 @@
 > `git log` cannot say whether the semantics engine changed. A conclusion bound to
 > "the engine" is bound to nothing. These hashes are the binding.
 
-Generated: `2026-10-01T19:13:42Z`  
+Generated: `2026-10-02T09:55:19Z`  
 Branch: `research/audio-sync-p3-production-semantics`  
-HEAD: `30b95dd15dc8253de2c23edb137f705dad0db90e` — docs(audio-sync): pin P3.8 implementation provenance into tracked docs  
+HEAD: `afefee2abf1235f3a62ca973d2cb63534780178c` — docs(audio-sync): refresh P3.8 provenance after the archive pass  
 Upstream: `(none)`
 
 `work/` is gitignored, so **none of the implementation files below are committed.**
@@ -32,7 +32,7 @@ The hashes in this file are the only durable record of what was actually tested.
 | P3.8 offset across delay models | `work/p3/p38/offset_across_models.py` | 6,725 | `3A04671573D1E0E4FC88D522D58741EDB8F24FB99E2D3FB926D6E2C2ABD950A0` |
 | P3.8 archive/quarantine record | `work/p3/p38/coordinator/archive_quarantine.py` | 12,504 | `FD33B1C565A625443225A8C284CDFE8364E2D2CD66C1CAB9ADCC564EF382CEED` |
 | P3.8 evidence freeze | `work/p3/p38/coordinator/freeze.py` | 7,251 | `ED93A545180C41D7917C9CBAB1F7A771D65DBD5ACAE8681E1B1E82496D06BE3B` |
-| P3.8 provenance pinner | `work/p3/p38/coordinator/pin_provenance.py` | 13,083 | `81923F57A6E974EB1B889114D5F34B142F3E3A6C9F03343C76CD95E9C95C7803` |
+| P3.8 provenance pinner | `work/p3/p38/coordinator/pin_provenance.py` | 16,479 | `98279A02C368D2BAB9E931860F9C8A3CD28E5770D80028C036434523612CDC29` |
 | P3.8 final git/regression audit | `work/p3/p38/coordinator/final_audit.py` | 9,134 | `06EB399FA5DCD463A9165A8DDCECCAF016A6D039A77722867BF88F805A0056F9` |
 | Critical A/C window-centre audit | `work/p3/p38/coordinator/a_window_center_audit.py` | 16,592 | `AD39A7C3601C63B80919932FAAEEA8418C066A8C7ECBA4BDD83A2076817D44E9` |
 | Critical A/C confirmatory (real measure_window) | `work/p3/p38/coordinator/a_confirmatory_real_measure.py` | 9,188 | `81A9D5E99B95CFB0CE195F397C32A8A0B6703D22DFCAC6E634DF89A6FDEC5E88` |
@@ -58,6 +58,33 @@ The hashes in this file are the only durable record of what was actually tested.
 | P3.3 frozen plan C1305 hop2.5 | `work/p3/p33/c1305/plan_20260919_C1305_hop2p5_s3000.json` | 150,829 | `C55103C2449918DE5630F5639C89D6988A8751A44898819F940645FB430864BC` |
 | P3.3 frozen plan C1306 hop10 | `work/p3/p33/c1306/plan_20260919_C1306_hop10.json` | 67,472 | `B1D8489CFA4370CAD94EE97656004775226818C17AFCEBFA332F881C306DFC0A` |
 | P3.3 frozen plan C1306 hop2.5 | `work/p3/p33/c1306/plan_20260919_C1306_hop2p5.json` | 166,430 | `D7EF2D38E6C47C4D7B723DCEBD30F8D749FEAA0DA359814BBAC0D41206AE77A9` |
+
+## Identity of every key semantic: version + hash + commit
+
+A hash alone says *which bytes*; it does not say *which semantics*. The version
+string lives inside the hashed file, so it is only meaningful together with the
+hash. The commit says which tree the tracked part of the evidence came from.
+
+| semantic | version string | source of the version | file SHA-256 (short) | git commit |
+|---|---|---|---|---|
+| P3 gap semantics engine | `p38-semantics-1` | `work/p3/p38/semantics/gap_semantics.py` | `CE10F3FB68484CFE…` | `afefee2abf12` |
+| P3 measurement layer | `3.0.0-dev` | `work/p3/measure.py` | `037A00953E64CD10…` | `afefee2abf12` |
+| P3.2 planner / plan format | `p3-correction-1` | `work/p3/correct.py` | `300707AD2B48478E…` | `afefee2abf12` |
+| P3.8 failure-injection record | `p38-failure-injection-1` | `work/p3/p38/failure_injection.py` | `9C8896FA3E90ACE8…` | `afefee2abf12` |
+| P3.8 frozen-plan reproduction record | `p38-real-reproduction-1` | `work/p3/p38/reproduce_frozen.py` | `6E837471D1304E1A…` | `afefee2abf12` |
+| P3.8 evidence freeze record | `p38-evidence-freeze-1` | `work/p3/p38/coordinator/freeze.py` | `ED93A545180C41D7…` | `afefee2abf12` |
+| P3.8 memory re-measurement record | `p38-memory-2` | `work/p3/p38/memory_check2.py` | `5067465869E3D6C8…` | `afefee2abf12` |
+| P3.8 window/centre mapping fixture | `p38-a-confirmatory-1` | `work/p3/p38/coordinator/a_confirmatory_real_measure.py` | `81A9D5E99B95CFB0…` | `afefee2abf12` |
+| P3.8 window-grid seam record | `p38-window-seam-1` | `work/p3/p38/window_grid_seam.py` | `C75AE758205DB7AA…` | `afefee2abf12` |
+| P3.8 offset-across-models record | `p38-offset-models-1` | `work/p3/p38/offset_across_models.py` | `3A04671573D1E0E4…` | `afefee2abf12` |
+| P3.8 final git/regression audit | `p38-final-audit-1` | `work/p3/p38/coordinator/final_audit.py` | `06EB399FA5DCD463…` | `afefee2abf12` |
+| P3 engine self-test | `100 PASS / 0 FAIL` | `work/p3/p38/semantics/selftest.py` | `42E879400B05275C…` | `afefee2abf12` |
+| P3.8 overlapping-window geometry | `26 PASS / 0 FAIL` | `work/p3/p38/overlap_geometry.py` | `4494E9AED7175F4E…` | `afefee2abf12` |
+
+The frozen P3.3 plans carry `version = p3-correction-1`; the P3.2 freeze carries
+`manifest_version = p32-validation-freeze-1` **and** its own `git_commit`
+(`b4582b6`), which is what makes that manifest auditable against a tree rather
+than only against a hash.
 
 ## Real corpus
 
