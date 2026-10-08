@@ -704,12 +704,26 @@ imports it.
 |---|---|---|
 | **P4 production regression** | `python tests/audio_sync_p4/test_production_sync.py` | **180 cases, 0 silent-wrong, 0 fail** |
 | **existing unit** | `python tests/full_autotest.py --level unit` | **626 PASS / 0 FAIL** |
+| **existing toolchain (L2)** | `python tests/full_autotest.py --level toolchain` | **649 PASS / 0 FAIL** |
 | **P1 guard** | `python work/p2/scripts/p1_regression_guard.py` | **27 PASS / 0 FAIL** |
 | **P3.11 reproduction** | `python work/p4/verify_p311_reproduction.py` | **30/30 byte-exact, 30/30 state counts** |
 | **P3.11 coordinate tests** | `python tests/audio_sync_p311/test_coordinates.py` | **71 PASS / 0 FAIL** |
 | **memory / performance** | `python work/p4/memory_and_performance.py` | **PASS** |
 | **hash re-verification** | `python work/p4/hash_verify.py` | **12 / 12 MATCH** |
-| **P3.10 / P3.8 / P3.7 suites** | in `work/`, **not re-run by P4** | see note |
+| **P3.8 / P3.10 / P3.12 suites** | in `work/`, **not re-run by P4** | see note |
+| **L3 (`--level full`)** | real encoder pipelines | **not run, deliberately** — see note |
+
+### L2 is the level that matters for P4
+
+`--level toolchain` adds real tool probing and — relevant to the user's
+concurrent work — **file-level metadata** (`nrtm` meta across a re-mux) and the
+`tref-cdsc` cross-remux cases. **Both pass**, which is the evidence that P4 left
+the user's `core/batch_hw.py` container-preservation fix working.
+
+**L3 (`--level full`) was not run.** It performs real NVENC/QSV pipelines and
+takes 10–15 minutes, and **P4's module is not reachable from any of it**. Running
+it would test encoder backends P4 did not touch, not P4. Recorded as a deliberate
+choice rather than an oversight.
 
 ### Why the P3.8/P3.10/P3.12 suites were not re-run
 

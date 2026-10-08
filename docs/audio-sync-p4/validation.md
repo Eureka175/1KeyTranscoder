@@ -13,6 +13,7 @@ Nothing is inherited from a P3 summary.
 | V2 | P3.11 corrected-PCM reproduction | **30 / 30 arms byte-for-byte** | `python work/p4/verify_p311_reproduction.py` |
 | V3 | P3.11 plan state counts | **30 / 30 match** | same, above |
 | V4 | existing unit regression | **626 PASS / 0 FAIL** | `python tests/full_autotest.py --level unit` |
+| V4b | existing toolchain regression | **649 PASS / 0 FAIL** | `python tests/full_autotest.py --level toolchain` |
 | V5 | P1 guard | **27 PASS / 0 FAIL** | `python work/p2/scripts/p1_regression_guard.py` |
 | V6 | memory control (positive, touched) | **discriminating, 3/3 sizes** | `python work/p4/memory_and_performance.py` |
 | V7 | bounded memory | peak **9.10 MB** over a **120×** stream range | same |
@@ -158,6 +159,25 @@ Run **after** `core/audio_sync_tv.py` and `tests/audio_sync_p4/` were added. Thi
 is the check that the new module did not perturb the existing suites — the three
 user-modified test files among them. `tests/selftest/suites/core.py` and
 `toolchain.py` are the user's uncommitted modifications and both participate.
+
+## V4b — existing toolchain regression (L2)
+
+```text
+########## 测试深度 TOOLCHAIN ##########
+SUMMARY: 649 PASS / 0 FAIL (92.9s)
+```
+
+L2 adds real tool-version probing, `--check-features` capability parsing, the
+known-flags whitelist, Gyroflow/GPAC availability, and — relevant to the user's
+concurrent work — **file-level metadata** (`nrtm` meta across a re-mux) and the
+`tref-cdsc` cross-remux cases. Both pass, which is the evidence that P4 left the
+user's `core/batch_hw.py` container-preservation fix working.
+
+L3 (`full`) was **not** run: it performs real encoder pipelines (NVENC/QSV) and
+takes 10–15 minutes, and **P4's module is not reachable from any of it** — the
+`--level toolchain` run already exercises the audio-sync selftest suites and the
+file-level metadata path. Running L3 would test the encoder backends P4 did not
+touch, not P4. Recorded as a deliberate choice rather than an oversight.
 
 ---
 
