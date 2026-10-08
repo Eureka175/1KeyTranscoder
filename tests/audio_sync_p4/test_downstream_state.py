@@ -144,11 +144,44 @@ def t2_model() -> None:
     value("T2.3 SUCCESS + a number is representable and reads as applied",
           r.applied and r.offset_samples == 615,
           "AudioSyncResult(status=success, offset_samples=615).applied=True")
-    value("T2.4 AudioSyncResult has no coverage field today",
-          not any(hasattr(r, k) for k in
-                  ("coverage", "measured_windows", "total_windows",
-                   "measurement_coverage", "states", "resolved")),
-          f"fields={list(r.__dict__)}")
+    # --- T2.4: PROMOTED BY P4.3, with the reason recorded in place ---------
+    #
+    # P4.1/P4.2 registered this as the CURRENT state: AudioSyncResult had no
+    # coverage field, so a consumer could not tell a fully measured track from
+    # a partly measured one. P4.3 (D1) adds the evidence triple. The negative
+    # assertion is therefore REPLACED by a positive assertion of the property
+    # it was standing in for; it is not deleted.
+    _r_null = AudioSyncResult()
+    _r_ev = AudioSyncResult(
+        status=SyncStatus.SUCCESS, offset_samples=615,
+        usable_frames=592, total_frames=481, coverage=592 / 481,
+    )
+    value("T2.4 PROMOTED (was 'AudioSyncResult has no coverage field today'): "
+          "the production model states the evidence",
+          hasattr(r, "coverage") and hasattr(r, "total_frames")
+          and _r_ev.coverage is not None
+          and _r_ev.measurement_coverage == _r_ev.coverage,
+          f"fields={sorted(r.__dict__)}; the existing usable_frames now has a "
+          f"denominator and a stated fraction")
+    value("T2.4a ...and 'not stated' is None, never 0 (U1: no sentinel)",
+          _r_null.coverage is None and _r_null.total_frames is None
+          and _r_null.measurement_coverage is None,
+          "an un-updated path must not be read as a total measurement failure")
+    value("T2.4b ...and the evidence survives a dict round-trip exactly",
+          AudioSyncResult.from_dict(
+              AudioSyncResult(status=SyncStatus.SUCCESS, offset_samples=615,
+                              usable_frames=592, total_frames=481,
+                              coverage=592 / 481).to_dict()
+          ).coverage == 592 / 481,
+          "status and coverage survive to_dict -> JSON -> from_dict")
+    value("T2.4c ...and a legacy record without the new keys is unchanged",
+          AudioSyncResult.from_dict(
+              {"status": "success", "offset_samples": 615}
+          ).status is SyncStatus.SUCCESS
+          and AudioSyncResult.from_dict(
+              {"status": "success", "offset_samples": 615}
+          ).coverage is None,
+          "new fields do not force historical results to fail")
 
     def break_it() -> None:
         assert hasattr(r, "measured_windows"), "x"
@@ -240,17 +273,45 @@ def t5_dangerous_loss() -> None:
     value("T5.3 the whole track is shifted (correct — applying is not the defect)",
           off == 296, f"offset={off} for a track that is {coverage:.1%} measured")
 
-    # THE FINDING
-    discoverable = (getattr(res, "measurement_coverage", None) is not None
-                    or getattr(res, "measured_windows", None) is not None)
+    # THE FINDING — SPLIT BY P4.3 into its decidable and undecidable halves.
+    #
+    # The original T5.4 was a COMPOUND claim: "a consumer can discover that
+    # 234/481 *plan windows* were policy-filled". P4.3's D1 decision implements
+    # the evidence contract for the population the P1 producer actually has
+    # (measurement frames of the adopted estimate) and deliberately does NOT
+    # mint a plan-window field, because no production producer populates one.
+    # So the compound claim is split rather than left as a single XFAIL whose
+    # reason has silently gone stale.
+    row_ev = dict(row)
+    row_ev["evidence"] = {"usable_frames": 592, "total_frames": 481,
+                          "coverage": 592 / 481, "confidence": 0.62}
+    res_ev = ChannelSyncReport({"status": "applied", "detail": "",
+                                "anchor_stream": 2, "channels": [row_ev],
+                                "algo_version": "2.3.0-p1"}).resolve(row_ev)
+    value("T5.4a PROMOTED BY P4.3 (was XFAIL owner=D1): a consumer CAN discover "
+          "how well measured the adopted estimate is",
+          res_ev.coverage is not None and res_ev.total_frames == 481
+          and res_ev.usable_frames == 592,
+          f"coverage={res_ev.measurement_coverage} stated on the production "
+          f"object; the frame-domain evidence contract (D1) is implemented")
+
+    # The undecidable half stays open, with its owner corrected: it is no
+    # longer D1 (the evidence contract exists) but D8 (nothing in production
+    # produces a plan-window population to populate such a field).
+    discoverable = getattr(res, "measured_windows", None) is not None
     xfail_check(
-        "T5.4 CONTRACT: a consumer can discover that 234/481 windows "
+        "T5.4b CONTRACT: a consumer can discover that 234/481 PLAN WINDOWS "
         "(48.6 %) were policy-filled",
-        discoverable, owner="D1",
-        reason="AudioSyncResult exposes no coverage field, so a consumer "
-               "reading status/applied/offset_samples cannot tell this track "
-               "from a fully measured one. This is the D6 finding. It flips "
-               "when the D1 patch adds measured_windows/total_windows.")
+        discoverable, owner="D8",
+        reason="the plan-window population (measured_windows/total_windows over "
+               "a CorrectionPlan) has NO producer in production: "
+               "core/audio_sync_tv is imported by no production module, so the "
+               "field could not be populated or tested. D1's frame-domain "
+               "contract (T5.4a) is implemented and is a DIFFERENT population "
+               "(measurement frames of the adopted estimate) — d1 contract "
+               "section 4.2 forbids reporting a coverage figure without naming "
+               "its population. It flips when D8 wires a producer that carries "
+               "the plan-window counts to AudioSyncResult.")
 
     # --- T5.5: RECLASSIFIED BY P4.2, with the reason recorded in place -------
     #
@@ -489,25 +550,38 @@ def t8_live_drop_points() -> None:
         print("  [SKIP] the baseline CSV is absent — a skip is NOT a pass")
 
     # 6. the P2 path computes a denominator and never uses it
+    #
+    # --- PROMOTED BY P4.3 ---------------------------------------------------
+    # T8.7..T8.10 recorded four negative facts about the P2 path. P4.3 (D1)
+    # closes all four, so each negative assertion is REPLACED in place by the
+    # positive property it was standing in for. None is deleted, and T8.10's
+    # probe function is kept because its inverse is now the assertion.
     from core import audio_sync as asy
     asrc = inspect.getsource(asy)
     value("T8.7 the P2 cross-file path computes total_frames",
           "total_frames = len(pair.frames)" in asrc,
-          "core/audio_sync.py:967")
-    value("T8.8 ...and does NOT copy it into the sync result",
-          "total_frames=self.total_frames" not in asrc
-          and "total_frames=out.total_frames" not in asrc,
-          "the AudioSyncResult construction copies usable_frames only, so the "
-          "denominator dies one line after it becomes available")
-    value("T8.9 ...and the P2 path has no coverage-fraction gate at all",
-          "min_usable_fraction" not in asrc,
-          "it gates on absolute counts (usable_frames < 5, confidence < 0.3) "
-          "only, then sets SUCCESS")
+          "core/audio_sync.py")
+    value("T8.8 PROMOTED (was '...and does NOT copy it into the sync result'): "
+          "the denominator now reaches the sync result",
+          "total_frames=int(item.total_frames)" in asrc
+          and "coverage=(" in asrc,
+          "the AudioSyncResult construction copies usable_frames AND its "
+          "denominator AND the stated fraction; the denominator no longer dies "
+          "one line after it becomes available")
+    value("T8.9 PROMOTED (was '...and the P2 path has no coverage-fraction gate "
+          "at all'): the P2 path applies all three production gates",
+          "min_usable_fraction" in asrc
+          and 'params["min_usable_fraction"]' in asrc,
+          "it now gates on usable_frames, confidence AND coverage. The three "
+          "default values are cross-checked against core.channel_sync.DEFAULTS "
+          "at import time, so the two gate sets cannot diverge silently")
 
-    value("T8.10 nothing in the repository READS the P2 denominator",
-          _no_reader_of_p2_total_frames(),
-          "grep shows total_frames appears in core/audio_sync.py only as a "
-          "field, a serialiser and an assignment")
+    value("T8.10 PROMOTED (was 'nothing in the repository READS the P2 "
+          "denominator'): the repository now reads it",
+          not _no_reader_of_p2_total_frames(),
+          "grep for `[.\\[]\\s*total_frames` now hits production/output.py as "
+          "well as core/audio_sync.py — the evidence is consumed, not merely "
+          "stored")
 
     def break_it() -> None:
         assert "min_usable_fraction" not in src, "x"
@@ -561,21 +635,31 @@ def t9_p42_revalidation() -> None:
           "evidence = {usable_frames, total_frames, coverage, confidence} on "
           "every decision row")
 
-    # ---- STILL OPEN: AudioSyncResult has no coverage field (that is D1's patch)
-    value("T9.5 AudioSyncResult still has no coverage field — D1's patch is "
-          "still outstanding",
-          not any(hasattr(res, k) for k in
-                  ("coverage", "measured_windows", "total_windows",
-                   "measurement_coverage")),
-          "P4.2 fixed the GATE and attached evidence to the PRODUCER's row; it "
-          "did not extend the production model, which is the D1 design")
+    # ---- RESOLVED BY P4.3: the production model states the evidence ---------
+    #
+    # P4.2 recorded this as open; P4.3 (D1) implements it. The negative
+    # assertion is REPLACED in place by the positive property, not deleted.
+    value("T9.5 PROMOTED (was 'AudioSyncResult still has no coverage field — "
+          "D1's patch is still outstanding'): D1's patch is applied",
+          all(hasattr(res, k) for k in
+              ("coverage", "total_frames", "measurement_coverage"))
+          and "coverage=coverage" in inspect.getsource(
+              __import__("core.audio_models", fromlist=["x"]).ChannelSyncReport),
+          "AudioSyncResult now carries the evidence triple and "
+          "ChannelSyncReport.resolve() populates it; the model reaches the "
+          "consumer with the value it describes")
 
-    # ---- STILL OPEN: the cross-file path still drops its denominator
-    value("T9.6 the P2 cross-file path still drops total_frames",
-          "total_frames=self.total_frames" not in inspect.getsource(
-              __import__("core.audio_sync", fromlist=["x"])),
-          "recorded as a remaining drop point; P4.2 did not touch it because "
-          "it is a different pipeline and changing it needs its own regression")
+    # ---- RESOLVED BY P4.3: the cross-file path carries its denominator -------
+    value("T9.6 PROMOTED (was 'the P2 cross-file path still drops "
+          "total_frames'): the P2 path carries its denominator end to end",
+          "total_frames=int(item.total_frames)" in inspect.getsource(
+              __import__("core.audio_sync", fromlist=["x"]))
+          and "item.total_frames" in inspect.getsource(
+              __import__("production.output", fromlist=["x"])),
+          "P4.2 recorded it as a remaining drop point and did not touch it "
+          "because it is a different pipeline needing its own regression. P4.3 "
+          "is that phase: the P2 path now gates on coverage, states the "
+          "evidence on the sync result, and exposes it on AlignmentOutcome")
 
     # ---- the new reason code is registered
     value("T9.7 the new reason code maps to a status and is a failure class",
@@ -629,11 +713,20 @@ def main() -> int:
     t9_p42_revalidation()
 
     n_cases = len(RESULTS)
+    # The XFAIL owner is DERIVED from the registered cases, not hardcoded: the
+    # owner changed at P4.3 (T5.4a promoted under D1; T5.4b now waits on D8), and
+    # a hardcoded label would have kept printing a stale owner.
+    _owners = sorted({
+        r["detail"].split("OWNER=", 1)[1].split(":", 1)[0]
+        for r in RESULTS
+        if r["kind"] == "xfail" and "OWNER=" in r["detail"]
+    })
     print("\n" + "=" * 78)
     print(f"cases            : {n_cases}")
     print(f"PASS             : {COUNTS['pass']}")
     print(f"FAIL             : {COUNTS['fail']}")
-    print(f"XFAIL (contract) : {COUNTS['xfail']}   <- D6 finding, owned by D1")
+    print(f"XFAIL (contract) : {COUNTS['xfail']}   <- "
+          f"{'owned by ' + ', '.join(_owners) if _owners else 'none open'}")
     print(f"XPASS (stale)    : {COUNTS['xpass']}   <- must be promoted")
     print(f"CONTROL_OK       : {COUNTS['control_ok']}")
     print(f"CONTROL_FAILED   : {COUNTS['control_failed']}")
@@ -670,7 +763,8 @@ def main() -> int:
         return 1
 
     print(f"\nRESULT: PASS — {COUNTS['pass']} behaviors hold, "
-          f"{COUNTS['xfail']} contract gap(s) OPEN and owned by D1, "
+          f"{COUNTS['xfail']} contract gap(s) OPEN"
+          + (f" and owned by {', '.join(_owners)}" if _owners else "") + ", "
           f"{COUNTS['control_ok']} controls discriminating")
     print("NOTE: XFAIL cases are NOT passes. They are the D6 finding, held "
           "open so they cannot be forgotten.")
