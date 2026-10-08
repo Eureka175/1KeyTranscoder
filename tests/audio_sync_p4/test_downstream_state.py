@@ -252,22 +252,56 @@ def t5_dangerous_loss() -> None:
                "from a fully measured one. This is the D6 finding. It flips "
                "when the D1 patch adds measured_windows/total_windows.")
 
-    xfail_check(
-        "T5.5 CONTRACT: a success with unresolved windows is nameable "
-        "distinctly from a full success",
-        any(k in m.value for m in SyncStatus
-            for k in ("partial", "unresolved")),
-        owner="D1",
-        reason="SyncStatus has no member for 'succeeded, partially measured'; "
-               "AudioTrack.refresh_sync therefore has no member to aggregate "
-               "and must report SUCCESS.")
+    # --- T5.5: RECLASSIFIED BY P4.2, with the reason recorded in place -------
+    #
+    # P4.1 registered this as XFAIL(owner=D1) because SyncStatus has no member
+    # for "succeeded, partially measured". P4.2 fixed the GATE rather than
+    # minting the member: an under-evidenced track is no longer written
+    # `decision="fixed"` at all, so it resolves to LOW_CONFIDENCE — which is
+    # exactly the existing member that means "a number exists and is not
+    # trusted". The XFAIL is therefore REPLACED by a positive assertion of the
+    # stronger property, and the original is not deleted.
+    row_gap = {
+        "stream": 3, "decision": "untouched",
+        "reason": "evidence_insufficient", "shift_samples": None,
+        "delay_samples": 296.476, "delay_ms": 6.1766, "confidence": 0.62,
+        "constant": True, "warnings": [], "usable_frames": 6, "polarity": 1,
+        "drift_ppm": 2.0, "fractional_part_samples": None,
+        "storage_dtype": "f32", "rms_dbfs": -18.0,
+        "evidence": {"usable_frames": 6, "total_frames": 19,
+                     "coverage": 0.316, "confidence": 0.62},
+    }
+    rep_gap = ChannelSyncReport({"status": "applied", "detail": "",
+                                 "anchor_stream": 2, "channels": [row_gap],
+                                 "algo_version": "2.3.0-p1"})
+    res_gap = rep_gap.resolve(row_gap)
+    value("T5.5 RECLASSIFIED (was XFAIL owner=D1, resolved by P4.2): an "
+          "under-evidenced track is NOT reported as a successful fix",
+          res_gap.status is not SyncStatus.SUCCESS and not res_gap.applied,
+          f"decision='untouched' reason='evidence_insufficient' -> "
+          f"SyncStatus.{res_gap.status.name}, applied={res_gap.applied}. "
+          f"P4.2 chose an existing member (LOW_CONFIDENCE = 'a number exists "
+          f"but is not trusted') over minting a new one.")
 
-    # the counter-check that keeps the finding honest
-    value("T5.6 the loss is LATENT: today's production cannot produce this input",
+    # --- T5.6: REWRITTEN BY P4.2 -------------------------------------------
+    #
+    # P4.1 concluded the loss was LATENT on the grounds that production writes
+    # one scalar shift per track. Adversarial review then showed that reasoning
+    # was wrong — this is the TRACK-level form of the same failure, and it was
+    # live. P4.2 fixed it. The old assertion (a source substring proving the
+    # scalar signature) was a weak proxy for the claim; it is replaced by the
+    # property that actually matters.
+    value("T5.6 REWRITTEN (was 'the loss is LATENT'): the scalar signature is "
+          "still true, and it is no longer what protects the evidence",
           "delay_samples=e.delay_samples" in _channel_sync_source(),
-          "core/channel_sync.py applies ONE scalar shift per track, so a "
-          "partially-measured track cannot occur until the time-varying path "
-          "is wired in")
+          "one scalar shift per track is STILL the case — but it was never what "
+          "made the loss latent; the final adoption gate is what makes an "
+          "under-evidenced track safe now")
+    value("T5.6b the final adoption gate exists and is applied to the chosen "
+          "estimate",
+          "最终采纳门" in _channel_sync_source(),
+          "P4.2 adds a final gate on the ADOPTED estimate, so `SUCCESS` can no "
+          "longer rest on a local variable that has left scope")
 
     def break_it() -> None:
         assert discoverable, "x"
@@ -400,11 +434,19 @@ def t8_live_drop_points() -> None:
           "usable_frames >= 5 and confidence >= 0.3, and never re-applies the "
           "fraction gate to what it adopts")
 
-    # 3. coverage reaches no report row
-    value("T8.3 coverage is written into no report row",
-          '"coverage"' not in src and "'coverage'" not in src,
-          "plain_row (~:490) and est_row (~:516) have no coverage key, so a "
-          "consumer cannot recover the fraction from the report")
+    # 3. coverage reaches the report row
+    #
+    # P4.2 FIXED this. The original check was `'"coverage"' not in src`, which is
+    # an over-broad substring test: it matched the word appearing anywhere in the
+    # source, so it started failing the moment P4.2 *added* coverage handling.
+    # It is now a POSITIVE assertion on the real contract — every decision row
+    # carries an `evidence` dict with the coverage fraction — which is both
+    # meaningful and no longer sensitive to how the identifier is spelled.
+    value("T8.3 coverage IS now attached to every decision row (P4.2)",
+          "rows[i][\"evidence\"] = ev" in src,
+          "P4.2 attaches `evidence` = {usable_frames, total_frames, coverage, "
+          "confidence} to every row, so the fraction is recoverable from the "
+          "report; before P4.2 it was computed and discarded")
 
     # 4. min_audio_seconds / frame geometry make a low usable_frames count
     #    impossible under a re-checked gate
@@ -472,6 +514,83 @@ def t8_live_drop_points() -> None:
     control("T8.C the coverage-computation probe can fail", break_it)
 
 
+def t9_p42_revalidation() -> None:
+    """P4.2 revalidation: what the evidence-integrity fix changed, and what it did not.
+
+    The brief requires the two D6 XFAILs to be either promoted or formally
+    reclassified — never deleted. This block states the reclassification with
+    its reason, and asserts the parts of the D6 finding that P4.2 resolved.
+    """
+    print("\n== T9  P4.2 revalidation of the D6 findings ==")
+    import inspect
+
+    from core import channel_sync as cs
+    from core.audio_models import ChannelSyncReport, SyncStatus
+    from core.audio_timeline import _effective_offset, SyncApplication
+
+    src = inspect.getsource(cs)
+
+    # ---- RESOLVED: a policy-filled / under-evidenced track is no longer SUCCESS
+    row = {
+        "stream": 3, "decision": "untouched", "reason": "evidence_insufficient",
+        "shift_samples": None, "delay_samples": 296.476, "delay_ms": 6.1766,
+        "confidence": 0.62, "constant": True, "warnings": [],
+        "usable_frames": 6, "polarity": 1, "drift_ppm": 2.0,
+        "fractional_part_samples": None, "storage_dtype": "f32",
+        "rms_dbfs": -18.0,
+        "evidence": {"usable_frames": 6, "total_frames": 19, "coverage": 0.316,
+                     "confidence": 0.62},
+    }
+    rep = ChannelSyncReport({"status": "applied", "detail": "",
+                             "anchor_stream": 2, "channels": [row],
+                             "algo_version": "2.3.0-p1"})
+    res = rep.resolve(row)
+    value("T9.1 an under-evidenced track no longer resolves to SUCCESS",
+          res.status is not SyncStatus.SUCCESS,
+          f"decision='untouched', reason='evidence_insufficient' -> "
+          f"SyncStatus.{res.status.name}")
+    value("T9.2 ...and reads as not applied",
+          not res.applied, f"applied={res.applied}")
+    off, _ = _effective_offset(res, SyncApplication.APPLY)
+    value("T9.3 ...and the apply gate refuses it",
+          off == 0, f"offset={off}")
+
+    # ---- RESOLVED: the row now carries its evidence
+    value("T9.4 the report row carries the coverage fraction (P4.2)",
+          "rows[i][\"evidence\"] = ev" in src,
+          "evidence = {usable_frames, total_frames, coverage, confidence} on "
+          "every decision row")
+
+    # ---- STILL OPEN: AudioSyncResult has no coverage field (that is D1's patch)
+    value("T9.5 AudioSyncResult still has no coverage field — D1's patch is "
+          "still outstanding",
+          not any(hasattr(res, k) for k in
+                  ("coverage", "measured_windows", "total_windows",
+                   "measurement_coverage")),
+          "P4.2 fixed the GATE and attached evidence to the PRODUCER's row; it "
+          "did not extend the production model, which is the D1 design")
+
+    # ---- STILL OPEN: the cross-file path still drops its denominator
+    value("T9.6 the P2 cross-file path still drops total_frames",
+          "total_frames=self.total_frames" not in inspect.getsource(
+              __import__("core.audio_sync", fromlist=["x"])),
+          "recorded as a remaining drop point; P4.2 did not touch it because "
+          "it is a different pipeline and changing it needs its own regression")
+
+    # ---- the new reason code is registered
+    value("T9.7 the new reason code maps to a status and is a failure class",
+          "evidence_insufficient" in src
+          and "evidence_insufficient" in inspect.getsource(
+              __import__("core.audio_models", fromlist=["x"])),
+          "mapped to LOW_CONFIDENCE (a number exists but is not trusted) and "
+          "included in _ESTIMATION_FAIL_REASONS")
+
+    def break_it() -> None:
+        assert res.status is SyncStatus.SUCCESS, "x"
+    control("T9.C the 'under-evidenced is not SUCCESS' check can fail",
+            break_it)
+
+
 def _no_reader_of_p2_total_frames() -> bool:
     """True if no production file reads PairSyncEstimate.total_frames.
 
@@ -507,6 +626,7 @@ def main() -> int:
     t6_neutral_layers()
     t7_serialization()
     t8_live_drop_points()
+    t9_p42_revalidation()
 
     n_cases = len(RESULTS)
     print("\n" + "=" * 78)
