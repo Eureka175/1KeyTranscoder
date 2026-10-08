@@ -1444,6 +1444,103 @@ mapping / 外挂音频命名规则 / 硬件用法 / 限制 / 排错)。
 
 ---
 
+## 6.8 时变延迟修正的生产路径（P4，**默认 OFF · 未接线**）
+
+> 本节只记录 P4 新增的内容。**它不改变上面任何一节的语义**，也不改变任何默认行为：
+> `core/audio_sync_tv.py` 不被任何生产模块 import（有测试断言）。
+
+### 6.8.1 P1 是固定的标量，P4 是逐窗的计划
+
+| | P1（已发布） | P4（本模块） |
+|---|---|---|
+| 修正量 | **一个标量** `delay_samples` | 每窗一个整数 `shifts[w]` |
+| 应用入口 | `core/sync_fix.shift_stream` | `core/audio_sync_tv.apply_shift_plan` |
+| 认知状态 | 无（有测量就是有测量） | `TRUSTED` / `UNRESOLVED_GAP` / `REENTRY` |
+
+`shift_stream` 的签名是 `delay_samples: float` —— 整条轨迹在调用前被压成一个数。
+**逐窗计划会改变这个签名，因此它不是 drop-in 替换**（`HANDOFF-CHECKLIST.md` §3.4.1）。
+
+### 6.8.2 状态语义：状态是 resolved mask 的纯函数
+
+```text
+TRUSTED         本窗自身有被接受的测量
+UNRESOLVED_GAP  本窗被拒绝；移位是**策略决定**，不是测量
+REENTRY         缺口之后第一个被接受的窗
+```
+
+**状态 = f(resolved mask)**，不是 f(块内历史)。禁止 `shifts[-1]`、
+previous_chunk、全局可变状态。P3.7 证明逐块状态**不可能**分块不变（一个单窗块
+无法知道前面是缺口），从 mask 推导把这个缺陷类整体消除，并让分块不变性自动成立。
+
+`UNRESOLVED_GAP` 是**合法认知状态，不是错误**；错误是另一条线（缺上下文 / mask
+非法 / 非有限 / 移位越界 → `AudioSyncError` 子类，一律抛出）。
+
+### 6.8.3 坐标合同：join 是**声明式**的，不是整数除法的隐含结果
+
+```text
+out[k] = in[k + S[join(k)]]
+join ∈ {latest-start, nearest-centre}        默认 latest-start
+sample-domain 与 latest-start 是**同一个函数**，不是第三个候选
+```
+
+三个平面必须分开：**窗索引**（名字）、**施加的移位值**（整数）、**输出样本坐标**
+（物理修正位置）。P4 实测：两个合同的**索引**一致率 0.21 % / 0.24 %，而**移位值**
+一致率 56.94 % / 36.37 % —— 两个不同的问题，互不代替。
+
+与 P1 一致的地方：`shift = +rint(delay)`，`out[n] = in[n+shift]`。
+
+### 6.8.4 策略边界：**产品决定，P4 不替它决定**
+
+| 决定 | 状态 | 归属 |
+|---|---|---|
+| 缺口策略（hold / no_correction_gap / explicit_state / current） | **DEFERRED** | 产品（D1、D5） |
+| 坐标合同（latest-start / nearest-centre） | **DEFERRED** | 产品 + 工程（D2） |
+| 残差接受阈值 | **NOT ESTABLISHED** | 产品（D3） |
+| 是否启用 | **NOT ENABLED** | 产品（D8） |
+
+`latest-start` 是**实现默认值**，理由是**可复现性**（P3.3–P3.8 的每一个真实素材
+数字都是在该合同下产生的，改它会静默改变所有历史 plan），**不是**产品选择。
+
+### 6.8.5 默认 OFF 是**结构性**保证，不是开关
+
+```text
+core/audio_sync_tv.py        存在且可 import
+但
+core/channel_sync.py, core/sync_fix.py, core/sync_estimate.py,
+core/audio_plan.py, 1kt.py   都不引用它 —— 由测试断言
+```
+
+运行时开关可能被配置或失误打开；**没有任何生产模块 import 的代码不可能运行**。
+（`production-semantics.md` §1：这比 feature flag 是更强的默认路径保证。）
+一旦产品决定授权启用，`HANDOFF-CHECKLIST.md` §1 第 1 条才变成生效项：那时才需要
+flag，并且需要"OFF 路径逐字节一致"的审计。
+
+### 6.8.6 与其它域的隔离（硬性）
+
+```text
+不 import encoders / preservation / 硬件后端 / Sony / DJI
+不依赖 Video 域，不依赖 AudioPlan（它是声明式的，不执行）
+不引入全局可变状态，不引入隐式跨块状态
+```
+
+音频域内的新文件，`core/` 内唯一的依赖是 `core/sync_estimate` 的**流式读取面**
+（`RawStream`）。
+
+### 6.8.7 实测
+
+| 项 | 值 |
+|---|---|
+| 复现 P3.11 修正后 PCM | **30/30 条臂逐字节一致**（两条坐标合同、五个策略、六个通道对） |
+| 回归套件 | `tests/audio_sync_p4/test_production_sync.py` — **180 例，0 silent-wrong** |
+| apply 吞吐 | **671–814 MB/s**，与分块大小无关 |
+| apply 内存 | traced 峰值 **9.10 MB 平**；流长 **45×** → 峰值 **1.18×** |
+| 状态计数 | 30/30 与 P3.11 的 plan 记录一致 |
+
+详见 `docs/audio-sync-p4/`（`implementation.md` / `validation.md` /
+`production-readiness.md` / `P4-FINAL-REPORT.md`）。
+
+---
+
 ## 7. 编码后验证：`--check` 三级
 
 | 级别 | Sony | DJI |

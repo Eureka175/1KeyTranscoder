@@ -615,6 +615,7 @@ by git; `dist/` holds release artifacts built locally.
 - [v0.6.1 release notes](docs/release_notes_v0.6.1.md) — channel-sync streaming memory fix and AV1 colour metadata fix.
 - [Channel-sync P1 design](docs/design/channel_sync_p1.md) — algorithm, thresholds, degradation rules, fixture calibration.
 - [Audio sync research (P3)](docs/audio-sync-p3/P3-RESEARCH-OVERVIEW.md) — the time-varying-delay research line: per-phase status, what is validated, what is deferred and what is not production-approved. Research only; P1 behaviour above is unchanged.
+- [Audio sync production policy (P4)](docs/audio-sync-p4/README.md) — the production phase: a per-window time-varying correction module (`core/audio_sync_tv.py`), **default OFF and imported by no production module**, which reproduces the P3.11 corrected PCM byte-for-byte on 30/30 real-corpus arms. Gap policy, coordinate contract and residual acceptance remain **deferred product decisions**; the overall status is `READY FOR PRODUCTION POLICY`. No default behaviour changed.
 - [Hardware decode deliverables](docs/hardware-decode/README.md) — integration test matrix, final report, patches, toolchain provenance.
 - [Evaluation reports](docs/evaluation/) — per-backend production-readiness and AV1 calibration studies.
 - [Third-party reference archive](docs/reference/README.md) — archived vendor documentation and upstream sources.

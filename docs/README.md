@@ -206,6 +206,36 @@ F:\1KeyTranscoder\
 > 其中包括两处**至今未被任何文档调和**的矛盾（P3.2 的 `NOT VALIDATED` 与
 > P3.10/P3.11 实测到的大幅中位数改善）。**该矛盾被记录为未决项，未被"修好"。**
 
+## 📁 [audio-sync-p4/](audio-sync-p4/) — 音频同步**生产化**（分类：生产工程 / 策略待批）
+
+**P3 是研究线（已冻结）；P4 是生产化线。P4 实现了一个逐窗时变修正的生产模块，
+它默认 OFF，且没有被任何生产模块 import。**
+
+| 文档 | 内容 | 状态 |
+|---|---|---|
+| [`README.md`](audio-sync-p4/README.md) | **★ 入口**：一句话结论、状态表、怎么跑验证 | ✅ 权威（当前状态） |
+| [`evidence-freeze.md`](audio-sync-p4/evidence-freeze.md) | P3 证据冻结：哪些数字可以引用、出自哪个 artifact；含 **10 处 P3 摘要与自身明细表不符**的登记 | ✅ 权威 |
+| [`policy-matrix.md`](audio-sync-p4/policy-matrix.md) | 缺口策略 / 坐标合同 / 启用与否 **三张完整证据矩阵**（真实 P3 数据，不排序、不推荐） | ✅ 权威 |
+| [`coordinate-decision.md`](audio-sync-p4/coordinate-decision.md) | 三个问题分开回答（测量位置 / 施加位置 / 输出样本坐标），真实样本坐标下的首个分歧点 | ✅ 权威 |
+| [`gap-policy-decision.md`](audio-sync-p4/gap-policy-decision.md) | `TRUSTED` / `UNRESOLVED_GAP` / `REENTRY` 的精确语义；hold / 不修正 / 插值 的差别 | ✅ 权威 |
+| [`residual-acceptance.md`](audio-sync-p4/residual-acceptance.md) | 误差预算（含出处）；**结构门 A1–A8 + N1–N6**；阈值为何**未建立**、需要什么实验才能建立 | ✅ 权威 |
+| [`implementation.md`](audio-sync-p4/implementation.md) | 生产 API 与实现；为什么默认 OFF 是**结构性保证**而非开关 | ✅ 权威 |
+| [`validation.md`](audio-sync-p4/validation.md) | 全部验证记录：**30/30 逐字节复现 P3.11 修正后 PCM**、180 例回归、内存/性能/长跑 | ✅ 权威 |
+| [`production-readiness.md`](audio-sync-p4/production-readiness.md) | **逐项状态矩阵**（只有状态词，无分数） | ✅ 权威 |
+| [`policy-recommendation.md`](audio-sync-p4/policy-recommendation.md) | **工程建议 vs 产品决定**严格分离；D1/D2/D3/D5/D6/D8 全部标 `REQUIRED` | ✅ 权威 |
+| [`provenance.md`](audio-sync-p4/provenance.md) | 分支 / 提交 / 实现哈希 / 语料哈希 / 复现锚点 / 未改动文件复核 | ✅ 权威（溯源） |
+| [`static-audit.md`](audio-sync-p4/static-audit.md) | 静态审计：禁用模式、静默异常、依赖方向、内存边界 | ✅ 权威 |
+| [`P4-FINAL-REPORT.md`](audio-sync-p4/P4-FINAL-REPORT.md) | 22 节最终报告 | ✅ 权威 |
+
+> **一句话状态**：固定偏移 `VALIDATED`；时变测量 `VALIDATED`；真实 PCM 施加
+> `VALIDATED`；六通道对 E2E `VALIDATED`；**缺口策略 `DEFERRED`、坐标合同
+> `DEFERRED`、残差阈值 `NOT ESTABLISHED`、生产特性 `OFF`**。
+> 总体：**READY FOR PRODUCTION POLICY** —— 即"实现完成、等待产品策略批准"。
+>
+> **P4 没有替产品做决定，也没有改动任何默认行为。** 模块 `core/audio_sync_tv.py`
+> 与套件 `tests/audio_sync_p4/` 都是 tracked 代码，且**不 import `work/`**，
+> 因此它不受 P3 D7（实现存放在 gitignored `work/`）的影响。
+
 ## 📁 [reference/](reference/) — 参考资料（分类：第三方一手资料存档）
 
 厂商官方文档、上游源码片段、GPU 能力探测报告、社区实测抓取等**外部一手资料**，
