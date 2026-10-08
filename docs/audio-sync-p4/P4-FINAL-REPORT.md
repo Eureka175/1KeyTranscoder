@@ -953,7 +953,7 @@ name it as such.
 |---|---|
 | `core/audio_sync_tv.py` | the production module (tracked) |
 | `tests/audio_sync_p4/test_production_sync.py` | 180-case regression (tracked) |
-| `docs/audio-sync-p4/` | this phase's documentation (12 documents) |
+| `docs/audio-sync-p4/` | this phase's documentation (13 documents) |
 | `work/p4/verify_p311_reproduction.py` | the byte-exact reproduction verifier |
 | `work/p4/memory_and_performance.py` | memory / performance / long-run harness |
 | `work/p4/hash_verify.py` | hash re-verification of everything P4 must not change |
