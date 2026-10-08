@@ -1,10 +1,12 @@
 # D1 — Explicit Uncertainty Production Contract (specification)
 
-**Status: SPECIFIED. Not implemented. Policy-neutral by construction.**
+**Status: SPECIFIED, AND IMPLEMENTED BY P4.3 FOR THE FRAME-DOMAIN POPULATION.**
+**Policy-neutral by construction.** See §9 for the implementation record; §8 is
+the P4.1 statement of what was, at the time, not yet applied.
 
 This document defines **what the production contract for epistemic uncertainty
-must say**. It does not implement it, does not choose a gap policy, does not
-choose a coordinate contract, and does not enable anything.
+must say**. It does not choose a gap policy, does not choose a coordinate
+contract, and does not enable anything.
 
 It is written because P4.1's D6 audit found the precise gap it fills:
 `work/p4.1/state-loss-repro.md`.
@@ -332,6 +334,10 @@ construction** because the field does not exist.
 
 ## 8. Status of D1
 
+> **Superseded in part by §9 (P4.3, appended). This section is the P4.1 record
+> and is left as written.** Where it says "NOT APPLIED" / "NOT IMPLEMENTED",
+> §9 states what P4.3 applied and what it deliberately did not.
+
 ```text
 state vocabulary                    DEFINED (P3, unchanged)
 required surface (C-1 .. C-5)       DEFINED
@@ -370,3 +376,109 @@ D8   wire in + populate + enable                             later
 
 **D1 can be COMPLETE while D2, D5 and D8 remain deferred.** That is the brief's
 §51 outcome, and it is where P4.1 lands.
+
+---
+
+## 9. P4.3 implementation record (appended; §1–§7 unchanged)
+
+**This section is new in P4.3. Nothing above was rewritten.**
+
+### 9.1 What was applied, and why `measured_windows` became `total_frames`
+
+§6 designed the patch as `measured_windows` / `total_windows` / `policy` — the
+**plan-window** population. Implementing it revealed that D1 has two candidate
+populations, and that only one of them has a producer:
+
+| population | who produces it today | status |
+|---|---|---|
+| **measurement frames** of the adopted estimate | `core/channel_sync.py` writes `rows[i]["evidence"]` (P4.2) | produced, gated, **and dropped one layer later** |
+| **plan windows** of a `CorrectionPlan` | `core/audio_sync_tv.CorrectionPlan` — imported by **no** production module | **no producer** |
+
+§4.2 already forbids reporting a coverage figure without naming its population.
+Adding `measured_windows` now would create a second quantity named "coverage"
+with no producer to populate it, so P4.3 applied the **frame-domain** half and
+left the window-domain half open.
+
+Applied, therefore:
+
+```text
+core/audio_models.py :: AudioSyncResult
+    + total_frames: int | None = None
+    + coverage:     float | None = None
+    + @property measurement_coverage -> float | None
+      (stated value, else derived from usable/total, else None — never 0)
+
+core/audio_models.py :: AudioTrack
+    + sync_coverage: float | None = None     (min over channels, conservative)
+
+core/audio_plan.py :: AudioChannelRef
+    + sync_coverage: float | None = None     (product-facing traceability)
+
+core/audio_models.py :: ChannelSyncReport
+    + evidence_gate  (read from the report; else core.channel_sync.effective_opts)
+    + the SUCCESS => evidence-satisfied guard in resolve()
+
+core/channel_sync.py
+    + the report states the gate it applied ("evidence_gate")
+    + the recheck-failure row keeps its evidence (it was rebuilt and lost it)
+
+production/output.py :: AlignmentOutcome
+    + evidence: dict[channel_id, {usable_frames, total_frames, coverage,
+                                  confidence, evidence_sufficient, applied}]
+    + a log line naming the coverage of a partially measured corrected track
+```
+
+The names match `core.audio_sync.PairSyncEstimate`, which **already** carried
+`usable_frames` and `total_frames`. The same measurement fact is not allowed two
+names in two sync models.
+
+### 9.2 No new `SyncStatus` member was needed
+
+§6 proposed `PARTIALLY_MEASURED`. It is still not needed, and P4.3 did not mint
+it: with the gate applied to the adopted estimate, an under-evidenced track is
+never written `fixed` in the first place, so it resolves to the existing
+`LOW_CONFIDENCE` — "a number exists and is not trusted". A guard in
+`ChannelSyncReport.resolve` reclassifies a *stale or foreign* row that asserts
+`fixed` while stating sub-gate coverage, using the **existing** reason code
+`evidence_insufficient` from P4.2.
+
+### 9.3 The backward-compatibility rule, made precise
+
+```text
+coverage is None   ->  "not stated"  ->  today's behaviour, exactly
+coverage is stated ->  compared against the gate the REPORT names
+coverage < gate while claiming SUCCESS -> the contradiction is removed
+```
+
+`None` is never converted to `0` in either direction, and `to_dict()` omits an
+unstated field entirely, so an existing path's serialised output is
+**byte-identical** (asserted: suite P.3, P.4). Replayed over the frozen
+137-corpus baseline: **548 rows, 0 resolved status changes**.
+
+### 9.4 Which requirements of §7 are now met
+
+| # | test | status |
+|---|---|---|
+| R-1 | state preservation | **met** (suite C.1–C.4) |
+| R-2 | state flattening | **met** (S3.3, S8.1: `source` distinguishes policy from measurement) |
+| R-3 | shift/state distinction | **met** (S8.3: a policy-sourced TRUSTED is unconstructible) |
+| R-4 | serialization round-trip | **met** (T2.4b: exact, including `None`) |
+| R-5 | dangerous state loss | **met for the frame population** (S5.2); the window population is T5.4b, XFAIL, owner D8 |
+| R-6 | safe state termination | **met** (C.5, EX-1: asserted and executed) |
+| R-7 | no-silent-report | **met** (S2, S7) |
+| R-8 | anti-silent-success | **met** (empty run = exit 2 in every P4 suite) |
+
+### 9.5 What P4.3 did NOT do
+
+```text
+did not add measured_windows / total_windows / policy   (no producer)
+did not mint PARTIALLY_MEASURED                          (not needed)
+did not choose a gap policy (D5) or a coordinate (D2)
+did not enable anything (D8)
+did not change any algorithm, threshold or correction
+did not rewrite section 1 .. section 8 of this document
+```
+
+The full record, with the decision-ID reconciliation between this document's
+numbering and the P4.3 brief's, is
+[`p4.3-production-semantics.md`](p4.3-production-semantics.md).

@@ -231,6 +231,8 @@ F:\1KeyTranscoder\
 | [`d1-uncertainty-contract.md`](audio-sync-p4/d1-uncertainty-contract.md) | **D1 不确定性生产契约（规范，未实现）**：状态词汇、序列化、日志、消费者可见性；最小补丁设计（**feature-gated by construction**）。**策略中立** | ✅ 权威（契约） |
 | [`p4.2-evidence-integrity.md`](audio-sync-p4/p4.2-evidence-integrity.md) | **P4.2 证据完整性修复**（**本仓库首个有意改变生产行为的阶段**）：复现 → 根因 → 修正采纳门 → 证据字段 → P1 137 语料审计 → 真实语料审计 → D6 复验 → 缺陷家族静态审计 → 全量回归。**状态 `COMPLETE`** | ✅ 权威（修复记录） |
 | [`p4.2-provenance.md`](audio-sync-p4/p4.2-provenance.md) | P4.2 溯源：改动了什么（2 个生产文件，前后哈希）与**证明没动什么**（9 个用户文件、冻结 fixture、同步算法） | ✅ 权威（溯源） |
+| [`p4.3-production-semantics.md`](audio-sync-p4/p4.3-production-semantics.md) | **P4.3 生产语义收口**：D1 证据契约**已实现**（证据随值抵达消费者）；D2 缺口策略 / D5 坐标合同 `DEFERRED` 且**实现默认值与语义契约分为两个字段**；D8 启用状态正式定义。含**决策编号三向冲突**的调和表、P2 路径同类缺陷的修复（前后**同 harness 实测**）、P1 548 行重放（0 结论变化）。**算法改动 = 0** | ✅ 权威（契约与决定） |
+| [`p4.3-provenance.md`](audio-sync-p4/p4.3-provenance.md) | P4.3 溯源：base/head、改动文件与前后哈希、fixture 哈希、测试计数、D1 修订、D2/D5/D8 状态 | ✅ 权威（溯源） |
 
 > **一句话状态**：固定偏移 `VALIDATED`；时变测量 `VALIDATED`；真实 PCM 施加
 > `VALIDATED`；六通道对 E2E `VALIDATED`；**缺口策略 `DEFERRED`、坐标合同
@@ -249,6 +251,29 @@ F:\1KeyTranscoder\
 > `LOW_CONFIDENCE`，而覆盖率确实达标的那一对 74.4 % 仍然成功）。
 > **P1 算法未改**（`sync_estimate.py` / `sync_fix.py` 哈希与 P3 一致），
 > 改的是**分类**，不是修正。
+>
+> **P4.3（生产语义收口，状态进行中）再补一句**：P4.2 之后剩下的问题不再是
+> "有没有证据门绕过"，而是"证据语义正确之后，生产契约是什么"。
+>
+> * **D1 证据契约 = 已决定并实现**：`AudioSyncResult` 现在携带
+>   `usable_frames` / `total_frames` / `coverage`，并向上贯通到
+>   `AudioTrack` / `AudioChannelRef` / `AlignmentOutcome`；`None` 表示
+>   "未陈述"而**不是** 0，因此**历史记录与外部输入不因新增字段而改变结论**
+>   （冻结的 P1 137 语料 **548 行重放、0 处结论变化**）。
+> * **同类缺陷的第二处实例被找到并修复**：`core/audio_sync.py`（P2 对齐路径）
+>   的质量门**从来没有覆盖率这一项**（文档却声称与文件级管线同一套），于是
+>   coverage 20.5 % 的估计会被发布为 `success` 并写进 offsets。修复前后由
+>   **同一个 harness 分别对 `97e1504` 抽取树与当前树实测**：改前
+>   `success/offset=480/applied=1`，改后 `failed/无 offset/applied=0`，
+>   而对照组（覆盖率 94.9 %）在两次运行中都成功。
+> * **D2 缺口策略 / D5 坐标合同 = `DEFERRED`**，并且**实现默认值**与**语义契约**
+>   在代码里是两个字段（`core/audio_sync_tv.DECISION_STATUS`），有测试保证二者
+>   不会被混为一谈。D2 不被决定的理由是 P4 的实测结论：**没有一列占优**，
+>   区分各候选的那些行取决于缺口内不连续点的位置 —— 而那**不可观测**。
+> * **D8 启用状态 = 正式定义**：默认路径不变；`core/audio_sync_tv.py` 仍然
+>   **不被任何生产模块 import**（结构性 OFF，不是开关）；启用 `D8-C` 未取。
+> * **算法改动 = 0**：`sync_estimate.py` / `sync_fix.py` / GCC-PHAT / P1 修正
+>   数学 / 六对 E2E 修正机制全部未动。
 >
 > **P4 没有替产品做决定，也没有改动任何默认行为。** 模块 `core/audio_sync_tv.py`
 > 与套件 `tests/audio_sync_p4/` 都是 tracked 代码，且**不 import `work/`**，
