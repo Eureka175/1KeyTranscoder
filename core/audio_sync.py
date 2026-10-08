@@ -807,7 +807,41 @@ _ESTIMATE_DEFAULTS: dict[str, Any] = {
     "fine_phase_band_hz": (200.0, 8000.0),
     "min_usable_frames": 5,
     "frame_min_rms_dbfs": -50.0,
+    # P4.3 (D1): 证据门的第三项 —— 覆盖率。上面那句"与 core.channel_sync
+    # 同一套标定值"在 P4.2 之前只对前两项成立: 文件级管线加了覆盖率门,
+    # 这里没加, 于是本路径可以发布一条覆盖率不足的 SUCCESS。
+    # 这个数值不是"第二个真相源": 导入期由 `_assert_gate_matches_production()`
+    # 与 `core.channel_sync.DEFAULTS` 逐项核对, 不一致直接 RuntimeError。
+    "min_usable_fraction": 0.6,
 }
+
+
+def _assert_gate_matches_production() -> None:
+    """本模块声明的阈值必须与生产配置逐项一致, 否则**在导入期报错**。
+
+    存在的意义: "两套阈值悄悄分叉"正是 P4.3 要关掉的缺陷家族。注释里写
+    "同一套"没有约束力, 这一行有。若 `core.channel_sync` 不可导入 (例如
+    裁剪过的部署), 只跳过核对, 不改变任何判定。
+
+    注意核对的是**本模块默认值**: 调用方通过 `SyncPlan.parameters` 覆盖
+    `min_usable_fraction` 仍然生效 (与另两项一致)。
+    """
+    try:
+        from .channel_sync import DEFAULTS as _CS
+    except Exception:                              # noqa: BLE001 - 可选依赖
+        return
+    for key in ("min_usable_frames", "min_confidence", "min_usable_fraction"):
+        want = _CS[key]
+        got = _ESTIMATE_DEFAULTS[key]
+        if float(got) != float(want):
+            raise RuntimeError(
+                f"core.audio_sync._ESTIMATE_DEFAULTS[{key!r}] = {got!r} "
+                f"disagrees with core.channel_sync.DEFAULTS = {want!r}; the "
+                "two production gate sets must not diverge"
+            )
+
+
+_assert_gate_matches_production()
 
 
 def _sync_estimate_module() -> Any:
@@ -994,6 +1028,27 @@ def _estimate_one(
             f"confidence {out.confidence:.3f} < {min_conf}"
         )
         return out
+    # P4.3 (D1): 第三道门 —— 覆盖率。P4.2 在文件级管线加了它, 本条路径此前
+    # 只做前两项, 因此一条 coverage 0.205、confidence 0.996 的估计会被发布为
+    # `success`, 再由 production/output.py 写进 offsets 并落到 plan 上 ——
+    # 也就是"值存在 -> 自动修正"而没有任何证据校验。
+    #
+    # 语义与文件级管线**同一口径**: 有数值但轨迹证据被大洞打断 -> 证据不足,
+    # 不是测量失败。这里沿用既有 `REASON_SYNC_INSUFFICIENT_SIGNAL`(不新造
+    # reason code, 与 `LOW_CONFIDENCE` 同族: 值在, 但不可信)。
+    min_fraction = float(params["min_usable_fraction"])
+    coverage = (
+        out.usable_frames / out.total_frames if out.total_frames else 0.0
+    )
+    if coverage < min_fraction:
+        out.status = SyncStatus.FAILED.value
+        out.reason = REASON_SYNC_INSUFFICIENT_SIGNAL
+        out.warnings.append(
+            f"measurement coverage {coverage:.3f} < {min_fraction} "
+            f"({out.usable_frames}/{out.total_frames} frames) — the shift is "
+            "not backed by enough of the timeline to be published as success"
+        )
+        return out
     if out.delay_samples != out.delay_samples:
         out.status = SyncStatus.FAILED.value
         out.reason = REASON_SYNC_ESTIMATION_FAILED
@@ -1079,6 +1134,13 @@ def apply_sync_result(
             constant=bool(item.constant),
             polarity=int(item.polarity),
             usable_frames=int(item.usable_frames),
+            # P4.3 (D1): 证据随值进入模型 —— 写 `usable_frames` 却不写分母,
+            # 消费者无法判断 5 帧是"够"还是"不够"。
+            total_frames=int(item.total_frames),
+            coverage=(
+                float(item.usable_frames) / float(item.total_frames)
+                if item.total_frames else None
+            ),
             algo_version=result.algo_version or None,
             source="audio_sync",
             warnings=list(item.warnings),
