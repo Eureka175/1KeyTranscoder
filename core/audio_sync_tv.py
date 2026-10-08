@@ -70,6 +70,7 @@ __all__ = [
     "ALGO_VERSION",
     "DEFAULT_COORDINATE",
     "DEFAULT_POLICY",
+    "DECISION_STATUS",
     "DEFAULT_SEARCH_SAMPLES",
     "DEFAULT_HOP_SAMPLES",
     "DEFAULT_WINDOW_SAMPLES",
@@ -106,6 +107,51 @@ DEFAULT_SEARCH_SAMPLES = 3_000       # ±62.5 ms — P3 生产几何
 
 DEFAULT_POLICY = "hold"
 DEFAULT_COORDINATE = "latest-start"
+
+#: **P4.3**: 两个未决产品决策的**机器可读状态**, 把两个必须分开的概念钉在一起:
+#:
+#:     implementation_default   本代码在无人指定时**实际用的**值。
+#:                              存在理由是**可复现性**, 不是偏好。
+#:     semantic_contract        产品**已经冻结的语义**。DEFERRED = 没有冻结。
+#:
+#: 二者混为一谈正是 P4.3 要消除的歧义: "默认值是 X" 不等于 "X 就是产品契约"。
+#: `tests/audio_sync_p4/test_production_semantics.py` 断言这张表与
+#: `DEFAULT_POLICY` / `DEFAULT_COORDINATE` 一致 —— 改默认值而不同时改这张表会
+#: 让测试失败, 而不是让一个未决决策悄悄改变。
+DECISION_STATUS: Mapping[str, Mapping[str, str]] = {
+    "gap_policy": {
+        "id": "D2 (canonical P4: D1)",
+        "implementation_default": DEFAULT_POLICY,
+        "semantic_contract": "DEFERRED",
+        "owner": "product",
+        "why_deferred": (
+            "no candidate dominates: each is the better answer in a different "
+            "row, and the rows that separate them are decided by the position "
+            "of a discontinuity inside the gap, which is not observable"
+        ),
+        "unblocked_by": (
+            "a product statement of what the output audio is for, plus "
+            "acceptance of a residual budget per state (D3)"
+        ),
+    },
+    "coordinate": {
+        "id": "D5 (canonical P4: D2)",
+        "implementation_default": DEFAULT_COORDINATE,
+        "semantic_contract": "DEFERRED",
+        "owner": "product + engineering",
+        "why_deferred": (
+            "latest-start and nearest-centre are not equivalent "
+            "implementations (C1305 56.94 %, C1306 36.37 % value agreement); "
+            "choosing means answering whether a correction should anticipate "
+            "a change or lag it, which is a product question"
+        ),
+        "unblocked_by": (
+            "a product statement of the acceptable error profile, and an "
+            "independent reference whose true delay is known at sample "
+            "resolution"
+        ),
+    },
+}
 
 #: 策略名 -> 是否需要**右端点** (因而只能离线运行) 。
 #:
