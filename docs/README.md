@@ -225,12 +225,21 @@ F:\1KeyTranscoder\
 | [`policy-recommendation.md`](audio-sync-p4/policy-recommendation.md) | **工程建议 vs 产品决定**严格分离；D1/D2/D3/D5/D6/D8 全部标 `REQUIRED` | ✅ 权威 |
 | [`provenance.md`](audio-sync-p4/provenance.md) | 分支 / 提交 / 实现哈希 / 语料哈希 / 复现锚点 / 未改动文件复核 | ✅ 权威（溯源） |
 | [`static-audit.md`](audio-sync-p4/static-audit.md) | 静态审计：禁用模式、静默异常、依赖方向、内存边界 | ✅ 权威 |
+| [`p4.1-provenance.md`](audio-sync-p4/p4.1-provenance.md) | P4.1 审计溯源：被审计源文件哈希、fixture、复现命令 | ✅ 权威（溯源） |
 | [`P4-FINAL-REPORT.md`](audio-sync-p4/P4-FINAL-REPORT.md) | 22 节最终报告 | ✅ 权威 |
+| [`downstream-audit.md`](audio-sync-p4/downstream-audit.md) | **P4.1 / D6 下游消费者审计**：`UNRESOLVED_GAP` 能否活着抵达消费者。**结论 `BLOCKED`** —— 逐窗状态在生产模型里**没有表示**，而且同一种失效在 shipped 代码里**已经存在**（track 粒度） | ✅ 权威（审计） |
+| [`d1-uncertainty-contract.md`](audio-sync-p4/d1-uncertainty-contract.md) | **D1 不确定性生产契约（规范，未实现）**：状态词汇、序列化、日志、消费者可见性；最小补丁设计（**feature-gated by construction**）。**策略中立** | ✅ 权威（契约） |
 
 > **一句话状态**：固定偏移 `VALIDATED`；时变测量 `VALIDATED`；真实 PCM 施加
 > `VALIDATED`；六通道对 E2E `VALIDATED`；**缺口策略 `DEFERRED`、坐标合同
 > `DEFERRED`、残差阈值 `NOT ESTABLISHED`、生产特性 `OFF`**。
 > 总体：**READY FOR PRODUCTION POLICY** —— 即"实现完成、等待产品策略批准"。
+>
+> **P4.1（D6 下游审计）补一句**：`UNRESOLVED_GAP` **无法**活着抵达生产消费者，
+> 而且同一种"有数字就等于已测量"的失效**已经在 shipped 代码里存在**（track 粒度：
+> `channel_sync` 算出覆盖率、用它把门、然后采纳一个**不再复核覆盖率**的回退分支，
+> 写出 `decision="fixed", reason=None`）。因此 **D6 = `BLOCKED`**，
+> **生产启用 = `BLOCKED`**；该缺陷属于真实生产代码，需**单独授权**才能修。
 >
 > **P4 没有替产品做决定，也没有改动任何默认行为。** 模块 `core/audio_sync_tv.py`
 > 与套件 `tests/audio_sync_p4/` 都是 tracked 代码，且**不 import `work/`**，
