@@ -2008,6 +2008,10 @@ _SYNC_REASON_STATUS: dict[str, SyncStatus] = {
     "out_of_range": SyncStatus.OUT_OF_RANGE,
     "recheck_residual": SyncStatus.RECHECK_FAILED,
     "already_aligned": SyncStatus.ALREADY_ALIGNED,
+    # P4.2: 估计有数值, 但轨迹证据覆盖率不足 (存在大洞) -> 有数值但不可信。
+    # 语义与 LOW_CONFIDENCE 同类 (同一个 SyncStatus), 单独成码是为了让报告能
+    # 区分"相关峰值未过门"与"证据被大洞打断"。
+    "evidence_insufficient": SyncStatus.LOW_CONFIDENCE,
 }
 
 # 文件级状态 -> 全部轨道的状态 (尚未逐轨测量)

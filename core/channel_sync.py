@@ -133,6 +133,9 @@ _BOOL_KEYS = ("channel_sync_transparent",)
 _ESTIMATION_FAIL_REASONS = frozenset({
     "insufficient_frames", "low_confidence", "non_constant",
     "out_of_range", "recheck_residual",
+    # P4.2: 证据覆盖率不足 = 估计层未通过证据门 (与 low_confidence 同类,
+    # 文件级判定同样算作"该 target 未测出").
+    "evidence_insufficient",
 })
 
 
@@ -697,42 +700,96 @@ def run_channel_sync(
         rows[anchor] = anchor_row
         to_fix: list[int] = []
         used_est: dict[int, Any] = {}   # 每轨最终采用的估计 (窄窗或宽窗)
+
+        def evidence_of_est(e: Any) -> dict[str, Any]:
+            """一次估计的**完整证据**: 帧数 / 置信度 / 覆盖率。
+
+            P4.2: 采纳门与最终结果都必须读这一份证据, 不允许"门看 A, 采纳 B"。
+            """
+            total = len(e.frames)
+            cov = (e.usable_frames / total) if total else 0.0
+            return {
+                "usable_frames": int(e.usable_frames),
+                "total_frames": int(total),
+                "coverage": cov,
+                "confidence": float(e.confidence),
+            }
+
+        def evidence_ok(ev: dict[str, Any]) -> tuple[bool, str | None]:
+            """最终采纳必须满足的**唯一**证据门 (帧数 + 置信度 + 覆盖率)。
+
+            返回 (是否通过, 未通过的原因)。任何一种估计——窄窗或宽窗——只要被
+            采纳, 就必须过这一道门。
+            """
+            if ev["usable_frames"] < eff["min_usable_frames"]:
+                return False, "low_confidence"
+            if not (ev["confidence"] >= eff["min_confidence"]):
+                return False, "low_confidence"
+            if ev["coverage"] < eff["min_usable_fraction"]:
+                # 有数值但轨迹证据不足 (存在大洞) -> 证据不足, 不是测量失败
+                return False, "evidence_insufficient"
+            return True, None
+
+        def try_wide(
+            i: int, ev: dict[str, Any], *, why: str,
+        ) -> tuple[Any, dict[str, Any], str | None]:
+            """宽窗复测并**按同一道门**判定可否采纳。
+
+            P4.2 修复的正是这里: 旧实现只检查 `usable_frames`/`confidence`,
+            不重查 coverage —— 于是一条 coverage 不足的窄窗可以被一条**同样
+            coverage 不足**的宽窗"救活", 最终仍写成 fixed/SUCCESS。
+
+            返回 (估计, 证据, 未通过原因或 None)。未通过时估计仍返回, 供
+            "有数值但证据不足" 的语义使用。
+            """
+            ew = wide_estimate(i)
+            ev_w = evidence_of_est(ew)
+            if abs(ew.delay_samples) > search_samples:
+                return ew, ev_w, "out_of_range"
+            ok, why_not = evidence_ok(ev_w)
+            if not ok:
+                log(
+                    f"channel-sync: CH{i + 1} 宽窗复测仍未通过证据门 "
+                    f"({why_not}: usable {ev_w['usable_frames']}/"
+                    f"{ev_w['total_frames']} = {ev_w['coverage']:.0%}, "
+                    f"conf {ev_w['confidence']:.2f}) — 按未通过处理 "
+                    f"(窄窗原因 {why})"
+                )
+                return ew, ev_w, why_not
+            return ew, ev_w, None
+
         for i in healthy:
             if i == anchor:
                 continue
             e = ests[i]
             stats = sync_estimate.summarize_trajectory(e.frames, sample_rate)
             reason_: str | None = None
-            coverage = (
-                e.usable_frames / max(1, len(e.frames))
-                if e.frames else 0.0
-            )
+            ev = evidence_of_est(e)
+            coverage = ev["coverage"]
             if e.usable_frames < eff["min_usable_frames"]:
-                # 窄窗无可靠帧: 宽窗复测 — 真实时差超窗 vs 确实不可测
-                ew = wide_estimate(i)
-                if (
-                    ew.usable_frames >= eff["min_usable_frames"]
-                    and ew.confidence >= eff["min_confidence"]
-                ):
-                    if abs(ew.delay_samples) > search_samples:
-                        reason_ = "out_of_range"
-                        log(
-                            f"channel-sync: CH{i + 1} 宽窗复测 delay "
-                            f"{ew.delay_ms:+.3f}ms 超出搜索窗 "
-                            f"±{eff['search_window_ms']}ms — out_of_range"
-                        )
-                    else:
-                        # 窄窗边缘置信不足但宽窗在窗内测出 -> 采用宽窗估计
-                        e, stats = ew, sync_estimate.summarize_trajectory(
-                            ew.frames, sample_rate
-                        )
-                        used_est[i] = ew
-                        log(
-                            f"channel-sync: CH{i + 1} 窄窗无可测帧, "
-                            f"宽窗窗内测出 {ew.delay_ms:+.3f}ms — 采用宽窗估计"
-                        )
+                # 窄窗无可测帧: 宽窗复测 — 真实时差超窗 vs 确实不可测
+                ew, ev_w, why_not = try_wide(i, ev, why="usable_frames")
+                if why_not == "out_of_range":
+                    reason_ = "out_of_range"
+                    log(
+                        f"channel-sync: CH{i + 1} 宽窗复测 delay "
+                        f"{ew.delay_ms:+.3f}ms 超出搜索窗 "
+                        f"±{eff['search_window_ms']}ms — out_of_range"
+                    )
+                elif why_not is None:
+                    e, ev = ew, ev_w
+                    stats = sync_estimate.summarize_trajectory(
+                        ew.frames, sample_rate
+                    )
+                    used_est[i] = ew
+                    log(
+                        f"channel-sync: CH{i + 1} 窄窗无可测帧, "
+                        f"宽窗窗内测出 {ew.delay_ms:+.3f}ms "
+                        f"(证据 {ev['usable_frames']}/{ev['total_frames']} = "
+                        f"{ev['coverage']:.0%}) — 采用宽窗估计"
+                    )
                 else:
-                    # 窄窗宽窗均无足够可测帧: 用"有信号的帧数"区分原因 —
+                    # 窄窗宽窗均未过门: 用"有信号的帧数"区分原因 —
                     # 有信号但相关性不足 -> low_confidence;
                     # 有信号的帧本身就太少 (稀疏内容/极短素材) -> insufficient_frames
                     attempted = sum(
@@ -747,29 +804,36 @@ def run_channel_sync(
                     else:
                         reason_ = "insufficient_frames"
             elif coverage < eff["min_usable_fraction"]:
-                # 轨迹证据覆盖率不足 (存在大洞): 恒定性判断不可靠 -> 宽窗复测
-                ew = wide_estimate(i)
-                if (
-                    ew.usable_frames >= eff["min_usable_frames"]
-                    and ew.confidence >= eff["min_confidence"]
-                ):
-                    if abs(ew.delay_samples) > search_samples:
-                        reason_ = "out_of_range"
-                    else:
-                        e, stats = ew, sync_estimate.summarize_trajectory(
-                            ew.frames, sample_rate
-                        )
-                        used_est[i] = ew
-                        log(
-                            f"channel-sync: CH{i + 1} 窄窗证据覆盖率 "
-                            f"{coverage:.0%} 不足, 采用宽窗估计 "
-                            f"({ew.delay_ms:+.3f}ms)"
-                        )
-                else:
-                    reason_ = "low_confidence"
+                # 轨迹证据覆盖率不足 (存在大洞): 恒定性判断不可靠 -> 宽窗复测。
+                # P4.2: 宽窗结果**必须重过同一道证据门**才可采纳。
+                ew, ev_w, why_not = try_wide(i, ev, why="evidence_insufficient")
+                if why_not == "out_of_range":
+                    reason_ = "out_of_range"
+                    log(
+                        f"channel-sync: CH{i + 1} 宽窗复测 delay "
+                        f"{ew.delay_ms:+.3f}ms 超出搜索窗 "
+                        f"±{eff['search_window_ms']}ms — out_of_range"
+                    )
+                elif why_not is None:
+                    e, ev = ew, ev_w
+                    stats = sync_estimate.summarize_trajectory(
+                        ew.frames, sample_rate
+                    )
+                    used_est[i] = ew
                     log(
                         f"channel-sync: CH{i + 1} 窄窗证据覆盖率 "
-                        f"{coverage:.0%} 不足且宽窗不可靠 — low_confidence"
+                        f"{coverage:.0%} 不足, 宽窗复测通过证据门 "
+                        f"({ev['usable_frames']}/{ev['total_frames']} = "
+                        f"{ev['coverage']:.0%}) — 采用宽窗估计 "
+                        f"({ew.delay_ms:+.3f}ms)"
+                    )
+                else:
+                    reason_ = why_not
+                    log(
+                        f"channel-sync: CH{i + 1} 证据不足: 窄窗覆盖率 "
+                        f"{coverage:.0%} < {eff['min_usable_fraction']:.0%}, "
+                        f"宽窗也未过门 — {reason_} (可用帧 "
+                        f"{ev['usable_frames']}/{ev['total_frames']})"
                     )
             elif sync_estimate.boundary_pileup(e.frames, search_samples) > 0.5:
                 # 边缘堆积: 宽窗确认真实时差是否在窗内
@@ -800,8 +864,24 @@ def run_channel_sync(
                     reason_ = "low_confidence"
                 elif abs(e.delay_samples) > search_samples:
                     reason_ = "out_of_range"
+                else:
+                    # P4.2 最终采纳门: 被采纳的估计必须过证据门。旧实现在这里
+                    # 只看置信度/恒定性/范围, 覆盖率**不再检查**, 因此一条
+                    # coverage 不足的宽窗可以被写成 fixed/SUCCESS。
+                    ev = evidence_of_est(e)
+                    ok, why_not = evidence_ok(ev)
+                    if not ok:
+                        reason_ = why_not
+                        log(
+                            f"channel-sync: CH{i + 1} 最终采纳门未通过 "
+                            f"({why_not}: 可用帧 {ev['usable_frames']}/"
+                            f"{ev['total_frames']} = {ev['coverage']:.0%} < "
+                            f"{eff['min_usable_fraction']:.0%}) — 该轨 "
+                            f"untouched"
+                        )
             if reason_ is not None:
                 rows[i] = est_row(i, e, stats, "untouched", reason_)
+                rows[i]["evidence"] = ev
                 rows[i]["rms_dbfs"] = (
                     round(rms_of[i], 1) if rms_of.get(i) is not None else None
                 )
@@ -817,6 +897,7 @@ def run_channel_sync(
             else:
                 rows[i] = est_row(i, e, stats, "fixed", None)
                 to_fix.append(i)
+            rows[i]["evidence"] = ev
             rows[i]["rms_dbfs"] = (
                 round(rms_of[i], 1) if rms_of.get(i) is not None else None
             )
