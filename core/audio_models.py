@@ -179,6 +179,65 @@ class SyncStatus(_StrEnum):
     FAILED = "failed"
 
 
+#: **P4.3 — 生产状态机 (单一真相源)。**
+#:
+#: 每个 `SyncStatus` 回答三个可判定的问题, 供任何消费者查询, 而不是让每个
+#: 消费者自己猜 "success 是不是就等于可信":
+#:
+#:     value_trusted         该状态携带的数值是否**被证据支持**?
+#:     may_enter_correction  该状态是否允许把数值送进修正路径?
+#:     is_unresolved         该状态是否表示"这里没被测过"(而非"测失败")?
+#:
+#: 三条硬约束 (与 `docs/audio-sync-p4/p4.3-production-semantics.md` 一致, 并由
+#: `tests/audio_sync_p4/test_production_semantics.py` 断言):
+#:
+#:   1. `SUCCESS` 且 `value_trusted` 为真 —— 不允许 "成功但证据不足";
+#:   2. `may_enter_correction` 只在 `value_trusted` 为真时为真 —— 数值存在
+#:      不是进入修正路径的充分条件 (U1: "数字存在 == 测量存在" 必须被消除);
+#:   3. 没有任何一个状态同时是 `value_trusted` 与 `is_unresolved`。
+#:
+#: ``ALREADY_ALIGNED`` 是"测过且结论是不需要动", 与"测过并移动了"同属可信;
+#: 它的 `may_enter_correction` 为假不是不信任, 而是**没有修正量可施加**。
+SYNC_STATUS_PATH: Mapping[SyncStatus, Mapping[str, bool]] = {
+    SyncStatus.NOT_PROCESSED: {
+        "value_trusted": False, "may_enter_correction": False,
+        "is_unresolved": False,
+    },
+    SyncStatus.NOT_APPLICABLE: {
+        "value_trusted": False, "may_enter_correction": False,
+        "is_unresolved": False,
+    },
+    SyncStatus.SUCCESS: {
+        "value_trusted": True, "may_enter_correction": True,
+        "is_unresolved": False,
+    },
+    SyncStatus.ALREADY_ALIGNED: {
+        "value_trusted": True, "may_enter_correction": False,
+        "is_unresolved": False,
+    },
+    SyncStatus.LOW_CONFIDENCE: {
+        "value_trusted": False, "may_enter_correction": False,
+        "is_unresolved": False,
+    },
+    SyncStatus.NON_CONSTANT: {
+        "value_trusted": False, "may_enter_correction": False,
+        "is_unresolved": False,
+    },
+    SyncStatus.OUT_OF_RANGE: {
+        "value_trusted": False, "may_enter_correction": False,
+        "is_unresolved": False,
+    },
+    SyncStatus.RECHECK_FAILED: {
+        "value_trusted": False, "may_enter_correction": False,
+        "is_unresolved": False,
+    },
+    SyncStatus.FAILED: {
+        "value_trusted": False, "may_enter_correction": False,
+        "is_unresolved": False,
+    },
+}
+
+
 class TrackBuildMode(_StrEnum):
     """stream -> track 的映射模式 (§5/§6/§10)。"""
 
@@ -655,6 +714,18 @@ class AudioSyncResult:
     # 同步**应用方式**: 本阶段模型只记录"结果从哪来", 不执行修正。
     # 取值如 "channel_sync_report" / None (未处理)。
     source: str | None = None
+    #: **P4.3 (D1 evidence contract)**: 证据三元组的另外两项。
+    #:
+    #: 语义与 `core.audio_sync.PairSyncEstimate` **同名同义** —— 同一份测量
+    #: 事实在两个同步模型里不允许有两个名字。分母是**测量帧**(被采纳的那一次
+    #: 估计的帧总数), 不是计划窗口数, 也不是残留网格点数; 三者不可互换。
+    #:
+    #: `None` 表示**该路径不陈述证据**, 不是 "0 帧" / "覆盖率 0"。把两者合并
+    #: 就是 U1 禁止的哨兵错误 —— 未升级的调用方不能被判成彻底失败。
+    total_frames: int | None = None
+    #: 被采纳估计的帧可用率 `usable_frames / total_frames` ∈ [0, 1]。
+    #: **显式陈述**而非每次现算: 消费方各自做除法迟早会出现两个分母。
+    coverage: float | None = None
     warnings: list[str] = field(default_factory=list)
 
     # -- 便捷判定 ---------------------------------------------------------
@@ -666,8 +737,26 @@ class AudioSyncResult:
 
     @property
     def applied(self) -> bool:
-        """是否发生了实际修正 (offset 为整数样本移位量)。"""
+        """是否发生了实际修正 (offset 为整数样本移位量)。
+
+        注意 `SUCCESS` + `offset_samples` 是**两个条件都要**满足: 值为数值但
+        证据不足的结果是 `LOW_CONFIDENCE`, 它的 `offset_samples` 存在, 却
+        不构成"已修正" —— 数值存在不等于可以进入修正路径。
+        """
         return self.status is SyncStatus.SUCCESS and self.offset_samples is not None
+
+    @property
+    def measurement_coverage(self) -> float | None:
+        """统一入口: 陈述的覆盖率, 缺失时可由帧数推导, 都没有 -> None。
+
+        绝不返回 0 代替 "未陈述"。写回序列化的始终是**陈述值** (`coverage`),
+        推导值只是读取便利, 不改变"未陈述"这一事实。
+        """
+        if self.coverage is not None:
+            return float(self.coverage)
+        if self.usable_frames is None or not self.total_frames:
+            return None
+        return float(self.usable_frames) / float(self.total_frames)
 
     # -- 序列化 -----------------------------------------------------------
 
@@ -691,6 +780,11 @@ class AudioSyncResult:
             data["polarity"] = int(self.polarity)
         if self.usable_frames is not None:
             data["usable_frames"] = int(self.usable_frames)
+        # P4.3 D1: 证据随值一起过序列化边界; None 保持 None (绝不写 0)。
+        if self.total_frames is not None:
+            data["total_frames"] = int(self.total_frames)
+        if self.coverage is not None:
+            data["coverage"] = float(self.coverage)
         if self.rms_dbfs is not None:
             data["rms_dbfs"] = self.rms_dbfs
         if self.algo_version is not None:
@@ -722,6 +816,9 @@ class AudioSyncResult:
             ),
             polarity=_opt_int(data.get("polarity")),
             usable_frames=_opt_int(data.get("usable_frames")),
+            # P4.3 D1: 旧记录没有这两个键 -> None, 不因新增字段而改变结论。
+            total_frames=_opt_int(data.get("total_frames")),
+            coverage=_opt_float(data.get("coverage")),
             rms_dbfs=_opt_float(data.get("rms_dbfs")),
             algo_version=_opt_str(data.get("algo_version")),
             source=_opt_str(data.get("source")),
@@ -1083,6 +1180,12 @@ class AudioTrack:
     sync_status: SyncStatus = SyncStatus.NOT_PROCESSED
     sync_offset_samples: float | None = None
     sync_offset_ms: float | None = None
+    #: **P4.3 (D1)**: track 级测量覆盖率 —— "这条轨有多少被真正测过"。
+    #:
+    #: 汇总规则与 `sync_status` 同向且更保守: 取各声道的**最小值**。只要有一个
+    #: 声道的证据覆盖率低, 整条 track 就不是"完整测量过"。`None` = 本轨的
+    #: 同步结论不陈述覆盖率 (默认路径、未升级的调用方) —— 不是 0。
+    sync_coverage: float | None = None
 
     def __post_init__(self) -> None:
         self.source_id = str(self.source_id or DEFAULT_SOURCE_ID)
@@ -1162,11 +1265,13 @@ class AudioTrack:
             self.sync_status = SyncStatus.NOT_PROCESSED
             self.sync_offset_samples = None
             self.sync_offset_ms = None
+            self.sync_coverage = None
             return self
         if all(s is SyncStatus.NOT_PROCESSED for s in statuses):
             self.sync_status = SyncStatus.NOT_PROCESSED
             self.sync_offset_samples = None
             self.sync_offset_ms = None
+            self.sync_coverage = None
             return self
         if any(s is SyncStatus.NOT_PROCESSED for s in statuses):
             self.sync_status = SyncStatus.NOT_PROCESSED
@@ -1183,6 +1288,13 @@ class AudioTrack:
         )
         self.sync_offset_samples = done.offset_samples
         self.sync_offset_ms = done.offset_ms
+        # P4.3 D1: 覆盖率按**最保守**规则汇总 —— 任一状态说了覆盖率就取最小值,
+        # 全都没说才是 None。"不知道" 与 "0" 继续分开。
+        stated = [
+            c for c in (ch.sync.measurement_coverage for ch in self.channels)
+            if c is not None
+        ]
+        self.sync_coverage = min(stated) if stated else None
         return self
 
     def set_sync(self, result: AudioSyncResult) -> "AudioTrack":
@@ -1244,6 +1356,9 @@ class AudioTrack:
             data["sync_offset_samples"] = self.sync_offset_samples
         if self.sync_offset_ms is not None:
             data["sync_offset_ms"] = self.sync_offset_ms
+        # P4.3 D1: 覆盖率过序列化边界, None 保持 None。
+        if self.sync_coverage is not None:
+            data["sync_coverage"] = float(self.sync_coverage)
         if self.metadata:
             data["metadata"] = copy.deepcopy(self.metadata)
         data["channels"] = [ch.to_dict() for ch in self.channels]
@@ -1291,6 +1406,7 @@ class AudioTrack:
             ),
             sync_offset_samples=_opt_float(data.get("sync_offset_samples")),
             sync_offset_ms=_opt_float(data.get("sync_offset_ms")),
+            sync_coverage=_opt_float(data.get("sync_coverage")),
         )
         if not track.track_id:
             track.track_id = _default_track_id(
@@ -2023,6 +2139,68 @@ _FILE_LEVEL_STATUS: dict[str, SyncStatus] = {
 }
 
 
+def _evidence_int(row: Mapping[str, Any], key: str) -> int | None:
+    """从报告行或其 `evidence` 子字典取一个整数事实 (P4.2 把证据放在子字典里,
+    顶层字段是同一份事实的既有位置 —— 两者都读, 不重算)。"""
+    value = row.get(key)
+    if value is None:
+        ev = row.get("evidence")
+        if isinstance(ev, Mapping):
+            value = ev.get(key)
+    return _opt_int(value)
+
+
+def _production_evidence_gate() -> dict[str, float] | None:
+    """生产实际的证据门 (帧数 / 置信度 / 覆盖率), 或 None (不可用)。
+
+    **不写字面量**: 阈值只有一个来源 —— `core.channel_sync.effective_opts()`,
+    也就是生产路径真正用的那一份配置。导入是**延迟的**, 与本仓库既有的
+    `from . import sync_estimate, sync_fix` 同一手法, 因此不引入模块环。
+    """
+    try:
+        from .channel_sync import effective_opts
+    except Exception:                              # noqa: BLE001 - 可选依赖
+        return None
+    try:
+        eff = effective_opts(None)
+        return {
+            "min_usable_frames": float(eff["min_usable_frames"]),
+            "min_confidence": float(eff["min_confidence"]),
+            "min_usable_fraction": float(eff["min_usable_fraction"]),
+        }
+    except Exception:                              # noqa: BLE001
+        return None
+
+
+def _evidence_verdict(
+    row: Mapping[str, Any], gate: Mapping[str, float] | None,
+) -> tuple[float | None, bool | None]:
+    """报告行 -> (陈述的覆盖率, 是否满足证据门)。
+
+    未陈述覆盖率时第二项是 `None` —— **无法判定, 不是"不满足"**。这是本契约
+    与"数字没有就失败"的分界线: 历史记录与外部输入不因缺少新字段而变结论。
+    """
+    raw = row.get("coverage")
+    if not isinstance(raw, (int, float)) or isinstance(raw, bool):
+        ev = row.get("evidence")
+        raw = ev.get("coverage") if isinstance(ev, Mapping) else None
+    coverage = float(raw) if isinstance(raw, (int, float)) and not isinstance(
+        raw, bool
+    ) else None
+    if coverage is None or gate is None:
+        return coverage, None
+    usable = _evidence_int(row, "usable_frames")
+    confidence = _opt_float(row.get("confidence"))
+    if usable is None or confidence is None:
+        return coverage, None
+    ok = (
+        usable >= gate["min_usable_frames"]
+        and confidence >= gate["min_confidence"]
+        and coverage >= gate["min_usable_fraction"]
+    )
+    return coverage, bool(ok)
+
+
 class ChannelSyncReport:
     """core.channel_sync.run_channel_sync() 报告的**只读**视图。
 
@@ -2045,6 +2223,28 @@ class ChannelSyncReport:
         self.channels: list[dict[str, Any]] = [
             dict(r) for r in rows if isinstance(r, Mapping)
         ]
+        #: **P4.3 (D1)**: 产出这份报告时**实际生效**的证据门。
+        #:
+        #: 优先读报告自己陈述的门 (生产者在 `run_channel_sync` 里写入, 因此
+        #: `opts` 曾经覆盖过的阈值会被如实带出来); 旧报告没有该键时回落到
+        #: `core.channel_sync.effective_opts()` —— 也就是生产有效配置, 而不是
+        #: 一个写死在模型里的字面量。
+        self.evidence_gate: dict[str, float] | None = self._read_gate()
+
+    def _read_gate(self) -> dict[str, float] | None:
+        stated = self.report.get("evidence_gate")
+        if isinstance(stated, Mapping):
+            out: dict[str, float] = {}
+            for key in ("min_usable_frames", "min_confidence",
+                        "min_usable_fraction"):
+                value = stated.get(key)
+                if isinstance(value, (int, float)) and not isinstance(
+                    value, bool
+                ):
+                    out[key] = float(value)
+            if len(out) == 3:
+                return out
+        return _production_evidence_gate()
 
     @property
     def eligible(self) -> bool:
@@ -2087,6 +2287,18 @@ class ChannelSyncReport:
             shift = _opt_float(row.get("shift_samples"))
             if shift is not None:
                 offset_samples = shift
+        # P4.3 D1: 证据随结论一起进入模型。覆盖率**陈述** (报告行写什么就是
+        # 什么), 不在这里重算。
+        coverage, evidence_ok = _evidence_verdict(row, self.evidence_gate)
+        if status is SyncStatus.SUCCESS and evidence_ok is False:
+            # **不变量守卫**: SUCCESS 与"证据不足"不得同时成立。P4.2 之后
+            # 生产端已不会写出这种行; 这里防的是**历史报告 / 外部输入** ——
+            # 例如新字段出现之前落盘的 JSON, 或调用方手工构造的行。
+            # 语义与生产者一致: 值仍存在, 但它不被信任 -> LOW_CONFIDENCE,
+            # 原因码 `evidence_insufficient` (P4.2 既有的那个, 不新造成员)。
+            status = SyncStatus.LOW_CONFIDENCE
+            if not reason:
+                reason = "evidence_insufficient"
         anchor_id = (
             f"stream:{self.anchor_stream}"
             if self.anchor_stream is not None else None
@@ -2105,7 +2317,9 @@ class ChannelSyncReport:
                 else None
             ),
             polarity=_opt_int(row.get("polarity")),
-            usable_frames=_opt_int(row.get("usable_frames")),
+            usable_frames=_evidence_int(row, "usable_frames"),
+            total_frames=_evidence_int(row, "total_frames"),
+            coverage=coverage,
             rms_dbfs=_opt_float(row.get("rms_dbfs")),
             algo_version=self.algo_version,
             source="channel_sync_report",

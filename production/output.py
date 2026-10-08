@@ -347,6 +347,16 @@ class AlignmentOutcome:
     applied: int = 0
     offsets: dict[str, float] = field(default_factory=dict)
     statuses: dict[str, str] = field(default_factory=dict)
+    #: **P4.3 (D1)**: 每条 target 的**测量证据**, 逐条陈述:
+    #: `{channel_id: {"usable_frames", "total_frames", "coverage",
+    #: "confidence", "evidence_sufficient"}}`。
+    #:
+    #: 存在的意义: `offsets` 只说"这条被修正了多少", 不说"这个值有多可信"。
+    #: 此前 `estimate_sync` 已经算出 `usable_frames`/`total_frames`, 却在这一层
+    #: 被丢掉 —— 消费者于是只能把 `statuses[...] == "success"` 读成"完全可信"。
+    #: 只有 `status == "success"` 的条目才带 `evidence_sufficient = true`;
+    #: 未通过的条目标 `false` 并保留帧数与覆盖率, 供报告如实陈述。
+    evidence: dict[str, dict[str, Any]] = field(default_factory=dict)
     errors: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -362,6 +372,10 @@ class AlignmentOutcome:
             "offsets": {k: float(v) for k, v in self.offsets.items()},
             "statuses": dict(self.statuses),
         }
+        if self.evidence:
+            data["evidence"] = {
+                k: dict(v) for k, v in self.evidence.items()
+            }
         if self.errors:
             data["errors"] = [dict(e) for e in self.errors]
         if self.warnings:
@@ -438,12 +452,43 @@ def apply_alignment(
     out.applied = int(written)
     for item in estimation.estimates:
         out.statuses[item.channel_id] = item.status
+        # P4.3 (D1): 证据在这一层被如实带出, 不再丢弃 usable/total frames。
+        total = int(item.total_frames)
+        coverage = (float(item.usable_frames) / total) if total else 0.0
+        out.evidence[item.channel_id] = {
+            "usable_frames": int(item.usable_frames),
+            "total_frames": total,
+            "coverage": round(coverage, 6),
+            "confidence": round(float(item.confidence), 6),
+            # "被发布为 success" 与 "证据充分" 必须同时为真; 二者不等时以
+            # 证据为准, 报告里能直接看出来。
+            "evidence_sufficient": bool(
+                item.status == "success" and item.applied
+            ),
+            "applied": bool(item.applied),
+            "reason": item.reason,
+        }
         if item.status == "success":
             out.offsets[item.channel_id] = float(item.offset_samples)
     if not written:
         out.warnings.append(
             "no target produced a usable estimate: every channel keeps its "
             "original position (a non-success estimate is never applied)"
+        )
+    # P4.3 (D1, 3.4 of the contract): 一条被修正但没有完全测过的轨, 必须产生
+    # 一行**点名覆盖率**的日志。只打 `applied` 就是把 D6 的缺陷搬进了日志。
+    partial = {
+        cid: ev for cid, ev in out.evidence.items()
+        if ev["applied"] and ev["coverage"] < 1.0
+    }
+    if partial:
+        log(
+            "alignment: partially measured track(s) — "
+            + ", ".join(
+                f"{cid} coverage={ev['coverage']:.1%} "
+                f"({ev['usable_frames']}/{ev['total_frames']} frames)"
+                for cid, ev in sorted(partial.items())
+            )
         )
     log(
         f"alignment: reference={reference} applied={written} "

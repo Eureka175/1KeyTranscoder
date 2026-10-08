@@ -181,6 +181,12 @@ class AudioChannelRef:
     sync_status: str = "not_processed"
     sync_offset_samples: float | None = None
     sync_offset_ms: float | None = None
+    #: **P4.3 (D1)**: 该输出声道的测量覆盖率 (测量帧口径), `None` = 未陈述。
+    #:
+    #: `AudioChannelRef` 是**产品面**的追溯记录 (报告/CLI 从这里读), 因此
+    #: 必须有地方放"这个值有多可信"。只带 offset 不带覆盖率, 报告就分不出
+    #: "完整测过" 与 "只测过一部分"。
+    sync_coverage: float | None = None
     source_type: str = AudioSourceType.MEDIA.value
 
     @property
@@ -215,6 +221,9 @@ class AudioChannelRef:
             data["sync_offset_samples"] = self.sync_offset_samples
         if self.sync_offset_ms is not None:
             data["sync_offset_ms"] = self.sync_offset_ms
+        # P4.3 D1: None 保持 None —— "未陈述" 不是 "覆盖率 0"。
+        if self.sync_coverage is not None:
+            data["sync_coverage"] = float(self.sync_coverage)
         return data
 
     @classmethod
@@ -240,6 +249,7 @@ class AudioChannelRef:
             sync_status=str(data.get("sync_status") or "not_processed"),
             sync_offset_samples=_opt_float(data.get("sync_offset_samples")),
             sync_offset_ms=_opt_float(data.get("sync_offset_ms")),
+            sync_coverage=_opt_float(data.get("sync_coverage")),
             source_type=str(
                 data.get("source_type") or AudioSourceType.MEDIA.value
             ),
@@ -352,6 +362,7 @@ def channel_ref(
             sync_status=channel.sync.status.value,
             sync_offset_samples=channel.sync.offset_samples,
             sync_offset_ms=channel.sync.offset_ms,
+            sync_coverage=channel.sync.measurement_coverage,
             source_type=_source_type(plan, channel.source_id),
         )
     found = plan.channel(str(channel))
@@ -537,6 +548,9 @@ class AudioOutputTrack:
             status=SyncStatus.coerce(ref.sync_status, SyncStatus.NOT_PROCESSED),
             offset_samples=ref.sync_offset_samples,
             offset_ms=ref.sync_offset_ms,
+            # P4.3 D1: 输出声道的追溯结果同样带证据, 否则这里就是那条
+            # "中间层丢掉证据" 的缝。
+            coverage=ref.sync_coverage,
         )
 
     # -- 序列化 -----------------------------------------------------------
@@ -655,6 +669,7 @@ class AudioMapSpec:
             "sync_status": ref.sync_status,
             "sync_offset_samples": ref.sync_offset_samples,
             "sync_offset_ms": ref.sync_offset_ms,
+            "sync_coverage": ref.sync_coverage,
         }
 
     def summary(self) -> dict[str, Any]:
@@ -1086,6 +1101,7 @@ def _mapping_entries(
             "sync_status": channel.sync.status.value,
             "sync_offset_samples": channel.sync.offset_samples,
             "sync_offset_ms": channel.sync.offset_ms,
+            "sync_coverage": channel.sync.measurement_coverage,
         })
     return entries
 

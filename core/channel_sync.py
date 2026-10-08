@@ -423,6 +423,15 @@ def run_channel_sync(
             "detail": detail,
             "source": str(source),
             "algo_version": eff["algo_version"],
+            # P4.3 (D1): 产出本报告时**实际生效**的证据门。消费者据此判定
+            # "SUCCESS 是否证据充分", 因此门必须随报告走 —— 用 `opts` 覆盖过
+            # 阈值的运行, 其结论不能被默认阈值重新解释。三个都是数值, 不含
+            # 任何写死的常量 (全部来自 eff)。
+            "evidence_gate": {
+                "min_usable_frames": int(eff["min_usable_frames"]),
+                "min_confidence": float(eff["min_confidence"]),
+                "min_usable_fraction": float(eff["min_usable_fraction"]),
+            },
             "anchor_stream": ctx["anchor"],
             "sync_mode": "transparent" if t_mode else "transcode",
             "result_scope": scope,
@@ -935,6 +944,10 @@ def run_channel_sync(
                                   sync_estimate.summarize_trajectory(
                                       e.frames, sample_rate),
                                   "untouched", "recheck_residual")
+                # P4.3 (D1): 该轨的测量**确实发生过** —— est_row 重建 dict 会
+                # 丢掉上一步挂上的 evidence, 于是 "值有、证据也有" 的一条轨
+                # 在报告里变成 "只有值"。这里补回同一份证据对象。
+                rows[i]["evidence"] = ev
                 log(f"channel-sync: WARNING CH{i + 1} shift failed: {exc}")
                 continue
             try:
