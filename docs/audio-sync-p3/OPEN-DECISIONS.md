@@ -1,5 +1,25 @@
 # Audio Sync P3 — Open Decisions
 
+> ## ⚠️ WRITTEN IN P3.9 — ONE ROW BELOW IS NOW FALSE, TEXT UNALTERED
+>
+> This register was written before P3.10 existed. P3.10, P3.11 and P3.12 have
+> since run and are recorded here as a **dated addendum** at the end
+> (`§ Addendum — what P3.10–P3.12 settled`), because this register is a live
+> decision log and a reader acting on a false row is the failure mode that
+> matters. **No line above the addendum is rewritten.**
+>
+> The one materially false row, in "Decisions that are NOT open":
+>
+> | row | still true? |
+> |---|---|
+> | *"treat the corrected output as validated on real audio — **DECIDED — no** — it has never been applied to real audio"* | **the reason given is false.** P3.10 applied the plan to real audio and re-measured on both corpora; P3.11 did it on all six channel pairs. The **decision** (`DECIDED — no`) still stands, but for a different reason: *acceptance* is not established, not *applicability*. |
+>
+> D1–D7 all remain `OPEN`. None was closed by P3.10–P3.12; two were reinforced
+> with measured numbers. D4's own "what is known" figures reproduce exactly in
+> the P3.10–P3.12 runs.
+>
+> **For current status read [`P3-RESEARCH-OVERVIEW.md`](P3-RESEARCH-OVERVIEW.md).**
+
 **This file is a register, not an argument.** It lists every decision the P3 research line
 has surfaced and deliberately did **not** take, what each decision actually controls, what
 the evidence can and cannot say about it, and who has to decide.
@@ -198,3 +218,55 @@ Recorded so the register is not misread as "everything is undecided":
 | resampling-based correction | **DECIDED — not justified** | P3.6 |
 | treat the corrected output as validated on real audio | **DECIDED — no** | it has never been applied to real audio |
 | re-open the P3.4 "gap policy is the dominant residual source" finding | **DECIDED — no, it stands** | direct same-axis evidence; only its *supporting inference* was rejected |
+
+---
+
+## Addendum — what P3.10–P3.12 settled
+
+**Appended during the P3 documentation cleanup. Everything above this line is
+frozen P3.9 text and is unchanged.** This section exists because a decision log
+that a reader acts on must not carry a false row, and because P3.10–P3.12 added
+two decisions the register did not contain.
+
+### D1–D7 status after P3.10–P3.12
+
+| id | status | what the later phases added |
+|---|---|---|
+| D1 gap policy | **still `OPEN`** | P3.11 measured all five arms on real PCM across six pairs and **still offers no ranking**, for the original reason: the nomination metric is policy-invariant (0 of 8 136 pairs). P3.11's addition is that `no_correction_gap` is nearly a **no-op** on low-coverage pairs, so the choice decides whether most of the stream is corrected at all. |
+| D2 `window_of` | **still `OPEN`** | P3.11 measured the real-PCM effect of `latest-start` vs `nearest-centre`:**index** agreement 0.21 %, **applied-shift value** agreement 56.94 % / 36.37 %. It also established that `sample-domain` is **not a third candidate** — it is identical to `latest-start`, because overlapping 30 s/10 s windows make the latest covering index `pos // hop`. Verified in `tests/audio_sync_p311/test_coordinates.py` (71 PASS / 0 FAIL). |
+| D3 15 s offset | **still `OPEN`** | Unchanged, still `OBSERVED SEMANTIC MISMATCH`. Its bound (one hop at `win = 3·hop`, **and only there**) is unchanged. |
+| D4 end-to-end cost | **still `OPEN`** | The register's own figures reproduce: **3988 s / 478 windows** (C1305), **1596 s / 414 windows** (C1306). What is new: the measured refusal rate across all six pairs is **19.5 %–74.4 %** valid; the **PCM apply stage in isolation** runs at **439–474 MB/s with peak RSS flat at 110 MiB**; and P3.12 measured that an adaptive measurement strategy costs **2–10×** the exhaustive pass rather than saving anything — so measurement is not merely dominant, it is not reducible by the route tested. |
+| D5 what a correction may claim | **still `OPEN`** | P3.12 independently reinforced the load-bearing fact: an excursion **shorter than the measurement window** is averaged away at any refinement depth. Refinement changes *where* windows are placed, not *how long* they are, so it cannot recover in-gap truth either. |
+| D6 downstream representability | **still `OPEN`** | Unchanged. Still nobody has looked at the consumers. |
+| D7 a durable home for the implementation | **still `OPEN`, and now more urgent** | P3.10–P3.12 added ~3700 more files and ~25 GiB under `work/`, all gitignored. The P3 cleanup phase quarantined only *unreferenced* files into `work/archive/pending-delete/audio-sync-p3/`; it did **not** and cannot make the implementation durable. If `work/` is deleted, P3 remains unreproducible and the provenance hashes remain a tombstone. |
+
+### D8 — Whether any P3 correction is enabled at all
+
+| | |
+|---|---|
+| **Status** | `OPEN` — no flag exists; nothing was enabled |
+| **Owner** | product |
+| **Blocks** | every other production question, trivially |
+
+The register's "not open" table says *enable any P3 correction by default —
+`DECIDED — no`*. That remains true. **What P3.10–P3.12 changed is the reason it
+is easy:** it is not that the correction is unproven end to end — it is now
+`VALIDATED` end to end on six real pairs — but that coverage is **19.5–74.4 %**,
+so most of the timeline would be **policy-filled while 100 % of samples are
+rewritten**, and no residual acceptance threshold exists to say that is
+acceptable.
+
+That is a product judgement, not a research one, and P3 deliberately stops short
+of it.
+
+### Entry that is not open after P3.12
+
+```text
+adaptive coarse-to-fine measurement   NO ADVANTAGE DEMONSTRATED  (P3.12)
+fractional / resampling correction    CLOSED, NOT JUSTIFIED      (P3.6, unchanged)
+```
+
+P3.12 is **not** recorded as a failed idea. It is recorded as: *the current
+tested formulation provides no demonstrated efficiency advantage.* Its safety
+half succeeded — `MISSED_TRANSITION = 0` on known ground truth — and the reason
+for the efficiency failure is measured, not assumed.

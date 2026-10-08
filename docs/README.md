@@ -14,6 +14,7 @@
 | 找**厂商官方文档 / 上游源码 / GPU 能力探测** | [`reference/README.md`](reference/README.md) |
 | 查**已封存的历史调查**（硬件解码 Phase 1 等） | [`../olddocs/docs/`](../olddocs/docs/) ★ **先读 [`../olddocs/README.md`](../olddocs/README.md) 的状态标注** |
 | 看**测试素材清单与冻结基线** | [`fixtures/a7m5_channel_sync_fixtures.md`](fixtures/a7m5_channel_sync_fixtures.md) |
+| 查**音频声道同步（channel-sync）研究线和当前结论** | [`audio-sync-p3/P3-RESEARCH-OVERVIEW.md`](audio-sync-p3/P3-RESEARCH-OVERVIEW.md) ★ 入口；⚠️ **先读该目录的 `README.md` 状态横幅——它是冻结的历史文档，不是入口** |
 | 看**历史代码快照与废弃脚本** | 根 [`../olddocs/README.md`](../olddocs/README.md) |
 
 > **分类规则**：**design** = 项目自身设计/实施文档；**evaluation** = 本项目的
@@ -177,6 +178,33 @@ F:\1KeyTranscoder\
 | 文件 | 说明 |
 |---|---|
 | [`a7m5_channel_sync_fixtures.md`](fixtures/a7m5_channel_sync_fixtures.md) | **A7M5 真实素材 channel-sync fixture 清单**：10 类场景（空 CH1/CH2、不同物理位置、已对齐、不同固定 delay、低相关等）；原始大文件不提交仓库，仅路径引用；冻结基线与标定依据见 §15 与 `tests/fixtures/channel_sync/` |
+
+## 📁 [audio-sync-p3/](audio-sync-p3/) — 音频声道同步研究线（分类：调研 / 证据归档）
+
+**P1 常量偏移矫正已上线且未被 P3 改动；P3 是时变延迟 `delay(t)` 的研究线，
+且 P3 从未启用任何东西。** 入口是
+[`audio-sync-p3/P3-RESEARCH-OVERVIEW.md`](audio-sync-p3/P3-RESEARCH-OVERVIEW.md)。
+
+| 文件 | 说明 | 状态 |
+|---|---|---|
+| [`P3-RESEARCH-OVERVIEW.md`](audio-sync-p3/P3-RESEARCH-OVERVIEW.md) | **★ 唯一入口**：P3 目的、P1 基线、P3.1–P3.12 每阶段 goal/status/一句话结论/报告位置、当前结论、已验证 vs 未验证、生产状态、P4 下一步 | ✅ 权威（当前状态） |
+| [`RESEARCH-SUMMARY.md`](audio-sync-p3/RESEARCH-SUMMARY.md) | 维护者五分钟版：**被证明的 / 被推翻的 / 仍未知的 / 生产安全的 / 明确推迟的** | ✅ 权威（摘要） |
+| [`PRODUCTION-HANDOFF.md`](audio-sync-p3/PRODUCTION-HANDOFF.md) | 已安全 / 研究已验证 / **未获生产批准**三类，逐项列出阻塞条件 | ✅ 权威 |
+| [`OPEN-DECISIONS.md`](audio-sync-p3/OPEN-DECISIONS.md) | 未决事项登记册（D1–D7）＋"**已决定、不开放**"清单。**不含推荐、不含排序** | ✅ 权威 |
+| [`P4-HANDOFF.md`](audio-sync-p3/P4-HANDOFF.md) | P3 已冻结；P4 应先做策略决策而非先写代码；以及 P4 **不应重做**的清单 | ✅ 权威 |
+| [`README.md`](audio-sync-p3/README.md) | ⚠️ **冻结的历史文档，不是入口**：原始 P3 阶段的进行中报告，状态行 `P3 NOT JUSTIFIED` 已被后续阶段超越。**原文未改**，只加状态横幅 | ⚠️ 历史 |
+| [`PRODUCTION-REQUIREMENTS.md`](audio-sync-p3/PRODUCTION-REQUIREMENTS.md) | P3.9 写成的生产需求（逐条有出处）。**§5/§6 有三句被 P3.10/P3.11 超越**（"从未把 plan 应用到真实音频并重测"等），已在头部横幅逐条标注。**原文未改** | ⚠️ 部分过期 |
+| [`FINAL-RESEARCH-SUMMARY.md`](audio-sync-p3/FINAL-RESEARCH-SUMMARY.md) | 逐阶段研究纪要，**只覆盖 P1–P3.8**，不含 P3.9–P3.12 | ⚠️ 覆盖到 P3.8 |
+| `audio-sync-p3/p3.10-provenance.md`、`p3.11-provenance.md`、`p3.12-provenance.md`、`provenance.md` | 各阶段 identity + 逐文件 SHA-256 + 复现命令 | ✅ 权威（溯源） |
+| [`HANDOFF-CHECKLIST.md`](audio-sync-p3/HANDOFF-CHECKLIST.md) | 12 条要求 + 集成者必须自己复核的事项（§3.3 "`core/` 未被修改"**不是无条件成立的**） | ✅ 权威 |
+| 其余 `measurement/validity/trajectory/long-duration/correction/…` | 各专题设计文档，属 P3.1–P3.8 时期 | ⚠️ 见各自内容 |
+
+> **引用审计结论（2026-10 cleanup）**：本目录历史文档**一律未改写**。已发现并
+> 以**头部横幅**方式（不改原文）标注的索引问题见
+> [`P3-RESEARCH-OVERVIEW.md`](audio-sync-p3/P3-RESEARCH-OVERVIEW.md)
+> 的"Historical documents that no longer state current status"一节，
+> 其中包括两处**至今未被任何文档调和**的矛盾（P3.2 的 `NOT VALIDATED` 与
+> P3.10/P3.11 实测到的大幅中位数改善）。**该矛盾被记录为未决项，未被"修好"。**
 
 ## 📁 [reference/](reference/) — 参考资料（分类：第三方一手资料存档）
 

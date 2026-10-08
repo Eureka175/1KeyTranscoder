@@ -1,3 +1,21 @@
+> ## ⚠️ FROZEN HISTORICAL DOCUMENT — THIS IS NOT THE ENTRY POINT
+>
+> This is the **in-progress report of the original P3 phase**, written on branch
+> `feature/audio-sync-timevarying-correction` before P3.1 existed. It is
+> preserved as history and is **not rewritten**.
+>
+> **Its status line is superseded.** The P3 line continued through P3.12, ran the
+> real PCM chain on six channel pairs, and produced verdicts this document
+> predates — including a large measured residual improvement that the
+> `P3 NOT JUSTIFIED` line below does not reflect.
+>
+> **For current status read [`P3-RESEARCH-OVERVIEW.md`](P3-RESEARCH-OVERVIEW.md).**
+> Supporting: [`RESEARCH-SUMMARY.md`](RESEARCH-SUMMARY.md) ·
+> [`PRODUCTION-HANDOFF.md`](PRODUCTION-HANDOFF.md) ·
+> [`OPEN-DECISIONS.md`](OPEN-DECISIONS.md) · [`P4-HANDOFF.md`](P4-HANDOFF.md).
+>
+> The text below is unaltered.
+
 # Audio Sync P3 — Long-Duration Time-Varying Delay Correction
 
 **STATUS: research complete for this corpus — `P3 NOT JUSTIFIED` at this resolution;

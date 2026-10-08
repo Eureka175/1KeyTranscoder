@@ -1,5 +1,25 @@
 # Audio Sync P3 — Production Requirements
 
+> ## ⚠️ THREE STATEMENTS BELOW ARE SUPERSEDED — TEXT UNALTERED
+>
+> This document was written in P3.9 and is frozen. Two passages in **§5** and one
+> in **§6** were overtaken by P3.10 and P3.11, which ran the real PCM chain this
+> document says had never been run. They are **not** edited here, because the
+> line's standing rule is that a historical report is never rewritten to match a
+> later result. Corrected status:
+>
+> | superseded statement | location | current status |
+> |---|---|---|
+> | *"No plan has ever been applied to real audio and re-measured (`UNKNOWN`)"* | §5, last row | **P3.10 did exactly that** (both corpora); **P3.11 did it on 6/6 channel pairs** |
+> | *"there is no measured improvement to set a threshold against"* | §5, third row | a large median improvement **is** measured (296.48 → 4.233 samples, C1305) — but the **threshold remains `NOT ESTABLISHED`**, which was the point of the row |
+> | *"treat the corrected output as validated on real audio — `DECIDED — no` … it has never been applied to real audio"* | §6, decided table | the **apply** is now `VALIDATED`; **acceptance** is still not established, and enabling is still `DECIDED — no` |
+>
+> What remains true, and is the load-bearing part of this document: **uncertainty
+> must be explicit**, no threshold may be invented, and no policy is selected.
+> Nothing in P3.10–P3.12 satisfies a requirement that P3.9 could not source.
+>
+> **For current status read [`P3-RESEARCH-OVERVIEW.md`](P3-RESEARCH-OVERVIEW.md).**
+
 **Every requirement below is derived from research that already exists in this repository. None
 was invented for this document. Each carries the phase that forces it.**
 
