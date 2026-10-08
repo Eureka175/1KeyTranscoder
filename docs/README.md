@@ -229,6 +229,8 @@ F:\1KeyTranscoder\
 | [`P4-FINAL-REPORT.md`](audio-sync-p4/P4-FINAL-REPORT.md) | 22 节最终报告 | ✅ 权威 |
 | [`downstream-audit.md`](audio-sync-p4/downstream-audit.md) | **P4.1 / D6 下游消费者审计**：`UNRESOLVED_GAP` 能否活着抵达消费者。**结论 `BLOCKED`** —— 逐窗状态在生产模型里**没有表示**，而且同一种失效在 shipped 代码里**已经存在**（track 粒度） | ✅ 权威（审计） |
 | [`d1-uncertainty-contract.md`](audio-sync-p4/d1-uncertainty-contract.md) | **D1 不确定性生产契约（规范，未实现）**：状态词汇、序列化、日志、消费者可见性；最小补丁设计（**feature-gated by construction**）。**策略中立** | ✅ 权威（契约） |
+| [`p4.2-evidence-integrity.md`](audio-sync-p4/p4.2-evidence-integrity.md) | **P4.2 证据完整性修复**（**本仓库首个有意改变生产行为的阶段**）：复现 → 根因 → 修正采纳门 → 证据字段 → P1 137 语料审计 → 真实语料审计 → D6 复验 → 缺陷家族静态审计 → 全量回归。**状态 `COMPLETE`** | ✅ 权威（修复记录） |
+| [`p4.2-provenance.md`](audio-sync-p4/p4.2-provenance.md) | P4.2 溯源：改动了什么（2 个生产文件，前后哈希）与**证明没动什么**（9 个用户文件、冻结 fixture、同步算法） | ✅ 权威（溯源） |
 
 > **一句话状态**：固定偏移 `VALIDATED`；时变测量 `VALIDATED`；真实 PCM 施加
 > `VALIDATED`；六通道对 E2E `VALIDATED`；**缺口策略 `DEFERRED`、坐标合同
@@ -238,8 +240,15 @@ F:\1KeyTranscoder\
 > **P4.1（D6 下游审计）补一句**：`UNRESOLVED_GAP` **无法**活着抵达生产消费者，
 > 而且同一种"有数字就等于已测量"的失效**已经在 shipped 代码里存在**（track 粒度：
 > `channel_sync` 算出覆盖率、用它把门、然后采纳一个**不再复核覆盖率**的回退分支，
-> 写出 `decision="fixed", reason=None`）。因此 **D6 = `BLOCKED`**，
-> **生产启用 = `BLOCKED`**；该缺陷属于真实生产代码，需**单独授权**才能修。
+> 写出 `decision="fixed", reason=None`）。因此 **D6 = `BLOCKED`**。
+>
+> **P4.2 已修复该缺陷（状态 `COMPLETE`）**：采纳门现在作用于**被采纳的那个估计**，
+> 并在写入 `fixed` 前再做一次最终证据门；证据（可用帧 / 总帧 / 覆盖率 / 置信度）
+> 附加到每一行。效果经三条独立证据确认：源码审计（51 模块，0 未复核）、
+> 35 例证据完整性回归、以及真实语料（六对里五对从 `SUCCESS` 改为
+> `LOW_CONFIDENCE`，而覆盖率确实达标的那一对 74.4 % 仍然成功）。
+> **P1 算法未改**（`sync_estimate.py` / `sync_fix.py` 哈希与 P3 一致），
+> 改的是**分类**，不是修正。
 >
 > **P4 没有替产品做决定，也没有改动任何默认行为。** 模块 `core/audio_sync_tv.py`
 > 与套件 `tests/audio_sync_p4/` 都是 tracked 代码，且**不 import `work/`**，
