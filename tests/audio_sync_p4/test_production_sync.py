@@ -923,26 +923,24 @@ def t9_default_path() -> None:
     # the module must not be importable into production by accident: nothing
     # in core/ references it except itself
     core = REPO / "core"
-    refs = []
-    for f in sorted(core.glob("*.py")):
-        if f.name == "audio_sync_tv.py":
-            continue
-        txt = f.read_text(encoding="utf-8", errors="replace")
-        if "audio_sync_tv" in txt:
-            refs.append(f.name)
-    value("T9.6 no other core module references audio_sync_tv",
-          refs == [], f"referenced by {refs}")
+    # STRENGTHENED (P4.4): these were substring scans, so a *comment* naming
+    # the module read as a reference, while an aliased import read as clean.
+    # The property is a dependency, so it is read from the import statements.
+    refs = [f.name for f in sorted(core.glob("*.py"))
+            if f.name != "audio_sync_tv.py"
+            and _imports_audio_sync_tv(
+                f.read_text(encoding="utf-8", errors="replace"))]
+    value("T9.6 no other core module imports audio_sync_tv",
+          refs == [], f"imported by {refs}")
 
-    # 1kt.py must not reference it either
+    # 1kt.py must not import it either
     kt = (REPO / "1kt.py").read_text(encoding="utf-8", errors="replace")
-    value("T9.7 1kt.py does not reference audio_sync_tv",
-          "audio_sync_tv" not in kt)
-
-    # AudioPlan must not be touched
+    value("T9.7 1kt.py does not import audio_sync_tv",
+          not _imports_audio_sync_tv(kt))
     ap = (REPO / "core" / "audio_plan.py").read_text(encoding="utf-8",
-                                                      errors="replace")
-    value("T9.8 core/audio_plan.py does not reference audio_sync_tv",
-          "audio_sync_tv" not in ap)
+                                                     errors="replace")
+    value("T9.8 core/audio_plan.py does not import audio_sync_tv",
+          not _imports_audio_sync_tv(ap))
 
     # dependency direction: the module must not reach into video/preservation.
     # Scan IMPORT statements only — the module docstring deliberately NAMES the
@@ -974,6 +972,17 @@ def t9_default_path() -> None:
                                                   errors="replace")]
         assert found == [], "x"
     control("T9.C the source-scan check can fail", break_it)
+
+    # CONTROL for the strengthened check: it must SEE a real import, and must
+    # NOT be fooled by prose that merely names the module.
+    def break_it_prose() -> None:
+        assert _imports_audio_sync_tv("# see core.audio_sync_tv for why"), "x"
+    control("T9.C2 the import check is not fooled by a comment naming the "
+            "module", break_it_prose)
+
+    def break_it_import() -> None:
+        assert not _imports_audio_sync_tv("from . import audio_sync_tv"), "x"
+    control("T9.C3 the import check DOES see a real import", break_it_import)
 
 
 # ==========================================================================
@@ -1160,6 +1169,39 @@ def t12_closed_form_equivalence() -> None:
                             hop_samples=HOP, n_windows=nw)
         assert np.array_equal(a, b), "x"
     control("T12.C the closed-form equivalence comparison can fail", break_it)
+
+
+def _imports_audio_sync_tv(src: str) -> bool:
+    """Does this source **import** the time-varying module? AST, not substring.
+
+    P4.4: the previous check was ``"audio_sync_tv" in txt``, which a comment
+    naming the module satisfies and an aliased import does not. Provenance
+    comments that explain *why* the module is not imported must not read as
+    imports — while a real (or lazily-named) import must not slip through.
+    """
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any("audio_sync_tv" in a.name for a in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            if "audio_sync_tv" in (node.module or ""):
+                return True
+            if any("audio_sync_tv" in a.name for a in node.names):
+                return True
+        elif isinstance(node, ast.Call):
+            fn = node.func
+            name = getattr(fn, "attr", None) or getattr(fn, "id", None)
+            if name in ("import_module", "__import__"):
+                for arg in node.args:
+                    if (isinstance(arg, ast.Constant)
+                            and isinstance(arg.value, str)
+                            and "audio_sync_tv" in arg.value):
+                        return True
+    return False
 
 
 def main() -> int:

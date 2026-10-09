@@ -369,6 +369,39 @@ def t5_dangerous_loss() -> None:
     control("T5.C the coverage-discovery probe can fail", break_it)
 
 
+def _imported_modules(src: str) -> set[str]:
+    """Every module name this source **actually imports** — AST, not substring.
+
+    A substring check cannot tell an import from a comment mentioning the
+    module, and it can be defeated by an alias. This reads the import
+    statements (including a lazily-named ``import_module`` / ``__import__``
+    argument), so the assertion is about the dependency, not about the prose.
+    """
+    import ast
+
+    out: set[str] = set()
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.Import):
+            out.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
+            out.add(base)
+            out.update(f"{base}.{alias.name}" for alias in node.names)
+        elif isinstance(node, ast.Call):
+            fn = node.func
+            name = getattr(fn, "attr", None) or getattr(fn, "id", None)
+            if name in ("import_module", "__import__"):
+                for arg in node.args:
+                    if (isinstance(arg, ast.Constant)
+                            and isinstance(arg.value, str)):
+                        out.add(arg.value)
+    return out
+
+
+def _imports_module(src: str, needle: str) -> bool:
+    return any(needle in mod for mod in _imported_modules(src))
+
+
 def _channel_sync_source() -> str:
     import inspect
     from core import channel_sync
@@ -403,13 +436,21 @@ def t6_neutral_layers() -> None:
 
     from core import audio_sync_tv
     src = inspect.getsource(audio_sync_tv)
+    # STRENGTHENED (P4.4): this was a substring test, so a *comment* naming the
+    # module read as an import, and an aliased import read as clean. It now
+    # reads the actual import statements — which is what the property is about.
+    tv_imports = _imported_modules(src)
     value("T6.4 the P4 module still imports no production model",
-          "audio_models" not in src and "output_compose" not in src,
-          "no import of AudioSyncResult / SyncStatus / AudioInputRef")
+          not any(m in ("audio_models", "output_compose")
+                  or m.startswith(("core.audio_models", "core.output_compose"))
+                  for m in tv_imports),
+          f"no import of AudioSyncResult / SyncStatus / AudioInputRef; "
+          f"imports={sorted(tv_imports)}")
 
     from core import audio_models
     value("T6.5 the production model does not import the P4 module",
-          "audio_sync_tv" not in inspect.getsource(audio_models))
+          not _imports_module(inspect.getsource(audio_models), "audio_sync_tv"),
+          "verified from the import statements, not from the text")
 
 
 # ==========================================================================

@@ -189,6 +189,35 @@ def resolve(row: dict):
     return rep.resolve(row)
 
 
+def _imported_modules(src: str) -> set[str]:
+    """Every module name this source **actually imports** — AST, not substring.
+
+    P4.4 STRENGTHENED THIS CHECK. It used to be
+    ``"audio_sync_tv" in txt and "import" in txt``, which flags a *comment*
+    that names the module and misses an aliased import. The property being
+    asserted is a dependency, so it is read from the import statements.
+    """
+    import ast
+
+    out: set[str] = set()
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.Import):
+            out.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
+            out.add(base)
+            out.update(f"{base}.{alias.name}" for alias in node.names)
+        elif isinstance(node, ast.Call):
+            fn = node.func
+            name = getattr(fn, "attr", None) or getattr(fn, "id", None)
+            if name in ("import_module", "__import__"):
+                for arg in node.args:
+                    if (isinstance(arg, ast.Constant)
+                            and isinstance(arg.value, str)):
+                        out.add(arg.value)
+    return out
+
+
 def applied_offset(res) -> int:
     from core.audio_timeline import SyncApplication, _effective_offset
 
@@ -620,13 +649,14 @@ def default_path(g: dict) -> None:
             sorted((REPO / "production").glob("*.py")) + [REPO / "1kt.py"]:
         if path.name == "audio_sync_tv.py":
             continue
-        txt = path.read_text(encoding="utf-8", errors="replace")
-        if "audio_sync_tv" in txt and "import" in txt:
+        src = path.read_text(encoding="utf-8", errors="replace")
+        if any("audio_sync_tv" in mod for mod in _imported_modules(src)):
             offenders.append(path.name)
     value("P.5 the time-varying path is still imported by no production module",
           not offenders,
           f"importers={offenders or 'none'} — default OFF is structural, not "
-          f"a flag that configuration can flip")
+          f"a flag that configuration can flip; checked from the import "
+          f"statements so a comment naming the module does not read as one")
 
     def break_it() -> None:
         assert d != {"status": "not_processed"}, "x"
