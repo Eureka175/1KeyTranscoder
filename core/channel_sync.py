@@ -370,6 +370,28 @@ def repair_remux_timescale(
         log(mv_desc)
 
 
+def _annotate_eligibility(rep: dict[str, Any]) -> None:
+    """给报告的每一行加上**修正资格**判定 (原地, 失败不影响报告)。
+
+    P4.4: 生产者与消费者必须用**同一个**判定入口。生产者在此之前只在内部
+    知道自己决定了什么; 这里把它写成报告的一部分, 于是"这条轨被写成 fixed"
+    与"这条轨允许进入修正路径"可以被独立核对 —— 两者不一致就是缺陷。
+
+    导入是函数内的: `core.audio_models` 反向引用本模块的 `effective_opts`,
+    模块级互相导入会成环, 而这条注解是**报告增强**, 不是算法的一部分。
+    """
+    try:
+        from .audio_models import ChannelSyncReport, correction_eligibility
+
+        view = ChannelSyncReport(rep)
+        gate = view.evidence_gate
+        for row in view.channels:
+            res = view.resolve(row)
+            row["eligibility"] = correction_eligibility(res, gate=gate).to_dict()
+    except Exception as exc:                       # noqa: BLE001 - 报告增强
+        rep["eligibility_note"] = f"not computed: {type(exc).__name__}: {exc}"
+
+
 def run_channel_sync(
     *,
     source: Path,
@@ -444,6 +466,11 @@ def run_channel_sync(
             "file_copied": bool(file_copied),
             "log_dir": str(work_dir),
         }
+        # P4.4: 每一行都附上**修正资格**判定 —— 与消费者用的是同一个入口
+        # (`correction_eligibility`), 因此生产者写的 `decision="fixed"` 与
+        # "允许进入修正路径" 是同一件事的两种说法, 而不是各说各话。
+        # 这里是所有终态的唯一汇合点, 所以在 report() 里做一次。
+        _annotate_eligibility(rep)
         (work_dir / f"channel_sync_{stem}.json").write_text(
             json.dumps(rep, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",

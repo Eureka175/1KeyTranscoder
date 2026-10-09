@@ -238,6 +238,258 @@ SYNC_STATUS_PATH: Mapping[SyncStatus, Mapping[str, bool]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# P4.4 — 生产修正资格 (correction eligibility): 唯一判定入口
+# ---------------------------------------------------------------------------
+
+#: 不修正时的稳定原因码。**每一个都来自 `SYNC_STATUS_PATH`, 不是另立的表** ——
+#: 新增成员会在这里被漏掉, 而 `test_production_eligibility.py` 断言两者同步。
+ELIGIBILITY_REASON_BY_STATUS: Mapping[SyncStatus, str] = {
+    SyncStatus.NOT_PROCESSED: "sync_not_processed",
+    SyncStatus.NOT_APPLICABLE: "sync_not_applicable",
+    SyncStatus.ALREADY_ALIGNED: "sync_already_aligned",
+    SyncStatus.LOW_CONFIDENCE: "sync_low_confidence",
+    SyncStatus.NON_CONSTANT: "sync_non_constant",
+    SyncStatus.OUT_OF_RANGE: "sync_out_of_range",
+    SyncStatus.RECHECK_FAILED: "sync_recheck_failed",
+    SyncStatus.FAILED: "sync_failed",
+}
+
+REASON_SYNC_OFFSET_MISSING = "sync_offset_missing"
+REASON_SYNC_OFFSET_INVALID = "sync_offset_invalid"
+REASON_SYNC_EVIDENCE_INSUFFICIENT = "sync_evidence_insufficient"
+REASON_SYNC_APPLICATION_NONE = "sync_application_none"
+REASON_SYNC_STATUS_UNKNOWN = "sync_status_unknown"
+
+#: 整数移位必须落在 int32 内。与 `core/audio_sync_tv.SHIFT_LIMIT` 是**同一个
+#: 界限**, 但两者的域不同 (这里是一条 track 的 offset, 那里是一个窗的移位),
+#: 所以各自持有并**互相核对** —— `test_production_eligibility.py` 断言二者相等,
+#: 因此不会悄悄分叉。这里不 import 那个模块: 它是 P4 的可选路径 (依赖 numpy),
+#: 而模型层不允许依赖它。
+SYNC_OFFSET_LIMIT = 1 << 31
+
+
+@dataclass(frozen=True)
+class CorrectionEligibility:
+    """一个同步结论**是否允许**进入修正路径, 以及不允许时的原因。
+
+    P4.4 的核心对象。它存在的原因是: 在此之前,"能不能修"这个问题由**每个
+    consumer 各自回答** —— timeline 看 `status`, `apply_sync_result` 看
+    `status`, `production/output` 看 `status`, 而**没有一个**看证据。于是
+    "数值存在" 与 "允许修正" 之间没有任何强制关系。
+
+    契约 (构造即成立, 由 `correction_eligibility()` 唯一产生):
+
+        eligible 为真  =>  offset_samples 是整数, 且该状态在
+                           `SYNC_STATUS_PATH` 里 `value_trusted` 且
+                           `may_enter_correction` 都为真, 且 (若结论陈述了证据)
+                           证据满足生产门。
+        eligible 为假  =>  **offset_samples 为 None**。
+
+    最后一条是关键: 不合格的判定**不携带可用的数值**。这不是"检查后不使用",
+    而是"根本不给出" —— §6 的 `raw_offset_samples` 存在**不能**自动意味着允许
+    修正, 在这里是**不可表示**而非被劝阻。数值本身仍然可以读
+    `raw_offset_samples`, 供报告如实陈述。
+    """
+
+    eligible: bool
+    reason: str | None
+    status: SyncStatus
+    #: 真正允许施加的整数移位; 不合格时**恒为 None**。
+    offset_samples: int | None = None
+    #: 数值本身 (可能存在但不被采用), 报告用。绝不作为修正依据。
+    raw_offset_samples: float | None = None
+    usable_frames: int | None = None
+    total_frames: int | None = None
+    coverage: float | None = None
+    #: 是否**实际**核对过证据门。False = 该结论未陈述证据 (历史/外部输入),
+    #: 判定不因缺少新字段而改变 —— 与 D1 的兼容规则一致。
+    evidence_checked: bool = False
+    #: 判定所用的证据门 (来自报告或生产有效配置), 便于审计。
+    gate: Mapping[str, float] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "eligible": bool(self.eligible),
+            "status": self.status.value,
+            "evidence_checked": bool(self.evidence_checked),
+        }
+        if self.reason is not None:
+            data["reason"] = self.reason
+        if self.offset_samples is not None:
+            data["offset_samples"] = int(self.offset_samples)
+        if self.raw_offset_samples is not None:
+            data["raw_offset_samples"] = float(self.raw_offset_samples)
+        if self.usable_frames is not None:
+            data["usable_frames"] = int(self.usable_frames)
+        if self.total_frames is not None:
+            data["total_frames"] = int(self.total_frames)
+        if self.coverage is not None:
+            data["coverage"] = float(self.coverage)
+        if self.gate is not None:
+            data["gate"] = {k: float(v) for k, v in self.gate.items()}
+        return data
+
+
+def correction_eligibility(
+    sync: Any,
+    *,
+    application: Any = None,
+    gate: Mapping[str, float] | None = None,
+) -> CorrectionEligibility:
+    """**唯一**的 "这个结论能不能进修正路径" 判定入口。
+
+    `sync` 可以是 `AudioSyncResult` / `AudioChannelRef` / 报告 dict / None ——
+    与 `core.audio_timeline` 的既有读取方式一致, 不新增第二种取值约定。
+
+    判定次序 (全部由**派生**得出, 无字面量阈值):
+
+      1. 状态未知 / 缺失                    -> 不合格
+      2. `SYNC_STATUS_PATH[status]` 不允许修正 -> 不合格 (原因码来自该表)
+      3. 没有数值 / 非有限 / 越界            -> 不合格
+      4. 结论**陈述了**证据且不过门          -> 不合格
+      5. `application == NONE`              -> 不合格 (调用方要求不施加)
+      6. 其余                               -> 合格
+
+    第 4 步只在结论**陈述了**证据时生效: 未陈述时 `evidence_checked=False`,
+    判定不变 —— 新增字段不得让历史结论失效 (D1 的兼容规则)。
+    """
+    status_raw = None
+    if sync is not None:
+        status_raw = getattr(sync, "status", None)
+        if status_raw is None and isinstance(sync, Mapping):
+            status_raw = sync.get("sync_status", sync.get("status"))
+
+    status: SyncStatus | None = None
+    unknown_status = False
+    if status_raw is not None:
+        status = SyncStatus.coerce(status_raw, SyncStatus.NOT_PROCESSED)
+        # coerce 对未知取值回落到默认成员; 那会让"未知状态"伪装成
+        # "not_processed"。这里把它区分出来, 因为二者的原因码不同。
+        if (status is SyncStatus.NOT_PROCESSED
+                and str(getattr(status_raw, "value", status_raw))
+                not in ("not_processed", "NOT_PROCESSED")):
+            unknown_status = True
+
+    raw_offset = _sync_offset_value(sync)
+    usable = _sync_int_value(sync, "usable_frames")
+    total = _sync_int_value(sync, "total_frames")
+    coverage = _sync_float_value(sync, "coverage")
+    if coverage is None and usable is not None and total:
+        coverage = float(usable) / float(total)
+    confidence = _sync_float_value(sync, "quality", "confidence")
+
+    def deny(reason: str, *, checked: bool = False,
+             effective_gate: Mapping[str, float] | None = None
+             ) -> CorrectionEligibility:
+        """不合格的判定**不携带 offset** —— 见 CorrectionEligibility 的契约。"""
+        return CorrectionEligibility(
+            eligible=False, reason=reason,
+            status=status or SyncStatus.NOT_PROCESSED,
+            offset_samples=None, raw_offset_samples=raw_offset,
+            usable_frames=usable, total_frames=total, coverage=coverage,
+            evidence_checked=checked, gate=effective_gate,
+        )
+
+    if status is None:
+        return deny(REASON_SYNC_STATUS_UNKNOWN)
+    if unknown_status:
+        return deny(REASON_SYNC_STATUS_UNKNOWN)
+
+    may = SYNC_STATUS_PATH[status]["may_enter_correction"]
+    if not may:
+        return deny(ELIGIBILITY_REASON_BY_STATUS[status])
+
+    # -- 数值有效性 -------------------------------------------------------
+    # NaN 判定沿用仓库惯例 (x != x); 越界判定用 int32 移位界限。
+    # **不在这里取整** —— 取整是 applier 的事, 判定只看是否有限、是否在界内。
+    if raw_offset is None:
+        return deny(REASON_SYNC_OFFSET_MISSING)
+    if raw_offset != raw_offset or raw_offset in (float("inf"), float("-inf")):
+        return deny(REASON_SYNC_OFFSET_INVALID)
+    if abs(raw_offset) >= SYNC_OFFSET_LIMIT:
+        return deny(REASON_SYNC_OFFSET_INVALID)
+
+    # -- 证据 (只在结论陈述了证据时生效) -----------------------------------
+    eff_gate = gate if gate is not None else (sync.evidence_gate
+                                             if hasattr(sync, "evidence_gate")
+                                             else None)
+    if eff_gate is None:
+        eff_gate = _production_evidence_gate()
+    checked = False
+    if coverage is not None and eff_gate is not None:
+        checked = True
+        if usable is not None and usable < eff_gate["min_usable_frames"]:
+            return deny(REASON_SYNC_EVIDENCE_INSUFFICIENT, checked=True,
+                        effective_gate=eff_gate)
+        if (confidence is not None
+                and confidence < eff_gate["min_confidence"]):
+            return deny(REASON_SYNC_EVIDENCE_INSUFFICIENT, checked=True,
+                        effective_gate=eff_gate)
+        if coverage < eff_gate["min_usable_fraction"]:
+            return deny(REASON_SYNC_EVIDENCE_INSUFFICIENT, checked=True,
+                        effective_gate=eff_gate)
+
+    if application is not None:
+        mode = (application.value if hasattr(application, "value")
+                else str(application))
+        if mode == "none":
+            return deny(REASON_SYNC_APPLICATION_NONE, checked=checked,
+                        effective_gate=eff_gate)
+
+    return CorrectionEligibility(
+        eligible=True, reason=None, status=status,
+        offset_samples=int(round(raw_offset)), raw_offset_samples=raw_offset,
+        usable_frames=usable, total_frames=total, coverage=coverage,
+        evidence_checked=checked, gate=eff_gate,
+    )
+
+
+def _sync_offset_value(sync: Any) -> float | None:
+    """从一个同步结论里取 offset (同一个读取约定, 三种载体)。"""
+    if sync is None:
+        return None
+    value = getattr(sync, "offset_samples", None)
+    if value is None and isinstance(sync, Mapping):
+        value = sync.get("sync_offset_samples", sync.get("offset_samples"))
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _sync_int_value(sync: Any, *names: str) -> int | None:
+    for name in names:
+        value = getattr(sync, name, None)
+        if value is None and isinstance(sync, Mapping):
+            value = sync.get(name)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _sync_float_value(sync: Any, *names: str) -> float | None:
+    for name in names:
+        value = getattr(sync, name, None)
+        if value is None and isinstance(sync, Mapping):
+            value = sync.get(name)
+        if value is None:
+            continue
+        try:
+            out = float(value)
+        except (TypeError, ValueError):
+            continue
+        if out == out:
+            return out
+    return None
+
+
 class TrackBuildMode(_StrEnum):
     """stream -> track 的映射模式 (§5/§6/§10)。"""
 

@@ -357,6 +357,9 @@ class AlignmentOutcome:
     #: 只有 `status == "success"` 的条目才带 `evidence_sufficient = true`;
     #: 未通过的条目标 `false` 并保留帧数与覆盖率, 供报告如实陈述。
     evidence: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: **P4.4**: 本次 alignment 的**修正计划** —— 每条 target 的资格判定与结论。
+    #: `kind == "fixed_integer_delay"`: 没有 gap policy, 没有 coordinate contract。
+    plan: Any = None
     errors: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -376,6 +379,8 @@ class AlignmentOutcome:
             data["evidence"] = {
                 k: dict(v) for k, v in self.evidence.items()
             }
+        if self.plan is not None:
+            data["plan"] = self.plan.to_dict()
         if self.errors:
             data["errors"] = [dict(e) for e in self.errors]
         if self.warnings:
@@ -409,10 +414,12 @@ def apply_alignment(
     重编码) —— 绝不用"改压缩包时间戳"冒充样本级对齐。
     """
     from core.audio_sync import (
+        FixedDelayPlan,
         apply_sync_result,
         estimate_sync,
         plan_from_plan,
     )
+    from core.audio_models import correction_eligibility
 
     log = log or (lambda _msg: None)
     decision = resolve_alignment(plan, requested)
@@ -448,13 +455,21 @@ def apply_alignment(
         return out
 
     out.warnings.extend(estimation.warnings)
+    # P4.4: **资格判定在写模型之前**, 而且只有一份。`FixedDelayPlan` 里不合格的
+    # 条目**不携带 offset**, 所以 `out.offsets` 与 `apply_sync_result` 用的是同一
+    # 个判定, 不存在"这里允许、那里不允许"的第二套规则。
+    delay_plan = FixedDelayPlan.from_sync_result(
+        estimation, reference_channel_id=str(reference))
+    out.plan = delay_plan
     written = apply_sync_result(plan, estimation)
     out.applied = int(written)
+    eligible = delay_plan.offsets()
     for item in estimation.estimates:
         out.statuses[item.channel_id] = item.status
         # P4.3 (D1): 证据在这一层被如实带出, 不再丢弃 usable/total frames。
         total = int(item.total_frames)
         coverage = (float(item.usable_frames) / total) if total else 0.0
+        verdict = correction_eligibility(item)
         out.evidence[item.channel_id] = {
             "usable_frames": int(item.usable_frames),
             "total_frames": total,
@@ -465,15 +480,24 @@ def apply_alignment(
             "evidence_sufficient": bool(
                 item.status == "success" and item.applied
             ),
+            # P4.4: 资格结论与原因码 —— 是否允许修正的唯一答案。
+            "eligible": bool(verdict.eligible),
+            "eligibility_reason": verdict.reason,
             "applied": bool(item.applied),
             "reason": item.reason,
         }
-        if item.status == "success":
-            out.offsets[item.channel_id] = float(item.offset_samples)
+        if item.channel_id in eligible:
+            out.offsets[item.channel_id] = float(eligible[item.channel_id])
+    refused = delay_plan.refusal_reasons()
+    if refused:
+        out.notes.append(
+            "correction not eligible for: " + ", ".join(
+                f"{cid} ({why})" for cid, why in sorted(refused.items()))
+        )
     if not written:
         out.warnings.append(
-            "no target produced a usable estimate: every channel keeps its "
-            "original position (a non-success estimate is never applied)"
+            "no target produced an eligible estimate: every channel keeps "
+            "its original position (an ineligible estimate is never applied)"
         )
     # P4.3 (D1, 3.4 of the contract): 一条被修正但没有完全测过的轨, 必须产生
     # 一行**点名覆盖率**的日志。只打 `applied` 就是把 D6 的缺陷搬进了日志。

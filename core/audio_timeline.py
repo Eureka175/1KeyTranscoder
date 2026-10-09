@@ -67,6 +67,7 @@ from .audio_models import (
     AudioPlan,
     AudioStream,
     SyncStatus,
+    correction_eligibility,
 )
 from .audio_plan import effective_mapping
 
@@ -233,25 +234,28 @@ def _sync_status(sync: Any) -> str:
 def _effective_offset(
     sync: Any, application: SyncApplication | str,
 ) -> tuple[int, float | None]:
-    """(整数样本 offset, 原始浮点 offset) —— 只应用已存在的固定整数 offset。
+    """(整数样本 offset, 原始浮点 offset) —— 只应用**有资格**的固定整数 offset。
 
-    规则:
-      * 只有 `status == success` 且带 offset 才应用 (其余状态按"无修正"处理);
+    规则 (P4.4: 判定委托给**唯一**入口 `correction_eligibility`):
+      * 状态必须允许修正 (`SYNC_STATUS_PATH.may_enter_correction`);
+      * 若结论**陈述了**证据, 证据必须过生产门 —— 状态为 success 但证据不足的
+        结论在这里就失效, 而不是靠上游自觉;
       * `SyncApplication.NONE` -> 一律 0;
       * 浮点 offset 取整用 `rint` 语义 (= `core/sync_fix.shift_stream`), 但
         报告里保留原浮点值, 分数部分作为 residual 记录, **不做**分数修正。
+
+    第二个返回值始终是**原始**浮点值 (可能存在于一个不合格的结论里), 供报告
+    如实陈述; 它**不是**许可, 修正量只有第一个返回值。
     """
     raw = _offset_samples(sync)
     mode = (
         application.value if isinstance(application, SyncApplication)
         else str(application or SyncApplication.APPLY.value)
     )
-    if raw is None or mode != SyncApplication.APPLY.value:
+    verdict = correction_eligibility(sync, application=mode)
+    if not verdict.eligible or verdict.offset_samples is None:
         return 0, raw
-    if _sync_status(sync) != SyncStatus.SUCCESS.value:
-        # 未测量/失败/已对齐(offset 无意义) -> 不施加任何移位
-        return 0, raw
-    return int(round(raw)), raw
+    return int(verdict.offset_samples), raw
 
 
 def source_to_timeline(

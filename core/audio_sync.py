@@ -85,12 +85,15 @@ from .audio_models import (
     AudioPlan,
     AudioSyncResult,
     SyncStatus,
+    correction_eligibility,
 )
 from .audio_plan import effective_mapping
 from .audio_timeline import AudioRenderError, SyncApplication
 
 __all__ = [
     "AudioSyncError",
+    "FixedDelayEntry",
+    "FixedDelayPlan",
     "PairSyncEstimate",
     "PCMChannelWindow",
     "SyncEstimateResult",
@@ -666,6 +669,9 @@ class PairSyncEstimate:
     applied: bool = False
     status: str = SyncStatus.NOT_PROCESSED.value
     reason: str | None = None
+    #: **P4.4**: 修正资格判定不通过时的原因码。`None` = 合格或尚未判定。
+    #: 这是"有数值但不采用"的**显式**记录 —— 不靠"offset 还在但没人读"。
+    eligibility_reason: str | None = None
     warnings: list[str] = field(default_factory=list)
 
     @property
@@ -696,6 +702,8 @@ class PairSyncEstimate:
             data["residual_samples"] = round(self.residual_samples, 6)
         if self.reason is not None:
             data["reason"] = self.reason
+        if self.eligibility_reason is not None:
+            data["eligibility_reason"] = self.eligibility_reason
         if self.warnings:
             data["warnings"] = list(self.warnings)
         return data
@@ -790,6 +798,186 @@ class SyncEstimateResult:
 
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# P4.4 — 固定延迟修正计划 (fixed-delay correction plan)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FixedDelayEntry:
+    """一条 track/channel 的修正条目: **资格判定 + 结论**一起冻结。
+
+    没有第二个构造入口。`offset_samples` 直接取自资格判定, 而不合格判定的
+    `offset_samples` 恒为 `None` —— 因此"不合格却带着可施加的数值"这个状态
+    在这个类型里**不可表示** (P4.4 的核心不变量)。
+
+    数值本身没有被丢掉: `eligibility.raw_offset_samples` 仍然可以读, 供报告
+    如实陈述"测出来了, 但不采用"。
+    """
+
+    channel_id: str
+    eligibility: Any                       # CorrectionEligibility
+    label: str | None = None               # 报告用的轨道/流名, 如 "CH4" / "stream:3"
+
+    @classmethod
+    def of(cls, channel_id: str, sync: Any, *, label: str | None = None,
+           gate: Mapping[str, float] | None = None,
+           application: Any = None) -> "FixedDelayEntry":
+        return cls(
+            channel_id=str(channel_id),
+            eligibility=correction_eligibility(
+                sync, gate=gate, application=application),
+            label=label,
+        )
+
+    @property
+    def eligible(self) -> bool:
+        return bool(self.eligibility.eligible)
+
+    @property
+    def offset_samples(self) -> int | None:
+        return self.eligibility.offset_samples
+
+    def to_dict(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "channel_id": self.channel_id,
+            **self.eligibility.to_dict(),
+        }
+        if self.label is not None:
+            data["label"] = self.label
+        return data
+
+
+@dataclass(frozen=True)
+class FixedDelayPlan:
+    """一次固定整数延迟修正的**完整且唯一**的输入。
+
+    它回答的不是"要移多少", 而是"**允许移哪些**"。存在的原因: 在此之前, 这个
+    问题由每个 consumer 各自回答, 而且没有任何一个把证据算进去 —— 于是
+    "数值存在" 与 "允许修正" 之间没有强制关系。
+
+    ::
+
+        measurement -> AudioSyncResult -> evidence validation
+                    -> production eligibility -> FixedDelayPlan -> PCM apply
+
+    ``kind`` 是**声明**: 这是固定整数延迟, **没有** gap policy, **没有**
+    coordinate contract。因此它不能与 `core/audio_sync_tv.CorrectionPlan`
+    (逐窗、需要 D2 与 D5) 混淆 —— 后者在 D2/D5 决定之前不得进入生产。
+    """
+
+    entries: tuple[FixedDelayEntry, ...]
+    algo_version: str = ""
+    kind: str = "fixed_integer_delay"
+    #: 判定所用的证据门 (来自报告或生产有效配置), 审计用。
+    gate: Mapping[str, float] | None = None
+    notes: tuple[str, ...] = ()
+
+    # -- 构造 (只此两处, 都经过 correction_eligibility) --------------------
+
+    @classmethod
+    def from_sync_result(
+        cls, result: "SyncEstimateResult", *,
+        gate: Mapping[str, float] | None = None,
+        application: Any = None,
+        reference_channel_id: str | None = None,
+    ) -> "FixedDelayPlan":
+        """P2 路径: 一次 `SyncEstimateResult` -> 计划。reference 不在 entries 里
+        (它的 offset 恒为 0, 且不允许被二次修正)。"""
+        entries = tuple(
+            FixedDelayEntry.of(item.channel_id, item, gate=gate,
+                               application=application)
+            for item in result.estimates
+        )
+        return cls(
+            entries=entries,
+            algo_version=str(result.algo_version or ""),
+            gate=gate,
+            notes=(f"reference={reference_channel_id}",)
+            if reference_channel_id else (),
+        )
+
+    @classmethod
+    def from_channel_sync_report(
+        cls, report: Mapping[str, Any] | None, *,
+        gate: Mapping[str, float] | None = None,
+    ) -> "FixedDelayPlan":
+        """P1 路径: 一份 `core.channel_sync.run_channel_sync()` 报告 -> 计划。
+
+        阈值优先取**报告自己陈述的**证据门 (生产者按实际生效的 `opts` 写入),
+        因此用 `opts` 覆盖过阈值的运行不会被默认阈值重新解释。
+        """
+        from .audio_models import ChannelSyncReport
+
+        rep = ChannelSyncReport(report)
+        eff_gate = gate if gate is not None else rep.evidence_gate
+        entries = tuple(
+            FixedDelayEntry.of(
+                f"stream:{int(row.get('stream', 0))}",
+                _row_as_sync_result(rep, row),
+                label=f"CH{int(row.get('stream', 0)) + 1}",
+                gate=eff_gate,
+            )
+            for row in rep.channels
+        )
+        return cls(
+            entries=entries,
+            algo_version=str(rep.algo_version or ""),
+            gate=eff_gate,
+            notes=(f"file_status={rep.status}",),
+        )
+
+    # -- 查询 -------------------------------------------------------------
+
+    @property
+    def eligible_entries(self) -> tuple[FixedDelayEntry, ...]:
+        return tuple(e for e in self.entries if e.eligible)
+
+    @property
+    def refused_entries(self) -> tuple[FixedDelayEntry, ...]:
+        return tuple(e for e in self.entries if not e.eligible)
+
+    def offsets(self) -> dict[str, int]:
+        """**只含合格条目**的 offset。不合格条目不出现在这里, 而不是出现后
+        被跳过 —— 调用方拿不到一个不该用的数。"""
+        return {e.channel_id: int(e.offset_samples)
+                for e in self.eligible_entries
+                if e.offset_samples is not None}
+
+    def refusal_reasons(self) -> dict[str, str]:
+        return {e.channel_id: str(e.eligibility.reason)
+                for e in self.refused_entries}
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "entries": len(self.entries),
+            "eligible": len(self.eligible_entries),
+            "refused": len(self.refused_entries),
+            "offsets": self.offsets(),
+            "refusal_reasons": self.refusal_reasons(),
+            "algo_version": self.algo_version,
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "kind": self.kind,
+            "algo_version": self.algo_version,
+            "entries": [e.to_dict() for e in self.entries],
+            "offsets": self.offsets(),
+        }
+        if self.gate is not None:
+            data["gate"] = {k: float(v) for k, v in self.gate.items()}
+        if self.notes:
+            data["notes"] = list(self.notes)
+        return data
+
+
+def _row_as_sync_result(rep: Any, row: Mapping[str, Any]) -> Any:
+    """报告行 -> AudioSyncResult (走**既有**的解析, 不另立一套映射)。"""
+    return rep.resolve(dict(row))
 
 
 # ---------------------------------------------------------------------------
@@ -1107,6 +1295,11 @@ def apply_sync_result(
     返回实际写入的 target 数 (reference 不写入, 其偏移恒为 0)。
 
     已 `applied` 的结果重复调用是幂等的 (同一 offset 再写一次)。
+
+    **P4.4**: 是否写入由 `correction_eligibility()` 判定 —— 唯一入口。此前这里
+    只看 `status == "success"`, 不看证据; 现在"状态允许 **且** 证据过门"才是
+    可写的。判定不通过时, **数值不会被写入模型**, 而不是"写进去再期望别人不
+    读它"。
     """
     mode = (
         application.value
@@ -1115,8 +1308,10 @@ def apply_sync_result(
     )
     written = 0
     for item in result.estimates:
-        if item.status != SyncStatus.SUCCESS.value:
-            # 估计失败的 target 一律保持"未处理": 绝不写入半可信偏移。
+        verdict = correction_eligibility(item, application=mode)
+        if not verdict.eligible:
+            # 不合格的 target 一律保持"未处理": 绝不写入半可信偏移。
+            item.eligibility_reason = verdict.reason
             continue
         channel = _channel_or_none(plan, item.channel_id)
         if channel is None:                    # pragma: no cover - 已校验
