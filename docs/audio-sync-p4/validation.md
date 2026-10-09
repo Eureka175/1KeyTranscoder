@@ -318,3 +318,87 @@ Stated so the record is not read as broader than it is.
 | the `linear` / `next` offline arms | **NOT REPRODUCED** — refused by design |
 | `core/channel_sync.py` integration | **NOT DONE** — no production wiring |
 | downstream representability of `UNRESOLVED_GAP` | **UNKNOWN** — `OPEN-DECISIONS.md` D6 |
+
+---
+
+# P4.1 – P4.4 — current validation roll-up
+
+**Appended by the P3–P4 documentation consolidation.** Everything above this line
+is P4's own record and is **unchanged**. This section states the current status of
+the whole P4 line, so a maintainer does not have to reconcile four phase reports
+by hand.
+
+Machine-checked identity for the append:
+[`documentation-provenance.md`](documentation-provenance.md) ·
+[`known-limitations.md`](known-limitations.md).
+
+## Where each suite stands
+
+| # | suite / check | status | command |
+|---|---|---|---|
+| C1 | `tests/audio_sync_p4/test_production_sync.py` (P4) | **PASS** — 182 cases, SILENT_WRONG 0, 14 controls | `python tests/audio_sync_p4/test_production_sync.py` |
+| C2 | `tests/audio_sync_p4/test_downstream_state.py` (P4.1 / D6) | **PASS with 1 XFAIL** — 66 cases, 0 FAIL, 1 XFAIL (owner D8), 7 controls | `python tests/audio_sync_p4/test_downstream_state.py` |
+| C3 | `tests/audio_sync_p4/test_evidence_integrity.py` (P4.2) | **PASS** — 35 cases, 3 controls | `python tests/audio_sync_p4/test_evidence_integrity.py` |
+| C4 | `tests/audio_sync_p4/test_production_semantics.py` (P4.3) | **PASS** — 60 cases, 8 controls | `python tests/audio_sync_p4/test_production_semantics.py` |
+| C5 | `tests/audio_sync_p4/test_production_eligibility.py` (P4.4) | **PASS** — 58 cases, 9 controls | `python tests/audio_sync_p4/test_production_eligibility.py` |
+| C6 | `tests/full_autotest.py --level unit` | **PASS** — 626 PASS / 0 FAIL | same |
+| C7 | `tests/full_autotest.py --level toolchain` | **PASS** — 649 PASS / 0 FAIL | same |
+| C8 | `work/p2/scripts/p1_regression_guard.py` | **PASS** — 27 PASS / 0 FAIL | same |
+| C9 | P1 frozen 137-corpus replay through the production resolver | **PASS** — 548 rows, **0** status changes | `python work/p4.4/p1-audit/audit_baseline.py` |
+| C10 | P1 frozen corpus eligibility | **PASS** — 11 / 11 `fixed` rows eligible (capability retained); 0 refusals carrying an offset | same |
+| C11 | frozen fixture integrity | **PASS** — sha256 `36242616062FFEC2…` MATCH, `edited: false` | same, and `work/p4.2/p1-audit/audit_baseline.py` |
+| C12 | real A7M5 known-answer material | **PASS** — 24 checks, 24 PASS, 0 FAIL | `python work/p4.4/real_material_validation.py` |
+| C13 | C1305 / C1306 eligibility audit | **PASS** — 6 pairs, 5 refused, **1 eligible** (74.4 %), 0 refusals carrying an offset | `python work/p4.4/real_corpus_audit.py` |
+| C14 | P4.4 static audit | **PASS** — 973 functions, **0** unreviewed, 7/7 guard checks | `python work/p4.4/static_audit.py` |
+| C15 | P4.3 successor-family static audit | **PASS** — 41 modules, 0 unreviewed, 3/3 executable adjudications | `python work/p4.3/static_family_audit.py` |
+| C16 | P4.2 defect-family static audit (re-run) | **PASS** — 51 modules, 64 gates, 0 unreviewed, 9/9 fixed-site | `python work/p4.2/static_audit.py` |
+| C17 | default-path instrumentation | **PASS** — **0** PCM calls, 0.035 ms, no file touched | `python work/p4.4/performance.py` |
+| C18 | enabled-path cost | **PASS (measured and reported)** — 1.234 s / 4 s clip, traced peak 13.15 MB | same |
+| C19 | `work/p3/p310/regression.py` | **PASS** — 26 PASS / 0 FAIL | same |
+| C20 | `work/p3/p311/regression.py` | **PASS** — 70 PASS / 0 FAIL | same |
+| C21 | `work/p3/p38/semantics/selftest.py` | **PASS** — 100 PASS / 0 FAIL | same |
+| C22 | `work/p3/p38/agent_a_closure/failure_injection.py` | **PASS (after a memory-blocked retry)** — 59 PASS / 0 FAIL | same |
+| C23 | `work/p3/p37/state_machine.py` | **PASS** — `STATE MACHINE = VALIDATED` | same |
+| C24 | `work/p3/p37/known_truth.py` | **FAIL — 21 cases, PRE-EXISTING** | same |
+| C25 | `tests/audio_sync_p311/test_coordinates.py` | **BLOCKED — machine memory** | same |
+
+### How these were produced, stated exactly
+
+Every row above was **executed in this repository during the P4.1–P4.4 work**,
+against the tree that became commit `bb056a1`. The three P4.4 commits changed
+only the files they name, and no code was edited after those runs, so the results
+apply to `bb056a1`.
+
+**They were not re-executed during the documentation consolidation.** The
+consolidation changed only `docs/` and added the three documents listed in
+[`documentation-provenance.md`](documentation-provenance.md); a docs-only change
+cannot alter a test outcome, but that is a reason, not a measurement, and it is
+recorded as such rather than presented as a fresh run.
+
+### V9's status changed, recorded rather than rewritten
+
+Section V9 above records `tests/audio_sync_p311/test_coordinates.py` as
+**71 PASS / 0 FAIL**. It was true when P4 ran it. Since P4.2 it is **BLOCKED by
+machine memory** (a 1.72 GiB allocation in P3.11 research code, with 3.8 GB free
+of 31.5 GB). The earlier result is left standing as history; the current state is
+row C25. This is a resource block, not a code failure, and it is **not** counted
+as a pass in the roll-up.
+
+## What is NOT validated (updated)
+
+The table at the end of the P4 section is unchanged and still stands, with three
+entries updated by later phases:
+
+| item | then (P4) | now |
+|---|---|---|
+| `core/channel_sync.py` integration | **NOT DONE** — no production wiring | **DONE and ENABLED** — `--channel-sync`, governed by `correction_eligibility()` |
+| downstream representability of `UNRESOLVED_GAP` | **UNKNOWN** — D6 | **BLOCKED** (P4.1's record, not rewritten); the frame-domain half is implemented, the plan-window half is `T5.4b`, XFAIL, owner D8 |
+| anything about correction *quality* | **NOT VALIDATED** — no threshold | **still `NOT ESTABLISHED`** — no threshold was invented, and production eligibility does **not** depend on one |
+
+Still not validated, unchanged: the in-gap delay (`UNOBSERVABLE`), a calibrated
+per-window σ, the C1306 ch3→ch2 instrument disagreement, behaviour outside
+C1305/C1306, the offline `linear` / `next` arms.
+
+Added by P4.4 and still open: the enabled path's cost profile (§5 of
+[`known-limitations.md`](known-limitations.md)) — it measures every stream,
+including the ones it then refuses.

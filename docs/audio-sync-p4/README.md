@@ -5,6 +5,76 @@ and is frozen. P4 is the **production** line.
 
 ---
 
+## ⚠️ Current status first — the P4 text below is P4's own record
+
+Everything from **"One-paragraph status"** down to the end of this file describes
+**P4 alone**, written when P4 finished. Its claims were true of P4. Four phases
+have happened since, and two of its lines are superseded. Read this block for the
+current state; read the rest as P4's history, which is preserved unaltered.
+
+```text
+P4.1  D6 downstream audit                       COMPLETE — D6 = BLOCKED (record not rewritten)
+P4.2  evidence-integrity fix                    COMPLETE — the adoption gate now covers the ADOPTED estimate
+P4.3  production-semantics decision closure     COMPLETE — D1 implemented; D2/D5 DEFERRED; D6 revalidated
+P4.4  production enablement                     COMPLETE — validated FIXED-DELAY path ENABLED
+```
+
+### What is actually enabled now
+
+| path | entry | state |
+|---|---|---|
+| **P1 fixed delay** (one integer shift per track) | `--channel-sync`, `--channel-sync-transparent` | **ENABLED** (opt-in) |
+| **P2 constant offset** (one offset per channel) | `--audio-plan` + explicit `sync.reference` | **ENABLED** (opt-in) |
+| **P4 time-varying** (one shift per window) | none | **NOT ENABLED** — imported by no production module |
+
+```text
+Default path          UNCHANGED — measured: 0 calls into any PCM entry point
+Drift correction      NOT ENABLED
+Resampling            NOT ENABLED
+D2 gap policy         DEFERRED
+D3 residual           NOT ESTABLISHED
+D5 coordinate         DEFERRED
+Algorithm changes     0
+```
+
+**Read the two superseded lines below accordingly:**
+
+* *"…verified it … and **did not enable it**"* and *"the overall status is
+  `READY FOR PRODUCTION POLICY`"* — true of P4. P4.4 enabled the **validated
+  fixed-delay subset**; the per-window module is still imported by nothing, so
+  *"the time-varying production feature: OFF"* in the status table **remains
+  correct**.
+* The **Memory / Performance / Compatibility** rows describe the P4 module's own
+  path. The enabled path's cost is different and is recorded in
+  [`known-limitations.md`](known-limitations.md) §5.
+
+### Read next
+
+| need | document |
+|---|---|
+| **the normative contract — what production may do** | [`production-contract.md`](production-contract.md) |
+| what is open, failing, blocked, XFAIL | [`known-limitations.md`](known-limitations.md) |
+| every suite and its current status | [`validation.md`](validation.md) → the P4.1–P4.4 roll-up |
+| what P4.2 fixed and why it was live | [`p4.2-evidence-integrity.md`](p4.2-evidence-integrity.md) |
+| how evidence travels, and where it stops | [`p4.3-production-semantics.md`](p4.3-production-semantics.md) |
+| what D1 decided, and what it did not | [`d1-uncertainty-contract.md`](d1-uncertainty-contract.md) §9 |
+| what P4.4 enabled, and why the rest stays off | [`p4.4-production-enablement.md`](p4.4-production-enablement.md) |
+| the P4.1 / D6 audit | [`downstream-audit.md`](downstream-audit.md) |
+| where a promoted document came from | [`documentation-provenance.md`](documentation-provenance.md) |
+| the P3 research line | [`../audio-sync-p3/P3-RESEARCH-OVERVIEW.md`](../audio-sync-p3/P3-RESEARCH-OVERVIEW.md) |
+
+### The P4 line, in order
+
+| phase | question | verdict |
+|---|---|---|
+| **P4** | build the per-window time-varying corrector as tracked production code, verify it, and **not** enable it | `COMPLETE` — 30/30 byte-exact reproduction of P3.11's corrected PCM; feature OFF |
+| **P4.1** | can `UNRESOLVED_GAP` reach a production consumer? | `D6 = BLOCKED` — no downstream representation, **and** the same failure already live at track granularity |
+| **P4.2** | fix that live defect without inventing a threshold | `COMPLETE` — the gate now applies to the estimate actually **adopted**; 35 regression cases; 5/6 real pairs move to `LOW_CONFIDENCE`, the 74.4 % pair still succeeds |
+| **P4.3** | make the evidence semantics a production **contract** | `COMPLETE` — D1 implemented and propagated; D2/D5 recorded as `DEFERRED` with implementation defaults kept **separate** from semantic contracts |
+| **P4.4** | enable the validated subset, safely | `COMPLETE` — one `correction_eligibility()` decision, a plan object that cannot carry a refused offset, fixed-delay **ENABLED** |
+
+---
+
 ## One-paragraph status
 
 P4 built a per-window, time-varying audio delay corrector as tracked production

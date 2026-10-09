@@ -14,6 +14,14 @@
 > [`PRODUCTION-HANDOFF.md`](PRODUCTION-HANDOFF.md) ·
 > [`OPEN-DECISIONS.md`](OPEN-DECISIONS.md) · [`P4-HANDOFF.md`](P4-HANDOFF.md).
 >
+> **What production did with this research** (added by the P3–P4 consolidation,
+> navigation only — nothing below this banner is altered):
+> [`P3-RESEARCH-OVERVIEW.md`](P3-RESEARCH-OVERVIEW.md) §"What P4 did with this" ·
+> the normative production contract
+> [`../audio-sync-p4/production-contract.md`](../audio-sync-p4/production-contract.md) ·
+> what is still open
+> [`../audio-sync-p4/known-limitations.md`](../audio-sync-p4/known-limitations.md).
+>
 > The text below is unaltered.
 
 # Audio Sync P3 — Long-Duration Time-Varying Delay Correction

@@ -1,0 +1,213 @@
+# Audio Sync — known limitations, failures and open items
+
+**One place for everything that is not green.** A maintainer should be able to
+read this file alone and know exactly what is unresolved, what failed, what was
+never run, and what is a deliberate product deferral rather than a defect.
+
+Status words are used strictly:
+
+```text
+FAIL            ran, and did not pass          — with the scope of the failure
+BLOCKED         could not run, and why         — with the distinction from FAIL
+XFAIL           a known contract gap, held open on purpose, NOT a pass
+NOT ESTABLISHED no value exists and none may be invented
+DEFERRED        a product decision deliberately not taken
+KNOWN LIMITATION measured, bounded, deliberately not fixed
+NOT RUN         not executed in the current environment
+```
+
+Nothing below is softened. Where a number is quoted it is the number that was
+measured, in the scope it was measured in.
+
+---
+
+## 1. `work/p3/p37/known_truth.py` — 21 FAIL, PRE-EXISTING
+
+```text
+status   : FAIL (21 of 132 cases), exit 2
+scope    : the `current` gap policy's row of the known-truth matrix
+           state sequence correct : 1/22
+           no fake TRUSTED        : 1/22
+           `resolved` flags       : 1/22
+           all five other policies: 22/22 on every check
+```
+
+### It is not a P3-P4 regression, and that was proven rather than argued
+
+* The script imports **nothing** from the repository. Its only imports are
+  stdlib, numpy and its own sibling module `work/p3/p37/semantics.py`.
+* Run from an **isolated copy** in a temporary directory with no repository on
+  `sys.path`, it reproduces **identically** — same 21 failures, same table.
+* It therefore cannot have been affected by P4.3 or P4.4, which changed only
+  files under `core/`, `production/`, `tests/audio_sync_p4/` and `docs/`.
+
+### The discrepancy, recorded not resolved
+
+`docs/audio-sync-p4/gap-policy-decision.md` §3.2 records `current` as
+
+```text
+state sequence matches the mask-derived expectation : 132/132 correct
+never labels a refused window TRUSTED               : 132/132 correct
+`resolved` flags backed by a measurement            : 1/22
+```
+
+The live run reports **1/22** on the first two as well. This is a P3.7
+bookkeeping discrepancy of the class already registered in
+`docs/audio-sync-p4/evidence-freeze.md` §7b (ten P3 summary ranges that do not
+reproduce from P3's own detail tables).
+
+**No conclusion is drawn about `current`.** `gap-policy-decision.md` is explicit
+that `current`'s failure is a **semantic over-claim, not an algorithmic error**,
+and nothing here contradicts that. P3.7's frozen research was **not edited**, and
+the two documents were **not** reconciled by rewriting either.
+
+> **This also means P3 is not "all green".** The P3 line's verdicts stand on the
+> per-phase reports and the tracked summaries; this one script's `current` row
+> does not reproduce from the P3.7 summary, and that is stated rather than
+> averaged away.
+
+---
+
+## 2. Blocked by machine resources — distinguished from real failures
+
+`tests/audio_sync_p311/test_coordinates.py` is **BLOCKED**, and has been since
+P4.2:
+
+```text
+error      : numpy._ArrayMemoryError: Unable to allocate 1.72 GiB
+host free  : 3.8 GB of 31.5 GB at the time of the first record
+allocation : work/p3/p311/production_chain_p311.py::coord_labels —
+             P3.11 research code that materialises int64 per sample by design
+touched by : nothing in P3-P4.4
+```
+
+During P4.4 host free memory fell as low as **0.44 GB of 31.5 GB** (the machine's
+own AfterFX / MATLAB / PyCharm / node sessions). At that point two harnesses
+were blocked, and the block is evidenced rather than asserted:
+
+| harness | at 0.44 GB free | after recovery |
+|---|---|---|
+| `work/p4.4/real_material_validation.py --only silent_ch4` | `MemoryError`, then `Unable to allocate **11.0 MiB**` | **PASS 7/7** |
+| `work/p4.4/performance.py` | `std::bad_alloc` inside an FFT | **PASS** (0 default-path calls) |
+| `python -c "import scipy"` | `SystemError: error return without exception set` | imports normally |
+| `work/p3/p38/agent_a_closure/failure_injection.py` | raised with the message *"host memory pressure, not an assertion failure — the run is not evidence and must be repeated with memory available"* | **PASS 59/0** |
+
+An **11 MiB** allocation failing is what identifies the condition as host
+pressure rather than a code defect: the estimator's bounded reader works in
+1 MiB blocks, and its largest allocation on this material is the **1.44 M-sample
+(30 s @ 48 kHz) anchor segment** — a fixed, designed size, not one proportional
+to the file.
+
+**A resource block is never reported as a pass**, and a retry that succeeds is
+recorded as the evidence that the earlier block was environmental.
+
+---
+
+## 3. `T5.4b` — XFAIL, owner D8
+
+```text
+case   : a consumer can discover that 234/481 PLAN WINDOWS were policy-filled
+status : XFAIL  (NOT a pass)
+owner  : D8 (corrected from D1 by P4.3)
+```
+
+The plan-window population has **no producer in production**: the only object
+that can count plan windows is `core/audio_sync_tv.CorrectionPlan`, and it is
+imported by nothing. A field nothing can populate could not be tested, and the
+contract itself forbids reporting a coverage figure without naming its population
+(`d1-uncertainty-contract.md` §4.2).
+
+P4.3 **split** the original compound claim rather than leaving a stale reason:
+`T5.4a` was promoted to a positive assertion (the **frame-domain** evidence
+contract exists and is discoverable), and `T5.4b` stays open on the window
+population. No XFAIL was deleted.
+
+It flips when D8 wires a producer that carries plan-window counts.
+
+---
+
+## 4. Product decisions that remain open
+
+| id | subject | state | why it is open |
+|---|---|---|---|
+| **D2** | gap policy | **DEFERRED** | no candidate dominates; the discriminating rows depend on a discontinuity position **inside the gap**, which is not observable |
+| **D3** | residual acceptance | **NOT ESTABLISHED** | no reference for "good enough"; no calibrated per-window σ. **No threshold was invented, raised or relaxed**, and production eligibility does not depend on one |
+| **D5** | coordinate contract | **DEFERRED** | choosing answers *anticipate or lag*, a product question. `latest-start` is an implementation default **for reproducibility**, not a selected contract |
+| — | enablement of the **per-window** path | **NOT TAKEN** | needs D2 and D5 |
+| — | downstream representability (`D6`) | P4.1's **BLOCKED** record **not rewritten** | consumers outside this repository have not been inventoried |
+
+None of these is a documentation gap, and none of them blocks the enabled
+fixed-delay path.
+
+---
+
+## 5. Known limitations of what IS enabled
+
+| limitation | state |
+|---|---|
+| the enabled path measures **every** stream, including tracks it then refuses | **KNOWN LIMITATION** — measured on a real 4 s 4-mono C1305 clip: 1.234 s wall (0.308 s per source second), traced peak 13.15 MB, RSS delta +65.9 MB. Not addressed; recorded so a future phase has a baseline |
+| the enabled path's memory is **not** P4's figure | P4 measured the plan/applier path at 9.10 MB peak. `run_channel_sync` is a different path with a 1.44 M-sample anchor segment. **The two numbers are not comparable and neither is quoted as the other** |
+| `shift_stream` carries no guard of its own | **BY DESIGN** — the guard is at every caller. A static audit enumerates the callers and exercises each one; the finding is left visible in the audit output rather than filtered out |
+| `AudioSyncResult` has no field for the plan-window population | open, owner D8 — see `T5.4b` |
+| the C1306 ch3→ch2 instrument disagreement | recorded in P3.11, **not averaged** |
+
+---
+
+## 6. Unreconciled historical contradiction (P3, for the maintainer)
+
+Two formal P3 documents state different things about the same quantity:
+
+```text
+P3.2-FINAL-REPORT.md / PRODUCTION-REQUIREMENTS.md §5
+    correction NOT VALIDATED; C1305 MIXED; C1306 no measurable effect
+
+P3.10 §6 / P3.11 §6
+    a large, independently verified median improvement on the same corpora;
+    on the accepted population five of six pairs improve in every statistic
+```
+
+Both are measured. The later one does not claim the earlier was wrong. The
+difference is plausibly one of conditions (grid, window length, hop, which
+windows count as accepted, whether the tail is included). **No document settles
+it, and this consolidation does not settle it either** — the P3 entry point
+records it as an open item, consistent with the line's rule that historical
+documents are immutable and later evidence is recorded as new evidence.
+
+---
+
+## 7. Documents that no longer state current status
+
+These are **frozen and are not rewritten.** The index correction lives in
+[`../audio-sync-p3/P3-RESEARCH-OVERVIEW.md`](../audio-sync-p3/P3-RESEARCH-OVERVIEW.md),
+not inside the history.
+
+| file | superseded statement |
+|---|---|
+| `../audio-sync-p3/README.md` | header `P3 NOT JUSTIFIED`; describes the original P3 phase only |
+| `../audio-sync-p3/PRODUCTION-REQUIREMENTS.md` §5/§6 | *"no plan has ever been applied to real audio and re-measured"* — P3.10 and P3.11 did exactly that |
+| `../audio-sync-p3/FINAL-RESEARCH-SUMMARY.md` | covers P1–P3.8 only; its closing section predates the real-PCM apply |
+| `README.md` (this directory) | the P4-era status block says the feature is OFF and the status is `READY FOR PRODUCTION POLICY`. **True of P4**; superseded by P4.2–P4.4, and a current-status block now precedes it |
+| `P4-FINAL-REPORT.md` | states `core/audio_plan.py` byte-identical to HEAD. True of P4/P4.2; **P4.3 changed that file** to carry evidence through the plan boundary |
+
+---
+
+## 8. Evidence that does not live in this repository
+
+The raw P3/P4 research tree (`work/`) is **gitignored** — 4700 files, 214 GB,
+almost entirely regenerable measurement data and real camera media.
+
+| what | where it is | is a tracked substitute available? |
+|---|---|---|
+| `work/p3/P3-FINAL-REPORT.md` and the P3.1–P3.8 per-phase reports | local only | **yes** — `../audio-sync-p3/FINAL-RESEARCH-SUMMARY.md` (P1–P3.8) and `P3-RESEARCH-OVERVIEW.md` |
+| `work/p3/p310`, `p311`, `p312` reports | local only | **yes** — `p3.10/p3.11/p3.12-provenance.md` pin identity, files and reproduction commands |
+| `work/p4.1`/`p4.2`/`p4.3`/`p4.4` harnesses and JSON | local only | **partly** — the conclusions and numbers are in the phase documents; the harness sources are not tracked |
+| the P2 corpus (104 GB) and the real candidates | local only | **yes** for the conclusion: the frozen 137-corpus CSV is tracked with a recorded hash, and the P1 guard reproduces against it |
+| the empirical p3 corpus (24 GB) | local only | **no** — by design; the conclusions, hashes and reproduction commands are tracked instead |
+
+**The dependency is stated rather than hidden**: a maintainer can read every
+conclusion and every number from the repository, but re-running the P3 harnesses
+requires the local tree. Where a document cites a `work/` path, that path is
+`work/`-relative and is **not** presented as a repository API.
+
+Full per-artifact classification:
+`work/p3-p4-doc-consolidation/inventory.json`.

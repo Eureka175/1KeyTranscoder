@@ -191,6 +191,103 @@ Every phase below is one row: **goal · status · one-line conclusion · report.
 
 ---
 
+## What P4 did with this — added by the P3–P4 consolidation
+
+P3 is a research line and enabled nothing. The phases after it decided what, if
+anything, would reach production. This table is the answer, and it is the point
+at which a P3 reader learns which verdicts became contract and which did not.
+
+| P3 result | what P4 did with it |
+|---|---|
+| P1 fixed offset | **shipped and unchanged** — still the production behaviour, now governed by `correction_eligibility()` |
+| the **fixed integer delay** mechanics (`out[n] = in[n + rint(delay)]`) | **ADOPTED** and **ENABLED** by P4.4, reachable through `--channel-sync` / `--audio-plan` |
+| P3.10 / P3.11 real PCM apply validation | **ADOPTED as evidence** — P4 reproduced P3.11's corrected PCM byte-for-byte on **30 of 30** arms |
+| the gap state vocabulary (`TRUSTED` / `UNRESOLVED_GAP` / `REENTRY`) | **ADOPTED as semantics** in `core/audio_sync_tv.py`; **NOT enabled** in production |
+| P3.7's "state is a pure function of the resolved mask" | **ADOPTED as a production invariant** in the disabled module, and asserted by test |
+| P3.8's "missing context raises, never guesses" | **ADOPTED** as the module's error contract |
+| P3.6's "no policy ranked; the ranking instrument is policy-invariant" | **NOT decided** — became D2, `DEFERRED` |
+| P3.11's coordinate ambiguity | **NOT decided** — became D5, `DEFERRED` |
+| P3.6's "fractional correction not needed; resampling not justified" | **NOT adopted** — neither is implemented |
+| P3.12 adaptive coarse-to-fine (`NO ADVANTAGE DEMONSTRATED`) | **NOT adopted** — not described anywhere as a production algorithm |
+| any residual acceptance threshold | **NOT ESTABLISHED** — no threshold was invented, in P3 or after it |
+| the per-window time-varying correction itself | **built, verified, and deliberately NOT enabled** — `core/audio_sync_tv.py` is imported by no production module |
+
+```text
+P3 produced the EVIDENCE and the SEMANTICS.
+P4.2-P4.4 turned the fixed-delay subset of it into a production contract.
+Nothing beyond the fixed integer delay was enabled.
+```
+
+The contract itself: [`../audio-sync-p4/production-contract.md`](../audio-sync-p4/production-contract.md).
+The P4 line, in order: [`../audio-sync-p4/README.md`](../audio-sync-p4/README.md).
+
+---
+
+## One P3 script does not reproduce — recorded, not hidden
+
+`work/p3/p37/known_truth.py`, run against the tree as it stands, reports
+**FAIL (21 of 132 cases)**, all of them the `current` policy's row:
+
+```text
+state sequence correct : 1/22       (gap-policy-decision.md section 3.2 records 132/132)
+no fake TRUSTED        : 1/22       (same document records 132/132)
+`resolved` flags       : 1/22       (matches: 1/22)
+the five other policies: 22/22 on every check
+```
+
+**This is a P3 bookkeeping discrepancy, not a P3–P4 regression, and that was
+proven rather than assumed.** The script imports **nothing** from the
+repository — only stdlib, numpy and its own sibling `semantics.py` — and run from
+an isolated copy in a temporary directory with no repository on `sys.path` it
+reproduces **identically**.
+
+```text
+what this does NOT mean : that `current` is algorithmically wrong.
+                          gap-policy-decision.md is explicit that its failure is a
+                          semantic over-claim, not an algorithmic error, and
+                          nothing here contradicts that.
+what this DOES mean     : P3 is not "all green". Two P3.7 summary figures do not
+                          reproduce from the live script, which places this in the
+                          same class as the ten P3 summary/detail discrepancies
+                          already registered in ../audio-sync-p4/evidence-freeze.md
+                          section 7b.
+what was done about it : recorded here and in
+                          ../audio-sync-p4/known-limitations.md section 1.
+                          P3.7's frozen research was NOT edited, and neither
+                          document was reconciled by rewriting the other.
+```
+
+No conclusion is drawn about `current`, and no phase is authorised to draw one on
+the strength of this consolidation.
+
+---
+
+## Where P3's primary sources live
+
+The per-phase P3 reports are **not tracked**. They live under the gitignored
+`work/p3/` (12 reports, ≈290 KB) and `work/p3/p310|p311|p312/`. This entry point
+links them by path because that is where they are, but **a clone does not contain
+them**.
+
+What a clone **does** contain, and it is sufficient to reach every P3 conclusion:
+
+```text
+P3-RESEARCH-OVERVIEW.md      this file — every phase's verdict
+FINAL-RESEARCH-SUMMARY.md    the tracked per-phase record, P1-P3.8
+RESEARCH-SUMMARY.md          the five-minute version
+PRODUCTION-REQUIREMENTS.md   the requirements the research forced (U1 etc.)
+HANDOFF-CHECKLIST.md         what an integrator must verify
+OPEN-DECISIONS.md            every undecided thing
+P4-HANDOFF.md                what the next phase starts from
+p3.10/p3.11/p3.12-provenance.md   identity, files, hashes, reproduction commands
+```
+
+Full classification of what is and is not in the repository:
+`work/p3-p4-doc-consolidation/inventory.json`, summarised in
+[`../audio-sync-p4/known-limitations.md`](../audio-sync-p4/known-limitations.md) §8.
+
+---
+
 ## Current research conclusion
 
 ```text
@@ -206,6 +303,16 @@ Gap policy                            DEFERRED
 Adaptive coarse-to-fine               NO ADVANTAGE DEMONSTRATED
 Production                            NOT YET ENABLED
 ```
+
+> **Update (P4.4, recorded rather than substituted).** The line
+> `Production NOT YET ENABLED` was true of P3 and remained true through P4 and
+> P4.1–P4.3. **P4.4 enabled the validated fixed-delay subset** behind
+> `core.audio_models.correction_eligibility()`, through the pre-existing opt-in
+> entries `--channel-sync` and `--audio-plan`. It enabled **nothing else**: the
+> per-window time-varying correction this research line produced is still
+> imported by no production module, and D2/D3/D5 are still
+> `DEFERRED` / `NOT ESTABLISHED` / `DEFERRED`. The block above is left as
+> written, because it is P3's conclusion about P3.
 
 **Not claimed anywhere in this line:** that drift correction is solved, that the
 correction is production-ready, that a policy was chosen, or that a residual

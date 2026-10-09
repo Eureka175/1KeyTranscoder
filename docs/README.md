@@ -211,16 +211,32 @@ F:\1KeyTranscoder\
 **P3 是研究线（已冻结）；P4 是生产化线。P4 实现了一个逐窗时变修正的生产模块，
 它默认 OFF，且没有被任何生产模块 import。**
 
+> **P4.1–P4.4 之后的当前状态**（这一段是索引里的现状说明，不是历史结论）：
+>
+> ```text
+> P4.4 起：验证过的 FIXED-DELAY 子集已进入生产（--channel-sync / --audio-plan，均为 opt-in）
+>          由唯一入口 core.audio_models.correction_eligibility() 判定
+>          逐窗时变路径仍然 OFF（无生产模块 import，有测试断言）
+>          默认路径未变（实测：0 次 PCM 调用）
+>          drift correction / resampling 未启用；算法改动 = 0
+>          D2 = DEFERRED、D3 = NOT ESTABLISHED、D5 = DEFERRED
+> ```
+>
+> 读 **`production-contract.md`** 拿当前契约；读 **`known-limitations.md`**
+> 拿未绿清单。上面那句"它默认 OFF"对**逐窗时变模块**仍然成立。
+
 | 文档 | 内容 | 状态 |
 |---|---|---|
-| [`README.md`](audio-sync-p4/README.md) | **★ 入口**：一句话结论、状态表、怎么跑验证 | ✅ 权威（当前状态） |
+| [`README.md`](audio-sync-p4/README.md) | **★ 入口**：当前状态块（P4.1–P4.4、启用范围、生产历史）+ P4 原文（保留未改）、状态表、怎么跑验证 | ✅ 权威（当前状态） |
+| [`production-contract.md`](audio-sync-p4/production-contract.md) | **★ 生产契约（唯一规范入口）**：启用范围、九个状态的真实语义、`correction_eligibility()`、`offset_samples` vs `raw_offset_samples`、证据传播与**安全终止点**、fail-closed、默认路径、仍未决项 | ✅ 权威（契约） |
+| [`known-limitations.md`](audio-sync-p4/known-limitations.md) | **未绿清单（单一入口）**：21 个 FAIL / BLOCKED / XFAIL / NOT ESTABLISHED / KNOWN LIMITATION，以及仓库中不存在的证据 | ✅ 权威（限制） |
 | [`evidence-freeze.md`](audio-sync-p4/evidence-freeze.md) | P3 证据冻结：哪些数字可以引用、出自哪个 artifact；含 **10 处 P3 摘要与自身明细表不符**的登记 | ✅ 权威 |
 | [`policy-matrix.md`](audio-sync-p4/policy-matrix.md) | 缺口策略 / 坐标合同 / 启用与否 **三张完整证据矩阵**（真实 P3 数据，不排序、不推荐） | ✅ 权威 |
 | [`coordinate-decision.md`](audio-sync-p4/coordinate-decision.md) | 三个问题分开回答（测量位置 / 施加位置 / 输出样本坐标），真实样本坐标下的首个分歧点 | ✅ 权威 |
 | [`gap-policy-decision.md`](audio-sync-p4/gap-policy-decision.md) | `TRUSTED` / `UNRESOLVED_GAP` / `REENTRY` 的精确语义；hold / 不修正 / 插值 的差别 | ✅ 权威 |
 | [`residual-acceptance.md`](audio-sync-p4/residual-acceptance.md) | 误差预算（含出处）；**结构门 A1–A8 + N1–N6**；阈值为何**未建立**、需要什么实验才能建立 | ✅ 权威 |
 | [`implementation.md`](audio-sync-p4/implementation.md) | 生产 API 与实现；为什么默认 OFF 是**结构性保证**而非开关 | ✅ 权威 |
-| [`validation.md`](audio-sync-p4/validation.md) | 全部验证记录：**30/30 逐字节复现 P3.11 修正后 PCM**、180 例回归、内存/性能/长跑 | ✅ 权威 |
+| [`validation.md`](audio-sync-p4/validation.md) | 全部验证记录：**30/30 逐字节复现 P3.11 修正后 PCM**、180 例回归、内存/性能/长跑；**末尾追加 P4.1–P4.4 汇总**（每个套件的当前状态、命令、以及"资源阻塞 ≠ 代码失败"的区分） | ✅ 权威 |
 | [`production-readiness.md`](audio-sync-p4/production-readiness.md) | **逐项状态矩阵**（只有状态词，无分数） | ✅ 权威 |
 | [`policy-recommendation.md`](audio-sync-p4/policy-recommendation.md) | **工程建议 vs 产品决定**严格分离；D1/D2/D3/D5/D6/D8 全部标 `REQUIRED` | ✅ 权威 |
 | [`provenance.md`](audio-sync-p4/provenance.md) | 分支 / 提交 / 实现哈希 / 语料哈希 / 复现锚点 / 未改动文件复核 | ✅ 权威（溯源） |
@@ -228,13 +244,16 @@ F:\1KeyTranscoder\
 | [`p4.1-provenance.md`](audio-sync-p4/p4.1-provenance.md) | P4.1 审计溯源：被审计源文件哈希、fixture、复现命令 | ✅ 权威（溯源） |
 | [`P4-FINAL-REPORT.md`](audio-sync-p4/P4-FINAL-REPORT.md) | 22 节最终报告 | ✅ 权威 |
 | [`downstream-audit.md`](audio-sync-p4/downstream-audit.md) | **P4.1 / D6 下游消费者审计**：`UNRESOLVED_GAP` 能否活着抵达消费者。**结论 `BLOCKED`** —— 逐窗状态在生产模型里**没有表示**，而且同一种失效在 shipped 代码里**已经存在**（track 粒度） | ✅ 权威（审计） |
-| [`d1-uncertainty-contract.md`](audio-sync-p4/d1-uncertainty-contract.md) | **D1 不确定性生产契约（规范，未实现）**：状态词汇、序列化、日志、消费者可见性；最小补丁设计（**feature-gated by construction**）。**策略中立** | ✅ 权威（契约） |
+| [`d1-uncertainty-contract.md`](audio-sync-p4/d1-uncertainty-contract.md) | **D1 不确定性生产契约（规范；§9 记录 P4.3 的实现）**：状态词汇、序列化、日志、消费者可见性；最小补丁设计（**feature-gated by construction**）。**策略中立**。§1–§8 保留原文未改 | ✅ 权威（契约） |
 | [`p4.2-evidence-integrity.md`](audio-sync-p4/p4.2-evidence-integrity.md) | **P4.2 证据完整性修复**（**本仓库首个有意改变生产行为的阶段**）：复现 → 根因 → 修正采纳门 → 证据字段 → P1 137 语料审计 → 真实语料审计 → D6 复验 → 缺陷家族静态审计 → 全量回归。**状态 `COMPLETE`** | ✅ 权威（修复记录） |
 | [`p4.2-provenance.md`](audio-sync-p4/p4.2-provenance.md) | P4.2 溯源：改动了什么（2 个生产文件，前后哈希）与**证明没动什么**（9 个用户文件、冻结 fixture、同步算法） | ✅ 权威（溯源） |
 | [`p4.3-production-semantics.md`](audio-sync-p4/p4.3-production-semantics.md) | **P4.3 生产语义收口**：D1 证据契约**已实现**（证据随值抵达消费者）；D2 缺口策略 / D5 坐标合同 `DEFERRED` 且**实现默认值与语义契约分为两个字段**；D8 启用状态正式定义。含**决策编号三向冲突**的调和表、P2 路径同类缺陷的修复（前后**同 harness 实测**）、P1 548 行重放（0 结论变化）。**算法改动 = 0** | ✅ 权威（契约与决定） |
 | [`p4.3-provenance.md`](audio-sync-p4/p4.3-provenance.md) | P4.3 溯源：base/head、改动文件与前后哈希、fixture 哈希、测试计数、D1 修订、D2/D5/D8 状态 | ✅ 权威（溯源） |
 | [`p4.4-production-enablement.md`](audio-sync-p4/p4.4-production-enablement.md) | **P4.4 生产启用**：验证过的 **fixed-delay** 子集进入生产（P1 `--channel-sync` / P2 `--audio-plan`），由**唯一**的 `correction_eligibility()` 判定；"不合格却带可用数值"**不可表示**。逐状态的支持/不支持表、fail-closed 行为、默认路径实测（**0 次 PCM 调用**）、真实素材验证（正/负/零偏移 + 多声道）。**D2/D3/D5 保持 `DEFERRED`/`NOT ESTABLISHED`**；drift 与 resample 未启用 | ✅ 权威（启用契约） |
 | [`p4.4-provenance.md`](audio-sync-p4/p4.4-provenance.md) | P4.4 溯源：改动文件与哈希、**证明未改**算法文件（`sync_estimate` / `sync_fix` / `audio_sync_tv`）、fixture 校验、9 个用户文件状态 | ✅ 权威（溯源） |
+| [`production-contract.md`](audio-sync-p4/production-contract.md) | **★ 生产契约（唯一规范入口）**：三条路径的启用状态；九个 `SyncStatus` 与其真实语义；`correction_eligibility()` 的职责与必要条件；`offset_samples` / `raw_offset_samples` 的区别；证据如何传播、**在哪里安全终止**（`ChannelTimeline`）；不合格时的 fail-closed 行为；默认路径保护；**D2/D3/D5 仍未决**。状态名与 reason code 全部从代码读出 | ✅ 权威（契约） |
+| [`known-limitations.md`](audio-sync-p4/known-limitations.md) | **未绿清单（单一入口）**：P3.7 `known_truth.py` 的 **21 个 FAIL（既有、已证明与本阶段无关）**；`test_coordinates.py` 的 **BLOCKED（机器内存）**及"资源阻塞 ≠ 代码失败"的证据；**T5.4b XFAIL**；D2/D3/D5；已启用路径的已知代价；仓库中不存在的证据及其替代 | ✅ 权威（限制） |
+| [`documentation-provenance.md`](audio-sync-p4/documentation-provenance.md) | **本次文档整合的来源记录**：新建/修改了哪些文档、历史语义是否保留、从 `work/` 晋升了什么、什么被有意排除及原因、`.gitignore` 审查结论、**建议但未创建的文件及理由**、canonical 映射 | ✅ 权威（文档溯源） |
 
 > **一句话状态**：固定偏移 `VALIDATED`；时变测量 `VALIDATED`；真实 PCM 施加
 > `VALIDATED`；六通道对 E2E `VALIDATED`；**缺口策略 `DEFERRED`、坐标合同
