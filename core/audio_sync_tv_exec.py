@@ -657,14 +657,23 @@ def _independent_join(
             flat = p.reshape(-1)
             res = out.reshape(-1)
             for i, v in enumerate(flat.tolist()):
-                # 朴素: 线性扫描全部窗中心取最近。整数距离, 平局取较小索引
-                # (与生产实现的 np.clip(floor_divide(...)) 在平局上的行为由
-                # 测试固定, 而不是靠"应该一样")。
+                # Naive linear scan of every window centre, integer distance.
+                #
+                # TIE-BREAK: on an exact tie the LARGER index wins, because that
+                # is what the production closed form does. nearest-centre is
+                # defined as floor((pos + hop//2 - win//2) / hop), and
+                # floor_divide rounds a tie toward +inf, i.e. toward the later
+                # window. The first version of this verifier used `d < bestd`,
+                # which prefers the EARLIER window -- and a tie is not a corner
+                # case: at the production ratio (hop = 480 000, win = 1 440 000)
+                # every sample at the midpoint between two centres is an exact
+                # tie, so k = 960 000 was reported as a mismatch that did not
+                # exist. The verifier was wrong, not the applier.
                 best = 0
                 bestd = abs(int(v) - int(centres[0]))
                 for w in range(1, nw):
                     d = abs(int(v) - int(centres[w]))
-                    if d < bestd:
+                    if d <= bestd:
                         bestd = d
                         best = w
                 res[i] = best
