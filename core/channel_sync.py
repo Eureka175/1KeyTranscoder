@@ -111,12 +111,40 @@ DEFAULTS: dict[str, Any] = {
     # —— 锚点 (P1: 候选顺序 + 健康门; 完整打分属二期) ——
     "anchor_candidates": [2, 3, 0, 1],   # CH3 > CH4 > CH1 > CH2 (0-based); CH3 非"真值基准"
 
+    # —— P4.6 时变同步 (逐窗修正): **显式 opt-in**, 默认关闭 ——
+    #
+    # 三项必须同时由调用方给出。policy 与 coordinate 是 D2/D5 两个**未冻结的
+    # 产品决策**, 因此这里**没有默认值**: 缺任何一个就拒绝执行时变路径, 而不是
+    # 替调用方选一个。`None` 表示"调用方没有说", 不是"用实现默认值"。
+    "time_varying": False,               # 显式开启逐窗修正
+    "tv_policy": None,                   # D2: hold / no_correction_gap / explicit_state / linear / next
+    "tv_coordinate": None,               # D5: latest-start / nearest-centre
+    # 计划几何: 默认取 P3 已冻结的生产几何 (30 s 窗 / 10 s 跳), 与
+    # core.audio_sync_tv 的具名常量同值。**测量几何**是另一回事: 帧轨迹仍按
+    # frame_ms/hop_ms 测量, 由 aggregate_frames_to_windows 显式聚合。
+    "tv_window_samples": None,           # None -> core.audio_sync_tv.DEFAULT_WINDOW_SAMPLES
+    "tv_hop_samples": None,              # None -> core.audio_sync_tv.DEFAULT_HOP_SAMPLES
+    "tv_search_samples": None,           # None -> core.audio_sync_tv.DEFAULT_SEARCH_SAMPLES
+    "tv_chunk_samples": 480_000,         # apply 分块 (= 一个 hop); 不改变结果
+    # 一个窗要多少帧才被接受为**可信**。与 min_usable_frames 是**不同的
+    # 群体**: 后者是整条轨被采纳估计的帧数门, 这里是单个计划窗内的帧数门。
+    # 取值 3 的理由: 计划窗 30 s 覆盖 300 个 100 ms 跳的帧, 3 帧是"这个窗里有
+    # 真实测量"的下限, 不是精度要求 —— 精度由中位数与 D3 的残差报告承担。
+    "tv_min_frames_per_window": 3,
+
     # —— 兼容 ——
     "max_lag_seconds": None,             # 旧键: 读取时映射为 search_window_ms
     "algo_version": "2.3.0-p1",
 }
 
 _INT_KEYS = ("min_audio_streams", "coarse_rate", "min_usable_frames")
+#: **可为 None** 的整数键 (P4.6): None 是"未指定, 用上游具名默认常量", 与 0
+#: 不是一回事。它们不能进 `_INT_KEYS` —— `int(None)` 会抛错, 而
+#: `effective_opts` 的 except 会把**整份配置**回退成 DEFAULTS, 于是调用方写的
+#: policy/coordinate 会被一个几何键悄悄丢掉。
+_INT_OR_NONE_KEYS = ("tv_window_samples", "tv_hop_samples", "tv_search_samples")
+#: **可为 None** 的字符串键 (P4.6): None = 调用方没有说 (拒绝时变路径)。
+_STR_OR_NONE_KEYS = ("tv_policy", "tv_coordinate")
 _FLOAT_KEYS = ("min_audio_seconds", "silent_rms_dbfs", "search_window_ms",
                "wide_search_ms", "frame_ms", "hop_ms",
                "anchor_segment_seconds",
@@ -127,7 +155,7 @@ _FLOAT_KEYS = ("min_audio_seconds", "silent_rms_dbfs", "search_window_ms",
 _LIST_INT_KEYS = ("supported_sample_rates", "anchor_candidates")
 _LIST_FLOAT_KEYS = ("fine_phase_band_hz",)
 _LIST_STR_KEYS = ("supported_codecs",)
-_BOOL_KEYS = ("channel_sync_transparent",)
+_BOOL_KEYS = ("channel_sync_transparent", "time_varying")
 
 # 参与"全部健康 target 均失败 -> 文件级 measure_failed" 判定的轨道级原因
 _ESTIMATION_FAIL_REASONS = frozenset({
@@ -155,6 +183,14 @@ def effective_opts(cfg: dict[str, Any] | None) -> dict[str, Any]:
     try:
         for key in _INT_KEYS:
             opts[key] = int(opts[key])
+        # P4.6: None 必须**原样保留** —— 它是"未指定", 不是 0。见
+        # `_INT_OR_NONE_KEYS` 的注释: 一个 int(None) 的抛错会整份回退 DEFAULTS。
+        for key in _INT_OR_NONE_KEYS:
+            if opts[key] is not None:
+                opts[key] = int(opts[key])
+        for key in _STR_OR_NONE_KEYS:
+            if opts[key] is not None:
+                opts[key] = str(opts[key])
         for key in _FLOAT_KEYS:
             opts[key] = float(opts[key])
         for key in _LIST_INT_KEYS:
@@ -390,6 +426,103 @@ def _annotate_eligibility(rep: dict[str, Any]) -> None:
             row["eligibility"] = correction_eligibility(res, gate=gate).to_dict()
     except Exception as exc:                       # noqa: BLE001 - 报告增强
         rep["eligibility_note"] = f"not computed: {type(exc).__name__}: {exc}"
+
+
+def _validate_tv_opts(eff: dict[str, Any]) -> str | None:
+    """时变路径的**必需参数**校验。返回错误描述, 或 None 表示可以执行。
+
+    P4.6 的核心约定: D2 (gap policy) 与 D5 (coordinate contract) 都是**未冻结
+    的产品决策**, 因此生产路径**没有默认值**。调用方必须同时说出两者, 说不全
+    就拒绝 —— 而不是替它选一个实现默认值, 然后让那个默认值在报告里看起来像是
+    产品语义。
+
+    校验放在**打开文件之前**: 一条 900 MB 的流不该先被解码再因为一个参数缺失
+    而中止。
+    """
+    missing: list[str] = []
+    if eff.get("tv_policy") is None:
+        missing.append("tv_policy (D2 gap policy)")
+    if eff.get("tv_coordinate") is None:
+        missing.append("tv_coordinate (D5 coordinate contract)")
+    if missing:
+        return (
+            "time-varying sync requires an explicit "
+            + " and ".join(missing)
+            + "; neither decision has a frozen product semantic, so this path "
+              "refuses rather than choosing an implementation default. Known "
+              "policies: hold, no_correction_gap, explicit_state, linear, next "
+              "(policy 'current' is a research policy and is NOT accepted). "
+              "Known coordinates: latest-start, nearest-centre."
+        )
+    return None
+
+
+def _apply_time_varying_track(
+    i: int, e: Any, src: Any, dst: Any, sample_rate: int,
+    storage_dtype: str, eff: dict[str, Any], log: Any,
+) -> tuple[Any, dict[str, Any]]:
+    """把一条轨的**帧轨迹**变成逐窗计划并施加。返回 (结果或 None, 详情)。
+
+    这一步只做适配与调度: 测量**已经发生** (`e.frames`), 坐标与策略由调用方
+    显式指定, 计划的构造/施加/独立复测全部在 `core.audio_sync_tv_exec` 里 ——
+    本函数不重新实现其中任何一件。
+
+    详情字典进报告行, 因此"这条轨为什么没被逐窗修正"可以直接从报告读出来,
+    不需要调试器。
+    """
+    from . import audio_sync_tv as tv
+    from . import audio_sync_tv_exec as tve
+
+    win = eff["tv_window_samples"] or tv.DEFAULT_WINDOW_SAMPLES
+    hop = eff["tv_hop_samples"] or tv.DEFAULT_HOP_SAMPLES
+    search = eff["tv_search_samples"] or tv.DEFAULT_SEARCH_SAMPLES
+    frames = list(getattr(e, "frames", []) or [])
+    stats = tve.frame_aggregation_stats(
+        frames, n_samples=int(src.shape[0]), window_samples=int(win),
+        hop_samples=int(hop),
+        min_frames_per_window=int(eff["tv_min_frames_per_window"]),
+    )
+    detail: dict[str, Any] = {
+        "policy": eff["tv_policy"], "coordinate": eff["tv_coordinate"],
+        "window_samples": int(win), "hop_samples": int(hop),
+        "aggregation": stats,
+    }
+    try:
+        request = tve.request_time_varying(
+            enabled=True, policy=eff["tv_policy"],
+            coordinate=eff["tv_coordinate"],
+            window_samples=int(win), hop_samples=int(hop),
+            search_samples=int(search),
+            chunk_samples=int(eff["tv_chunk_samples"]),
+        )
+    except tve.TimeVaryingRefused as exc:
+        detail.update({"executed": False, "reason": exc.reason,
+                       "detail": exc.detail})
+        return None, detail
+
+    records = tve.aggregate_frames_to_windows(
+        frames, n_samples=int(src.shape[0]), window_samples=int(win),
+        hop_samples=int(hop),
+        min_frames_per_window=int(eff["tv_min_frames_per_window"]),
+    )
+    try:
+        res = tve.run_time_varying(
+            src, dst, request=request, measurements=records,
+            storage_dtype=storage_dtype, verify=True,
+        )
+    except tve.TimeVaryingRefused as exc:
+        detail.update({"executed": False, "reason": exc.reason,
+                       "detail": exc.detail})
+        return None, detail
+    detail.update(res.to_dict())
+    log(
+        f"channel-sync: CH{i + 1} time-varying "
+        f"({'applied' if res.executed else 'REFUSED'}"
+        f"{'' if res.executed else ' ' + str(res.reason)}) "
+        f"policy={eff['tv_policy']} coordinate={eff['tv_coordinate']} "
+        f"windows={res.n_windows} states={dict(res.state_counts)}"
+    )
+    return res, detail
 
 
 def run_channel_sync(
@@ -954,29 +1087,57 @@ def run_channel_sync(
         )
 
         # 5. 逐轨修正 (纯整数移位) + 独立复检 (失败只回退该轨)
+        #
+        # P4.6: `eff["time_varying"]` 打开时, 该轨改走**逐窗**修正路径。默认
+        # 关闭时这一段与 P1/P4.4 完全逐字节相同 —— 默认路径没有被改写过。
+        tv_error: str | None = None
+        if eff["time_varying"]:
+            tv_error = _validate_tv_opts(eff)
+            if tv_error is not None:
+                # 显式指定不全 -> 拒绝整条时变路径。**不静默退回固定延迟**:
+                # 调用方要求的是逐窗修正, 拿固定延迟交差就是另一种结果。
+                log(f"channel-sync: TIME-VARYING REFUSED — {tv_error}")
+                return finish("tv_not_configured", tv_error, channels=rows)
         fixed_ok: list[int] = []
         for i in to_fix:
             e = used_est.get(i, ests[i])   # 宽窗采纳轨用采纳估计 (窄窗 delay 可能为 NaN)
             shift = int(np.rint(e.delay_samples))
-            try:
-                sync_fix.shift_stream(
-                    arrs[i], fixed_raw[i],
-                    delay_samples=e.delay_samples,
-                    sample_rate=sample_rate,
-                    storage_dtype=storage[i],
-                    chunk_seconds=eff["fix_chunk_seconds"],
+            if eff["time_varying"]:
+                tv_res, tv_detail = _apply_time_varying_track(
+                    i, e, arrs[i], fixed_raw[i], sample_rate, storage[i],
+                    eff, log,
                 )
-            except Exception as exc:      # noqa: BLE001 — 单轨失败不回滚其它轨
-                rows[i] = est_row(i, e,
-                                  sync_estimate.summarize_trajectory(
-                                      e.frames, sample_rate),
-                                  "untouched", "recheck_residual")
-                # P4.3 (D1): 该轨的测量**确实发生过** —— est_row 重建 dict 会
-                # 丢掉上一步挂上的 evidence, 于是 "值有、证据也有" 的一条轨
-                # 在报告里变成 "只有值"。这里补回同一份证据对象。
-                rows[i]["evidence"] = ev
-                log(f"channel-sync: WARNING CH{i + 1} shift failed: {exc}")
-                continue
+                rows[i]["time_varying"] = tv_detail
+                if tv_res is None or not tv_res.executed:
+                    rows[i] = est_row(i, e,
+                                      sync_estimate.summarize_trajectory(
+                                          e.frames, sample_rate),
+                                      "untouched", "time_varying_refused")
+                    rows[i]["evidence"] = ev
+                    rows[i]["time_varying"] = tv_detail
+                    log(f"channel-sync: CH{i + 1} time-varying refused "
+                        f"({tv_detail.get('reason')}) — 该轨 untouched")
+                    continue
+            else:
+                try:
+                    sync_fix.shift_stream(
+                        arrs[i], fixed_raw[i],
+                        delay_samples=e.delay_samples,
+                        sample_rate=sample_rate,
+                        storage_dtype=storage[i],
+                        chunk_seconds=eff["fix_chunk_seconds"],
+                    )
+                except Exception as exc:      # noqa: BLE001 — 单轨失败不回滚其它轨
+                    rows[i] = est_row(i, e,
+                                      sync_estimate.summarize_trajectory(
+                                          e.frames, sample_rate),
+                                      "untouched", "recheck_residual")
+                    # P4.3 (D1): 该轨的测量**确实发生过** —— est_row 重建 dict 会
+                    # 丢掉上一步挂上的 evidence, 于是 "值有、证据也有" 的一条轨
+                    # 在报告里变成 "只有值"。这里补回同一份证据对象。
+                    rows[i]["evidence"] = ev
+                    log(f"channel-sync: WARNING CH{i + 1} shift failed: {exc}")
+                    continue
             try:
                 residual = sync_fix.recheck_residual(
                     arrs[anchor],

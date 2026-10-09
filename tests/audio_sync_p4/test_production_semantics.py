@@ -665,7 +665,10 @@ def default_path(g: dict) -> None:
     #         explicit request — exactly the flag-flip the original check
     #         forbade — so P.5b fails on a module-level import too.
     core_py = REPO / "core"
-    sanctioned = {"audio_sync_tv_exec.py"}
+    # P4.6 sanctioned a SECOND importer: core/channel_sync.py, the production
+    # boundary that opts in. It is listed here explicitly rather than by
+    # loosening the predicate, so a third accidental importer still fails.
+    sanctioned = {"audio_sync_tv_exec.py", "channel_sync.py"}
     importers = sorted(
         p.name for p in core_py.glob("*.py")
         if p.name != "audio_sync_tv.py"

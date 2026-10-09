@@ -28,6 +28,7 @@ from typing import Any
 
 from core.batch_hw import (
     BatchCtx,
+    _meta_manifest,
     detect_vfr,
     hw_backend_for,
     is_dji_source,
@@ -659,6 +660,7 @@ def encode_one(
         place_final(
             gpac=gpac, intermediate=part_dst, dst=dst,
             work_dir=(work_dir or part_dst.parent),
+            meta_source=_meta_manifest(work_dir or part_dst.parent),
             log=lambda msg: file_logger.info("CONTAINER | %s", msg),
         )
     except (OSError, RuntimeError) as exc:
@@ -851,7 +853,11 @@ def encode_one_sony(
             report.get("critical_modified"),
         )
         return "failed"
-    if gyro is not None and gyro.get("status") != "PASS":
+    # Only a real FAIL blocks delivery. `SKIPPED` means the consumer-side
+    # check did not run (Gyroflow absent, or check=basic) — a coverage
+    # gap, not a defect in this file. It is surfaced in the preserve log
+    # and in report["gyroflow"], so it cannot pass unnoticed.
+    if gyro is not None and gyro.get("status") == "FAIL":
         logger.error("[FAIL] Gyroflow consumer validation | %s | %s",
                      src, gyro.get("detail"))
         file_logger.error("GYROFLOW VALIDATION FAILED | %s", gyro.get("detail"))
@@ -860,11 +866,14 @@ def encode_one_sony(
     dst.parent.mkdir(parents=True, exist_ok=True)
     final = work_dir / "final" / "output.mov"
     # 保留管线的工作容器恒为 MOV; 最终容器跟随源 (见 place_final)。
-    # 校验已经在上面的 run_sony_pipeline 内完成, 容器重封装只搬 box,
-    # 不触碰视频基本流。
+    # 校验已经在上面的 run_sony_pipeline 内完成, 但**校验跑在校验对象还是
+    # MOV 的时候** —— 这一步会逐轨重建容器, 而逐轨重建会丢文件级 meta
+    # (nrtm), 消费端 (Gyroflow) 因此读不到 rtmd 轨。meta_source 就是让它
+    # 在重封装后把 meta 与 tref/cdsc 补回来并断言。
     try:
         place_final(
             gpac=gpac, intermediate=final, dst=dst, work_dir=work_dir,
+            meta_source=_meta_manifest(work_dir),
             log=lambda msg: file_logger.info("CONTAINER | %s", msg),
         )
     except (OSError, RuntimeError) as exc:
@@ -1187,6 +1196,48 @@ def parse_args() -> argparse.Namespace:
             "编码, 视频与所有非音频流 stream copy, 仅对需要修正的音频轨重新"
             "生成, untouched 轨保持原始内容; 全部已对齐时输出与源文件字节级"
             "一致 (SHA256 相同); 文件级失败时输出为源文件原样拷贝。"
+        ),
+    )
+    parser.add_argument(
+        "--channel-sync-tv",
+        action="store_true",
+        default=None,
+        help=(
+            "**逐窗时变**延时补偿 (P4.6, 显式 opt-in, 默认关闭). 与 "
+            "--channel-sync 的固定延迟不同, 它按计划窗 (默认 30 s 窗 / 10 s "
+            "跳, P3 已冻结的生产几何) 逐窗施加不同移位, 因此能跟随真实漂移。"
+            "**启用时必须同时给出 --channel-sync-tv-policy 与 "
+            "--channel-sync-tv-coordinate**: 这两项对应两个尚未冻结的产品"
+            "决策 (D2 gap policy / D5 coordinate contract), 缺任何一个都会"
+            "**拒绝执行**并保持原音频不动 —— 不会替你选一个实现默认值, 也"
+            "不会静默退回固定延迟。每轨的逐窗状态 (TRUSTED / UNRESOLVED_GAP "
+            "/ REENTRY) 与拒绝理由写进报告。"
+        ),
+    )
+    parser.add_argument(
+        "--channel-sync-tv-policy",
+        default=None,
+        choices=["hold", "no_correction_gap", "explicit_state", "linear",
+                 "next"],
+        help=(
+            "D2 gap policy (必需, 无默认). 决定**缺口窗**的移位怎么来: "
+            "hold=前向携带最后一个可信值; no_correction_gap=缺口内为 0; "
+            "explicit_state=与 hold 同移位, 状态为一等输出; "
+            "linear=缺口两侧线性插值 (离线); next=用下一个可信值 (离线)。"
+            "研究策略 'current' **不在可选列表内**: 它把没有测量的窗报告为 "
+            "TRUSTED (P3.7/P4.5 实测 195 个窗), 不得进入生产路径。"
+        ),
+    )
+    parser.add_argument(
+        "--channel-sync-tv-coordinate",
+        default=None,
+        choices=["latest-start", "nearest-centre"],
+        help=(
+            "D5 coordinate contract (必需, 无默认). 决定**哪个窗拥有一个"
+            "样本**: latest-start = 起点不晚于该样本的最晚窗 (P1/P3 历史"
+            "合同); nearest-centre = 中心最近的窗。两者在真实素材上**不等价**"
+            "(C1305 值一致率约 56.9%%, C1306 约 36.4%%), 因此必须由调用方"
+            "指定, 不能由实现替你决定。"
         ),
     )
     parser.add_argument(
@@ -1790,6 +1841,26 @@ def main() -> int:
         getattr(args, "channel_sync", False)
         or getattr(args, "channel_sync_transparent", False)
     )
+
+    # P4.6 — 时变同步: CLI 显式 opt-in。只覆写**调用方真的给了值**的键, 因此
+    # 未指定时 config 块里的值保持不变 (与其它 CLI 覆盖同一手法)。
+    #
+    # `_validate_tv_opts` 在 core.channel_sync 里做**必需参数**校验: policy 与
+    # coordinate 缺任何一个都拒绝执行, 且拒绝发生在打开/解码任何文件之前。
+    _tv_flag = getattr(args, "channel_sync_tv", None)
+    _tv_policy = getattr(args, "channel_sync_tv_policy", None)
+    _tv_coord = getattr(args, "channel_sync_tv_coordinate", None)
+    if _tv_flag is not None or _tv_policy is not None or _tv_coord is not None:
+        channel_sync_opts = dict(channel_sync_opts or {})
+        if _tv_flag is not None:
+            channel_sync_opts["time_varying"] = bool(_tv_flag)
+        if _tv_policy is not None:
+            channel_sync_opts["tv_policy"] = str(_tv_policy)
+        if _tv_coord is not None:
+            channel_sync_opts["tv_coordinate"] = str(_tv_coord)
+    # --channel-sync-tv 隐含 --channel-sync (与 transparent 同一处理)
+    if _tv_flag:
+        channel_sync_enabled = True
 
     # 显式音频计划 (v0.8.0+): 经典软件路径 (x265 / svtav1) 与硬件后端
     # (nvenc / qsv, 含 AV1) 都支持; Sony / DJI 保留管线有自己的音频处理方式,

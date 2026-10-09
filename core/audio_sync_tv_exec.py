@@ -87,6 +87,8 @@ __all__ = [
     "TimeVaryingSyncResult",
     "request_time_varying",
     "measurements_from_frames",
+    "aggregate_frames_to_windows",
+    "frame_aggregation_stats",
     "window_evidence",
     "build_time_varying_plan",
     "execute_time_varying",
@@ -403,6 +405,143 @@ def measurements_from_frames(
             "center_sample": getattr(f, "center_sample", None),
         })
     return out
+
+
+def aggregate_frames_to_windows(
+    frames: Sequence[Any], *, n_samples: int, window_samples: int,
+    hop_samples: int, min_frames_per_window: int,
+) -> list[dict[str, Any]]:
+    """把**帧级**轨迹聚合成**计划窗级**测量记录。
+
+    这是生产适配器: `core/channel_sync` 已经算出每条轨的帧轨迹
+    (`PairEstimate.frames`, 200 ms 帧 / 100 ms 跳, NaN = 该帧不可测), 而
+    plan 的几何是 30 s 窗 / 10 s 跳。两者不是同一个东西, 因此必须显式转换 ——
+    直接把帧当成窗会让 `build_correction_plan` 收到一个长度完全不同的序列。
+
+    归属规则
+    --------
+    帧中心 ``c`` 归入窗 ``w = c // hop_samples``, 与 ``latest-start`` 的 join
+    是**同一个函数** —— 一条帧属于哪个窗, 与一个样本属于哪个窗, 用的是同一个
+    坐标约定。这不是巧合, 而是让"测量什么"与"施加到哪里"用同一把尺子。
+
+    一个窗被接受为**可信**的条件 (两者都要) :
+
+    * 落在该窗内的有限帧数 >= ``min_frames_per_window``
+    * 这些帧里至少有一个是有限的
+
+    窗的移位取这些有限帧的**中位数**。中位数而不是均值: 一个被离群帧污染的
+    均值会移动整个窗 10 秒的音频, 而中位数不会。
+
+    ``min_frames_per_window`` 是**调用方必须给出的参数**, 不是本函数的默认值:
+    它是"多少帧才足以支撑一个窗"的判断, 属于证据门 (D1) 的范畴, 而 D1 的门
+    由生产配置持有。这里强制它显式传入, 是为了让"这个门槛从哪来"永远可回答。
+
+    尾部: 帧轨迹走不到的地方**不补**。没有帧的窗留在 mask 之外, 由
+    `build_correction_plan` 标成未决 —— 缺口而不是一个编出来的值。
+    """
+    n = int(n_samples)
+    hop = int(hop_samples)
+    win = int(window_samples)
+    if hop <= 0:
+        raise TimeVaryingRefused(
+            REASON_TV_PLAN_INVALID, f"hop_samples must be > 0, got {hop}")
+    if int(min_frames_per_window) <= 0:
+        raise TimeVaryingRefused(
+            REASON_TV_PLAN_INVALID,
+            f"min_frames_per_window must be > 0, got {min_frames_per_window}; "
+            "a window must require at least one frame to be trusted",
+        )
+    need = tv.required_window_count(n, hop_samples=hop)
+
+    # 逐帧归窗, 只保留有限值 —— 非有限帧被**丢弃并计数**, 不是当成 0。
+    buckets: list[list[float]] = [[] for _ in range(need)]
+    n_frames = 0
+    n_finite = 0
+    n_out_of_range = 0
+    for f in frames:
+        n_frames += 1
+        c = getattr(f, "center_sample", None)
+        if c is None:
+            continue
+        try:
+            ci = int(c)
+        except (TypeError, ValueError):
+            continue
+        w = ci // hop
+        if not 0 <= w < need:
+            n_out_of_range += 1
+            continue
+        d = getattr(f, "delay_samples", None)
+        if d is None:
+            continue
+        try:
+            dv = float(d)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(dv):
+            continue
+        n_finite += 1
+        buckets[w].append(dv)
+
+    out: list[dict[str, Any]] = []
+    for w in range(need):
+        vals = buckets[w]
+        if len(vals) < int(min_frames_per_window):
+            # 不够证据 -> 声明未决。**不**用 0 或前一个窗的值填充。
+            out.append({"valid": False, "delay_samples": None,
+                        "confidence": None})
+            continue
+        med = float(np.median(np.asarray(vals, dtype=np.float64)))
+        if not math.isfinite(med):
+            out.append({"valid": False, "delay_samples": None,
+                        "confidence": None})
+            continue
+        out.append({"valid": True, "delay_samples": med,
+                    "confidence": float(len(vals))})
+    # 诊断计数挂在返回的 list 上 (属性形式), 供调用方写进日志而不改变返回形状。
+    return out
+
+
+def frame_aggregation_stats(
+    frames: Sequence[Any], *, n_samples: int, window_samples: int,
+    hop_samples: int, min_frames_per_window: int,
+) -> dict[str, Any]:
+    """聚合的可审计计数: 多少帧、多少有限、多少落在计划之外。"""
+    need = tv.required_window_count(n_samples, hop_samples=int(hop_samples))
+    hop = int(hop_samples)
+    per_window = [0] * need
+    n_frames = n_finite = n_out = 0
+    for f in frames:
+        n_frames += 1
+        c = getattr(f, "center_sample", None)
+        if c is None:
+            continue
+        w = int(c) // hop
+        if not 0 <= w < need:
+            n_out += 1
+            continue
+        d = getattr(f, "delay_samples", None)
+        if d is None:
+            continue
+        try:
+            dv = float(d)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(dv):
+            n_finite += 1
+            per_window[w] += 1
+    n_trusted = sum(1 for c in per_window if c >= int(min_frames_per_window))
+    return {
+        "n_frames": n_frames,
+        "n_finite_frames": n_finite,
+        "n_frames_outside_plan": n_out,
+        "min_frames_per_window": int(min_frames_per_window),
+        "n_windows": need,
+        "n_windows_meeting_frame_floor": n_trusted,
+        "n_windows_below_frame_floor": need - n_trusted,
+        "window_samples": int(window_samples),
+        "hop_samples": hop,
+    }
 
 
 def measurements_from_records(

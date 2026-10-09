@@ -1583,6 +1583,11 @@ CASES = [
     t53_controls,
 ]
 
+#: NOTE. ``CASES`` is built lazily inside ``main()`` from ``_CASES`` below,
+#: because the T54+ integration cases are defined after this point in the file.
+#: An earlier version built the list here, so every function defined later was a
+#: NameError at import time.
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -1591,7 +1596,14 @@ def main() -> int:
     print("=" * 78)
     print("P4.6 — time-varying sync: production execution regression")
     print("=" * 78)
-    for fn in CASES:
+    cases = CASES + [
+        t54_default_path_is_untouched, t55_tv_opts_normalisation,
+        t56_tv_requires_both_decisions,
+        t57_forbidden_policy_at_the_option_layer,
+        t58_channel_sync_imports_tv_lazily, t59_trajectory_aggregation,
+        t60_aggregation_chunk_invariance,
+    ]
+    for fn in cases:
         fn()
     total = (COUNTS["value_ok"] + COUNTS["raised"] + COUNTS["silent_wrong"]
              + COUNTS["control_ok"] + COUNTS["control_failed"]
@@ -1627,6 +1639,224 @@ def main() -> int:
           f"SILENT_WRONG = 0")
     return 0
 
+
+# ==========================================================================
+# T54-T60  production integration: channel_sync opt-in and default protection
+# ==========================================================================
+def _cs():
+    from core import channel_sync
+    return channel_sync
+
+
+def t54_default_path_is_untouched() -> None:
+    print("\n== T54  the default path is unchanged when the flag is off ==")
+    cs = _cs()
+    eff_off = cs.effective_opts(None)
+    value("T54 time_varying defaults to False", eff_off["time_varying"] is False,
+          f"{eff_off['time_varying']!r}")
+    value("T54b tv_policy and tv_coordinate default to None (NOT to a policy)",
+          eff_off["tv_policy"] is None and eff_off["tv_coordinate"] is None,
+          f"{eff_off['tv_policy']!r} / {eff_off['tv_coordinate']!r}")
+    # every pre-existing key must be byte-for-byte what it was: the P1 path is
+    # protected by the defaults table, not by a code reading.
+    for key in ("search_window_ms", "frame_ms", "hop_ms", "min_usable_frames",
+                "min_confidence", "min_usable_fraction", "mad_max_ms",
+                "aligned_max_ms", "verify_max_ms", "fix_chunk_seconds",
+                "anchor_candidates", "algo_version",
+                "channel_sync_transparent"):
+        value(f"T54c the documented default of {key!r} is unchanged",
+              eff_off[key] == cs.DEFAULTS[key],
+              f"{eff_off[key]!r} vs {cs.DEFAULTS[key]!r}")
+    value("T54d the P1 algorithm version is still 2.3.0-p1",
+          cs.DEFAULTS["algo_version"] == "2.3.0-p1",
+          f"{cs.DEFAULTS['algo_version']}")
+
+
+def t55_tv_opts_normalisation() -> None:
+    print("\n== T55  the new options survive normalisation ==")
+    cs = _cs()
+    # The None-valued geometry keys must NOT be int()-ed: int(None) raises, and
+    # effective_opts' except returns DEFAULTS wholesale -- which would silently
+    # discard the caller's policy and coordinate.
+    eff = cs.effective_opts({"tv_policy": "hold",
+                             "tv_coordinate": "nearest-centre"})
+    value("T55 a None geometry key does not reset the whole config",
+          eff["tv_policy"] == "hold"
+          and eff["tv_coordinate"] == "nearest-centre",
+          f"{eff['tv_policy']!r} / {eff['tv_coordinate']!r}")
+    value("T55b the None geometry keys stay None (meaning: use the upstream "
+          "named constant)",
+          eff["tv_window_samples"] is None and eff["tv_hop_samples"] is None
+          and eff["tv_search_samples"] is None,
+          f"{eff['tv_window_samples']!r}")
+    eff2 = cs.effective_opts({"time_varying": True, "tv_policy": "hold",
+                              "tv_coordinate": "latest-start",
+                              "tv_window_samples": 960000,
+                              "tv_hop_samples": 480000})
+    value("T55c explicit geometry is honoured and coerced to int",
+          eff2["tv_window_samples"] == 960000
+          and isinstance(eff2["tv_window_samples"], int),
+          f"{eff2['tv_window_samples']!r}")
+    value("T55d tv_chunk_samples has a concrete default",
+          isinstance(eff2["tv_chunk_samples"], int)
+          and eff2["tv_chunk_samples"] > 0, f"{eff2['tv_chunk_samples']!r}")
+
+
+def t56_tv_requires_both_decisions() -> None:
+    print("\n== T56  the production path refuses without both decisions ==")
+    cs = _cs()
+    full = {"time_varying": True, "tv_policy": "hold",
+            "tv_coordinate": "latest-start"}
+    value("T56 the full opt-in validates clean",
+          cs._validate_tv_opts(cs.effective_opts(full)) is None,
+          f"{cs._validate_tv_opts(cs.effective_opts(full))}")
+    for missing, kw in (
+        ("policy", {"time_varying": True, "tv_coordinate": "latest-start"}),
+        ("coordinate", {"time_varying": True, "tv_policy": "hold"}),
+        ("both", {"time_varying": True}),
+    ):
+        err = cs._validate_tv_opts(cs.effective_opts(kw))
+        value(f"T56 with {missing} missing the path is refused with a message",
+              isinstance(err, str) and len(err) > 20, f"{err!r}")
+    err = cs._validate_tv_opts(cs.effective_opts(
+        {"time_varying": True, "tv_coordinate": "latest-start"}))
+    value("T56b the refusal message names the missing decision AND the "
+          "alternatives",
+          "tv_policy" in err and "hold" in err and "current" in err,
+          f"{err}")
+
+
+def t57_forbidden_policy_at_the_option_layer() -> None:
+    print("\n== T57  the research policy cannot be selected ==")
+    cs = _cs()
+    # `_validate_tv_opts` checks presence; the whitelist is enforced by
+    # request_time_varying, which channel_sync calls. Both must refuse.
+    raises_tv("T57 request_time_varying refuses policy='current'",
+              ex.REASON_TV_POLICY_NOT_PRODUCTION, ex.request_time_varying,
+              enabled=True, policy="current", coordinate="latest-start")
+    import argparse
+    import subprocess
+    cli = subprocess.run(
+        [sys.executable, str(REPO / "1kt.py"), "--help"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=180)
+    value("T57b the CLI exits 0 on --help (the new options parse)",
+          cli.returncode == 0, f"rc={cli.returncode} {(cli.stderr or '')[-200:]}")
+    value("T57c the CLI does NOT offer 'current' as a policy choice",
+          "no_correction_gap" in (cli.stdout or "")
+          and "{hold,no_correction_gap,explicit_state,linear,next}"
+          in (cli.stdout or ""), "the policy choice list is not as expected")
+    value("T57d the CLI offers exactly the two coordinate contracts",
+          "{latest-start,nearest-centre}" in (cli.stdout or ""),
+          "the coordinate choice list is not as expected")
+
+
+def t58_channel_sync_imports_tv_lazily() -> None:
+    print("\n== T58  the production module reaches the path lazily ==")
+    import ast as _ast
+    import inspect as _inspect
+    cs = _cs()
+    src = _inspect.getsource(cs)
+    tree = _ast.parse(src)
+    top = []
+    for node in tree.body:
+        if isinstance(node, _ast.Import):
+            top += [a.name for a in node.names if "audio_sync_tv" in a.name]
+        elif isinstance(node, _ast.ImportFrom):
+            if "audio_sync_tv" in (node.module or ""):
+                top.append(node.module)
+    value("T58 channel_sync imports audio_sync_tv ONLY inside a function",
+          top == [], f"module-scope imports: {top}")
+    names = {n.name for n in _ast.walk(tree) if isinstance(n, _ast.FunctionDef)}
+    value("T58b the opt-in helpers exist as functions",
+          {"_validate_tv_opts", "_apply_time_varying_track"} <= names,
+          f"{sorted(names & {'_validate_tv_opts', '_apply_time_varying_track'})}")
+    value("T58c the opt-in branch is guarded by the flag, so the default run "
+          "never evaluates it",
+          'if eff["time_varying"]:' in src, "the guard is not present")
+
+
+def t59_trajectory_aggregation() -> None:
+    print("\n== T59  frame trajectory -> plan windows ==")
+    # frames at 200 ms / 100 ms hop (the production channel_sync geometry)
+    class F:
+        __slots__ = ("center_sample", "delay_samples", "confidence")
+
+        def __init__(self, c, d, conf=0.9):
+            self.center_sample, self.delay_samples, self.confidence = c, d, conf
+
+    n = 4 * HOP
+    frames = [F(c, 250.0) for c in range(0, n, 4800)]      # 100 ms hop
+    recs = ex.aggregate_frames_to_windows(
+        frames, n_samples=n, window_samples=WIN, hop_samples=HOP,
+        min_frames_per_window=3)
+    value("T59 the adapter returns exactly required_window_count records",
+          len(recs) == nw_for(n), f"{len(recs)} vs {nw_for(n)}")
+    value("T59b every window with enough frames is valid",
+          all(r["valid"] for r in recs), f"{[r['valid'] for r in recs]}")
+    value("T59c the window shift is the MEDIAN of its frames",
+          all(abs(r["delay_samples"] - 250.0) < 1e-9 for r in recs),
+          f"{[r['delay_samples'] for r in recs]}")
+    # NaN frames are dropped, not treated as a zero delay
+    frames2 = [F(c, float("nan")) for c in range(0, n, 4800)]
+    recs2 = ex.aggregate_frames_to_windows(
+        frames2, n_samples=n, window_samples=WIN, hop_samples=HOP,
+        min_frames_per_window=3)
+    value("T59d all-NaN frames leave every window UNMEASURED (not 0)",
+          all(not r["valid"] and r["delay_samples"] is None for r in recs2),
+          f"{recs2[:2]}")
+    # the frame floor is enforced
+    frames3 = [F(c, 100.0) for c in range(0, 4800, 100)]    # 48 frames, all w=0
+    recs3 = ex.aggregate_frames_to_windows(
+        frames3, n_samples=n, window_samples=WIN, hop_samples=HOP,
+        min_frames_per_window=100)
+    value("T59e a window below the frame floor is not trusted",
+          recs3[0]["valid"] is False, f"{recs3[0]}")
+    raises_tv("T59f a frame floor of 0 is refused (a window must need at "
+              "least one frame)",
+              ex.REASON_TV_PLAN_INVALID, ex.aggregate_frames_to_windows,
+              frames3, n_samples=n, window_samples=WIN, hop_samples=HOP,
+              min_frames_per_window=0)
+    stats = ex.frame_aggregation_stats(
+        frames, n_samples=n, window_samples=WIN, hop_samples=HOP,
+        min_frames_per_window=3)
+    value("T59g the aggregation is auditable (frame counts reported)",
+          stats["n_frames"] == len(frames)
+          and stats["n_finite_frames"] == len(frames)
+          and stats["n_windows"] == nw_for(n), f"{stats}")
+
+
+def t60_aggregation_chunk_invariance() -> None:
+    print("\n== T60  the aggregated plan is chunk-invariant end to end ==")
+    n = 4 * HOP
+    ref = reference(n)
+    src = source_with_delay(ref, lambda i: 333)
+    sp = write_f32(tmpdir() / "T60.f32", src)
+
+    class F:
+        __slots__ = ("center_sample", "delay_samples", "confidence")
+
+        def __init__(self, c, d):
+            self.center_sample, self.delay_samples, self.confidence = c, d, 0.9
+
+    frames = [F(c, 333.0) for c in range(0, n, 4800)]
+    recs = ex.aggregate_frames_to_windows(
+        frames, n_samples=n, window_samples=WIN, hop_samples=HOP,
+        min_frames_per_window=3)
+    outs = {}
+    for c in (256, 4096, HOP):
+        dp = tmpdir() / f"T60_{c}.f32"
+        r = ex.run_time_varying(sp, dp, request=req(chunk=c), measurements=recs,
+                                verify=True)
+        value(f"T60 chunk={c} executed from an AGGREGATED trajectory",
+              r.executed, f"reason={r.reason} detail={r.detail}")
+        if r.executed:
+            outs[c] = np.fromfile(dp, dtype="<f4")
+    if len(outs) == 3:
+        vals = list(outs.values())
+        value("T60 the aggregated path is chunk-invariant too",
+              all(np.array_equal(vals[0], v) for v in vals[1:]),
+              f"{[int((vals[0] != v).sum()) for v in vals[1:]]}")
 
 if __name__ == "__main__":
     raise SystemExit(main())

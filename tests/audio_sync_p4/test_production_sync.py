@@ -903,8 +903,17 @@ def t9_default_path() -> None:
     es = importlib.import_module("core.sync_estimate")
 
     src_ch = inspect.getsource(ch)
-    value("T9.1 core/channel_sync.py does not import the time-varying module",
-          "audio_sync_tv" not in src_ch)
+    # REVISED BY P4.6. This asserted that core/channel_sync.py does not import
+    # the time-varying module at all. P4.6 wired the explicit opt-in path
+    # through channel_sync, so that premise changed. The property that matters
+    # is stronger and is what is asserted now: channel_sync reaches the module
+    # ONLY from inside a function, so importing the production P1 module does
+    # not load the time-varying stack, and the path cannot be reached by import
+    # order -- only by an explicit request that passes its own validation.
+    value("T9.1 core/channel_sync.py reaches the time-varying module only from "
+          "FUNCTION scope", not _module_scope_tv_imports(src_ch))
+    value("T9.1b ...and it really does reach it (the opt-in path is wired, not "
+          "dead code)", _imports_audio_sync_tv(src_ch))
     value("T9.2 core/sync_fix.py does not import the time-varying module",
           "audio_sync_tv" not in inspect.getsource(fx))
     value("T9.3 core/sync_estimate.py does not import the time-varying module",
@@ -938,21 +947,23 @@ def t9_default_path() -> None:
     # STRENGTHENED (P4.4): these were substring scans, so a *comment* naming
     # the module read as a reference, while an aliased import read as clean.
     # The property is a dependency, so it is read from the import statements.
-    SANCTIONED_TV_IMPORTERS = {"audio_sync_tv_exec.py"}
+    SANCTIONED_TV_IMPORTERS = {"audio_sync_tv_exec.py", "channel_sync.py"}
     core = REPO / "core"
     refs = sorted(f.name for f in core.glob("*.py")
                   if f.name != "audio_sync_tv.py"
                   and _imports_audio_sync_tv(
                       f.read_text(encoding="utf-8", errors="replace")))
-    value("T9.6 the ONLY core module importing audio_sync_tv is the explicit "
-          "opt-in execution layer",
+    value("T9.6 the ONLY core modules importing audio_sync_tv are the explicit "
+          "opt-in execution layer and the production boundary that opts in",
           refs == sorted(SANCTIONED_TV_IMPORTERS),
           f"imported by {refs}, expected exactly "
           f"{sorted(SANCTIONED_TV_IMPORTERS)}")
-    # ...and that layer must be reachable only through the opt-in request, not
-    # by a second module quietly importing it too.
-    value("T9.6b the shipped fixed-delay applier is still not in that set",
-          "sync_fix.py" not in refs and "channel_sync.py" not in refs,
+    # ...and the shipped fixed-delay applier must still be outside that set: the
+    # scalar P1 path must not have been turned into a time-varying path.
+    value("T9.6b the shipped fixed-delay applier and the estimator are still "
+          "not in that set",
+          "sync_fix.py" not in refs and "sync_estimate.py" not in refs
+          and "audio_plan.py" not in refs and "audio_models.py" not in refs,
           f"{refs}")
 
     # 1kt.py must not import it either
@@ -1223,6 +1234,34 @@ def _imports_audio_sync_tv(src: str) -> bool:
                             and isinstance(arg.value, str)
                             and "audio_sync_tv" in arg.value):
                         return True
+    return False
+
+
+def _module_scope_tv_imports(src: str) -> bool:
+    """Is the time-varying module imported at MODULE scope (``tree.body``)?
+
+    P4.6: this is the distinction the opt-in guarantee rests on. A
+    function-local import runs only when that branch executes, so the path
+    cannot be reached by import order; a module-level one loads the whole
+    time-varying stack as soon as the production module is imported, which makes
+    the path reachable without anyone asking for it.
+
+    Read from the AST's module body rather than by indentation, so a multi-line
+    or oddly-indented import cannot fool it.
+    """
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return False
+    for node in tree.body:                      # body only == module scope
+        if isinstance(node, ast.Import):
+            if any("audio_sync_tv" in a.name for a in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            if "audio_sync_tv" in (node.module or ""):
+                return True
+            if any("audio_sync_tv" in a.name for a in node.names):
+                return True
     return False
 
 
