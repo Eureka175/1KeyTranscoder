@@ -233,6 +233,8 @@ F:\1KeyTranscoder\
 | [`p4.2-provenance.md`](audio-sync-p4/p4.2-provenance.md) | P4.2 溯源：改动了什么（2 个生产文件，前后哈希）与**证明没动什么**（9 个用户文件、冻结 fixture、同步算法） | ✅ 权威（溯源） |
 | [`p4.3-production-semantics.md`](audio-sync-p4/p4.3-production-semantics.md) | **P4.3 生产语义收口**：D1 证据契约**已实现**（证据随值抵达消费者）；D2 缺口策略 / D5 坐标合同 `DEFERRED` 且**实现默认值与语义契约分为两个字段**；D8 启用状态正式定义。含**决策编号三向冲突**的调和表、P2 路径同类缺陷的修复（前后**同 harness 实测**）、P1 548 行重放（0 结论变化）。**算法改动 = 0** | ✅ 权威（契约与决定） |
 | [`p4.3-provenance.md`](audio-sync-p4/p4.3-provenance.md) | P4.3 溯源：base/head、改动文件与前后哈希、fixture 哈希、测试计数、D1 修订、D2/D5/D8 状态 | ✅ 权威（溯源） |
+| [`p4.4-production-enablement.md`](audio-sync-p4/p4.4-production-enablement.md) | **P4.4 生产启用**：验证过的 **fixed-delay** 子集进入生产（P1 `--channel-sync` / P2 `--audio-plan`），由**唯一**的 `correction_eligibility()` 判定；"不合格却带可用数值"**不可表示**。逐状态的支持/不支持表、fail-closed 行为、默认路径实测（**0 次 PCM 调用**）、真实素材验证（正/负/零偏移 + 多声道）。**D2/D3/D5 保持 `DEFERRED`/`NOT ESTABLISHED`**；drift 与 resample 未启用 | ✅ 权威（启用契约） |
+| [`p4.4-provenance.md`](audio-sync-p4/p4.4-provenance.md) | P4.4 溯源：改动文件与哈希、**证明未改**算法文件（`sync_estimate` / `sync_fix` / `audio_sync_tv`）、fixture 校验、9 个用户文件状态 | ✅ 权威（溯源） |
 
 > **一句话状态**：固定偏移 `VALIDATED`；时变测量 `VALIDATED`；真实 PCM 施加
 > `VALIDATED`；六通道对 E2E `VALIDATED`；**缺口策略 `DEFERRED`、坐标合同
@@ -274,6 +276,29 @@ F:\1KeyTranscoder\
 >   **不被任何生产模块 import**（结构性 OFF，不是开关）；启用 `D8-C` 未取。
 > * **算法改动 = 0**：`sync_estimate.py` / `sync_fix.py` / GCC-PHAT / P1 修正
 >   数学 / 六对 E2E 修正机制全部未动。
+>
+> **P4.4（生产启用）最后一补**：把"能不能修"这个问题从**每个 consumer 各自
+> 判断**收敛成**唯一入口** `core.audio_models.correction_eligibility()`。
+>
+> * **验证过的 fixed-delay 子集进入生产**：P1（`--channel-sync`）与 P2
+>   （`--audio-plan` + 显式 `sync.reference`）两条 opt-in 路径都由该入口管辖。
+>   在此之前三条消费路径各自只看 `status`，**没有一条看证据**。
+> * **不变量是结构性的**：不合格的判定**不携带 offset**（`offset_samples =
+>   None`），"测出来了但不采用"的值仍可读 `raw_offset_samples` 供报告陈述。
+>   `FixedDelayPlan.offsets()` 只含合格条目。U1 的
+>   "数字存在 == 测量存在" 因此在类型层面不可表示。
+> * **默认路径实测未变**：把所有 PCM 入口打桩后跑无 opt-in 的生产调用，
+>   `run_channel_sync` / `estimate_sync` / `apply_sync_result` /
+>   `resolve_timeline` / `AudioPCMReader` 全部 **0 次调用**，0.035 ms，未触碰
+>   任何文件。
+> * **真实素材验证**：注入 +1200 / −600 / 0 样本的四声道 A7M5 素材，实际施加
+>   的移位与注入值逐条相符（符号与大小），修正后由 harness **自写的**互相关
+>   独立复测残差为 **0 样本**。
+> * **time-varying / 逐窗路径仍未启用**：`CorrectionPlan` 的构造函数要求
+>   `policy=` 与 `coordinate=`，接进生产等于顺手决定 D2 与 D5 —— 因此本阶段
+>   用**固定延迟计划**（无 policy、无 coordinate）满足链路中的计划一步。
+> * **D2 = `DEFERRED`、D3 = `NOT ESTABLISHED`、D5 = `DEFERRED` 全部保持不变**；
+>   drift correction 与 resampling 未启用。
 >
 > **P4 没有替产品做决定，也没有改动任何默认行为。** 模块 `core/audio_sync_tv.py`
 > 与套件 `tests/audio_sync_p4/` 都是 tracked 代码，且**不 import `work/`**，
