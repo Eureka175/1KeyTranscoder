@@ -43,6 +43,9 @@ I8  分块不变性: 输出 PCM 与 ``chunk_samples`` 无关.
 * 不 import ``encoders`` / ``preservation`` / 硬件后端 / Sony 元数据;
 * 只依赖 numpy 与 ``core.sync_estimate`` 的流式读取面;
 * **不**被 ``core/channel_sync.py`` 调用, 除非显式开启 feature gate;
+* 生产边界是 ``core/audio_sync_tv_exec.py`` (P4.6) —— 本模块自身仍不决定
+  gap policy 或 coordinate contract, 两个决策的语义状态仍是 DEFERRED; 那个
+  模块的职责只是把"未决"变成**必须显式指定, 否则拒绝**的调用契约。
 * ``AudioPlan`` 与本模块无关 (它是声明式的, 不执行)。
 
 状态语义

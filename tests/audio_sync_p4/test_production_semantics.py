@@ -643,20 +643,95 @@ def default_path(g: dict) -> None:
           tr.to_dict() == before,
           f"to_dict()={tr.to_dict()}")
 
-    # the P4 time-varying path must still be unreachable from production
-    offenders = []
-    for path in sorted((REPO / "core").glob("*.py")) + \
-            sorted((REPO / "production").glob("*.py")) + [REPO / "1kt.py"]:
-        if path.name == "audio_sync_tv.py":
-            continue
-        src = path.read_text(encoding="utf-8", errors="replace")
-        if any("audio_sync_tv" in mod for mod in _imported_modules(src)):
-            offenders.append(path.name)
-    value("P.5 the time-varying path is still imported by no production module",
-          not offenders,
-          f"importers={offenders or 'none'} — default OFF is structural, not "
-          f"a flag that configuration can flip; checked from the import "
-          f"statements so a comment naming the module does not read as one")
+    # P4.6 REPLACED THIS CHECK, at STRONGER strength.
+    #
+    # The original property was
+    #     "the time-varying path is still imported by no production module"
+    # with the reason "default OFF is structural, not a flag that configuration
+    # can flip". P4.6 added `core/audio_sync_tv_exec.py` — the explicit opt-in
+    # execution layer — so the original premise is no longer true, and simply
+    # deleting the check would lose the property entirely.
+    #
+    # The property P.5 actually protects is: **a default run cannot reach the
+    # time-varying path**. P4.6 keeps that, and states it two ways:
+    #
+    #   P.5a  the ONLY module that reaches `audio_sync_tv` is the sanctioned
+    #         execution layer. Any new accidental importer still fails, and so
+    #         does the execution layer vanishing (opt-in silently un-wired).
+    #   P.5b  `core/channel_sync.py` reaches that layer ONLY from inside a
+    #         function, so merely importing the production P1 module does not
+    #         load the time-varying stack at all. A module-level import there
+    #         would make the path reachable by import order rather than by an
+    #         explicit request — exactly the flag-flip the original check
+    #         forbade — so P.5b fails on a module-level import too.
+    core_py = REPO / "core"
+    sanctioned = {"audio_sync_tv_exec.py"}
+    importers = sorted(
+        p.name for p in core_py.glob("*.py")
+        if p.name != "audio_sync_tv.py"
+        and any("audio_sync_tv" in mod
+                for mod in _imported_modules(
+                    p.read_text(encoding="utf-8", errors="replace")))
+    )
+    value("P.5a the ONLY reachable importer of the time-varying module is the "
+          "sanctioned explicit opt-in execution layer",
+          importers == sorted(sanctioned),
+          f"importers={importers or 'none'}, expected exactly "
+          f"{sorted(sanctioned)} — a default run must not reach this path, and "
+          f"the property is read from import statements so a comment naming the "
+          f"module does not read as one")
+
+    def _module_level_tv_imports(path) -> list[str]:
+        """Top-level (module-scope) imports of the time-varying stack."""
+        import ast as _ast
+
+        tree = _ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        found: list[str] = []
+        for node in tree.body:                     # body only == module scope
+            if isinstance(node, _ast.Import):
+                found += [a.name for a in node.names
+                          if "audio_sync_tv" in a.name]
+            elif isinstance(node, _ast.ImportFrom):
+                if "audio_sync_tv" in (node.module or ""):
+                    found.append(node.module or "")
+                found += [a.name for a in node.names
+                          if "audio_sync_tv" in a.name]
+        return found
+
+    top_level = {}
+    for name in ("channel_sync.py", "audio_sync_tv_exec.py", "1kt.py"):
+        p = (core_py / name) if name != "1kt.py" else (REPO / name)
+        if p.is_file():
+            top_level[name] = _module_level_tv_imports(p)
+    values = {k: v for k, v in top_level.items()
+              if k in ("channel_sync.py", "1kt.py")}
+    value("P.5b the production P1 module and the CLI do not import the "
+          "time-varying stack at module scope",
+          all(v == [] for v in values.values()),
+          f"module-scope imports: {values or 'none'} — a function-local import "
+          f"runs only when the opt-in branch executes; a module-level one would "
+          f"load the path on any import")
+
+    # CONTROL: P.5a's scan must SEE a real importer when one exists. The
+    # sanctioned execution layer IS one, so asserting the empty set here must
+    # fail — if it passes, the scan is not reading imports at all.
+    def break_p5a() -> None:
+        assert importers == [], "x"
+    control("P.5a.C the importer scan can see a real importer", break_p5a)
+
+    # CONTROL: the module-scope reader must not be fooled by a function-local
+    # import. This is the exact distinction P.5b rests on, so it is asserted
+    # rather than assumed.
+    def break_p5b() -> None:
+        import ast as _ast2
+
+        nested = _ast2.parse(
+            "def f():\n    from . import audio_sync_tv\n")
+        seen = [n for n in nested.body
+                if isinstance(n, (_ast2.Import, _ast2.ImportFrom))]
+        assert seen, "a function-local import must NOT count as module scope"
+    control("P.5b.C the module-scope reader ignores a function-local import",
+            break_p5b)
 
     def break_it() -> None:
         assert d != {"status": "not_processed"}, "x"

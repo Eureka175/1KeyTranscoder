@@ -920,18 +920,40 @@ def t9_default_path() -> None:
           ch.DEFAULTS["algo_version"] == "2.3.0-p1",
           f"{ch.DEFAULTS['algo_version']}")
 
-    # the module must not be importable into production by accident: nothing
-    # in core/ references it except itself
-    core = REPO / "core"
+    # the module must not be importable into production by accident.
+    #
+    # REVISED BY P4.6. The original check was
+    #     refs == []      over every core/*.py except audio_sync_tv.py
+    # with the reason "core/audio_sync_tv is imported by no production module".
+    # P4.6 deliberately changed that premise: it added
+    # `core/audio_sync_tv_exec.py`, the EXPLICIT OPT-IN execution layer, whose
+    # entire job is to be the single production boundary onto this module.
+    # Deleting the check would lose the property it protects, and relaxing it
+    # to a substring scan would lose the P4.4 strengthening. So the property is
+    # re-stated at the same strength: the set of core modules that import
+    # audio_sync_tv must be EXACTLY the sanctioned execution layer and nothing
+    # else. A new accidental importer still fails, and so does the execution
+    # layer disappearing (which would mean the opt-in path was un-wired again).
+    #
     # STRENGTHENED (P4.4): these were substring scans, so a *comment* naming
     # the module read as a reference, while an aliased import read as clean.
     # The property is a dependency, so it is read from the import statements.
-    refs = [f.name for f in sorted(core.glob("*.py"))
-            if f.name != "audio_sync_tv.py"
-            and _imports_audio_sync_tv(
-                f.read_text(encoding="utf-8", errors="replace"))]
-    value("T9.6 no other core module imports audio_sync_tv",
-          refs == [], f"imported by {refs}")
+    SANCTIONED_TV_IMPORTERS = {"audio_sync_tv_exec.py"}
+    core = REPO / "core"
+    refs = sorted(f.name for f in core.glob("*.py")
+                  if f.name != "audio_sync_tv.py"
+                  and _imports_audio_sync_tv(
+                      f.read_text(encoding="utf-8", errors="replace")))
+    value("T9.6 the ONLY core module importing audio_sync_tv is the explicit "
+          "opt-in execution layer",
+          refs == sorted(SANCTIONED_TV_IMPORTERS),
+          f"imported by {refs}, expected exactly "
+          f"{sorted(SANCTIONED_TV_IMPORTERS)}")
+    # ...and that layer must be reachable only through the opt-in request, not
+    # by a second module quietly importing it too.
+    value("T9.6b the shipped fixed-delay applier is still not in that set",
+          "sync_fix.py" not in refs and "channel_sync.py" not in refs,
+          f"{refs}")
 
     # 1kt.py must not import it either
     kt = (REPO / "1kt.py").read_text(encoding="utf-8", errors="replace")
