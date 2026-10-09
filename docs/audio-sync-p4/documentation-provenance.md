@@ -107,6 +107,26 @@ Two existing rules that matter here, both verified rather than assumed:
 
 No `.gitignore` change was needed, so none was made.
 
+### `.gitattributes` — audited, and left unchanged
+
+Read as part of the same audit. It contains one rule,
+`*.patch text eol=lf`, written for exactly the failure mode this phase then
+found elsewhere: with `core.autocrlf=true` git re-encodes text files to LF at
+commit time, which silently invalidates any hash recorded against the working
+tree.
+
+The frozen channel-sync baseline has **no such rule**, and its recorded hash
+(`36242616062FFEC2…`, `docs/hardware-decode/final-report.md` HD-G06) describes
+the **CRLF** form while the repository stores the **LF** form. The consequence,
+the two hashes, and why it was recorded rather than fixed are in
+[`known-limitations.md`](known-limitations.md) §7.
+
+**No rule was added.** Choosing between `eol=lf` and `eol=crlf` for that fixture
+changes what every checkout writes, and would invalidate the recorded hash on one
+platform or the other — a content decision outside a documentation task, and
+exactly the kind of thing the brief says to **record and stop on** rather than
+fix in passing.
+
 ---
 
 ## 6. Suggested files that were deliberately NOT created

@@ -284,7 +284,7 @@ p3.10/p3.11/p3.12-provenance.md   identity, files, hashes, reproduction commands
 
 Full classification of what is and is not in the repository:
 `work/p3-p4-doc-consolidation/inventory.json`, summarised in
-[`../audio-sync-p4/known-limitations.md`](../audio-sync-p4/known-limitations.md) §8.
+[`../audio-sync-p4/known-limitations.md`](../audio-sync-p4/known-limitations.md) §9.
 
 ---
 

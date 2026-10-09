@@ -22,7 +22,6 @@ measured, in the scope it was measured in.
 ---
 
 ## 1. `work/p3/p37/known_truth.py` — 21 FAIL, PRE-EXISTING
-
 ```text
 status   : FAIL (21 of 132 cases), exit 2
 scope    : the `current` gap policy's row of the known-truth matrix
@@ -175,7 +174,65 @@ documents are immutable and later evidence is recorded as new evidence.
 
 ---
 
-## 7. Documents that no longer state current status
+## 7. The frozen fixture's recorded hash is LINE-ENDING DEPENDENT
+
+Found by the documentation consolidation when it read the pushed file back from
+GitHub and hashed it. **Pre-existing, not caused by any P3/P4 phase, and NOT
+fixed here** — the fix is authorised content decision, not a documentation one.
+
+```text
+working tree (this machine)   55123 bytes   549 CRLF    sha256 36242616062FFEC2…
+committed blob / on GitHub    54574 bytes     0 CRLF    sha256 7B1FB2DCAEECBA4B…
+difference                    549 bytes   = exactly 549 CRLF -> LF conversions
+```
+
+`.gitattributes` exists and pins **`*.patch text eol=lf`** with this rationale,
+written for exactly this failure mode:
+
+> *"With `core.autocrlf=true` … git re-encodes text files to LF at commit time,
+> which silently changed the patch hashes and made … fail on a clean checkout.
+> Force LF so the recorded hashes stay valid everywhere."*
+
+The frozen channel-sync baseline has **no such rule**, so:
+
+| environment | what the file looks like | recorded hash matches? |
+|---|---|---|
+| this machine — `core.autocrlf=true`, CRLF checkout | 549 CRLF | **yes** (`36242616062FFEC2…`) |
+| a clean Linux/macOS checkout, or any blob-level read | 0 CRLF | **no** (`7B1FB2DCAEECBA4B…`) |
+
+### What this affects
+
+`docs/hardware-decode/final-report.md` HD-G06 records the hash as
+`36242616062ffec2`, and `work/p4.2/`, `work/p4.3/` and `work/p4.4/`'s
+`p1-audit/audit_baseline.py` all assert exactly that prefix. On a checkout where
+the file lands as LF they would **`ABORT: fixture hash mismatch; … nothing below
+can be concluded` and return exit 4** — which is the P4.2 discipline working as
+designed: the audit refuses to conclude anything from a fixture it cannot
+identify, rather than proceeding on a near-miss.
+
+**Every P1/P4 audit result recorded in this repository was produced on this
+machine, where the hash matches.** That is stated so the results are not read as
+platform-independent.
+
+### Why it was not fixed
+
+Any fix is a content decision outside a documentation task's authority:
+
+1. add a `.gitattributes` rule for the fixture — changes what **every** checkout
+   writes, and would invalidate the recorded CRLF hash unless `eol=crlf` is
+   chosen, which in turn changes what a Linux clone stores;
+2. re-record the hash in `docs/hardware-decode/final-report.md` — that is a
+   recorded HD-G06 result from another phase, and revising it is not this task's
+   call;
+3. change the audit scripts — they are P4-owned tracked tests whose assertion is
+   the point.
+
+Recorded, not resolved. A future phase with authority over the fixture's
+provenance should choose one and say so.
+
+---
+
+## 8. Documents that no longer state current status
 
 These are **frozen and are not rewritten.** The index correction lives in
 [`../audio-sync-p3/P3-RESEARCH-OVERVIEW.md`](../audio-sync-p3/P3-RESEARCH-OVERVIEW.md),
@@ -191,7 +248,7 @@ not inside the history.
 
 ---
 
-## 8. Evidence that does not live in this repository
+## 9. Evidence that does not live in this repository
 
 The raw P3/P4 research tree (`work/`) is **gitignored** — 4700 files, 214 GB,
 almost entirely regenerable measurement data and real camera media.
