@@ -23,6 +23,32 @@ measured, in the scope it was measured in.
 
 ## 1. `work/p3/p37/known_truth.py` — 21 FAIL, PRE-EXISTING
 ```text
+status   : RESOLVED in P4.5 — root cause confirmed as definitional.
+           The 21 FAILs are RETAINED; nothing was deleted to get green.
+           See docs/audio-sync-p3/p3.7-discrepancy-audit.md
+```
+
+> **P4.5 outcome.** The discrepancy was a **denominator/definition conflict**, not
+> an algorithm problem. `known_truth.py` derives the expected state sequence from
+> the **measurement mask** (the independent oracle the policy cannot see) — that
+> is definition **1a**, giving `current` = **1/22** and **111/132** overall. The
+> `132/132` in the documents is definition **1b**, which derives the expectation
+> from the **policy's own claimed mask**; because the engine defines
+> `state == derive_states(resolved)`, 1b is satisfied **by construction** for
+> every policy and cannot detect an over-claim. The documents' quoted
+> `True/True/False` block matches a recomputed 1b block exactly, while the
+> unchanged reproducer prints `False/False/False`.
+>
+> **Corrected reading:** `current` does not merely fail the `resolved` check — it
+> fails the state-sequence and fake-`TRUSTED` checks too, labelling **195**
+> refused windows `TRUSTED` in 21 of 22 cases. So `0 fake TRUSTED` is **not**
+> true of `current`. The *character* of the finding is unchanged
+> (**semantic over-claim, not algorithmic error**), but its extent as stated in
+> the P4 documents was too small. Both statistics are kept and labelled; the
+> better-looking one is not selected. `D2` remains `DEFERRED`.
+
+The original record of the conflict, preserved verbatim below.
+```text
 status   : FAIL (21 of 132 cases), exit 2
 scope    : the `current` gap policy's row of the known-truth matrix
            state sequence correct : 1/22
@@ -59,6 +85,10 @@ reproduce from P3's own detail tables).
 that `current`'s failure is a **semantic over-claim, not an algorithmic error**,
 and nothing here contradicts that. P3.7's frozen research was **not edited**, and
 the two documents were **not** reconciled by rewriting either.
+
+*(P4.5 superseded the "no conclusion" line above by establishing the root cause —
+see the P4.5 block at the top of this section. The frozen research and the 21
+FAILs are still not edited.)*
 
 > **This also means P3 is not "all green".** The P3 line's verdicts stand on the
 > per-phase reports and the tracked summaries; this one script's `current` row
@@ -175,10 +205,28 @@ documents are immutable and later evidence is recorded as new evidence.
 ---
 
 ## 7. The frozen fixture's recorded hash is LINE-ENDING DEPENDENT
+```text
+status   : RESOLVED in P4.5 — the acceptance test is now line-ending independent.
+           The recorded historical raw hash is RETAINED, not replaced.
+           See docs/audio-sync-p4/p4.5-baseline-integrity.md
+```
+
+> **P4.5 outcome.** The raw-byte comparison was replaced by an explicit versioned
+> contract, `sha256-lf-normalized-v1`, implemented in the tracked module
+> `tests/audio_sync_p4/baseline_identity.py`. `raw_byte_sha256` (line-ending
+> dependent) is now reported for provenance only; `canonical_content_sha256`
+> (line-ending independent) is the acceptance test. Both checkout forms normalise
+> to `7B1FB2DCAEECBA4BD170973C336F470D0E7B6746A551E41A88D9032D3A6B464B`.
+> The three `work/p4.*/p1-audit/audit_baseline.py` harnesses now import that
+> contract, and `tests/audio_sync_p4/test_baseline_hash_portability.py` (65 cases,
+> 10 controls) is the permanent regression. Fail-closed is **retained**: a real
+> content change still aborts with exit 4. The fixture itself was not edited
+> (content change 0, row count change 0, field change 0).
 
 Found by the documentation consolidation when it read the pushed file back from
-GitHub and hashed it. **Pre-existing, not caused by any P3/P4 phase, and NOT
-fixed here** — the fix is authorised content decision, not a documentation one.
+GitHub and hashed it. **Pre-existing and not caused by any P3/P4 phase.** At the
+time it was found it was **NOT fixed** — the fix is an authorised content
+decision, not a documentation one — and P4.5 is that authorisation.
 
 ```text
 working tree (this machine)   55123 bytes   549 CRLF    sha256 36242616062FFEC2…
@@ -214,7 +262,7 @@ identify, rather than proceeding on a near-miss.
 machine, where the hash matches.** That is stated so the results are not read as
 platform-independent.
 
-### Why it was not fixed
+### Why it was not fixed at the time (superseded by P4.5)
 
 Any fix is a content decision outside a documentation task's authority:
 

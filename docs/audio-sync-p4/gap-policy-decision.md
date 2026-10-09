@@ -122,7 +122,30 @@ candidate.**
 
 ### 3.2 The precise form of the `current` finding — do not overstate it
 
-The 132-case known-truth matrix separates three checks that must not be merged:
+> **P4.5 correction — read this before quoting the table below.**
+> The table and the quoted output block are **check 1b**: the expectation is
+> derived from the **policy's own claimed mask**. Because the engine defines
+> `state == derive_states(resolved)`, 1b holds **by construction for every
+> policy** and cannot detect an over-claim.
+>
+> The reproducer `work/p3/p37/known_truth.py` implements **check 1a**: the
+> expectation is derived from the **measurement mask**, the independent oracle the
+> policy cannot see. Under 1a, `current` is **1/22** (not 132/132) and the
+> all-case aggregate is **111/132** (not 132/132), and `current` labels **195**
+> refused windows `TRUSTED` (not `0`). The reproducer prints
+> `False / False / False`; a recomputed 1b block prints the `True / True / False`
+> quoted below.
+>
+> **Both statistics are real and both are retained** — they answer different
+> questions. The corrected reading: `current` fails all three checks in 21 of 22
+> cases, so `0 fake TRUSTED` is **not** true of it. The *character* of the finding
+> is unchanged (semantic over-claim, not algorithmic error); its *extent* as
+> stated here was too small. `D2` remains `DEFERRED`.
+> Full forensics: `docs/audio-sync-p3/p3.7-discrepancy-audit.md`.
+> The figures below are preserved verbatim.
+
+The 132-case known-truth matrix separates three checks that must not be merged
+(**[check 1b — see the correction above]**):
 
 | check | `current` |
 |---|---|
@@ -136,8 +159,10 @@ no fake TRUSTED window in any case      : True
 `resolved` flags correct in every case  : False
 ```
 
-**`current`'s state machine is correct.** What fails is the separate `resolved`
-claim.
+**`current`'s state machine is correct** *under check 1b* — i.e. it is consistent
+with its own claimed mask. Under the independent mask-derived check 1a it is not,
+because it claims every window is backed by a measurement. What fails in either
+reading is the separate `resolved` claim, and that is the substantive point.
 
 > **`current` claims more knowledge than the evidence supports** — a semantic
 > over-claim, not an algorithmic error, and not a claim that `current` is unsafe

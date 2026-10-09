@@ -225,6 +225,30 @@ The P4 line, in order: [`../audio-sync-p4/README.md`](../audio-sync-p4/README.md
 
 ## One P3 script does not reproduce — recorded, not hidden
 
+> **P4.5 resolved this. Root cause: a denominator/definition conflict, not an
+> algorithm problem.** `known_truth.py` derives the expected state sequence from
+> the **measurement mask** (definition **1a**), giving `current` = **1/22** and
+> **111/132** overall. The `132/132` in the documents is definition **1b**, which
+> derives the expectation from the **policy's own claimed mask**; since the engine
+> defines `state == derive_states(resolved)`, 1b holds **by construction for every
+> policy** and cannot detect an over-claim. The documents' quoted
+> `True/True/False` block matches a recomputed 1b block exactly, while the
+> unchanged reproducer prints `False/False/False`.
+>
+> `22` is one policy's row; `132` is all six policies × 22 pairings — **not the
+> same metric**. The corrected all-case aggregate is **111/132**.
+>
+> **Corrected reading:** `current` fails all three checks in 21 of 22 cases and
+> labels **195** refused windows `TRUSTED`, so `0 fake TRUSTED` is **not** true of
+> it. The character of the finding is unchanged (semantic over-claim, not
+> algorithmic error); its stated extent was too small. Both statistics are kept
+> and labelled; neither was dropped. `D2` remains `DEFERRED`, and the 21 FAILs
+> are retained.
+>
+> Full forensics and a case-level export:
+> [`p3.7-discrepancy-audit.md`](p3.7-discrepancy-audit.md). The original record is
+> preserved verbatim below.
+
 `work/p3/p37/known_truth.py`, run against the tree as it stands, reports
 **FAIL (21 of 132 cases)**, all of them the `current` policy's row:
 
@@ -252,13 +276,16 @@ what this DOES mean     : P3 is not "all green". Two P3.7 summary figures do not
                           already registered in ../audio-sync-p4/evidence-freeze.md
                           section 7b.
 what was done about it : recorded here and in
-                          ../audio-sync-p4/known-limitations.md section 1.
-                          P3.7's frozen research was NOT edited, and neither
-                          document was reconciled by rewriting the other.
+                          ../audio-sync-p4/known-limitations.md section 1, and
+                          RESOLVED in P4.5 (see the block above) without editing
+                          P3.7's frozen research or rewriting either document's
+                          original figures.
 ```
 
-No conclusion is drawn about `current`, and no phase is authorised to draw one on
-the strength of this consolidation.
+No conclusion is drawn about `current`'s *safety* here, and no phase is authorised
+to draw one on the strength of this consolidation. P4.5 draws exactly one
+conclusion — the discrepancy's **root cause** — and explicitly leaves `D2`
+`DEFERRED`.
 
 ---
 

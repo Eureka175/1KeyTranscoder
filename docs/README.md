@@ -197,6 +197,7 @@ F:\1KeyTranscoder\
 | [`FINAL-RESEARCH-SUMMARY.md`](audio-sync-p3/FINAL-RESEARCH-SUMMARY.md) | 逐阶段研究纪要，**只覆盖 P1–P3.8**，不含 P3.9–P3.12 | ⚠️ 覆盖到 P3.8 |
 | `audio-sync-p3/p3.10-provenance.md`、`p3.11-provenance.md`、`p3.12-provenance.md`、`provenance.md` | 各阶段 identity + 逐文件 SHA-256 + 复现命令 | ✅ 权威（溯源） |
 | [`HANDOFF-CHECKLIST.md`](audio-sync-p3/HANDOFF-CHECKLIST.md) | 12 条要求 + 集成者必须自己复核的事项（§3.3 "`core/` 未被修改"**不是无条件成立的**） | ✅ 权威 |
+| [`p3.7-discrepancy-audit.md`](audio-sync-p3/p3.7-discrepancy-audit.md) | **★ P4.5 P3.7 数字冲突取证**：`known_truth.py` 报 `current` 状态序列 `1/22`，文档记 `132/132` —— 根因确认为**口径冲突**：定义 **1a**（期望由**测量掩码**导出，独立 oracle，`current`=**1/22**、全体 **111/132**）vs 定义 **1b**（期望由**策略自述掩码**导出，因引擎定义 `state == derive_states(resolved)` 而**恒真**，**132/132**）。`22` 是单策略行、`132` 是 6 策略 × 22 配对，**不是同一指标**。**修正读法**：`current` 三项检查在 22 例中失败 21 例，把 **195** 个被拒窗口标成 `TRUSTED`（故 `0 fake TRUSTED` 不成立）；**性质不变**（语义过度声称，非算法错误），**幅度**比文档所述更大。两种统计**都保留并标注**；**21 个 FAIL 未删除**；`D2` 仍 `DEFERRED`。含逐案例导出与独立 verifier | ✅ 权威（勘误 + 取证） |
 | 其余 `measurement/validity/trajectory/long-duration/correction/…` | 各专题设计文档，属 P3.1–P3.8 时期 | ⚠️ 见各自内容 |
 
 > **引用审计结论（2026-10 cleanup）**：本目录历史文档**一律未改写**。已发现并
@@ -252,8 +253,9 @@ F:\1KeyTranscoder\
 | [`p4.4-production-enablement.md`](audio-sync-p4/p4.4-production-enablement.md) | **P4.4 生产启用**：验证过的 **fixed-delay** 子集进入生产（P1 `--channel-sync` / P2 `--audio-plan`），由**唯一**的 `correction_eligibility()` 判定；"不合格却带可用数值"**不可表示**。逐状态的支持/不支持表、fail-closed 行为、默认路径实测（**0 次 PCM 调用**）、真实素材验证（正/负/零偏移 + 多声道）。**D2/D3/D5 保持 `DEFERRED`/`NOT ESTABLISHED`**；drift 与 resample 未启用 | ✅ 权威（启用契约） |
 | [`p4.4-provenance.md`](audio-sync-p4/p4.4-provenance.md) | P4.4 溯源：改动文件与哈希、**证明未改**算法文件（`sync_estimate` / `sync_fix` / `audio_sync_tv`）、fixture 校验、9 个用户文件状态 | ✅ 权威（溯源） |
 | [`production-contract.md`](audio-sync-p4/production-contract.md) | **★ 生产契约（唯一规范入口）**：三条路径的启用状态；九个 `SyncStatus` 与其真实语义；`correction_eligibility()` 的职责与必要条件；`offset_samples` / `raw_offset_samples` 的区别；证据如何传播、**在哪里安全终止**（`ChannelTimeline`）；不合格时的 fail-closed 行为；默认路径保护；**D2/D3/D5 仍未决**。状态名与 reason code 全部从代码读出 | ✅ 权威（契约） |
-| [`known-limitations.md`](audio-sync-p4/known-limitations.md) | **未绿清单（单一入口）**：P3.7 `known_truth.py` 的 **21 个 FAIL（既有、已证明与本阶段无关）**；`test_coordinates.py` 的 **BLOCKED（机器内存）**及"资源阻塞 ≠ 代码失败"的证据；**T5.4b XFAIL**；D2/D3/D5；已启用路径的已知代价；仓库中不存在的证据及其替代 | ✅ 权威（限制） |
+| [`known-limitations.md`](audio-sync-p4/known-limitations.md) | **未绿清单（单一入口）**：P3.7 `known_truth.py` 的 **21 个 FAIL（既有；P4.5 已查明为口径冲突，FAIL 保留不删）**；`test_coordinates.py` 的 **BLOCKED（机器内存）**及"资源阻塞 ≠ 代码失败"的证据；**T5.4b XFAIL**；D2/D3/D5；已启用路径的已知代价；仓库中不存在的证据及其替代。§7 行尾缺陷已标 `RESOLVED` | ✅ 权威（限制） |
 | [`documentation-provenance.md`](audio-sync-p4/documentation-provenance.md) | **本次文档整合的来源记录**：新建/修改了哪些文档、历史语义是否保留、从 `work/` 晋升了什么、什么被有意排除及原因、`.gitignore` 审查结论、**建议但未创建的文件及理由**、canonical 映射 | ✅ 权威（文档溯源） |
+| [`p4.5-baseline-integrity.md`](audio-sync-p4/p4.5-baseline-integrity.md) | **P4.5 Part A — 冻结 P1 基线跨平台完整性（`FIXED`）**：验收哈希原先取**检出字节**的 SHA-256，因此依赖行尾（Windows CRLF `36242616062FFEC2…` vs GitHub LF `7B1FB2DCAEECBA4B…`），在干净 LF checkout 上审计 `ABORT exit 4`。新增版本化契约 **`sha256-lf-normalized-v1`**（`raw_byte_sha256` 仅供溯源 / `canonical_content_sha256` 才是验收），两种行尾归一到 **`7B1FB2DCAEECBA4B…`**；真实内容改动**仍然**失败。**fixture 未改**（内容 0 / 行数 0 / 字段 0）；历史 raw 哈希**原样保留**；fail-closed 保留 | ✅ 权威（修复记录） |
 
 > **一句话状态**：固定偏移 `VALIDATED`；时变测量 `VALIDATED`；真实 PCM 施加
 > `VALIDATED`；六通道对 E2E `VALIDATED`；**缺口策略 `DEFERRED`、坐标合同

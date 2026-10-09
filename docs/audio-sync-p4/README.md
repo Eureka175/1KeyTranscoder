@@ -59,6 +59,8 @@ Algorithm changes     0
 | how evidence travels, and where it stops | [`p4.3-production-semantics.md`](p4.3-production-semantics.md) |
 | what D1 decided, and what it did not | [`d1-uncertainty-contract.md`](d1-uncertainty-contract.md) §9 |
 | what P4.4 enabled, and why the rest stays off | [`p4.4-production-enablement.md`](p4.4-production-enablement.md) |
+| **how the frozen baseline is identified across platforms** | [`p4.5-baseline-integrity.md`](p4.5-baseline-integrity.md) |
+| **why the P3.7 matrix reported two different totals** | [`../audio-sync-p3/p3.7-discrepancy-audit.md`](../audio-sync-p3/p3.7-discrepancy-audit.md) |
 | the P4.1 / D6 audit | [`downstream-audit.md`](downstream-audit.md) |
 | where a promoted document came from | [`documentation-provenance.md`](documentation-provenance.md) |
 | the P3 research line | [`../audio-sync-p3/P3-RESEARCH-OVERVIEW.md`](../audio-sync-p3/P3-RESEARCH-OVERVIEW.md) |
@@ -72,6 +74,7 @@ Algorithm changes     0
 | **P4.2** | fix that live defect without inventing a threshold | `COMPLETE` — the gate now applies to the estimate actually **adopted**; 35 regression cases; 5/6 real pairs move to `LOW_CONFIDENCE`, the 74.4 % pair still succeeds |
 | **P4.3** | make the evidence semantics a production **contract** | `COMPLETE` — D1 implemented and propagated; D2/D5 recorded as `DEFERRED` with implementation defaults kept **separate** from semantic contracts |
 | **P4.4** | enable the validated subset, safely | `COMPLETE` — one `correction_eligibility()` decision, a plan object that cannot carry a refused offset, fixed-delay **ENABLED** |
+| **P4.5** | can the frozen validation asset be identified across platforms, and why did two P3.7 totals disagree? | `COMPLETE` — baseline identity is now line-ending independent (`sha256-lf-normalized-v1`, fixture **unchanged**); the P3.7 conflict is a **definitional** one (check 1a `111/132` vs check 1b `132/132`), **`D2` still `DEFERRED`**, no production code touched |
 
 ---
 

@@ -346,7 +346,7 @@ Machine-checked identity for the append:
 | C8 | `work/p2/scripts/p1_regression_guard.py` | **PASS** — 27 PASS / 0 FAIL | same |
 | C9 | P1 frozen 137-corpus replay through the production resolver | **PASS** — 548 rows, **0** status changes | `python work/p4.4/p1-audit/audit_baseline.py` |
 | C10 | P1 frozen corpus eligibility | **PASS** — 11 / 11 `fixed` rows eligible (capability retained); 0 refusals carrying an offset | same |
-| C11 | frozen fixture integrity | **PASS** — sha256 `36242616062FFEC2…` MATCH, `edited: false` | same, and `work/p4.2/p1-audit/audit_baseline.py` |
+| C11 | frozen fixture integrity | **PASS** — sha256 `36242616062FFEC2…` MATCH, `edited: false` → replaced in P4.5 by the canonical-content check (C26) | same, and `work/p4.2/p1-audit/audit_baseline.py` |
 | C12 | real A7M5 known-answer material | **PASS** — 24 checks, 24 PASS, 0 FAIL | `python work/p4.4/real_material_validation.py` |
 | C13 | C1305 / C1306 eligibility audit | **PASS** — 6 pairs, 5 refused, **1 eligible** (74.4 %), 0 refusals carrying an offset | `python work/p4.4/real_corpus_audit.py` |
 | C14 | P4.4 static audit | **PASS** — 973 functions, **0** unreviewed, 7/7 guard checks | `python work/p4.4/static_audit.py` |
@@ -359,21 +359,87 @@ Machine-checked identity for the append:
 | C21 | `work/p3/p38/semantics/selftest.py` | **PASS** — 100 PASS / 0 FAIL | same |
 | C22 | `work/p3/p38/agent_a_closure/failure_injection.py` | **PASS (after a memory-blocked retry)** — 59 PASS / 0 FAIL | same |
 | C23 | `work/p3/p37/state_machine.py` | **PASS** — `STATE MACHINE = VALIDATED` | same |
-| C24 | `work/p3/p37/known_truth.py` | **FAIL — 21 cases, PRE-EXISTING** | same |
+| C24 | `work/p3/p37/known_truth.py` | **FAIL — 21 cases, PRE-EXISTING** → root cause confirmed in P4.5 (C30, definitional); the 21 FAILs are retained | same |
 | C25 | `tests/audio_sync_p311/test_coordinates.py` | **BLOCKED — machine memory** | same |
+
+## P4.5 — baseline integrity and P3.7 forensics
+
+**Executed against the tree that became the P4.5 commits, after the P4.5 code and
+tests were written.** The rows above describe the earlier `bb056a1` tree and are
+unchanged; these are new measurements.
+
+| # | suite / check | status | command |
+|---|---|---|---|
+| C26 | `tests/audio_sync_p4/test_baseline_hash_portability.py` (P4.5 Part A) | **PASS** — 65 cases, 10 controls, 0 FAIL, **0 skipped** | `python tests/audio_sync_p4/test_baseline_hash_portability.py` |
+| C27 | frozen-fixture canonical content identity | **PASS** — `canonical_content_sha256 = 7B1FB2DCAEECBA4B…` for **both** the CRLF worktree and the LF blob; content change 0, row count change 0, field change 0 | `python work/p4.5/audit_repository.py` |
+| C28 | P1 audit harnesses on the new contract | **PASS** — `work/p4.2`, `p4.3`, `p4.4` `p1-audit/audit_baseline.py` all run to completion with `verdict: MATCH`; fail-closed preserved | `python work/p4.4/p1-audit/audit_baseline.py` |
+| C29 | P1 regression guard (re-run) | **PASS** — 27 PASS / 0 FAIL, exit 0 | `python work/p2/scripts/p1_regression_guard.py` |
+| C30 | `tests/audio_sync_p37/test_p37_known_truth_summary.py` (P4.5 Part B) | **PASS** — 24 cases, 6 controls, 0 FAIL, 0 skipped | `python tests/audio_sync_p37/test_p37_known_truth_summary.py` |
+| C31 | P3.7 independent case-level verification | **PASS (measurement)** — check 1a `111/132`, check 1b `132/132` (tautological `132/132` by construction), 195 over-claims, 0 under-claims | `python work/p4.5/p37-forensics/independent_verifier.py` |
+| C32 | P3.7 reproducer determinism | **PASS** — `known_truth.py` rewrites its matrix **byte-identically** (`F46AB9E3…` before and after); exit 2, 21 FAILs | `python work/p4.5/p37-forensics/reproduce.py` |
+| C33 | P4 suites re-run after the P4.5 changes | **PASS** — `test_production_sync` 182/0 (SILENT_WRONG 0), `test_downstream_state` 58 + 1 XFAIL (D8), `test_evidence_integrity` 35/0, `test_production_semantics` 60/0, `test_production_eligibility` 58/0 | each suite directly |
+| C34 | `tests/full_autotest.py --level unit` (re-run) | **PASS** — 626 PASS / 0 FAIL | same |
+| C35 | `tests/audio_sync_p311/test_coordinates.py` (re-run) | **BLOCKED — machine memory**, unchanged and pre-existing: `numpy._ArrayMemoryError: Unable to allocate 1.72 GiB for an array with shape (230880000,)` | same |
+
+### Resource block during the P4.5 test run — recorded as BLOCKED, not FAIL
+
+The first P4.5 attempt at the L1 unit level reported two failures while host free
+memory was **1.01 GB of 31.5 GB** (AfterFX 5.0 GB, memory compression 4.25 GB):
+
+```text
+FAIL [unit] audio mix invariance v0.7.1
+     OSError: [WinError 1455] 页面文件太小，无法完成操作。   (ERROR_COMMITMENT_LIMIT)
+FAIL [unit] sync.恒定偏移 [0, 1, 7, 60, 1000, -1, -7, -60, -1000] 全部 sample-exact
+     measured={0:0, 1:1, 7:0, 60:0, 1000:1000, -1:-1, -7:-7, -60:-60, -1000:-1000}
+```
+
+Neither is reported as a code failure, and neither was worked around by relaxing
+a test:
+
+* the run was repeated with `OPENBLAS_NUM_THREADS=1` / `OMP_NUM_THREADS=1`, which
+  reduces BLAS worker memory and changes **no assertion**;
+* `tests/audio_sync_p4/test_evidence_integrity.py`, which failed on the first
+  attempt with `OpenBLAS error: Memory allocation still failed after 10 retries`,
+  then passed **35/0**;
+* the unit level then passed **626 PASS / 0 FAIL**;
+* the sync row was investigated separately rather than assumed benign:
+  `work/p4.5/diagnose_sync_offset.py` rebuilds that exact fixture and measures
+  every channel — **3 consecutive runs, all 10 channels sample-exact**, including
+  the two offsets (`7`, `60`) that the pressured run reported as `0`.
+
+Conclusion: **resource-induced, not reproducible, no code change.** The P4.5
+changes touch no file the sync path loads, and `tests/selftest/suites/audio_sync.py`
+and `core/audio_sync.py` are unmodified by this phase.
 
 ### How these were produced, stated exactly
 
-Every row above was **executed in this repository during the P4.1–P4.4 work**,
+Rows **C1–C25** were **executed in this repository during the P4.1–P4.4 work**,
 against the tree that became commit `bb056a1`. The three P4.4 commits changed
 only the files they name, and no code was edited after those runs, so the results
 apply to `bb056a1`.
 
 **They were not re-executed during the documentation consolidation.** The
-consolidation changed only `docs/` and added the three documents listed in
-[`documentation-provenance.md`](documentation-provenance.md); a docs-only change
-cannot alter a test outcome, but that is a reason, not a measurement, and it is
-recorded as such rather than presented as a fresh run.
+consolidation changed only `docs/`; a docs-only change cannot alter a test
+outcome, but that is a reason, not a measurement, and it is recorded as such
+rather than presented as a fresh run.
+
+**P4.5 did re-execute them.** Rows C26–C35 are P4.5 measurements, and C33/C34
+are fresh re-runs of the C1–C5/C6 suites on the post-P4.5 tree. Every re-run
+agreed with its `bb056a1` value:
+
+```text
+test_production_sync       182 cases, 0 FAIL, SILENT_WRONG 0, 14 controls   (was 182)
+test_downstream_state       58 PASS, 1 XFAIL (D8), 0 FAIL, 7 controls      (unchanged)
+test_evidence_integrity     35 PASS, 3 controls                            (unchanged)
+test_production_semantics   60 PASS, 8 controls                            (unchanged)
+test_production_eligibility 58 PASS, 9 controls                            (unchanged)
+tests/full_autotest.py --level unit        626 PASS / 0 FAIL               (unchanged)
+```
+
+P4.5 changed no production file, so agreement was expected; it is recorded as a
+measurement rather than asserted as an expectation. The one exception is C11,
+whose *contract* P4.5 deliberately replaced — see C26 and
+[`p4.5-baseline-integrity.md`](p4.5-baseline-integrity.md).
 
 ### V9's status changed, recorded rather than rewritten
 
