@@ -296,13 +296,46 @@ def l1_hardware_audio() -> None:
            <= set(VideoHandoff.__dataclass_fields__)
            and "file_logger" in VideoHandoff.__dataclass_fields__)
 
-    # --- 6. CLI 面: 没有新增参数 ---------------------------------------
+    # --- 6. CLI 面 -------------------------------------------------------
+    #
+    # REVISED BY P4.6. This asserted `len(args_now) == 30`, i.e. "this (v0.8.0
+    # hardware-additions) phase added no CLI argument". P4.6 adds three for the
+    # explicit time-varying opt-in, so a frozen total can no longer express the
+    # property this check protects. Deleting it would lose the check entirely,
+    # so it is re-stated at the same strength as the properties that still hold:
+    #
+    #   * the v0.8.0 arguments are all still present (nothing was removed);
+    #   * the ONLY arguments beyond the v0.8.0 set are P4.6's three, each named,
+    #     so a future phase that adds an argument must edit this list and cannot
+    #     slip one in silently -- which is exactly what the frozen count did;
+    #   * the three are the opt-in and are off by default.
     import re
 
     args_now = set(re.findall(r'add_argument\(\s*["\'](--[a-z0-9-]+)', entry))
-    record("v08hw.cli 本阶段没有新增任何 CLI 参数 (仍是 --audio-plan)",
-           len(args_now) == 30 and "--audio-plan" in args_now,
-           f"{len(args_now)} args")
+    P46_ADDED = {"--channel-sync-tv", "--channel-sync-tv-policy",
+                 "--channel-sync-tv-coordinate"}
+    V080_BASELINE = {
+        "--version", "--input", "--output", "--preset", "--encoder", "--config",
+        "--scaling-config", "--tool-nvencc", "--tool-qsvencc",
+        "--ffmpeg", "--ffprobe", "--gpac-dir", "--gyroflow",
+        "--channel-sync", "--channel-sync-transparent", "--audio-plan",
+        "--check", "--jobs", "--experimental-multihw", "--log-level",
+        "--verbose", "--fresh-log", "--hw-decode", "--hw-decode-verify",
+        "--no-hw-autoselect", "--headless", "--retry-list", "--keep-work",
+        "--no-downgrade", "--dry-run",
+    }
+    record("v08hw.cli v0.8.0 的 CLI 参数一个都没少 (仍含 --audio-plan)",
+           "--audio-plan" in args_now and V080_BASELINE <= args_now,
+           f"missing: {sorted(V080_BASELINE - args_now)}")
+    record("v08hw.cli 除 P4.6 的时变 opt-in 三个参数外, 没有其它新增 CLI 参数",
+           args_now - P46_ADDED <= V080_BASELINE,
+           f"unexpected: {sorted(args_now - P46_ADDED - V080_BASELINE)}")
+    _tv_at = entry.find("--channel-sync-tv")
+    record("v08hw.cli P4.6 的三个参数就是时变 opt-in, 且默认关闭",
+           P46_ADDED <= args_now
+           and _tv_at >= 0
+           and "default=None" in entry[_tv_at: _tv_at + 400],
+           f"present: {sorted(P46_ADDED & args_now)}")
 
 
 def _video_deps(path: Path) -> list[str]:
