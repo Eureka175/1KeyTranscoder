@@ -198,6 +198,9 @@ F:\1KeyTranscoder\
 | `audio-sync-p3/p3.10-provenance.md`、`p3.11-provenance.md`、`p3.12-provenance.md`、`provenance.md` | 各阶段 identity + 逐文件 SHA-256 + 复现命令 | ✅ 权威（溯源） |
 | [`HANDOFF-CHECKLIST.md`](audio-sync-p3/HANDOFF-CHECKLIST.md) | 12 条要求 + 集成者必须自己复核的事项（§3.3 "`core/` 未被修改"**不是无条件成立的**） | ✅ 权威 |
 | [`p3.7-discrepancy-audit.md`](audio-sync-p3/p3.7-discrepancy-audit.md) | **★ P4.5 P3.7 数字冲突取证**：`known_truth.py` 报 `current` 状态序列 `1/22`，文档记 `132/132` —— 根因确认为**口径冲突**：定义 **1a**（期望由**测量掩码**导出，独立 oracle，`current`=**1/22**、全体 **111/132**）vs 定义 **1b**（期望由**策略自述掩码**导出，因引擎定义 `state == derive_states(resolved)` 而**恒真**，**132/132**）。`22` 是单策略行、`132` 是 6 策略 × 22 配对，**不是同一指标**。**修正读法**：`current` 三项检查在 22 例中失败 21 例，把 **195** 个被拒窗口标成 `TRUSTED`（故 `0 fake TRUSTED` 不成立）；**性质不变**（语义过度声称，非算法错误），**幅度**比文档所述更大。两种统计**都保留并标注**；**21 个 FAIL 未删除**；`D2` 仍 `DEFERRED`。含逐案例导出与独立 verifier | ✅ 权威（勘误 + 取证） |
+| [`p4.5-baseline-integrity.md`](audio-sync-p4/p4.5-baseline-integrity.md) | **★ P4.5 基线完整性**：冻结 P1 fixture 的身份在 CRLF/LF checkout 下不一致 —— 原始字节哈希被当成**内容**判据。建立 `sha256-lf-normalized-v1` 契约，把 `raw_byte_sha256`（溯源用，永不判定通过/失败）与 `canonical_content_sha256`（验收判据）显式分开。**fixture 一个字节都没改**，历史原始哈希逐字保留；LF checkout 上旧检查 MISMATCH→exit 4 的缺陷被真实复现 | ✅ 权威（完整性契约） |
+| [`p4.6-time-varying-production.md`](audio-sync-p4/p4.6-time-varying-production.md) | **★ P4.6 时变同步生产实现**：把 `core/audio_sync_tv.py` 里早已存在、却无人导入的逐窗修正能力接入生产。**显式 opt-in**：`policy` 与 `coordinate` **没有默认值**，缺任一个即 `Refused`（D2/D5 仍未决，实现默认值绝不冒充产品语义）。缺口策略/坐标合同表、逐窗证据与状态契约、原子 PCM 写入、稳定拒绝码、独立逐样本复测 | ✅ 权威（实现记录） |
+| [`p4.6-real-corpus.md`](audio-sync-p4/p4.6-real-corpus.md) | **★ P4.6 真实素材六对**（C1305/C1306 × CH3→CH1/CH2/CH4）：**6/6 逐字节复现 P3.11 冻结修正 PCM**；两个**互不相同**的独立判据（施加机制 vs 估计质量）；残差分两个总体报告；**如实记录逐轨时变步骤在真实语料上不可达**（测量证据门先拒，门未被放宽） | ✅ 权威（真实素材） |
 | 其余 `measurement/validity/trajectory/long-duration/correction/…` | 各专题设计文档，属 P3.1–P3.8 时期 | ⚠️ 见各自内容 |
 
 > **引用审计结论（2026-10 cleanup）**：本目录历史文档**一律未改写**。已发现并

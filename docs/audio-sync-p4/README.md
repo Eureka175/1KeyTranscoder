@@ -61,6 +61,8 @@ Algorithm changes     0
 | what P4.4 enabled, and why the rest stays off | [`p4.4-production-enablement.md`](p4.4-production-enablement.md) |
 | **how the frozen baseline is identified across platforms** | [`p4.5-baseline-integrity.md`](p4.5-baseline-integrity.md) |
 | **why the P3.7 matrix reported two different totals** | [`../audio-sync-p3/p3.7-discrepancy-audit.md`](../audio-sync-p3/p3.7-discrepancy-audit.md) |
+| **what the time-varying capability now does, and how it refuses** | [`p4.6-time-varying-production.md`](p4.6-time-varying-production.md) |
+| **the six real corpus pairs and the two independent oracles** | [`p4.6-real-corpus.md`](p4.6-real-corpus.md) |
 | the P4.1 / D6 audit | [`downstream-audit.md`](downstream-audit.md) |
 | where a promoted document came from | [`documentation-provenance.md`](documentation-provenance.md) |
 | the P3 research line | [`../audio-sync-p3/P3-RESEARCH-OVERVIEW.md`](../audio-sync-p3/P3-RESEARCH-OVERVIEW.md) |
@@ -75,10 +77,23 @@ Algorithm changes     0
 | **P4.3** | make the evidence semantics a production **contract** | `COMPLETE` — D1 implemented and propagated; D2/D5 recorded as `DEFERRED` with implementation defaults kept **separate** from semantic contracts |
 | **P4.4** | enable the validated subset, safely | `COMPLETE` — one `correction_eligibility()` decision, a plan object that cannot carry a refused offset, fixed-delay **ENABLED** |
 | **P4.5** | can the frozen validation asset be identified across platforms, and why did two P3.7 totals disagree? | `COMPLETE` — baseline identity is now line-ending independent (`sha256-lf-normalized-v1`, fixture **unchanged**); the P3.7 conflict is a **definitional** one (check 1a `111/132` vs check 1b `132/132`), **`D2` still `DEFERRED`**, no production code touched |
+| **P4.6** | can the per-window capability built in P4 actually be executed, without deciding D2/D5 for the product? | `COMPLETE` — an **explicit opt-in** path that refuses when `policy` or `coordinate` is unspecified; it plans, applies and independently verifies per-window correction, is chunk-invariant and flat at ~173 MiB; **D2/D5/D3 all still open**, fixed-delay and default paths unchanged |
 
 ---
 
 ## One-paragraph status
+
+> **P4.6 note.** The paragraph below is the P4-era status and is preserved as
+> written. Two of its statements are now superseded and are corrected here rather
+> than edited in place. (a) "imported by no production module" — P4.6 added
+> `core/audio_sync_tv_exec.py` and wired `channel_sync.py` to it **from function
+> scope**, so the path is now reachable by an explicit request; the default run
+> still never evaluates the branch, and that is asserted rather than assumed.
+> (b) "Default OFF is structural, not a flag" (§3 below) — the opt-in is now a
+> flag, so the property is re-stated: `time_varying` defaults to `False`, every
+> pre-existing option is asserted unchanged key by key, no report row carries a
+> `time_varying` block on a default run, and a 15-check end-to-end run confirms
+> the default path takes the shipped `shift_stream` call unchanged.
 
 P4 built a per-window, time-varying audio delay corrector as tracked production
 code (`core/audio_sync_tv.py`), verified it by reproducing **P3.11's corrected PCM
@@ -114,6 +129,20 @@ READY FOR PRODUCTION POLICY
 | Default path | **PASS** (structurally unchanged) |
 | Compatibility | **PARTIAL** (all checks answerable without wiring) |
 | **Time-varying production feature** | **OFF** |
+
+**P4.6 additions to the table above** (the rows above are the P4-era record and are
+left as written):
+
+| Area | Status |
+|---|---|
+| Time-varying **execution** | **COMPLETE** — plans, applies, independently verifies; chunk-invariant; ~173 MiB flat from 30 s to 10 min |
+| Time-varying **opt-in** | **ENABLED** — `--channel-sync-tv` + policy + coordinate; refuses with a stable reason code if either is unspecified |
+| Default / fixed-delay path | **UNCHANGED** — asserted by instrumentation, not by reading code |
+| Real corpus (C1305/C1306, 6 pairs) | **PASS** for execution and mechanics — 6/6 bit-exact against the frozen P3.11 PCM |
+| Real corpus **reachability** | **PARTIAL** — the per-track time-varying step is not reachable through `run_channel_sync` because the production evidence gate refuses that material first |
+| A7M5 raw media | **NOT RUN** — the source media is absent from this machine |
+| Memory / performance | **PASS** — flat peak working set, linear throughput, no partial output on failure |
+| Gap policy (D2) / Coordinate (D5) / Residual (D3) | **still `DEFERRED` / `DEFERRED` / `NOT ESTABLISHED`** |
 
 Detailed matrix: [`production-readiness.md`](production-readiness.md).
 
@@ -249,6 +278,8 @@ on a clone for exactly that reason (`current-state-audit.md` §6).
 | [`policy-recommendation.md`](policy-recommendation.md) | engineering recommendations vs product decisions |
 | [`provenance.md`](provenance.md) | identity, hashes, reproduction anchors, unmodified-file verification |
 | [`static-audit.md`](static-audit.md) | forbidden patterns, silent exceptions, dependency direction, memory — all checks, all outputs |
+| [`p4.6-time-varying-production.md`](p4.6-time-varying-production.md) | **P4.6** — the explicit opt-in time-varying production path: entry point, refusal contract, evidence/state, gap and coordinate tables, PCM apply |
+| [`p4.6-real-corpus.md`](p4.6-real-corpus.md) | **P4.6** — the six real C1305/C1306 pairs, the two independent oracles, and the reachability limitation |
 | [`P4-FINAL-REPORT.md`](P4-FINAL-REPORT.md) | the 22-section final report |
 
 Architecture note added at [`../design/architecture.md`](../design/architecture.md) §6.8.
@@ -257,21 +288,25 @@ Architecture note added at [`../design/architecture.md`](../design/architecture.
 
 ## What would change the answer
 
-The path from here is ordered, and the last step is the only one that changes
-production behaviour:
+> **P4.6 note.** Steps 6–9 below were carried out in P4.6 **without** settling
+> steps 1–5, by making the two open decisions mandatory arguments the path refuses
+> to supply. The capability ships as an explicit opt-in and the product semantics
+> stay open.
 
 ```text
-1.  D5  what a correction may claim            -> shapes the API
-2.  D6  can a consumer represent uncertainty?  -> can remove an option
-3.  D1  which gap policy ships                 -> selects the fill rule
-4.  D2  which coordinate contract              -> selects the join
-5.  D3  residual acceptance                    -> sets any gate
-6.  wire it in: one call site, one place decides the shift, inside the try
-7.  add the flag: default OFF + byte-identical OFF-path audit
-8.  measure the full pipeline
-9.  full regression, including a live --channel-sync run
-10. D8  enablement
+1.  D5  what a correction may claim            -> STILL OPEN (DEFERRED)
+2.  D6  can a consumer represent uncertainty?  -> STILL OPEN
+3.  D1  which gap policy ships                 -> STILL OPEN (D2 = DEFERRED)
+4.  D2  which coordinate contract              -> STILL OPEN (D5 = DEFERRED)
+5.  D3  residual acceptance                    -> STILL OPEN (NOT ESTABLISHED)
+6.  wire it in: one call site, one place decides the shift  -> DONE (P4.6)
+7.  add the flag: default OFF + byte-identical OFF-path audit -> DONE (P4.6)
+8.  measure the full pipeline                  -> DONE (P4.6)
+9.  full regression, including a live --channel-sync run -> DONE (P4.6)
+10. D8  enablement                             -> NOT DONE (needs 1-5 first)
 ```
 
-Steps 6–9 cannot start meaningfully before 1–5, because 1–5 determine what is
-being built.
+Step 10 remains gated on 1–5: the **opt-in** is enabled, but no **default** can be
+chosen until the product decides what a gap means and which window owns a sample.
+P4.6 removed the "cannot build it yet" blocker; it did not remove the "cannot
+decide it for the product" blocker.
