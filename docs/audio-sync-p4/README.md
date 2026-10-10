@@ -64,6 +64,8 @@ Algorithm changes     0
 | **what the time-varying capability now does, and how it refuses** | [`p4.6-time-varying-production.md`](p4.6-time-varying-production.md) |
 | **the six real corpus pairs and the two independent oracles** | [`p4.6-real-corpus.md`](p4.6-real-corpus.md) |
 | **what actually reaches apply on real material, and what does not** | [`p4.7-production-reachability.md`](p4.7-production-reachability.md) |
+| **which measurement window/hop geometry is usable on real material without hiding delay change** | [`p4.8-measurement-geometry.md`](p4.8-measurement-geometry.md) |
+| **what P4.8 changed, and what it proved it did not** | [`p4.8-provenance.md`](p4.8-provenance.md) |
 | the P4.1 / D6 audit | [`downstream-audit.md`](downstream-audit.md) |
 | where a promoted document came from | [`documentation-provenance.md`](documentation-provenance.md) |
 | the P3 research line | [`../audio-sync-p3/P3-RESEARCH-OVERVIEW.md`](../audio-sync-p3/P3-RESEARCH-OVERVIEW.md) |
@@ -282,6 +284,8 @@ on a clone for exactly that reason (`current-state-audit.md` §6).
 | [`p4.6-time-varying-production.md`](p4.6-time-varying-production.md) | **P4.6** — the explicit opt-in time-varying production path: entry point, refusal contract, evidence/state, gap and coordinate tables, PCM apply |
 | [`p4.6-real-corpus.md`](p4.6-real-corpus.md) | **P4.6** — the six real C1305/C1306 pairs, the two independent oracles, and the reachability limitation |
 | [`p4.7-production-reachability.md`](p4.7-production-reachability.md) | **P4.7** — the long-run production test matrix: three separated conclusions (mechanics / reachable / refused), the measured frame-geometry calibration finding, and the three product defects found and fixed |
+| [`p4.8-measurement-geometry.md`](p4.8-measurement-geometry.md) | **P4.8** — the measurement-geometry calibration: four window/hop geometries measured on synthetic and real material, the three separated questions (validity / reachability / correctness), the transition-resolution cost, and why the shipped geometry is left unchanged |
+| [`p4.8-provenance.md`](p4.8-provenance.md) | **P4.8** — what the phase changed (one test file, plus documentation), what it proved it did **not** change (no `core/`, `1kt.py` or `production/` diff), the matrix reconciliation, and the decision record |
 | [`P4-FINAL-REPORT.md`](P4-FINAL-REPORT.md) | the 22-section final report |
 
 Architecture note added at [`../design/architecture.md`](../design/architecture.md) §6.8.
