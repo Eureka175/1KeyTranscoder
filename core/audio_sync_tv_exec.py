@@ -159,6 +159,18 @@ class TimeVaryingRequest:
     #: 默认 False —— 一条没有任何可信测量的流**默认拒绝**, 因为此时输出不是
     #: 被测量的修正, 而纯粹是策略填充。
     allow_all_unresolved: bool = False
+    #: **P4.7**: 置位时, plan 级证据必须过**生产覆盖率门**才允许执行。
+    #:
+    #: 为什么需要它: `allow_all_unresolved=False` 只拒绝"一个可信窗都没有",
+    #: 因此 coverage = 1/417 (0.2%) 的计划**会被执行**。对**机制**测试这是
+    #: 对的 (它要在受控输入上验证施加与独立复测), 但**生产可达性**必须在
+    #: 生产证据门上被判定。P4.7 的真实语料矩阵正是这样暴露了一个混淆风险:
+    #: 六对真实素材的 coverage 全部低于 0.6 门, 却全部"REACHED APPLY"。
+    #:
+    #: 语义与 `channel_sync` 的**轨道级**帧门 (`min_usable_fraction`) 一致: 门
+    #: 来自 `channel_sync.effective_opts()`, 不是这里的字面量; 门不可得时
+    #: (`None`) **不判定**, 与 D1 的兼容规则一致。
+    require_evidence_gate: bool = False
     #: 允许调用方覆写证据门; `None` 时取生产实际生效的门。
     gate: Mapping[str, float] | None = None
 
@@ -696,6 +708,34 @@ def build_time_varying_plan(
             "gap policy's product and is not a measured correction. Pass "
             "allow_all_unresolved=True to execute anyway.",
         )
+    # P4.7: the PRODUCTION coverage gate, applied at the plan level.
+    #
+    # `allow_all_unresolved=False` only rejects the degenerate "zero trusted
+    # windows" case, so a plan whose coverage is 1/417 (0.2 %) still executed.
+    # That is correct for mechanics testing on controlled input but it must not
+    # be how production reachability is judged: the real-corpus matrix below was
+    # turning coverage 0.012 into "REACHED APPLY", which reads as though the
+    # measurement chain had produced a usable plan.
+    #
+    # The gate is read from `channel_sync.effective_opts()` -- the same source
+    # the track-level frame gate uses -- never from a literal here. When the gate
+    # is unavailable (`None`) the check is SKIPPED and does not decide, matching
+    # D1's compatibility rule that a missing new field must not change a verdict.
+    if request.require_evidence_gate:
+        gate = request.gate if request.gate is not None else _production_gate()
+        if gate is not None:
+            cov = ev.coverage_fraction
+            if cov < float(gate["min_usable_fraction"]):
+                raise TimeVaryingRefused(
+                    REASON_TV_EVIDENCE_INSUFFICIENT,
+                    f"plan coverage {cov:.4f} ({ev.n_measured}/{ev.n_windows} "
+                    f"windows) is below the production gate "
+                    f"{float(gate['min_usable_fraction']):.4f} "
+                    f"(min_usable_fraction from channel_sync); the measurement "
+                    "chain did not produce enough evidence for a production "
+                    "correction. This is a REACHABILITY refusal, not an apply "
+                    "failure -- the mechanism itself is unaffected.",
+                )
     if ev.n_overclaimed != 0:
         # 生产白名单已排除 `current`, 所以走到这里意味着白名单被绕过。
         raise TimeVaryingRefused(

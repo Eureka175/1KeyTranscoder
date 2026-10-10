@@ -494,6 +494,12 @@ def _apply_time_varying_track(
             window_samples=int(win), hop_samples=int(hop),
             search_samples=int(search),
             chunk_samples=int(eff["tv_chunk_samples"]),
+            # P4.7: the PRODUCTION path must clear the coverage gate. The
+            # track-level frame gate above already admitted this track, so a plan
+            # far below the gate means the frame->window aggregation collapsed --
+            # executing that would apply a correction to a stream the plan has
+            # almost no evidence about.
+            require_evidence_gate=True,
         )
     except tve.TimeVaryingRefused as exc:
         detail.update({"executed": False, "reason": exc.reason,
