@@ -1602,6 +1602,12 @@ def main() -> int:
         t57_forbidden_policy_at_the_option_layer,
         t58_channel_sync_imports_tv_lazily, t59_trajectory_aggregation,
         t60_aggregation_chunk_invariance,
+        t61_unreadable_source_is_refused_not_raised,
+        t62_unwritable_destination_is_refused_not_raised,
+        t63_no_raw_oserror_escapes_the_entry_point,
+        t64_refusal_leaves_no_partial_output,
+        t65_lying_verifier_is_a_documented_limit,
+        t66_source_equal_to_destination,
     ]
     for fn in cases:
         fn()
@@ -1638,6 +1644,285 @@ def main() -> int:
           f"{COUNTS['raised']} refusal, {COUNTS['control_ok']} control; "
           f"SILENT_WRONG = 0")
     return 0
+
+
+# ==========================================================================
+# T61-T66  P4.7 regressions: the refusal contract must cover the FILESYSTEM
+# ==========================================================================
+def t61_unreadable_source_is_refused_not_raised() -> None:
+    """A missing / unreadable / empty source must REFUSE, not raise an OSError.
+
+    P4.7 found this live. ``_source_length`` opened the source unguarded, so a
+    missing file raised ``FileNotFoundError``, an unreadable one
+    ``PermissionError`` and an empty one a bare ``ValueError`` straight out of
+    ``run_time_varying``. That function documents that EVERY failure returns
+    ``executed=False`` with a stable reason code, and ``channel_sync`` relies on
+    it to leave the original audio alone -- a raw ``OSError`` escapes the
+    contract entirely, so a caller that only catches ``TimeVaryingRefused``
+    crashes instead of refusing.
+    """
+    print("\n== T61  unreadable sources are refused, not raised ==")
+    td = tmpdir()
+    missing = td / "T61_missing.f32"
+    if missing.exists():
+        missing.unlink()
+    one = [{"valid": True, "delay_samples": 1.0}]
+    r = ex.run_time_varying(missing, td / "T61_a.f32", request=req(),
+                            measurements=one)
+    value("T61 a missing source returns executed=False, not an exception",
+          r.executed is False and r.reason == ex.REASON_TV_PLAN_INVALID,
+          f"executed={r.executed} reason={r.reason}")
+    value("T61b the refusal names the underlying fault rather than hiding it",
+          "FileNotFoundError" in (r.detail or ""), f"{r.detail}")
+    value("T61c a refused run writes no output",
+          not (td / "T61_a.f32").exists())
+
+    empty = td / "T61_empty.f32"
+    empty.write_bytes(b"")
+    r2 = ex.run_time_varying(empty, td / "T61_b.f32", request=req(),
+                             measurements=one)
+    value("T61d an empty source is refused with evidence_insufficient",
+          r2.executed is False
+          and r2.reason == ex.REASON_TV_EVIDENCE_INSUFFICIENT,
+          f"executed={r2.executed} reason={r2.reason} detail={r2.detail}")
+    value("T61e the empty-source refusal explains itself",
+          "empty" in (r2.detail or "").lower(), f"{r2.detail}")
+
+    a_dir = td / "T61_dir.f32"
+    a_dir.mkdir(exist_ok=True)
+    r3 = ex.run_time_varying(a_dir, td / "T61_c.f32", request=req(),
+                             measurements=one)
+    value("T61f a directory given as the source is refused, not raised",
+          r3.executed is False and r3.reason == ex.REASON_TV_PLAN_INVALID,
+          f"executed={r3.executed} reason={r3.reason} detail={r3.detail}")
+
+    raises_tv("T61g the internal length probe raises the DOMAIN error, never a "
+              "bare OSError", ex.REASON_TV_PLAN_INVALID,
+              ex._source_length, td / "definitely_absent.f32")
+
+    def control_bad() -> None:
+        good = td / "T61_control.f32"
+        np.zeros(2048, dtype="<f4").tofile(good)
+        try:
+            ex._source_length(good)
+        except BaseException as exc:                            # noqa: BLE001
+            raise AssertionError(f"a readable file was refused: {exc}") from exc
+        raise AssertionError("x")
+    control("T61.C a readable source is still accepted, so the refusal is "
+            "specific to faults", control_bad)
+
+
+def t62_unwritable_destination_is_refused_not_raised() -> None:
+    """Same defect class on the WRITE side: creating the .part file was unguarded."""
+    print("\n== T62  unwritable destinations are refused, not raised ==")
+    td = tmpdir()
+    n = 2 * HOP
+    src = td / "T62_src.f32"
+    np.ascontiguousarray(reference(n)).tofile(src)
+    plan = ex.build_time_varying_plan(
+        src, request=req(),
+        measurements=records_for(nw_for(n), lambda i: True, lambda i: 0))
+    blocker = td / "T62_blocker"
+    if not blocker.is_file():
+        blocker.write_bytes(b"not a directory")
+    raises_tv("T62 a destination under a FILE path component is refused",
+              ex.REASON_TV_APPLY_FAILED,
+              ex.execute_time_varying, src, blocker / "sub" / "out.f32",
+              plan=plan)
+    value("T62b no .part survived the refusal",
+          not sorted(p.name for p in td.glob("T62*.part")))
+
+    def control_bad() -> None:
+        good_target = td / "T62_ok" / "out.f32"
+        ex.execute_time_varying(src, good_target, plan=plan, verify=False)
+        if not good_target.is_file():
+            raise AssertionError("a writable destination produced no output")
+        raise AssertionError("x")
+    control("T62.C a writable destination still works, so the check is "
+            "discriminating", control_bad)
+
+
+def t63_no_raw_oserror_escapes_the_entry_point() -> None:
+    """Enumerate the filesystem faults a caller can produce; each must answer
+    with a reason code rather than an exception."""
+    print("\n== T63  no raw OSError escapes run_time_varying ==")
+    td = tmpdir()
+    n = 2 * HOP
+    good = td / "T63_src.f32"
+    np.ascontiguousarray(reference(n)).tofile(good)
+    recs = records_for(nw_for(n), lambda i: True, lambda i: 0)
+    missing = td / "T63_absent.f32"
+    if missing.exists():
+        missing.unlink()
+    empty = td / "T63_empty.f32"
+    empty.write_bytes(b"")
+    a_dir = td / "T63_dir.f32"
+    a_dir.mkdir(exist_ok=True)
+    blocker = td / "T63_blocker"
+    if not blocker.is_file():
+        blocker.write_bytes(b"x")
+
+    faults = [
+        ("missing source", missing, td / "T63_o1.f32"),
+        ("empty source", empty, td / "T63_o2.f32"),
+        ("directory as source", a_dir, td / "T63_o3.f32"),
+        ("unwritable destination", good, blocker / "s" / "o.f32"),
+    ]
+    for label, s, d in faults:
+        try:
+            r = ex.run_time_varying(s, d, request=req(), measurements=recs)
+            value(f"T63 {label}: returns a stable reason code",
+                  r.executed is False and r.reason is not None,
+                  f"executed={r.executed} reason={r.reason}")
+        except BaseException as exc:                            # noqa: BLE001
+            value(f"T63 {label}: returns a stable reason code", False,
+                  f"raised {type(exc).__name__}: {exc}")
+    value("T63e the source is never modified by a refused run",
+          good.stat().st_size == n * 4, f"{good.stat().st_size}")
+
+    def control_bad() -> None:
+        r = ex.run_time_varying(good, td / "T63_ok.f32", request=req(),
+                                measurements=recs)
+        if not r.executed:
+            raise AssertionError(f"a healthy source was refused: {r.reason}")
+        raise AssertionError("x")
+    control("T63.C a healthy source still executes, so the refusals are "
+            "specific", control_bad)
+
+
+def t64_refusal_leaves_no_partial_output() -> None:
+    """No `.part` file may survive any refusal, at any failing stage."""
+    print("\n== T64  refusals leave no partial output ==")
+    td = tmpdir()
+    n = 2 * HOP
+    src = td / "T64_src.f32"
+    np.ascontiguousarray(reference(n)).tofile(src)
+    recs = records_for(nw_for(n), lambda i: True, lambda i: 0)
+
+    r1 = ex.run_time_varying(src, td / "T64_a.f32", request=req(),
+                             measurements=None)
+    parts = sorted(p.name for p in td.glob("T64_a*.part"))
+    value("T64 a plan-stage refusal leaves no .part",
+          not parts and not r1.executed, f"parts={parts} executed={r1.executed}")
+
+    short = td / "T64_short.f32"
+    np.ascontiguousarray(reference(n // 2)).tofile(short)
+    plan = ex.build_time_varying_plan(src, request=req(), measurements=recs)
+    try:
+        ex.execute_time_varying(short, td / "T64_b.f32", plan=plan)
+        raised = False
+    except ex.TimeVaryingRefused:
+        raised = True
+    parts2 = sorted(p.name for p in td.glob("T64_b*.part"))
+    value("T64b an apply-stage refusal leaves no .part",
+          raised and not parts2, f"raised={raised} parts={parts2}")
+
+    orig = ex.verify_applied_shift
+    ex.verify_applied_shift = lambda *a, **kw: ex.VerificationResult(
+        checked_samples=n, n_samples=n, mismatches=5, first_mismatch=3,
+        complete=True, contract="injected")
+    try:
+        try:
+            ex.execute_time_varying(src, td / "T64_c.f32", plan=plan)
+            raised3 = False
+        except ex.TimeVaryingRefused:
+            raised3 = True
+    finally:
+        ex.verify_applied_shift = orig
+    parts3 = sorted(p.name for p in td.glob("T64_c*.part"))
+    value("T64c a verification-stage refusal leaves no .part",
+          raised3 and not parts3, f"raised={raised3} parts={parts3}")
+
+    def control_bad() -> None:
+        leftover = td / "T64_control.part"
+        leftover.write_bytes(b"x")
+        if not sorted(p.name for p in td.glob("T64_*.part")):
+            raise AssertionError("the .part scan cannot see a .part file")
+        raise AssertionError("x")
+    control("T64.C the .part scan can see a .part file", control_bad)
+
+
+def t65_lying_verifier_is_a_documented_limit() -> None:
+    """A verifier that reports success cannot be caught by the engine.
+
+    P4.7 asserts this rather than implying otherwise: ``execute_time_varying``
+    publishes whatever ``verify_applied_shift`` accepts. That is why the verifier
+    is independently implemented and why the freeze/hash oracles exist. It is a
+    structural property of the layering, and stating it stops "verification
+    passed" from being read as stronger than it is.
+    """
+    print("\n== T65  a lying verifier is a documented limit ==")
+    td = tmpdir()
+    n = 2 * HOP
+    src = td / "T65_src.f32"
+    np.ascontiguousarray(reference(n)).tofile(src)
+    recs = records_for(nw_for(n), lambda i: True, lambda i: 0)
+    plan = ex.build_time_varying_plan(src, request=req(), measurements=recs)
+    orig = ex.verify_applied_shift
+    ex.verify_applied_shift = lambda *a, **kw: ex.VerificationResult(
+        checked_samples=n, n_samples=n, mismatches=0, first_mismatch=None,
+        complete=True, contract="always-ok")
+    try:
+        r = ex.execute_time_varying(src, td / "T65_out.f32", plan=plan,
+                                    verify=True)
+    finally:
+        ex.verify_applied_shift = orig
+    value("T65 a verifier that always accepts publishes the output, so the "
+          "limit is real rather than hypothetical",
+          r.executed and (r.verification or {}).get("ok") is True,
+          f"executed={r.executed} verification={r.verification}")
+
+    dst = td / "T65_real.f32"
+    ex.execute_time_varying(src, dst, plan=plan, verify=False)
+    arr = np.fromfile(dst, dtype="<f4")
+    arr[777] = np.float32(arr[777] + 3.0)
+    arr.tofile(dst)
+    v = ex.verify_applied_shift(dst, src, plan.plan)
+    value("T65b the REAL verifier rejects that same corruption, so the limit "
+          "is about trust rather than capability",
+          (not v.ok) and v.mismatches > 0, f"{v.to_dict()}")
+
+
+def t66_source_equal_to_destination() -> None:
+    """Writing the correction over its own input must not be a silent success.
+
+    The applier opens the destination for writing while still reading the source.
+    If they are the same file, the read stream can be truncated underneath the
+    writer. Whatever the outcome, it must not be reported as success with a wrong
+    output length.
+    """
+    print("\n== T66  source == destination ==")
+    td = tmpdir()
+    n = 2 * HOP
+    same = td / "T66_same.f32"
+    np.ascontiguousarray(reference(n)).tofile(same)
+    recs = records_for(nw_for(n), lambda i: True, lambda i: 0)
+    before = same.stat().st_size
+    r = ex.run_time_varying(same, same, request=req(), measurements=recs)
+    value("T66 source == destination is not reported as a silent success",
+          (r.executed is False)
+          or (r.n_samples_out == n),
+          f"executed={r.executed} reason={r.reason} "
+          f"n_out={r.n_samples_out}")
+    if r.executed:
+        value("T66b if it executed, the output length invariant still holds",
+              r.n_samples_out == n and same.stat().st_size == n * 4,
+              f"n_out={r.n_samples_out} size={same.stat().st_size} "
+              f"(before {before})")
+    else:
+        value("T66b a refusal leaves the source at its original length",
+              same.stat().st_size == before,
+              f"{same.stat().st_size} vs {before}")
+
+    def control_bad() -> None:
+        other = td / "T66_other.f32"
+        np.ascontiguousarray(reference(n)).tofile(other)
+        rr = ex.run_time_varying(same, other, request=req(), measurements=recs)
+        if not rr.executed:
+            raise AssertionError(f"a normal run was refused: {rr.reason}")
+        raise AssertionError("x")
+    control("T66.C distinct source and destination still executes",
+            control_bad)
 
 
 # ==========================================================================

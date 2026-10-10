@@ -711,11 +711,39 @@ def build_time_varying_plan(
 
 
 def _source_length(source: Any) -> int:
-    """样本数 —— 只读长度, 不整文件载入。"""
+    """样本数 —— 只读长度, 不整文件载入。
+
+    **P4.7 fix.** Before this, opening the source was unguarded, so a missing
+    file raised ``FileNotFoundError``, an unreadable one ``PermissionError`` and
+    an empty one a bare ``ValueError`` ("cannot open empty raw file") straight
+    out of the call. ``run_time_varying`` documents that *every* failure is
+    returned as ``executed=False`` with a stable reason code, and callers
+    (``channel_sync``) rely on that to leave the original audio in place. A raw
+    ``OSError`` from deep inside a reader escapes that contract: nothing maps it
+    to a reason, and a caller that only catches ``TimeVaryingRefused`` fails
+    instead of refusing.
+
+    The distinction is preserved rather than flattened: a filesystem problem and
+    an invalid source are different faults, so they keep different reason codes.
+    """
     from .sync_estimate import open_source
 
-    if isinstance(source, (str, bytes, Path)) or hasattr(source, "__fspath__"):
-        x = open_source(source, "f32")
+    is_path = (isinstance(source, (str, bytes, Path))
+               or hasattr(source, "__fspath__"))
+    if is_path:
+        try:
+            x = open_source(source, "f32")
+        except (OSError, ValueError) as exc:
+            # OSError covers missing / permission / locked; ValueError covers the
+            # empty file and the "size is not a multiple of the dtype" case.
+            kind = type(exc).__name__
+            reason = (REASON_TV_EVIDENCE_INSUFFICIENT
+                      if "empty" in str(exc).lower()
+                      else REASON_TV_PLAN_INVALID)
+            raise TimeVaryingRefused(
+                reason,
+                f"the source cannot be opened ({kind}): {exc}",
+            ) from exc
     else:
         x = source
     try:
@@ -724,6 +752,12 @@ def _source_length(source: Any) -> int:
             raise TimeVaryingRefused(
                 REASON_TV_PLAN_INVALID,
                 f"source of type {type(x).__name__} has no length",
+            )
+        if int(shape[0]) <= 0:
+            raise TimeVaryingRefused(
+                REASON_TV_EVIDENCE_INSUFFICIENT,
+                f"the source holds {int(shape[0])} samples; there is nothing to "
+                "plan or correct",
             )
         return int(shape[0])
     finally:
@@ -1045,11 +1079,21 @@ def execute_time_varying(
         )
     p = plan.plan
     target = Path(dst)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=target.name + ".", suffix=".part", dir=str(target.parent)
-    )
-    os.close(fd)
+    # P4.7: creating the temp file is itself a filesystem operation that can
+    # fail (destination directory missing, a path component is a FILE, the
+    # volume is read-only). It used to raise a raw FileExistsError/OSError out
+    # of this function, which the documented refusal contract does not allow.
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=target.name + ".", suffix=".part", dir=str(target.parent)
+        )
+        os.close(fd)
+    except OSError as exc:
+        raise TimeVaryingRefused(
+            REASON_TV_APPLY_FAILED,
+            f"the destination is not writable ({type(exc).__name__}): {exc}",
+        ) from exc
     tmp = Path(tmp_name)
     try:
         try:
@@ -1090,6 +1134,18 @@ def execute_time_varying(
                     f"checked {v.checked_samples}/{v.n_samples}",
                 )
         os.replace(tmp, target)
+    except TimeVaryingRefused:
+        tmp.unlink(missing_ok=True)
+        raise
+    except OSError as exc:
+        # P4.7: belt and braces. Any remaining filesystem failure -- a short
+        # write, a disk-full, a locked volume -- must become the documented
+        # refusal, never a raw OSError escaping the entry point.
+        tmp.unlink(missing_ok=True)
+        raise TimeVaryingRefused(
+            REASON_TV_APPLY_FAILED,
+            f"filesystem failure during apply ({type(exc).__name__}): {exc}",
+        ) from exc
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
