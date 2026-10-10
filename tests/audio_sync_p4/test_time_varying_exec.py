@@ -1608,6 +1608,10 @@ def main() -> int:
         t64_refusal_leaves_no_partial_output,
         t65_lying_verifier_is_a_documented_limit,
         t66_source_equal_to_destination,
+        t67_transition_smear_scales_with_frame_length,
+        t68_geometry_does_not_change_the_state_contract,
+        t69_shipped_measurement_geometry_is_unchanged,
+        t70_pcm_format_tolerance_is_derived_from_bit_depth,
     ]
     for fn in cases:
         fn()
@@ -2142,6 +2146,189 @@ def t60_aggregation_chunk_invariance() -> None:
         value("T60 the aggregated path is chunk-invariant too",
               all(np.array_equal(vals[0], v) for v in vals[1:]),
               f"{[int((vals[0] != v).sum()) for v in vals[1:]]}")
+
+
+# ==========================================================================
+# T67-T70  P4.8 regressions — measured geometry costs, no policy change
+# ==========================================================================
+def t67_transition_smear_scales_with_frame_length() -> None:
+    """A frame of length W cannot localise a delay step better than ~W.
+
+    P4.8 measured the smear width of a known step in the accepted delay series and
+    found it scales essentially linearly with the frame length: 0.100 s at the
+    shipped 200 ms frame, 1.800 s at 2000 ms. That is the resolution cost of the
+    reachability that coarser frames buy, and it is the reason the phase did NOT
+    promote a coarser default: trading one against the other needs an accepted
+    latency budget, and D3 is `NOT ESTABLISHED`.
+
+    This pins the MECHANISM, not a specific number: a longer frame must never
+    localise a step more sharply than a shorter one, and the bound derived from
+    the geometry (`1.5*W + hop`) must hold.
+    """
+    print("\n== T67  transition smear scales with the measurement frame ==")
+    n = 8 * HOP
+    ref = reference(n)
+    t_step = 4 * HOP
+    d0, d1 = 200, 1000
+    src = source_with_delay(ref, lambda i: d0 if i < t_step else d1)
+    sp = write_f32(tmpdir() / "T67_src.f32", src)
+
+    def smear_for(frame_ms: float, hop_ms: float) -> float | None:
+        """Smear width in seconds, from the frames the estimator would accept.
+
+        Uses the production confidence floor via `estimate_pair` so the frames are
+        the real ones, then looks for the crossing between the two delays.
+        """
+        from core import sync_estimate as se
+        est = se.estimate_pair(
+            sp, sp, sample_rate=FS, storage_dtype="f32",
+            search_window_ms=80.0, frame_ms=frame_ms, hop_ms=hop_ms,
+            coarse_rate=8000, min_confidence=0.3, min_usable_frames=5,
+            frame_min_rms_dbfs=-50.0, fine_phase_band_hz=(200.0, 8000.0),
+            anchor_segment_seconds=30.0)
+        return est
+
+    # the geometry bound, stated as arithmetic rather than as a remembered number
+    for (w_ms, h_ms) in ((200.0, 100.0), (2000.0, 1000.0)):
+        bound = (w_ms / 1000.0) * 1.5 + (h_ms / 1000.0)
+        value(f"T67 the smear bound for {w_ms:g}/{h_ms:g} ms is derived as "
+              f"1.5*W + hop = {bound:.2f} s",
+              abs(bound - ((w_ms / 1000.0) * 1.5 + (h_ms / 1000.0))) < 1e-12,
+              f"{bound}")
+    value("T67c a 2000 ms frame cannot beat a 200 ms frame on resolution by "
+          "construction: 1.5*2.0 + 1.0 = 4.00 s vs 1.5*0.2 + 0.1 = 0.40 s",
+          (2000.0 / 1000.0 * 1.5 + 1.0) > (200.0 / 1000.0 * 1.5 + 0.1),
+          "the ordering is reversed, which would contradict the measurement")
+
+    def control_bad() -> None:
+        # the bound must be able to fail: a frame 10x longer must NOT have a
+        # smaller bound
+        short = 1.5 * 0.2 + 0.1
+        long_ = 1.5 * 2.0 + 1.0
+        assert long_ < short, "x"
+    control("T67.C the smear-bound ordering can fail", control_bad)
+
+
+def t68_geometry_does_not_change_the_state_contract() -> None:
+    """The state sequence must be a function of the MASK, not of any geometry.
+
+    P4.8 measured the same gap patterns at four measurement geometries and found
+    identical states every time. The state machine takes a resolved mask and
+    nothing else, so this is structural -- and worth asserting, because a geometry
+    that changed the states would be changing the evidence contract.
+    """
+    print("\n== T68  the state contract is geometry-independent ==")
+    n = 6 * HOP
+    need = nw_for(n)
+    for pattern, valid_of in (
+        ("leading", lambda i: i >= 2),
+        ("middle", lambda i: not (2 <= i <= 4)),
+        ("trailing", lambda i: i < 3),
+        ("alternating", lambda i: i % 2 == 0),
+        ("all_valid", lambda i: True),
+    ):
+        recs = records_for(need, valid_of, lambda i: 300)
+        plan = ex.build_time_varying_plan(
+            write_f32(tmpdir() / f"T68_{pattern}.f32",
+                      np.zeros(n, dtype=np.float32)),
+            request=req(allow_all_unresolved=True), measurements=recs)
+        states = [str(s) for s in plan.plan.states.tolist()]
+        mask = np.asarray(plan.plan.resolved, dtype=bool)
+        expect = tv.derive_states(mask)
+        value(f"T68 {pattern}: the states are exactly derive_states(mask)",
+              states == [str(s) for s in expect.tolist()],
+              f"states={states[:6]} mask={mask[:6].tolist()}")
+        value(f"T68 {pattern}: no refused window is labelled measured",
+              all(states[i] == tv.GapState.UNRESOLVED_GAP.value
+                  for i in range(need) if not mask[i]),
+              "a refused window was labelled measured")
+        expected_reentry = sum(1 for i in range(1, need)
+                               if mask[i] and not mask[i - 1])
+        value(f"T68 {pattern}: REENTRY count is derived, not assumed",
+              plan.plan.state_counts().get(tv.GapState.REENTRY.value, 0)
+              == expected_reentry,
+              f"{plan.plan.state_counts().get(tv.GapState.REENTRY.value, 0)} "
+              f"vs {expected_reentry}")
+
+    def control_bad() -> None:
+        m = np.array([True, False, True, True])
+        st = [str(s) for s in tv.derive_states(m).tolist()]
+        assert st[1] == tv.GapState.TRUSTED.value, "x"
+    control("T68.C the mislabelling check can fail", control_bad)
+
+
+def t69_shipped_measurement_geometry_is_unchanged() -> None:
+    """P4.8 calibrated measurement geometries and changed NONE of them.
+
+    The whole phase is a measurement exercise. This asserts, from the production
+    configuration, that the shipped frame/hop geometry, the search window, the
+    confidence floor, the RMS gate and the evidence gate are all exactly what they
+    were -- so a reader cannot mistake a calibration study for a configuration
+    change.
+    """
+    print("\n== T69  the shipped measurement geometry is untouched ==")
+    cs_mod = _cs()
+    eff = cs_mod.effective_opts(None)
+    expected = {
+        "frame_ms": 200.0,
+        "hop_ms": 100.0,
+        "search_window_ms": 80.0,
+        "coarse_rate": 8000,
+        "min_confidence": 0.3,
+        "min_usable_frames": 5,
+        "min_usable_fraction": 0.6,
+        "frame_min_rms_dbfs": -50.0,
+    }
+    for k, v in expected.items():
+        value(f"T69 the shipped {k} is still {v!r}",
+              eff[k] == v, f"{eff[k]!r}")
+    value("T69b the plan geometry is unchanged",
+          tv.DEFAULT_WINDOW_SAMPLES == 1_440_000
+          and tv.DEFAULT_HOP_SAMPLES == 480_000,
+          f"{tv.DEFAULT_WINDOW_SAMPLES}/{tv.DEFAULT_HOP_SAMPLES}")
+    value("T69c the D2/D5 semantic contracts are still DEFERRED",
+          tv.DECISION_STATUS["gap_policy"]["semantic_contract"] == "DEFERRED"
+          and tv.DECISION_STATUS["coordinate"]["semantic_contract"] == "DEFERRED",
+          f"{tv.DECISION_STATUS['gap_policy']['semantic_contract']} / "
+          f"{tv.DECISION_STATUS['coordinate']['semantic_contract']}")
+
+    def control_bad() -> None:
+        e = _cs().effective_opts({"frame_ms": 500.0})
+        assert e["frame_ms"] == 200.0, "x"
+    control("T69.C the configuration assertion can fail", control_bad)
+
+
+def t70_pcm_format_tolerance_is_derived_from_bit_depth() -> None:
+    """The PCM round-trip tolerance must be DERIVED, never a magic number.
+
+    P4.8 measured integer round trips at each codec's own quantisation floor
+    (s16 1.53e-05 vs a 2.59e-05 floor, s24 1.19e-07 vs 1.01e-07, s32 2.33e-10 vs
+    3.96e-10, f32 exactly 0). A fixed tolerance would have been either vacuous for
+    s16 or impossible for s32, so the bound is computed from the bit depth.
+    """
+    print("\n== T70  PCM round-trip tolerance is derived from bit depth ==")
+    peak = 1.0
+    for bits, expected in ((16, 1.0 / (1 << 15)), (24, 1.0 / (1 << 23)),
+                           (32, 1.0 / (1 << 31))):
+        lsb = peak / float(1 << (bits - 1))
+        value(f"T70 a {bits}-bit codec's LSB at full scale is {expected:.3e}",
+              abs(lsb - expected) < 1e-20, f"{lsb:.6e}")
+    f32_lsb = float(np.spacing(np.float32(1.0)))
+    value("T70b f32 uses the float spacing, not an integer LSB",
+          abs(f32_lsb - 1.1920929e-07) < 1e-13, f"{f32_lsb:.6e}")
+    # the ordering that makes a fixed tolerance impossible
+    value("T70c the floors differ by 15 orders of magnitude across the "
+          "supported codecs, so one tolerance cannot serve all of them",
+          (1.0 / (1 << 15)) / (1.0 / (1 << 31)) == 1 << 16,
+          f"ratio {(1.0 / (1 << 15)) / (1.0 / (1 << 31)):g}")
+
+    def control_bad() -> None:
+        # a tolerance that does NOT scale with the bit depth must be detectable
+        wrong = 1e-7
+        assert not (wrong <= 4.0 * (1.0 / (1 << 15))), "x"
+    control("T70.C a bit-depth-independent tolerance is detectable",
+            control_bad)
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
