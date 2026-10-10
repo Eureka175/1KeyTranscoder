@@ -68,6 +68,7 @@ Algorithm changes     0
 | **whether the short 20260903/20260904 clips suit the fixed-delay path** | [`p4.9a-short-clip-revalidation.md`](p4.9a-short-clip-revalidation.md) |
 | **what P4.9A changed, and what it proved it did not** | [`p4.9a-provenance.md`](p4.9a-provenance.md) |
 | **how large the measurement and correction error actually is against known truth** | [`p4.9b-residual-calibration.md`](p4.9b-residual-calibration.md) |
+| **what P4.9B changed, and what it proved it did not** | [`p4.9b-provenance.md`](p4.9b-provenance.md) |
 | **what P4.8 changed, and what it proved it did not** | [`p4.8-provenance.md`](p4.8-provenance.md) |
 | the P4.1 / D6 audit | [`downstream-audit.md`](downstream-audit.md) |
 | where a promoted document came from | [`documentation-provenance.md`](documentation-provenance.md) |
@@ -292,6 +293,7 @@ on a clone for exactly that reason (`current-state-audit.md` §6).
 | [`p4.9a-short-clip-revalidation.md`](p4.9a-short-clip-revalidation.md) | **P4.9A** — the short-clip fixed-delay revalidation over `testsets/20260903` + `20260904`: inventory and channel identity, production measurement and gate outcome per pair, within-clip and between-clip stability, real correction with independent residual, and a known-delay positive control |
 | [`p4.9a-provenance.md`](p4.9a-provenance.md) | **P4.9A** — corpus read-only proof, the production code reused (no new parser, estimator or algorithm), why the independent verifier is not the estimator in disguise, and the verifier defect that was found and fixed |
 | [`p4.9b-residual-calibration.md`](p4.9b-residual-calibration.md) | **P4.9B** — controlled residual calibration: known-truth end-to-end residuals (R1), accepted-population sensitivity to each gate term (R2), the estimator's error against truth versus bandwidth and SNR (R3), and the independent-verifier disagreement (R4) |
+| [`p4.9b-provenance.md`](p4.9b-provenance.md) | **P4.9B** — what was reused from production rather than rewritten, how the three corpora are kept apart, the one verifier defect that changed a published number and the check on how far it reached, and the decision record |
 | [`P4-FINAL-REPORT.md`](P4-FINAL-REPORT.md) | the 22-section final report |
 
 Architecture note added at [`../design/architecture.md`](../design/architecture.md) §6.8.

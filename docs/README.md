@@ -206,6 +206,7 @@ F:\1KeyTranscoder\
 | [`p4.9a-short-clip-revalidation.md`](audio-sync-p4/p4.9a-short-clip-revalidation.md) | **★ P4.9A 短素材固定延迟复测**：对 `testsets/20260903` + `testsets/20260904` 两批真实短素材（929 文件 / 91 GB，其中 **137 条**为四路单声道 PCM 短片）复测现有 **fixed-delay** 路径。含素材清单与身份判定（**不从文件名猜通道**）、生产测量与生产门逐项结果、片内稳定性（独立 verifier 的分块滞后）、跨片一致性、真实 correction 与**独立残差**、以及一条**已知延迟的正对照**。不降低任何门、不改生产算法与默认值；D2/D3/D5 状态不变 | ✅ 权威（短素材复测） |
 | [`p4.9a-provenance.md`](audio-sync-p4/p4.9a-provenance.md) | **P4.9A 溯源**：语料只读性如何可验证、复用了哪些生产代码（**未新增 parser / estimator / 算法**）、独立 verifier 为何不是估计器的伪装（逐项对比表），以及那个"对静音通道给出答案"的 verifier 缺陷是如何被发现并修掉的 | ✅ 权威（溯源） |
 | [`p4.9b-residual-calibration.md`](audio-sync-p4/p4.9b-residual-calibration.md) | **★ P4.9B 受控残差标定**：R1 已知真值端到端残差（恒定延迟下**估计误差 0、校正后残差 0**；分段/过渡处误差来自**每 30 s 窗一个移位**这一坐标语义，最大 700 samples）、R2 每个门项对 accepted population 的敏感度（**提高 coverage ≠ 提高精度**）、R3 误差 vs 带宽/SNR、R4 独立 verifier 分歧。含一个真实 verifier 缺陷（负滞后轴映射错误，**P4.9A 的 verifier 同样存在**）的定位、修复与对既有结论影响范围的核查 | ✅ 权威（标定证据） |
+| [`p4.9b-provenance.md`](audio-sync-p4/p4.9b-provenance.md) | **P4.9B 溯源**：复用了哪些生产代码（**未新增 estimator / parser / plan / 算法**）、三类语料如何被**分开统计**（A 短素材 / B 长素材 / C 合成真值）、那个改变了已发布数字的 verifier 缺陷及其**影响范围核查**（负延迟侧两实现完全一致 → P4.9A 的 CH3→CH1/CH2 结论成立；CH3→CH4 残差被更正），以及 D2/D3/D5 决策记录 | ✅ 权威（溯源） |
 | 其余 `measurement/validity/trajectory/long-duration/correction/…` | 各专题设计文档，属 P3.1–P3.8 时期 | ⚠️ 见各自内容 |
 
 > **引用审计结论（2026-10 cleanup）**：本目录历史文档**一律未改写**。已发现并
