@@ -65,6 +65,8 @@ Algorithm changes     0
 | **the six real corpus pairs and the two independent oracles** | [`p4.6-real-corpus.md`](p4.6-real-corpus.md) |
 | **what actually reaches apply on real material, and what does not** | [`p4.7-production-reachability.md`](p4.7-production-reachability.md) |
 | **which measurement window/hop geometry is usable on real material without hiding delay change** | [`p4.8-measurement-geometry.md`](p4.8-measurement-geometry.md) |
+| **whether the short 20260903/20260904 clips suit the fixed-delay path** | [`p4.9a-short-clip-revalidation.md`](p4.9a-short-clip-revalidation.md) |
+| **what P4.9A changed, and what it proved it did not** | [`p4.9a-provenance.md`](p4.9a-provenance.md) |
 | **what P4.8 changed, and what it proved it did not** | [`p4.8-provenance.md`](p4.8-provenance.md) |
 | the P4.1 / D6 audit | [`downstream-audit.md`](downstream-audit.md) |
 | where a promoted document came from | [`documentation-provenance.md`](documentation-provenance.md) |
@@ -286,6 +288,8 @@ on a clone for exactly that reason (`current-state-audit.md` §6).
 | [`p4.7-production-reachability.md`](p4.7-production-reachability.md) | **P4.7** — the long-run production test matrix: three separated conclusions (mechanics / reachable / refused), the measured frame-geometry calibration finding, and the three product defects found and fixed |
 | [`p4.8-measurement-geometry.md`](p4.8-measurement-geometry.md) | **P4.8** — the measurement-geometry calibration: four window/hop geometries measured on synthetic and real material, the three separated questions (validity / reachability / correctness), the transition-resolution cost, and why the shipped geometry is left unchanged |
 | [`p4.8-provenance.md`](p4.8-provenance.md) | **P4.8** — what the phase changed (one test file, plus documentation), what it proved it did **not** change (no `core/`, `1kt.py` or `production/` diff), the matrix reconciliation, and the decision record |
+| [`p4.9a-short-clip-revalidation.md`](p4.9a-short-clip-revalidation.md) | **P4.9A** — the short-clip fixed-delay revalidation over `testsets/20260903` + `20260904`: inventory and channel identity, production measurement and gate outcome per pair, within-clip and between-clip stability, real correction with independent residual, and a known-delay positive control |
+| [`p4.9a-provenance.md`](p4.9a-provenance.md) | **P4.9A** — corpus read-only proof, the production code reused (no new parser, estimator or algorithm), why the independent verifier is not the estimator in disguise, and the verifier defect that was found and fixed |
 | [`P4-FINAL-REPORT.md`](P4-FINAL-REPORT.md) | the 22-section final report |
 
 Architecture note added at [`../design/architecture.md`](../design/architecture.md) §6.8.
