@@ -71,6 +71,7 @@ Algorithm changes     0
 | **what P4.9B changed, and what it proved it did not** | [`p4.9b-provenance.md`](p4.9b-provenance.md) |
 | **whether this machine's material can supply a real wireless ground truth, and what to record if not** | [`p4.10-real-source-qualification.md`](p4.10-real-source-qualification.md) |
 | **the recording procedure that would supply one** | [`p4.10-acquisition-protocol.md`](p4.10-acquisition-protocol.md) |
+| **the executable tooling that runs once the takes exist** | [`p4.11-acquisition-tooling.md`](p4.11-acquisition-tooling.md) |
 | **what P4.8 changed, and what it proved it did not** | [`p4.8-provenance.md`](p4.8-provenance.md) |
 | the P4.1 / D6 audit | [`downstream-audit.md`](downstream-audit.md) |
 | where a promoted document came from | [`documentation-provenance.md`](documentation-provenance.md) |
@@ -299,6 +300,8 @@ on a clone for exactly that reason (`current-state-audit.md` §6).
 | [`p4.10-real-source-qualification.md`](p4.10-real-source-qualification.md) | **P4.10** — real-source qualification: a full probe of every media container on the machine, truth grading (G0/G1/G2/G3) with the one proposed anchor rejected, a measured demonstration that the production corpus's only eligible channel pair is internally coincident, a cross-method agreement check on real stereo audio, and an executable acquisition protocol |
 | [`p4.10-provenance.md`](p4.10-provenance.md) | **P4.10** — what was read rather than recomputed, the cross-phase verifier dependency stated rather than assumed, and the decision record |
 | [`p4.10-acquisition-protocol.md`](p4.10-acquisition-protocol.md) | **P4.10** — the executable acquisition protocol: equipment and wiring, recording format, test signal, reference events, duration and repeats with their reasons, how the truth is established by construction, reference-path calibration, expected truth resolution, the operator-note fields, and the acceptance and failure conditions |
+| [`p4.11-acquisition-tooling.md`](p4.11-acquisition-tooling.md) | **P4.11** — the tooling that makes the protocol runnable: the pipeline audit that found P4.10's "already automated" claim unsupported, the four protocol ambiguities resolved by measurement, deterministic signal generation, operator package, preflight, ingest through the real production API, and the end-to-end test with its negative controls |
+| [`p4.11-provenance.md`](p4.11-provenance.md) | **P4.11** — where the tracked code lives and why not `tools/`, what was reused rather than rewritten, the eight harness defects found, and the decision record |
 | [`P4-FINAL-REPORT.md`](P4-FINAL-REPORT.md) | the 22-section final report |
 
 Architecture note added at [`../design/architecture.md`](../design/architecture.md) §6.8.
