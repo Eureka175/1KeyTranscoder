@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "P4.11 acquisition operator note",
+  "description": "The facts a recording cannot carry. The physical input mapping is the one that can never be inferred: four mono streams do not say which physical input feeds each of them.",
+  "type": "object",
+  "required": [
+    "take_id", "recorded_at", "operator", "camera_body_serial",
+    "input_mapping", "wireless_tx", "wireless_rx", "tx_rx_distance_m",
+    "wireless_channel", "tx_gain", "rx_output_level", "receiver_output_type",
+    "agc_limiter_lowcut_nr", "signal_file_sha256", "signal_description",
+    "take_kind"
+  ],
+  "properties": {
+    "take_id": {"type": "string", "minLength": 1,
+                "description": "stable identifier; must be unique across the session"},
+    "recorded_at": {"type": "string",
+                    "description": "ISO 8601 with timezone offset, e.g. 2026-10-12T14:03:00+08:00"},
+    "operator": {"type": "string", "minLength": 1},
+    "camera_body_serial": {"type": "string", "minLength": 1},
+    "input_mapping": {
+      "type": "string",
+      "description": "physical input for each of the four streams, e.g. 0=CH1_direct_cable;1=CH2_spare;2=CH3_wireless_rx;3=CH4_spare. Names must be physical inputs, not stream numbers restated.",
+      "pattern": "^\\s*[0-3]\\s*=\\s*\\S+"
+    },
+    "wireless_tx": {"type": "string", "minLength": 1},
+    "wireless_rx": {"type": "string", "minLength": 1},
+    "tx_rx_distance_m": {"type": "string", "minLength": 1},
+    "wireless_channel": {"type": "string", "minLength": 1},
+    "tx_gain": {"type": "string", "minLength": 1},
+    "rx_output_level": {"type": "string", "minLength": 1},
+    "receiver_output_type": {"type": "string", "minLength": 1,
+                             "description": "e.g. XLR line, 3.5 mm, USB"},
+    "agc_limiter_lowcut_nr": {
+      "type": "string", "minLength": 1,
+      "description": "must state OFF for every input; any of these is a time-varying nonlinearity inside the path being measured"
+    },
+    "signal_file_sha256": {"type": "string", "minLength": 32},
+    "signal_description": {"type": "string", "minLength": 1},
+    "take_kind": {"type": "string", "enum": ["MEASURE", "CABLE_CALIBRATION", "MARKER_ONLY"]},
+    "notes": {"type": "string"}
+  },
+  "additionalProperties": true
+}
