@@ -207,6 +207,8 @@ F:\1KeyTranscoder\
 | [`p4.9a-provenance.md`](audio-sync-p4/p4.9a-provenance.md) | **P4.9A 溯源**：语料只读性如何可验证、复用了哪些生产代码（**未新增 parser / estimator / 算法**）、独立 verifier 为何不是估计器的伪装（逐项对比表），以及那个"对静音通道给出答案"的 verifier 缺陷是如何被发现并修掉的 | ✅ 权威（溯源） |
 | [`p4.9b-residual-calibration.md`](audio-sync-p4/p4.9b-residual-calibration.md) | **★ P4.9B 受控残差标定**：R1 已知真值端到端残差（恒定延迟下**估计误差 0、校正后残差 0**；分段/过渡处误差来自**每 30 s 窗一个移位**这一坐标语义，最大 700 samples）、R2 每个门项对 accepted population 的敏感度（**提高 coverage ≠ 提高精度**）、R3 误差 vs 带宽/SNR、R4 独立 verifier 分歧。含一个真实 verifier 缺陷（负滞后轴映射错误，**P4.9A 的 verifier 同样存在**）的定位、修复与对既有结论影响范围的核查 | ✅ 权威（标定证据） |
 | [`p4.9b-provenance.md`](audio-sync-p4/p4.9b-provenance.md) | **P4.9B 溯源**：复用了哪些生产代码（**未新增 estimator / parser / plan / 算法**）、三类语料如何被**分开统计**（A 短素材 / B 长素材 / C 合成真值）、那个改变了已发布数字的 verifier 缺陷及其**影响范围核查**（负延迟侧两实现完全一致 → P4.9A 的 CH3→CH1/CH2 结论成立；CH3→CH4 残差被更正），以及 D2/D3/D5 决策记录 | ✅ 权威（溯源） |
+| [`p4.10-real-source-qualification.md`](audio-sync-p4/p4.10-real-source-qualification.md) | **★ P4.10 真实素材资格与真值获取**：对全机 193 个媒体容器完成探测（**0 probe 错误**），按 G0/G1/G2/G3 分级 —— **G0 27 / G1 166 / G2 0 / G3 0**，唯一被文件名暗示的"延时"候选**经核实无音轨**故被拒。并**实测证明**生产语料唯一能过门的通道对（CH3→CH4）是**同一路馈送的两个内部重合输入**（137 条片段实测互相关中位 0.831、滞后中位 **0.06 sample**、范围 4.55）→ P4.9A 的"零偏移"是**接线性质**，**不是无线链路延迟的测量**。另含真实立体声素材上的双方法一致性核查（4/4 一致）。结论 `REAL_GROUND_TRUTH = BLOCKED`，并给出可直接执行的**最小真实采集方案** | ✅ 权威（资格与采集） |
+| [`p4.10-provenance.md`](audio-sync-p4/p4.10-provenance.md) | **P4.10 溯源**：哪些是**读取而非重跑**（未重解码长素材、未重跑 P4.8/P4.9A/P4.9B 矩阵）、跨阶段 verifier 依赖为何**显式携带**而不是跨目录 import、以及 D2/D3/D5 记录 | ✅ 权威（溯源） |
 | 其余 `measurement/validity/trajectory/long-duration/correction/…` | 各专题设计文档，属 P3.1–P3.8 时期 | ⚠️ 见各自内容 |
 
 > **引用审计结论（2026-10 cleanup）**：本目录历史文档**一律未改写**。已发现并

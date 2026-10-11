@@ -69,6 +69,7 @@ Algorithm changes     0
 | **what P4.9A changed, and what it proved it did not** | [`p4.9a-provenance.md`](p4.9a-provenance.md) |
 | **how large the measurement and correction error actually is against known truth** | [`p4.9b-residual-calibration.md`](p4.9b-residual-calibration.md) |
 | **what P4.9B changed, and what it proved it did not** | [`p4.9b-provenance.md`](p4.9b-provenance.md) |
+| **whether this machine's material can supply a real wireless ground truth, and what to record if not** | [`p4.10-real-source-qualification.md`](p4.10-real-source-qualification.md) |
 | **what P4.8 changed, and what it proved it did not** | [`p4.8-provenance.md`](p4.8-provenance.md) |
 | the P4.1 / D6 audit | [`downstream-audit.md`](downstream-audit.md) |
 | where a promoted document came from | [`documentation-provenance.md`](documentation-provenance.md) |
@@ -294,6 +295,8 @@ on a clone for exactly that reason (`current-state-audit.md` §6).
 | [`p4.9a-provenance.md`](p4.9a-provenance.md) | **P4.9A** — corpus read-only proof, the production code reused (no new parser, estimator or algorithm), why the independent verifier is not the estimator in disguise, and the verifier defect that was found and fixed |
 | [`p4.9b-residual-calibration.md`](p4.9b-residual-calibration.md) | **P4.9B** — controlled residual calibration: known-truth end-to-end residuals (R1), accepted-population sensitivity to each gate term (R2), the estimator's error against truth versus bandwidth and SNR (R3), and the independent-verifier disagreement (R4) |
 | [`p4.9b-provenance.md`](p4.9b-provenance.md) | **P4.9B** — what was reused from production rather than rewritten, how the three corpora are kept apart, the one verifier defect that changed a published number and the check on how far it reached, and the decision record |
+| [`p4.10-real-source-qualification.md`](p4.10-real-source-qualification.md) | **P4.10** — real-source qualification: a full probe of every media container on the machine, truth grading (G0/G1/G2/G3) with the one proposed anchor rejected, a measured demonstration that the production corpus's only eligible channel pair is internally coincident, a cross-method agreement check on real stereo audio, and an executable acquisition protocol |
+| [`p4.10-provenance.md`](p4.10-provenance.md) | **P4.10** — what was read rather than recomputed, the cross-phase verifier dependency stated rather than assumed, and the decision record |
 | [`P4-FINAL-REPORT.md`](P4-FINAL-REPORT.md) | the 22-section final report |
 
 Architecture note added at [`../design/architecture.md`](../design/architecture.md) §6.8.
