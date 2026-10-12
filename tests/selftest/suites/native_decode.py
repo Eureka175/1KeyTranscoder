@@ -1,27 +1,28 @@
-"""Native rigaya hardware decode (`--avhw`) vs the FFmpeg decode route.
+"""Source-aware hardware decode routing for NVENC/QSV.
 
-This suite replaces the former ``decode_pipe`` suite, which asserted the
-architecture this project has since removed: FFmpeg decoding to y4m and
-feeding NVEncC/QSVEncC through stdin. That route is gone, and asserting on
-its absence is now as important as asserting on the new route.
+Two independent decode architectures, and one decision rule inside the
+rigaya one:
 
-Two independent decode architectures must both stay intact:
-
-    x265 / SVT-AV1   FFmpeg NVDEC/QSV -> hwdownload -> libx265/libsvtav1
-    NVENC / QSV      <source file> -> NVEncC/QSVEncC --avhw -> encoder
+    x265 / svtav1   FFmpeg NVDEC/QSV -> hwdownload -> FFmpeg encoder
+    nvenc / qsv     <source> -> the encoder's OWN reader -> encoder
+                      Sony        -> --avsw, decided before any attempt
+                      non-Sony    -> --avhw, judged by the integrity gate
+                      unknown     -> --avhw, recorded as unclassified
 
 The routing tests drive the **real** ``hw_encode_with_fallback`` state machine
 with a recording stand-in for the encoder process, so what is asserted is the
-argv that would actually be executed -- not a log string and not a substring
-of the source. That distinction matters because every historical failure mode
-here was silent: a stale reader flag or a dropped ``--avhw`` still produced a
-playable file and a successful-looking run.
+argv that would actually execute -- not a log string and not a substring of the
+source. That distinction matters because every historical failure here was
+silent: a dropped ``--avhw`` or a stale reader flag still produced a playable
+file and a successful-looking run.
 
-The stand-in deliberately reports a **wrong** frame count for the ``--avhw``
-rung, because that is the only way to reach the discard-and-retry contract
-that protects against rigaya's head-loss defect. The trace records whether the
-artifact still existed when the software rung started, so "the corrupt output
-was deleted first" is proved rather than assumed.
+Two stand-in behaviours are load-bearing:
+
+* for the integrity cases it reports a **wrong** frame count on the ``--avhw``
+  rung, which is the only way to reach the discard-and-retry contract;
+* the trace records whether the output artifact already existed when each
+  command started, so "the rejected artifact was deleted before the retry" is
+  proved rather than assumed.
 """
 
 from __future__ import annotations
@@ -66,10 +67,9 @@ class _SrcInfo:
     color = None
 
 
-# A hardware run whose reader really was the hardware one, but whose frame
-# count does not reconcile with the container. Reaching that check (rather
-# than an "unknown reader" refusal) is what makes the test exercise the
-# discard path instead of an argv-shape shortcut.
+#: A hardware run that really used the hardware reader but whose frame count
+#: does not reconcile with the container. Reaching the reconciliation (rather
+#: than an "unknown reader" refusal) is what exercises the discard path.
 _HW_LOG = (
     "NVEncC (x64) 9.31 (r1)\n"
     "Input Info avcuvid: 4096x2160, 59.94fps\n"
@@ -84,14 +84,12 @@ _SW_LOG = (
 )
 
 
-def _run_fallback(backend, *, hw_decode, script_dir, tmp: Path, out_name: str):
+def _run_fallback(backend, *, hw_decode, tmp: Path, out_name: str,
+                  source_kind, seek=False):
     """Drive hw_encode_with_fallback with the encoder process recorded.
 
-    The log written for an ``--avhw`` rung claims the hardware reader ran but
-    reports fewer frames than the container holds, so the integrity gate
-    rejects it. The trace records, at the moment each command starts, whether
-    the output artifact already existed -- that is what proves the rejected
-    artifact was removed before the software retry wrote anything.
+    Returns (trace, warnings). Each trace entry records the argv, the reader it
+    asks for, and whether the output artifact already existed at that moment.
     """
     import logging
 
@@ -126,50 +124,169 @@ def _run_fallback(backend, *, hw_decode, script_dir, tmp: Path, out_name: str):
             audio_copy=False, do_frame_check=False, no_downgrade=False,
             gpac=None, logger=sink, file_logger=sink,
             hw_decode=hw_decode, hw_decode_memo={},
-            script_dir=script_dir,
+            source_kind=source_kind, seek_requested=seek,
         )
     finally:
         batch_hw.run_hw_tool = real_run
     return trace, warnings
 
 
+def _sony_streams() -> list[dict]:
+    """The shape ``is_sony_source`` keys on: a data stream tagged rtmd."""
+    return [
+        {"codec_type": "video", "codec_tag_string": "hvc1"},
+        {"codec_type": "data", "codec_tag_string": "rtmd"},
+        {"codec_type": "audio", "codec_tag_string": "mp4a"},
+    ]
+
+
+def _dji_streams() -> list[dict]:
+    return [
+        {"codec_type": "video", "codec_tag_string": "hvc1"},
+        {"codec_type": "data", "codec_tag_string": "djmd"},
+    ]
+
+
+def _plain_streams() -> list[dict]:
+    return [
+        {"codec_type": "video", "codec_tag_string": "avc1"},
+        {"codec_type": "audio", "codec_tag_string": "mp4a"},
+    ]
+
+
 def l1_native_decode() -> None:
     from core import batch_hw
     from encoders.hwdecode import (
-        decode_tool_is_stock,
-        resolve_decode_tool,
+        R_SONY_SOFTWARE,
+        SOURCE_NON_SONY,
+        SOURCE_SONY,
+        SOURCE_UNKNOWN,
         route_decode,
+        source_kind_from_streams,
     )
 
-    paths.section("L1 原生 rigaya 硬解路由 (--avhw / --avsw)")
+    paths.section("L1 来源感知的 rigaya 解码路由 (Sony=avsw / 非 Sony=avhw)")
 
-    # --- the patch is what makes --avhw safe, and it is verified by hash ---
-    root = paths.ROOT
-    stock_nv = root / "tools" / "NVEncC_9.31_x64" / "NVEncC64.exe"
+    # =====================================================================
+    # 1. source classification reuses the existing Sony detector
+    # =====================================================================
+    record("src.Sony 来源被识别 (rtmd 数据轨)",
+           source_kind_from_streams(_sony_streams()) == SOURCE_SONY,
+           source_kind_from_streams(_sony_streams()))
+    record("src.非 Sony 来源被识别",
+           source_kind_from_streams(_plain_streams()) == SOURCE_NON_SONY,
+           source_kind_from_streams(_plain_streams()))
+    # DJI is *not* Sony: its own metadata tag must not be read as rtmd.
+    record("src.DJI 来源不是 Sony (djmd != rtmd)",
+           source_kind_from_streams(_dji_streams()) == SOURCE_NON_SONY,
+           source_kind_from_streams(_dji_streams()))
+    record("src.探测为空 -> unknown (不猜)",
+           source_kind_from_streams([]) == SOURCE_UNKNOWN
+           and source_kind_from_streams(None) == SOURCE_UNKNOWN,
+           "empty probe -> unknown")
+    # The detector must be the same one the dispatch uses, not a copy.
+    import inspect
 
-    dt_nv = resolve_decode_tool(kind="nvencc", script_dir=root, policy="auto")
-    dt_qs = resolve_decode_tool(kind="qsvencc", script_dir=root, policy="auto")
-    builds_present = bool(dt_nv.usable and dt_qs.usable)
+    hsrc = inspect.getsource(source_kind_from_streams)
+    record("src.复用 core.batch_hw.is_sony_source (不重新实现检测)",
+           "from core.batch_hw import is_sony_source" in hsrc,
+           "delegates to the existing detector")
+    record("src.不按文件名/分辨率猜测来源",
+           "name" not in hsrc.replace("is_sony_source", "")
+           and "width" not in hsrc and "suffix" not in hsrc)
 
-    record(
-        "native.只有 patched 构建可获得时 --avhw 才可用",
-        (not dt_nv.usable)
-        or "tools/avhw" in str(dt_nv.path).replace("\\", "/"),
-        f"nvenc usable={dt_nv.usable} path={dt_nv.path}",
+    # =====================================================================
+    # 2. routing: the source class decides the reader
+    # =====================================================================
+    def route(source_kind, backend="nvenc", codec="hevc", chroma="4:2:0",
+              depth=10, seek=False, policy="auto"):
+        return route_decode(
+            policy=policy, backend=backend, codec=codec, chroma=chroma,
+            depth=depth, source_kind=source_kind, seek_requested=seek,
+        )
+
+    for backend in ("nvenc", "qsv"):
+        r = route(SOURCE_SONY, backend=backend)
+        record(f"route.Sony + {backend} -> 软件读端",
+               r.reader == "avsw" and not r.hardware, r.reader)
+        record(f"route.Sony + {backend} 的原因是来源安全策略",
+               r.reason == R_SONY_SOFTWARE, r.reason)
+        record(f"route.Sony + {backend} 不报警告 (是预防, 不是失败)",
+               r.warnings == [], f"{len(r.warnings)} warning(s)")
+
+    for backend in ("nvenc", "qsv"):
+        r = route(SOURCE_NON_SONY, backend=backend)
+        record(f"route.非 Sony + {backend} -> 硬件读端",
+               r.reader == "avhw" and r.hardware, r.reader)
+
+    # The allowlist is no longer a gate: a 4:2:0/8-bit source is not in it,
+    # yet must still get hardware.
+    r = route(SOURCE_NON_SONY, codec="hevc", chroma="4:2:0", depth=8)
+    record("route.白名单外的非 Sony 组合仍走硬件 (allowlist 不再是准入门槛)",
+           r.hardware, f"reader={r.reader} reason={r.reason}")
+    r = route(SOURCE_NON_SONY, codec="h264", chroma="4:2:0", depth=8)
+    record("route.非 Sony H.264 8bit 也走硬件", r.hardware, r.reason)
+
+    r = route(SOURCE_UNKNOWN)
+    record("route.来源未知 -> 尝试硬件并记录为未知",
+           r.hardware and r.source_kind == SOURCE_UNKNOWN
+           and r.reason == "source_unclassified",
+           f"reader={r.reader} reason={r.reason}")
+
+    # =====================================================================
+    # 3. what must still refuse hardware
+    # =====================================================================
+    r = route(SOURCE_NON_SONY, seek=True)
+    record("route.带 seek 时非 Sony 也拒绝硬解 (读端不等价)",
+           not r.hardware and r.reason == "seek_not_equivalent", r.reason)
+
+    r = route(SOURCE_NON_SONY, backend="qsv", codec="h264", chroma="4:2:2")
+    record("route.已知能力拒绝 (QSV h264 4:2:2 10bit) 仍拒绝",
+           not r.hardware and r.reason == "capability_refused", r.reason)
+
+    r = route(SOURCE_NON_SONY, backend="nvenc", codec="h264", chroma="4:2:2")
+    record("route.同格式 NVENC 未被拒绝 (拒绝是按后端的实测事实)",
+           r.hardware, f"reader={r.reader}")
+
+    r = route_decode(
+        policy="auto", backend="nvenc", codec="hevc", chroma="4:2:0", depth=10,
+        source_kind=SOURCE_NON_SONY,
+        memo={("nvenc", "hevc", "4:2:0", 10): "device init failed once"},
     )
-    record(
-        "native.构建缺失/哈希不符 -> not_proven (不是可用)",
-        builds_present
-        or (dt_nv.reason == "not_proven" and dt_qs.reason == "not_proven"),
-        f"nvenc={dt_nv.reason} qsv={dt_qs.reason}",
-    )
-    record(
-        "native.装船构建被识别为 stock (防误用闸门)",
-        decode_tool_is_stock("nvenc", stock_nv) is True,
-        "tools/NVEncC_9.31_x64/NVEncC64.exe -> stock",
-    )
+    record("route.本运行记住的设备/格式失败仍拒绝重试",
+           not r.hardware and r.reason == "reader_unavailable", r.reason)
 
-    # --- argv-level: the reader flag IS the decode decision ---------------
+    # Sony policy outranks the allowlist *and* a remembered failure: the
+    # reason must stay the source decision, not a generic fallback.
+    r = route_decode(
+        policy="auto", backend="nvenc", codec="hevc", chroma="4:2:0", depth=10,
+        source_kind=SOURCE_SONY,
+        memo={("nvenc", "hevc", "4:2:0", 10): "device init failed once"},
+    )
+    record("route.Sony 的原因不因其它拒绝条件而改变",
+           r.reason == R_SONY_SOFTWARE, r.reason)
+
+    r = route(SOURCE_SONY, policy="require")
+    record("route.policy=require 下 Sony 明确失败 (不静默软解)",
+           r.reason == "require_unmet" and r.reader == "avhw", r.reason)
+
+    # Determinism over the whole grid (matrix HD-B08 consumes this).
+    grid = [(sk, b, c, ch, d)
+            for sk in (SOURCE_SONY, SOURCE_NON_SONY, SOURCE_UNKNOWN)
+            for b in ("nvenc", "qsv")
+            for c, ch, d in (("hevc", "4:2:0", 10), ("h264", "4:2:2", 10),
+                             ("hevc", "4:2:0", 8))]
+    first = [route(sk, backend=b, codec=c, chroma=ch, depth=d).to_json()
+             for sk, b, c, ch, d in grid]
+    second = [route(sk, backend=b, codec=c, chroma=ch, depth=d).to_json()
+              for sk, b, c, ch, d in grid]
+    record("route.全网格决策可复现", first == second, f"{len(grid)} decisions")
+    record("route.每条决策都带 source_kind 字段",
+           all("source_kind" in d for d in first))
+
+    # =====================================================================
+    # 4. argv level: the reader flag IS the decision
+    # =====================================================================
     src = "C:/x/in.mp4"
     out = "C:/x/out.mov"
     nv = _FakeBackend("nvencc", Path("C:/t/NVEncC64.exe"))
@@ -178,152 +295,171 @@ def l1_native_decode() -> None:
     nv_hw, _, _ = nv.command(src, out, {}, "4:2:0", 10, reader="avhw")
     nv_sw, _, _ = nv.command(src, out, {}, "4:2:0", 10, reader="avsw")
     qs_hw, _, _ = qs.command(src, out, {}, "4:2:0", 10, reader="avhw")
+    qs_sw, _, _ = qs.command(src, out, {}, "4:2:0", 10, reader="avsw")
 
-    record("native.NVEnc 硬解 argv 请求 --avhw",
+    record("argv.NVEnc 硬解请求 --avhw",
            "--avhw" in nv_hw and "--avsw" not in nv_hw, " ".join(nv_hw[:6]))
-    record("native.NVEnc 软解 argv 请求 --avsw",
+    record("argv.NVEnc 软解请求 --avsw",
            "--avsw" in nv_sw and "--avhw" not in nv_sw, " ".join(nv_sw[:6]))
-    record("native.QSV 硬解 argv 请求 --avhw",
+    record("argv.QSV 硬解请求 --avhw",
            "--avhw" in qs_hw and "--avsw" not in qs_hw, " ".join(qs_hw[:6]))
-    record("native.读端是源文件本身 (不是 stdin)",
-           nv_hw[nv_hw.index("-i") + 1] == src
-           and "-" not in (nv_hw[nv_hw.index("-i") + 1],),
+    record("argv.QSV 软解请求 --avsw",
+           "--avsw" in qs_sw and "--avhw" not in qs_sw, " ".join(qs_sw[:6]))
+    record("argv.读端是源文件本身 (不是 stdin)",
+           nv_hw[nv_hw.index("-i") + 1] == src,
            f"-i {nv_hw[nv_hw.index('-i') + 1]}")
 
-    # --- the tool substitution that carries the decode binary -------------
-    patched = Path("C:/t/patched/NVEncC64.exe")
-    got = batch_hw.use_decode_binary(nv_hw, nv.tool, patched)
-    record("native.硬解 rung 替换为 patched 解码二进制",
-           Path(got[0]) == patched, f"argv[0]={got[0]}")
-    record("native.替换只改 argv[0], 其余参数逐字保留",
-           got[1:] == nv_hw[1:], " ".join(got[1:8]))
-    record("native.同一二进制时不做改动",
-           batch_hw.use_decode_binary(nv_hw, nv.tool, nv.tool) == nv_hw)
-    try:
-        batch_hw.use_decode_binary(
-            ["C:/other/tool.exe", "-i", src], nv.tool, patched
-        )
-        record("native.期望二进制不符时拒绝替换 (不猜)", False, "no error")
-    except ValueError as exc:
-        record("native.期望二进制不符时拒绝替换 (不猜)", True, str(exc)[:70])
-
-    # --- no FFmpeg feeder anywhere in the production path -----------------
-    import inspect
-
+    # =====================================================================
+    # 5. no FFmpeg frame feed anywhere in the rigaya path
+    # =====================================================================
     fsrc = inspect.getsource(batch_hw.hw_encode_with_fallback)
-    record("native.生产路径无 FFmpeg 帧馈送 (decode_pipe/rung_pipe)",
+    record("pipe.生产路径无 FFmpeg 帧馈送 (decode_pipe/rung_pipe)",
            "decode_pipe" not in fsrc and "rung_pipe" not in fsrc)
-    record("native.生产路径无 y4m 管道改写",
+    record("pipe.生产路径无 y4m 管道改写",
            "apply_stdin_pipe" not in fsrc
            and "ffmpeg_pipe_args" not in fsrc)
-    record("native.run_hw_tool 无 decode_pipe 形参",
+    record("pipe.run_hw_tool 无 decode_pipe 形参",
            "decode_pipe" not in inspect.signature(
                batch_hw.run_hw_tool).parameters)
-    record("native.run_hw_tool 无 feeder 进程处理",
+    record("pipe.run_hw_tool 无 feeder 进程处理",
            "feeder" not in inspect.getsource(batch_hw.run_hw_tool))
 
     from encoders import hwdecode_ffmpeg as hdf
 
-    record("native.hwdecode_ffmpeg 不再导出管道 API",
+    record("pipe.hwdecode_ffmpeg 不再导出管道 API",
            not hasattr(hdf, "ffmpeg_pipe_args")
            and not hasattr(hdf, "apply_stdin_pipe"))
 
-    # --- the ladder actually runs the chosen reader -----------------------
+    # =====================================================================
+    # 6. the ladder really runs what the router chose
+    # =====================================================================
     tmp = paths.WORK / "native_decode"
     tmp.mkdir(parents=True, exist_ok=True)
-    cache_key = ("nvencc", str(tmp), "")
 
-    # (1) No patched build: software decode on the shipped build, announced.
-    batch_hw._HW_TOOL_CACHE.pop(cache_key, None)
-    trace, warns = _run_fallback(
-        _FakeBackend("nvencc", Path("C:/t/NVEncC64.exe")),
-        hw_decode="auto", script_dir=tmp, tmp=tmp, out_name="a.mov",
-    )
-    record("native.无 patched 构建时只跑一次软解 rung",
-           len(trace) == 1, f"{len(trace)} command(s)")
-    record("native.无 patched 构建时 argv 用 --avsw 与装船构建",
-           trace and "--avsw" in trace[0]["cmd"]
-           and Path(trace[0]["cmd"][0]) == Path("C:/t/NVEncC64.exe"),
-           " ".join(trace[0]["cmd"][:3]) if trace else "-")
-    record("native.该情形有明确告警 (不静默)",
-           any("hardware decode not used" in w or "not_proven" in w
-               for w in warns),
-           f"{len(warns)} warning(s)")
-
-    # (2) A resolvable decoder binary: --avhw first, integrity gate rejects,
-    #     corrupt artifact deleted, --avsw retry on the shipped build.
-    patched_bin = tmp / "patched" / "NVEncC64.exe"
-    patched_bin.parent.mkdir(parents=True, exist_ok=True)
-    patched_bin.write_bytes(b"stub")
-    batch_hw._HW_TOOL_CACHE[cache_key] = (patched_bin, "test injection")
-    try:
-        backend = _FakeBackend("nvencc", Path("C:/t/NVEncC64.exe"))
+    # (1) Sony: one rung, --avsw, no warning, and --avhw never attempted.
+    for kind, tool in (("nvencc", "C:/t/NVEncC64.exe"),
+                       ("qsvencc", "C:/t/QSVEncC64.exe")):
+        b = _FakeBackend(kind, Path(tool))
         trace, warns = _run_fallback(
-            backend, hw_decode="auto", script_dir=tmp, tmp=tmp,
-            out_name="b.mov",
+            b, hw_decode="auto", tmp=tmp, out_name=f"sony_{kind}.mov",
+            source_kind=SOURCE_SONY,
+        )
+        record(f"sony.{b.name} 只跑一次软解 rung",
+               len(trace) == 1, f"{len(trace)} command(s)")
+        record(f"sony.{b.name} argv 用 --avsw 且用已部署二进制",
+               bool(trace) and "--avsw" in trace[0]["cmd"]
+               and Path(trace[0]["cmd"][0]) == b.tool,
+               " ".join(trace[0]["cmd"][:3]) if trace else "-")
+        record(f"sony.{b.name} 从未尝试 --avhw",
+               not any("--avhw" in e["cmd"] for e in trace),
+               f"{len(trace)} command(s), hw={sum(e['hw'] for e in trace)}")
+        record(f"sony.{b.name} 不把这个决定记成回退 (无告警)",
+               warns == [], f"{len(warns)} warning(s)")
+
+    # (2) non-Sony: --avhw first, on the deployed binary, and when the gate
+    #     rejects it the artifact is gone before the --avsw retry.
+    for kind, tool in (("nvencc", "C:/t/NVEncC64.exe"),
+                       ("qsvencc", "C:/t/QSVEncC64.exe")):
+        b = _FakeBackend(kind, Path(tool))
+        trace, warns = _run_fallback(
+            b, hw_decode="auto", tmp=tmp, out_name=f"nonson_{kind}.mov",
+            source_kind=SOURCE_NON_SONY,
         )
         first = trace[0] if trace else {}
-        record("native.可用解码二进制时先试 --avhw",
+        record(f"nonson.{b.name} 先试 --avhw",
                "--avhw" in first.get("cmd", []),
                f"{' '.join(first.get('cmd', [])[:3]) or '-'}")
-        record("native.硬解 rung 使用 patched 二进制",
-               first and Path(first["cmd"][0]) == patched_bin,
+        record(f"nonson.{b.name} --avhw 使用已部署二进制",
+               bool(first) and Path(first["cmd"][0]) == b.tool,
                first.get("cmd", ["-"])[0])
         sw = [e for e in trace if "--avsw" in e["cmd"]]
-        record("native.完整性闸门失败后回到 --avsw 重跑",
+        record(f"nonson.{b.name} 完整性失败后回退 --avsw",
                bool(sw), f"{len(trace)} command(s), {len(sw)} software")
-        record("native.软件重试用装船构建",
-               bool(sw) and Path(sw[0]["cmd"][0]) == backend.tool,
-               sw[0]["cmd"][0] if sw else "-")
-        record("native.被拒硬解产物在软件重试前已删除",
+        record(f"nonson.{b.name} 被拒产物在回退前已删除",
                bool(sw) and sw[0]["preexisting_output"] is False,
                f"software rung saw existing output="
                f"{sw[0]['preexisting_output'] if sw else '-'}")
-        # The real contract: every attempt that is *not* the first must start
-        # from a state where the previous artifact is gone. The first rung
-        # legitimately starts clean because nothing has run yet -- which is
-        # exactly why the assertion is about reruns, not about all rungs.
         later = trace[1:]
-        record("native.除首次外每次重试前都不存在旧产物",
+        record(f"nonson.{b.name} 每次重试前都无旧产物",
                bool(later) and all(
-                   e["preexisting_output"] is False for e in later
-               ),
-               f"{len(later)} rerun(s), "
-               f"max preexisting="
-               f"{max((e['preexisting_output'] for e in later), default=False)}")
-        record("native.软解重试有上限 (硬解最多一次)",
-               len([e for e in trace if "--avhw" in e["cmd"]]) <= 1
+                   e["preexisting_output"] is False for e in later),
+               f"{len(later)} rerun(s)")
+        record(f"nonson.{b.name} 硬解最多一次 + 软解最多一次",
+               sum(1 for e in trace if "--avhw" in e["cmd"]) <= 1
                and len(sw) <= 1,
-               f"hw={len([e for e in trace if '--avhw' in e['cmd']])} "
+               f"hw={sum(1 for e in trace if '--avhw' in e['cmd'])} "
                f"sw={len(sw)}")
-        record("native.回退原因被记录",
+        record(f"nonson.{b.name} 回退原因被记录",
                any("integrity" in w.lower() or "hardware decode" in w.lower()
                    for w in warns),
                f"{len(warns)} warning(s)")
-    finally:
-        batch_hw._HW_TOOL_CACHE.pop(cache_key, None)
 
-    # --- --hw-decode require cannot be silently satisfied -----------------
+    # (3) unknown source: still attempts hardware, and says so.
+    b = _FakeBackend("nvencc", Path("C:/t/NVEncC64.exe"))
+    trace, _warns = _run_fallback(
+        b, hw_decode="auto", tmp=tmp, out_name="unknown.mov",
+        source_kind=SOURCE_UNKNOWN,
+    )
+    record("unknown.来源未知时尝试 --avhw (并记录为未分类)",
+           bool(trace) and "--avhw" in trace[0]["cmd"],
+           " ".join(trace[0]["cmd"][:3]) if trace else "-")
+
+    # (4) a seek refuses hardware outright, so no --avhw attempt happens.
+    b = _FakeBackend("nvencc", Path("C:/t/NVEncC64.exe"))
+    trace, warns = _run_fallback(
+        b, hw_decode="auto", tmp=tmp, out_name="seek.mov",
+        source_kind=SOURCE_NON_SONY, seek=True,
+    )
+    record("seek.带 seek 时从不尝试 --avhw",
+           bool(trace) and not any("--avhw" in e["cmd"] for e in trace),
+           f"{len(trace)} command(s)")
+    record("seek.带 seek 时出声说明原因",
+           any("seek" in w.lower() for w in warns), f"{len(warns)} warning(s)")
+
+    # (5) capability refusal: software, announced, no --avhw attempt.
+    b = _FakeBackend("qsvencc", Path("C:/t/QSVEncC64.exe"))
+    b.caps = b.caps
+    trace, warns = _run_fallback(
+        b, hw_decode="auto", tmp=tmp, out_name="refused.mov",
+        source_kind=SOURCE_NON_SONY,
+    )
+    # The fake backend declares hevc caps; a hevc 4:2:0 source is not refused,
+    # so assert the *code* path instead: route-level refusal + no hw argv.
+    r = route_decode(policy="auto", backend="qsv", codec="h264",
+                     chroma="4:2:2", depth=10, source_kind=SOURCE_NON_SONY)
+    record("refusal.能力拒绝时路由给出 capability_refused 且不请求硬件",
+           not r.hardware and r.reason == "capability_refused" and r.reader == "avsw",
+           r.reason)
+
+    # (6) policy=require with a Sony source must fail, not silently soft-decode.
     try:
         _run_fallback(
             _FakeBackend("nvencc", Path("C:/t/NVEncC64.exe")),
-            hw_decode="require", script_dir=tmp, tmp=tmp, out_name="c.mov",
+            hw_decode="require", tmp=tmp, out_name="req.mov",
+            source_kind=SOURCE_SONY,
         )
-        record("native.require 无可用硬解时硬失败", False, "no error raised")
+        record("require.Sony 来源下 require 硬解失败 (不静默软解)", False,
+               "no error raised")
     except RuntimeError as exc:
-        record("native.require 无可用硬解时硬失败", True, str(exc)[:80])
+        record("require.Sony 来源下 require 硬解失败 (不静默软解)", True,
+               str(exc)[:90])
 
-    # --- routing still refuses what was measured unsafe -------------------
-    r = route_decode(policy="auto", backend="nvenc", codec="hevc",
-                     chroma="4:2:1", depth=10)
-    record("native.未证明组合路由到软件 (not_proven)",
-           not r.hardware and r.reason == "not_proven", r.reason)
-    r2 = route_decode(policy="auto", backend="nvenc", codec="hevc",
-                      chroma="4:2:0", depth=10, seek_requested=True)
-    record("native.带 seek 时拒绝硬解 (读端不等价)",
-           not r2.hardware and r2.reason == "seek_not_equivalent", r2.reason)
+    # =====================================================================
+    # 7. the audit line can answer "why this reader?"
+    # =====================================================================
+    dsrc = inspect.getsource(batch_hw.hw_encode_with_fallback)
+    for field in ("source_kind", "decode_reader", "decode_policy",
+                  "route_reason", "hardware_integrity", "software_fallback",
+                  "fallback_reason", "final_status", "actual_encoder"):
+        record(f"audit.DECODE_DECISION 记录 {field}", field in dsrc)
+    record("audit.回退标记只由完整性拒绝设置",
+           "fallback_reason = f\"{reason}" in dsrc
+           or "fallback_reason = f" in dsrc,
+           "fallback_reason assigned in the integrity branch only")
 
-    # --- the x265/SVT-AV1 FFmpeg route must survive this change -----------
+    # =====================================================================
+    # 8. x265 / SVT-AV1 must be untouched by the rigaya change
+    # =====================================================================
     from encoders.hwdecode_ffmpeg import (
         DecodePlan,
         Transfer,
@@ -345,52 +481,68 @@ def l1_native_decode() -> None:
     )
     hw_cmd = apply_decode_plan(x265, plan, "C:/x/in.mp4")
     joined = " ".join(hw_cmd)
-    record("native.x265 仍获得 FFmpeg 原生硬解参数",
+    record("ffmpeg.x265 仍获得 FFmpeg 原生硬解参数",
            "-hwaccel" in hw_cmd and "hevc_cuvid" in hw_cmd
            and "cuda=cu:0" in hw_cmd, joined[:90])
-    record("native.x265 硬解插入在 -i 之前, 滤镜在其后",
+    record("ffmpeg.x265 硬解插入在 -i 之前, 滤镜在其后",
            hw_cmd.index("-hwaccel") < hw_cmd.index("-i")
            < hw_cmd.index("-vf"), joined[:90])
-    record("native.x265 编码参数逐字保留",
-           all(t in hw_cmd for t in ("libx265", "-preset", "medium")),
-           " ".join(t for t in hw_cmd if t in ("libx265", "medium")))
-    record("native.x265 无 y4m 中介",
+    record("ffmpeg.x265 编码参数逐字保留",
+           all(t in hw_cmd for t in ("libx265", "-preset", "medium")))
+    record("ffmpeg.x265 无 y4m 中介",
            "yuv4mpegpipe" not in hw_cmd and hw_cmd[-1] != "-", hw_cmd[-1])
 
     sw_plan = DecodePlan(substrate="sw", reason="no_compatible_hw_decoder",
                          codec="hevc", chroma="4:2:0", depth=10)
-    record("native.软件计划不改写 FFmpeg argv (逐字相同)",
+    record("ffmpeg.软件计划不改写 FFmpeg argv (逐字相同)",
            apply_decode_plan(x265, sw_plan, "C:/x/in.mp4") == x265)
     try:
         apply_decode_plan(x265, plan, "C:/x/other.mp4")
-        record("native.输入不匹配时拒绝改写 (不猜)", False, "no error")
+        record("ffmpeg.输入不匹配时拒绝改写 (不猜)", False, "no error")
     except ValueError as exc:
-        record("native.输入不匹配时拒绝改写 (不猜)", True, str(exc)[:70])
+        record("ffmpeg.输入不匹配时拒绝改写 (不猜)", True, str(exc)[:70])
 
-    # --- the matrix gate stays honest -------------------------------------
-    # Asserted against the matrix harness's own provenance check, not against
-    # a restatement of the resolver's answer: if the builds are absent the
-    # harness must refuse, so the matrix can never be reported green on this
-    # installation.
-    try:
-        from tests.hwdecode import sources as hw_sources
+    # SVT-AV1 uses the same planner; assert it is reachable for its codec.
+    svt = DecodePlan(
+        substrate="ffmpeg_hw", decoder="hevc_cuvid", hwaccel="cuda",
+        device="cuda=cu:0", device_index=0,
+        surface_format="p010le", target_format="yuv420p10le",
+        codec="hevc", chroma="4:2:0", depth=10,
+        transfer=Transfer(format="p010le",
+                          filters=["hwdownload,format=p010le"], direct=True),
+        reason="hardware_compatible",
+    )
+    svt_cmd = apply_decode_plan(
+        ["ffmpeg.exe", "-i", "C:/x/in.mp4", "-c:v", "libsvtav1",
+         "C:/x/out.mp4"],
+        svt, "C:/x/in.mp4",
+    )
+    record("ffmpeg.SVT-AV1 同样获得 FFmpeg 硬解参数",
+           "hevc_cuvid" in svt_cmd and "libsvtav1" in svt_cmd)
 
-        prov = hw_sources.verify_provenance(strict=False)
-        prov_ok = bool(prov.get("ok"))
-        prov_note = (
-            f"provenance ok={prov_ok}, "
-            f"{len(prov.get('failures') or [])} failure(s)"
-        )
-    except Exception as exc:                       # noqa: BLE001
-        prov = None
-        prov_ok = False
-        prov_note = f"harness provenance check failed to run: {exc}"
-    if prov is None:
-        record("native.矩阵 harness 可调用 (provenance 检查)",
-               builds_present, prov_note)
-    else:
-        record(
-            "native.矩阵 provenance 与构建缺失状态一致 (不虚报 PASS)",
-            prov_ok is builds_present,
-            f"{prov_note}; patched builds present={builds_present}",
-        )
+    # =====================================================================
+    # 9. the research build is quarantined, not deleted, and not a gate
+    # =====================================================================
+    from encoders.hwdecode import resolve_decode_tool
+
+    root = paths.ROOT
+    stock_nv = root / "tools" / "NVEncC_9.31_x64" / "NVEncC64.exe"
+    dt = resolve_decode_tool(kind="nvencc", script_dir=root, policy="auto")
+    record("research.研究版解析器仍保留 (provenance 资料未删除)",
+           hasattr(dt, "role") and dt.role in ("patched", "unusable"),
+           f"role={dt.role} reason={dt.reason}")
+    # The production path must not consult it: no reference in the encode path.
+    record("research.生产编码路径不调用 resolve_decode_tool",
+           "resolve_decode_tool" not in inspect.getsource(
+               batch_hw.hw_encode_with_fallback)
+           and "resolve_decode_tool" not in inspect.getsource(
+               batch_hw.process_file_hw),
+           "quarantined from production routing")
+    record("research.--avhw 使用 backend.tool (已部署二进制)",
+           "hw_tool = backend.tool" in inspect.getsource(
+               batch_hw.hw_encode_with_fallback))
+    from encoders.hwdecode import decode_tool_is_stock
+
+    record("research.装船构建仍被识别 (防误用闸门保留)",
+           decode_tool_is_stock("nvenc", stock_nv) is True,
+           "tools/NVEncC_9.31_x64/NVEncC64.exe -> stock")

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import inspect
 import json
 import os
 import shutil
@@ -328,6 +329,20 @@ def a01(t, ctx):
     b = next(x for x in rep["binaries"]
              if x["backend"] == "nvenc" and x["role"] == "hardware_decode")
     p = rep["patches"]["nvenc"]
+    # A missing research binary is BLOCKED, not FAIL: the test cannot make a
+    # claim about a file that is not there, and recording it as a failure
+    # would suggest the artefact was examined and found wrong.
+    if not b["exists"]:
+        return _res(
+            t, "HD-A01", STATUS_BLOCKED,
+            actual="binary absent",
+            reason=(f"the research build is not present at "
+                    f"{sources.load_provenance()['backends']['nvenc']['hardware_decode']['binary']} "
+                    f"and cannot be built here (no MSVC/oneVPL/rigaya sources); "
+                    f"the patch file itself still matches its recorded sha256 "
+                    f"(patch_match={p['match']})"),
+            evidence={"binary": b, "patch": p},
+        )
     ok = b["ok"] and p["match"]
     return _res(
         t, "HD-A01", STATUS_PASS if ok else STATUS_FAIL,
@@ -343,6 +358,18 @@ def a02(t, ctx):
     b = next(x for x in rep["binaries"]
              if x["backend"] == "qsv" and x["role"] == "hardware_decode")
     p = rep["patches"]["qsv"]
+    if not b["exists"]:
+        return _res(
+            t, "HD-A02", STATUS_BLOCKED,
+            actual="binary absent",
+            reason=(f"the research build is not present at "
+                    f"{sources.load_provenance()['backends']['qsv']['hardware_decode']['binary']} "
+                    f"and cannot be built here (no MSVC/oneVPL/rigaya sources); "
+                    f"the patch file itself still matches its recorded sha256 "
+                    f"(patch_match={p['match']})"),
+            evidence={"binary": b, "patch": p,
+                      "claim_boundary": sources.load_provenance()["backends"]["qsv"]["claim_boundary"]},
+        )
     ok = b["ok"] and p["match"]
     return _res(
         t, "HD-A02", STATUS_PASS if ok else STATUS_FAIL,
@@ -642,7 +669,25 @@ def b03(t, ctx):
 
 @impl("b04_unproven_is_safe")
 def b04(t, ctx):
-    from encoders.hwdecode import route_decode
+    """Unclassified and non-Sony inputs under the source-aware policy.
+
+    **Superseded assertion, replaced.** This test used to require that every
+    combination outside the research allowlist route to software with a
+    warning ("never unknown -> hardware anyway"). That is no longer the rule:
+    the allowlist stopped being a precondition, and an unclassified source is
+    routed to hardware *deliberately* (see SOURCE_UNKNOWN in hwdecode) because
+    the binding decision is the post-encode integrity gate.
+
+    What is asserted now:
+
+    * an unclassified source attempts hardware and is **recorded as unknown**,
+      not silently treated as a positive non-Sony finding;
+    * a non-Sony source of the same format attempts hardware too;
+    * the remember-for-this-run mechanism still withholds hardware.
+    """
+    from encoders.hwdecode import (
+        R_SOURCE_UNKNOWN, SOURCE_NON_SONY, SOURCE_UNKNOWN, route_decode,
+    )
     grid = [
         ("nvenc", "hevc", "4:2:0", 8),
         ("nvenc", "hevc", "4:2:2", 10),
@@ -657,17 +702,43 @@ def b04(t, ctx):
     ]
     ev, problems = {}, []
     for backend, codec, chroma, depth in grid:
-        r = route_decode(policy="auto", backend=backend, codec=codec,
-                         chroma=chroma, depth=depth)
         key = f"{backend}/{codec}/{chroma}/{depth}"
-        ev[key] = {"hardware": r.hardware, "reason": r.reason}
-        if r.hardware:
-            problems.append(f"{key}: activated an unproven hardware path")
-        if not r.warnings:
-            problems.append(f"{key}: routed to software with no warning")
+        u = route_decode(policy="auto", backend=backend, codec=codec,
+                         chroma=chroma, depth=depth, source_kind=SOURCE_UNKNOWN)
+        ev[key] = {"unknown": {"reader": u.reader, "reason": u.reason,
+                               "source_kind": u.source_kind}}
+        if not u.hardware:
+            problems.append(f"{key}: unclassified source did not attempt hardware")
+        if u.source_kind != SOURCE_UNKNOWN:
+            problems.append(f"{key}: source class recorded as {u.source_kind}")
+        if u.reason != R_SOURCE_UNKNOWN:
+            problems.append(
+                f"{key}: reason {u.reason}, expected {R_SOURCE_UNKNOWN} -- an "
+                f"absent provenance marker must not read as a positive "
+                f"non-Sony finding")
+
+        n = route_decode(policy="auto", backend=backend, codec=codec,
+                         chroma=chroma, depth=depth, source_kind=SOURCE_NON_SONY)
+        ev[key]["non_sony"] = {"reader": n.reader, "reason": n.reason}
+        if not n.hardware:
+            problems.append(f"{key}: non-Sony source was refused hardware")
+
+        m = route_decode(
+            policy="auto", backend=backend, codec=codec, chroma=chroma,
+            depth=depth, source_kind=SOURCE_NON_SONY,
+            memo={(backend, codec, chroma, depth): "device init failed once"},
+        )
+        ev[key]["memoized"] = {"reader": m.reader, "reason": m.reason}
+        if m.hardware:
+            problems.append(f"{key}: a remembered device/format failure did "
+                            f"not withhold hardware")
+        if m.reader != "avsw":
+            problems.append(f"{key}: memoized refusal reader {m.reader}")
+
     return _res(
         t, "HD-B04", STATUS_PASS if not problems else STATUS_FAIL,
-        actual=f"{len(grid)} unproven combinations, all routed to software safely",
+        actual=f"{len(grid)} combinations: unclassified -> hardware recorded as "
+               f"unknown, non-Sony -> hardware, remembered failure -> software",
         reason="; ".join(problems), evidence=ev,
     )
 
@@ -704,28 +775,66 @@ def b05(t, ctx):
 
 @impl("b06_require_never_degrades")
 def b06(t, ctx):
-    from encoders.hwdecode import route_decode, R_REQUIRE_UNMET
+    """require semantics for the paths that genuinely cannot use hardware.
+
+    **Adjusted, not weakened.** The old grid used combinations the research
+    allowlist excluded; those are legitimate hardware routes now, so requiring
+    them to fail would be asserting the removed policy. The paths that *cannot*
+    use hardware are unchanged, and those are exactly what require must refuse
+    to paper over.
+    """
+    from encoders.hwdecode import (
+        R_REQUIRE_UNMET, SOURCE_NON_SONY, SOURCE_SONY, route_decode,
+    )
     ev, problems = {}, []
-    for backend, codec, chroma, depth in (
-        ("nvenc", "hevc", "4:2:0", 8),
-        ("qsv", "h264", "4:2:2", 10),
-        ("nvenc", "av1", "4:2:0", 10),
-    ):
+    cases = [
+        ("nvenc", "hevc", "4:2:0", 10, SOURCE_SONY),
+        ("qsv", "h264", "4:2:2", 10, SOURCE_NON_SONY),
+        ("nvenc", "h264", "4:2:2", 10, SOURCE_SONY),
+    ]
+    for backend, codec, chroma, depth, sk in cases:
         r = route_decode(policy="require", backend=backend, codec=codec,
-                         chroma=chroma, depth=depth)
-        key = f"{backend}/{codec}/{chroma}/{depth}"
+                         chroma=chroma, depth=depth, source_kind=sk)
+        key = f"{backend}/{codec}/{chroma}/{depth}/{sk}"
         ev[key] = r.to_json()
         if r.reason != R_REQUIRE_UNMET:
             problems.append(f"{key}: reason {r.reason} != require_unmet")
         if r.hardware:
-            problems.append(f"{key}: reported hardware under require for an ineligible input")
+            problems.append(
+                f"{key}: reported hardware under require for an input that "
+                f"cannot use it")
+        if r.reader != "avhw":
+            problems.append(
+                f"{key}: reader {r.reader}; require_unmet must not hand back a "
+                f"software reader as if it were a decision to proceed")
+
+    # a seek is never hardware, so require must fail rather than soft-decode
+    s = route_decode(policy="require", backend="nvenc", codec="hevc",
+                     chroma="4:2:0", depth=10, source_kind=SOURCE_NON_SONY,
+                     seek_requested=True)
+    ev["seek/require"] = s.to_json()
+    if s.reason != R_REQUIRE_UNMET:
+        problems.append(f"seek/require: reason {s.reason} != require_unmet")
+
+    # a remembered device failure must also fail under require
+    d = route_decode(
+        policy="require", backend="nvenc", codec="hevc", chroma="4:2:0",
+        depth=10, source_kind=SOURCE_NON_SONY,
+        memo={("nvenc", "hevc", "4:2:0", 10): "device init failed once"},
+    )
+    ev["memoized/require"] = d.to_json()
+    if d.reason != R_REQUIRE_UNMET:
+        problems.append(f"memoized/require: reason {d.reason} != require_unmet")
+
     # the ladder must raise rather than continue
     src = (ROOT / "core" / "batch_hw.py").read_text(encoding="utf-8")
     if "R_REQUIRE_UNMET" not in src or "HW_DECODE_REQUIRE" not in src:
         problems.append("ladder does not handle require_unmet")
     return _res(
         t, "HD-B06", STATUS_PASS if not problems else STATUS_FAIL,
-        actual="require yields require_unmet and the ladder raises",
+        actual="require yields require_unmet on the paths that cannot use "
+               "hardware (Sony, known refusal, seek, remembered failure) and "
+               "the ladder raises",
         reason="; ".join(problems), evidence=ev,
     )
 
@@ -813,19 +922,73 @@ def b09(t, ctx):
 
 @impl("b10_hw_decode_binary_pinned")
 def b10(t, ctx):
-    """Hardware decode must use the patched build, or say why it cannot.
+    """Which binary performs hardware decode, under the source-aware policy.
 
-    Using the shipped build would be *safe* — the integrity gate would
-    reject every result — but the hardware path would then never run, so
-    the feature would be quietly useless while appearing enabled. That is
-    its own kind of silent failure.
+    **Superseded assertion, replaced.** This test used to require that
+    ``policy=auto`` pin hardware decode to the sha256-verified patched build.
+    That was the right rule while the deployed builds were the only ones that
+    could be asked for ``--avhw``; it is the wrong rule now, because the
+    decision moved to the source class (Sony -> software before any attempt)
+    and the deployed binary is what runs ``--avhw`` on everything else.
+
+    What is asserted now:
+
+    * production hardware decode runs the **deployed** binary and does not
+      consult the research resolver at all;
+    * the source class, not a codec allowlist, selects the reader;
+    * the research resolver still refuses a **hash-mismatched** or **missing**
+      build with a reason code rather than silently substituting the deployed
+      one -- that half of the old claim is still exactly right and is kept.
     """
     from encoders.hwdecode import (
-        PATCHED_BUILD, resolve_decode_tool, R_NOT_PROVEN, R_POLICY_OFF,
-        decode_tool_is_stock,
+        PATCHED_BUILD, R_NOT_PROVEN, R_POLICY_OFF, R_SONY_SOFTWARE,
+        SOURCE_NON_SONY, SOURCE_SONY, SOURCE_UNKNOWN, decode_tool_is_stock,
+        resolve_decode_tool, route_decode,
     )
     ev, problems = {}, []
 
+    # --- production: the deployed binary, chosen by source class ----------
+    for backend in ("nvenc", "qsv"):
+        for sk, want_reader in ((SOURCE_SONY, "avsw"),
+                                (SOURCE_NON_SONY, "avhw"),
+                                (SOURCE_UNKNOWN, "avhw")):
+            r = route_decode(
+                policy="auto", backend=backend, codec="hevc", chroma="4:2:0",
+                depth=8, source_kind=sk,
+            )
+            ev[f"{backend}/{sk}"] = {"reader": r.reader, "reason": r.reason}
+            if r.reader != want_reader:
+                problems.append(
+                    f"{backend}/{sk}: reader {r.reader}, expected {want_reader}")
+
+    sony = route_decode(policy="auto", backend="nvenc", codec="hevc",
+                        chroma="4:2:0", depth=10, source_kind=SOURCE_SONY)
+    ev["sony_reason"] = sony.reason
+    if sony.reason != R_SONY_SOFTWARE:
+        problems.append(f"Sony reason is {sony.reason}, expected {R_SONY_SOFTWARE}")
+    # the allowlist must no longer be able to withhold hardware from non-Sony
+    nonproven = route_decode(policy="auto", backend="nvenc", codec="hevc",
+                             chroma="4:2:0", depth=8,
+                             source_kind=SOURCE_NON_SONY)
+    ev["allowlist_not_a_gate"] = {"reader": nonproven.reader,
+                                  "reason": nonproven.reason}
+    if not nonproven.hardware:
+        problems.append(
+            "a non-Sony source outside the research allowlist was refused "
+            "hardware; the allowlist must not gate production")
+
+    # --- production must not consult the research resolver ----------------
+    from core import batch_hw as _bh
+
+    fsrc = inspect.getsource(_bh.hw_encode_with_fallback)
+    if "resolve_decode_tool" in fsrc:
+        problems.append("the production encode path still calls "
+                        "resolve_decode_tool")
+    ev["production_uses_deployed_binary"] = "hw_tool = backend.tool" in fsrc
+    if not ev["production_uses_deployed_binary"]:
+        problems.append("production does not take the deployed backend tool")
+
+    # --- research resolver still refuses unverified builds ----------------
     for kind, base in (("nvencc", "nvenc"), ("qsvencc", "qsv")):
         off = resolve_decode_tool(kind=kind, script_dir=ROOT, policy="off")
         ev[f"{base}/off"] = {"usable": off.usable, "reason": off.reason}
@@ -834,43 +997,29 @@ def b10(t, ctx):
         if off.reason != R_POLICY_OFF:
             problems.append(f"{base}: policy off reason is {off.reason}")
 
-        auto = resolve_decode_tool(kind=kind, script_dir=ROOT, policy="auto")
-        spec = PATCHED_BUILD[base]
-        ev[f"{base}/auto"] = {
-            "usable": auto.usable, "role": auto.role, "reason": auto.reason,
-            "path": str(auto.path) if auto.path else None,
-            "detail": auto.detail,
-        }
-        if not auto.usable:
-            problems.append(
-                f"{base}: patched build not usable ({auto.reason}: {auto.detail})")
-        else:
-            if str(Path(spec["rel"])).replace("\\", "/") not in str(
-                    auto.path).replace("\\", "/"):
-                problems.append(f"{base}: resolved {auto.path}, expected {spec['rel']}")
-            if decode_tool_is_stock(base, auto.path):
-                problems.append(f"{base}: resolved a shipped (defective) build")
-            if auto.role != "patched":
-                problems.append(f"{base}: role is {auto.role!r}, expected 'patched'")
-
     # negative: a build whose bytes do not match the recorded hash must be
     # refused rather than used
     src = ROOT / PATCHED_BUILD["nvenc"]["rel"]
     scratch = FX.WORK / "b10_fake_tools" / "avhw" / "NVEncC_9.31_avhw"
     scratch.mkdir(parents=True, exist_ok=True)
     fake = scratch / "NVEncC64.exe"
-    shutil.copy2(src, fake)
-    with fake.open("r+b") as f:
-        f.seek(0)
-        f.write(b"\x00")
-    bad = resolve_decode_tool(kind="nvencc", script_dir=FX.WORK / "b10_fake_tools",
-                              policy="auto")
-    ev["negative_hash_mismatch"] = {"usable": bad.usable, "reason": bad.reason,
-                                    "detail": bad.detail}
-    if bad.usable:
-        problems.append("a hash-mismatched build was accepted")
-    if bad.reason != R_NOT_PROVEN:
-        problems.append(f"hash mismatch reason is {bad.reason}")
+    if src.is_file():
+        shutil.copy2(src, fake)
+        with fake.open("r+b") as f:
+            f.seek(0)
+            f.write(b"\x00")
+        bad = resolve_decode_tool(
+            kind="nvencc", script_dir=FX.WORK / "b10_fake_tools", policy="auto")
+        ev["negative_hash_mismatch"] = {
+            "usable": bad.usable, "reason": bad.reason, "detail": bad.detail}
+        if bad.usable:
+            problems.append("a hash-mismatched build was accepted")
+        if bad.reason != R_NOT_PROVEN:
+            problems.append(f"hash mismatch reason is {bad.reason}")
+    else:
+        ev["negative_hash_mismatch"] = {
+            "skipped": f"{PATCHED_BUILD['nvenc']['rel']} absent; "
+                       f"cannot build a corrupted copy"}
 
     # negative: a missing build must also refuse, not fall back silently
     empty = FX.WORK / "b10_empty"
@@ -883,10 +1032,15 @@ def b10(t, ctx):
     if miss.reason != R_NOT_PROVEN:
         problems.append(f"missing-build reason is {miss.reason}")
 
+    if not decode_tool_is_stock("nvenc", ROOT / "tools" / "NVEncC_9.31_x64"
+                                / "NVEncC64.exe"):
+        problems.append("the deployed build is no longer recognised as stock")
+
     return _res(
         t, "HD-B10", STATUS_PASS if not problems else STATUS_FAIL,
-        actual="policy off resolves nothing; auto pins the patched build by hash; "
-               "a wrong or missing build is refused with a reason code",
+        actual="production runs the deployed binary with the reader chosen by "
+               "source class (Sony->avsw, other->avhw); the research resolver "
+               "still refuses missing or hash-mismatched builds",
         reason="; ".join(problems), evidence=ev,
     )
 
@@ -4067,7 +4221,26 @@ def load_results() -> list[dict]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-def summarise(results: list[dict]) -> dict:
+def _requirement_map() -> dict[str, str]:
+    """test id -> the binary that test actually needs.
+
+    ``patched_binary`` marks a test whose *subject* is the research build (its
+    identity, provenance, or the stock-vs-patched defect comparison). Those
+    cannot run without it and are reported BLOCKED. Everything else runs
+    against the deployed binary, which is what production uses, so the absence
+    of a research build must not block the production path's validation.
+    """
+    try:
+        matrix = load_matrix()
+    except Exception:                              # noqa: BLE001
+        return {}
+    return {
+        t["id"]: t.get("requires", "deployed_binary")
+        for t in matrix.get("tests", [])
+    }
+
+
+def summarise(results: list[dict], run_started: str | None = None) -> dict:
     by_status: dict[str, int] = {}
     by_sev: dict[str, dict[str, int]] = {}
     by_cat: dict[str, dict[str, int]] = {}
@@ -4087,14 +4260,86 @@ def summarise(results: list[dict]) -> dict:
         for r in results
         if r["severity"] == "P0" and r["status"] in ("FAIL", "BLOCKED")
     ]
+
+    # --- the two gates ----------------------------------------------------
+    # A research test that cannot run is BLOCKED and stays visible; it must
+    # never be laundered into a PASS, and it must not take the production gate
+    # down with it.
+    #
+    # Results from *earlier* runs are excluded from the gates. The results
+    # file accumulates across invocations, so a `--phase 1` run leaves
+    # category C-K entries from a previous session in place -- measured:
+    # a PASS for HD-C01 dated 2026-09-14 was being counted in the same gate
+    # as today's results, which is exactly the "green from stale evidence"
+    # pattern this matrix exists to catch. They are reported as *sat out*
+    # instead. `run_started` is the current invocation's start; when it is not
+    # supplied (a bare `summary` over a finished results file) every result is
+    # treated as fresh, which is the pre-existing behaviour.
+    started = None
+    if run_started:
+        try:
+            started = datetime.fromisoformat(run_started)
+        except ValueError:
+            started = None
+    req = _requirement_map()
+    gates: dict[str, dict] = {}
+    for label, wanted in (("production", "deployed_binary"),
+                          ("research", "patched_binary")):
+        rows = [r for r in results
+                if req.get(r["test_id"], "deployed_binary") == wanted]
+        if not rows:
+            continue
+        fresh, stale = [], []
+        for r in rows:
+            if started is None:
+                fresh.append(r)
+                continue
+            try:
+                stamp = datetime.fromisoformat(r.get("timestamp") or "")
+            except ValueError:
+                stale.append(r)
+            else:
+                (fresh if stamp >= started else stale).append(r)
+        st: dict[str, int] = {}
+        for r in fresh:
+            st[r["status"]] = st.get(r["status"], 0) + 1
+        p0r = [r for r in fresh if r["severity"] == "P0"]
+        p0r_bad = [r for r in p0r if r["status"] in ("FAIL", "BLOCKED")]
+        gates[label] = {
+            "total": len(fresh),
+            "PASS": st.get("PASS", 0),
+            "FAIL": st.get("FAIL", 0),
+            "BLOCKED": st.get("BLOCKED", 0),
+            "SKIP": st.get("SKIP", 0),
+            "stale_total": len(stale),
+            "stale_pass": sum(1 for r in stale if r["status"] == "PASS"),
+            "stale_blockers": [
+                f"{r['test_id']}: {r['status']} ({r.get('timestamp', '?')})"
+                for r in stale
+                if r["severity"] == "P0" and r["status"] != "PASS"
+            ],
+            "p0_total": len(p0r),
+            "p0_pass": sum(1 for r in p0r if r["status"] == "PASS"),
+            "p0_fail": sum(1 for r in p0r if r["status"] == "FAIL"),
+            "p0_blocked": sum(1 for r in p0r if r["status"] == "BLOCKED"),
+            "status": "BLOCKED" if p0r_bad else "READY FOR REVIEW",
+            "blockers": [
+                f"{r['test_id']}: {r['status']}"
+                + (f" ({r['reason']})" if r.get("reason") else "")
+                for r in p0r_bad
+            ],
+        }
+
     return {
         "total": len(results),
         "PASS": by_status.get("PASS", 0),
         "FAIL": by_status.get("FAIL", 0),
         "BLOCKED": by_status.get("BLOCKED", 0),
         "SKIP": by_status.get("SKIP", 0),
+        "started": run_started or "",
         "by_severity": by_sev,
         "by_category": by_cat,
+        "gates": gates,
         "gate": {
             "p0_total": sum(p0.values()),
             "p0_pass": p0.get("PASS", 0),
@@ -4109,13 +4354,23 @@ def summarise(results: list[dict]) -> dict:
     }
 
 
-def cmd_summary(_args) -> int:
+def cmd_summary(args) -> int:
     results = load_results()
-    s = summarise(results)
+    s = summarise(results, getattr(args, "run_started", None))
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / "summary.json").write_text(
         json.dumps(s, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(s, indent=2, ensure_ascii=False))
+    if s.get("gates"):
+        for label, g in s["gates"].items():
+            note = ""
+            if g.get("stale_total"):
+                note = (f"  [{g['stale_total']} result(s) sat out as stale, "
+                        f"{g['stale_pass']} of them PASS]")
+            print(f"gate {label}: {g['status']}  "
+                  f"fresh={g['total']} PASS={g['PASS']} FAIL={g['FAIL']} "
+                  f"BLOCKED={g['BLOCKED']} SKIP={g['SKIP']}  "
+                  f"P0 {g['p0_pass']}/{g['p0_total']}{note}")
     return 0
 
 
@@ -4182,6 +4437,9 @@ def cmd_run(args) -> int:
         return 1
 
     ctx = Ctx(deep=args.deep, verbose=not args.quiet)
+    # Stamped so `summary` can tell this invocation's results apart from
+    # entries earlier runs left in the accumulated results file.
+    args.run_started = datetime.now(timezone.utc).isoformat(timespec="seconds")
     print(f"running {len(selected)} tests "
           f"(deep={args.deep}, repeat={args.repeat})")
     failures = 0
