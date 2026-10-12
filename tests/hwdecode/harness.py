@@ -115,9 +115,14 @@ def find_test(matrix: dict, tid: str) -> dict | None:
 class Ctx:
     """Shared per-run state."""
 
-    def __init__(self, *, deep: bool = False, verbose: bool = True):
+    def __init__(self, *, deep: bool = False, verbose: bool = True,
+                 run_started: str | None = None):
         self.deep = deep
         self.verbose = verbose
+        #: ISO timestamp of this invocation, so a test that reads the
+        #: accumulated results file (HD-J06) can tell this run's results from
+        #: entries an earlier session left behind.
+        self.run_started = run_started
         self._facts: dict[str, object] = {}
         self.notes: list[str] = []
 
@@ -154,6 +159,129 @@ def _require_fixture(fx: FX.Fixture | None, tid: str, ctx: Ctx) -> TestResult | 
             input=fx.fid, reason="fixture has no video stream",
         )
     return None
+
+
+def source_kind_of(path: Path) -> tuple[str, list[dict]]:
+    """Classify a real file through the product's own probe and classifier.
+
+    Deliberately not a re-implementation: it calls ``core.probe.probe_source``
+    (the same call the product makes) and then
+    ``encoders.hwdecode.source_kind_from_streams``, which in turn delegates to
+    ``core.batch_hw.is_sony_source``. A routing test that synthesised its own
+    stream list would be testing a copy of the rule rather than the rule, and
+    could pass while the product classified the same file differently.
+
+    Returns ``(source_kind, streams)``.
+    """
+    from core.probe import probe_source
+    from encoders.hwdecode import source_kind_from_streams
+
+    _summary, streams = probe_source(ROOT / "tools" / "ffprobe.exe", path)
+    return source_kind_from_streams(streams), streams
+
+
+def _sony_evidence(streams: list[dict]) -> list[str]:
+    """The data-stream tags that made a file Sony, for the evidence dict."""
+    return sorted(
+        str(s.get("codec_tag_string"))
+        for s in streams
+        if s.get("codec_type") == "data"
+    )
+
+
+def _ffmpeg_caps():
+    """Build (once per run) the FFmpeg hardware-decode capability snapshot."""
+    from encoders.hwdecode_ffmpeg import build_caps
+    ffmpeg = ROOT / "tools" / "ffmpeg.exe"
+    if not ffmpeg.is_file():
+        return None, ffmpeg
+    global _FFMPEG_CAPS
+    try:
+        cached = _FFMPEG_CAPS
+    except NameError:
+        cached = None
+    if cached is None:
+        cached = build_caps(ffmpeg)
+        _FFMPEG_CAPS = cached
+    return cached, ffmpeg
+
+
+def _route_trace(tmp: Path, backend: str, *, source_kind: str,
+                 out_name: str) -> tuple[list[dict], list[list[str]]]:
+    """Drive the real routing state machine and record every argv it builds.
+
+    Mirrors the encoding-side entry point closely enough to be decisive about
+    *which reader was requested*, while standing in for the encoder process so
+    no binary is needed. Returns ``(entries, commands)`` where each entry is
+    ``{"cmd", "hw", "preexisting_output"}``.
+
+    This is what lets a routing test assert "``--avhw`` was never attempted"
+    on the argv, rather than asserting that a log line is absent.
+    """
+    import logging
+
+    from core import batch_hw
+    from encoders.caps import BackendCaps, CodecCaps
+
+    class _Backend:
+        def __init__(self) -> None:
+            self.kind = "nvencc" if backend == "nvenc" else "qsvencc"
+            self.name = backend
+            self.codec = "hevc"
+            self.tool = Path(f"C:/t/{'NVEncC64' if backend == 'nvenc' else 'QSVEncC64'}.exe")
+            self.caps = BackendCaps(tool="stub",
+                                    codecs={"hevc": CodecCaps(bit10=True)})
+
+        def command(self, source, output, profile, chroma, depth, vfr=False,
+                    audio_copy=False, color=None, reader="avsw",
+                    container="mov"):
+            return ([str(self.tool), "-i", str(source), f"--{reader}",
+                     "--video-track", "1", "-c", self.codec,
+                     "--output-depth", str(depth), "-f", container,
+                     "-o", str(output)], [], [])
+
+    class _SrcInfo:
+        codec = "hevc"
+        chroma = "4:2:0"
+        bit_depth = 10
+        color = None
+
+    entries: list[dict] = []
+    commands: list[list[str]] = []
+    out = tmp / out_name
+    real_run = batch_hw.run_hw_tool
+
+    def fake_run(cmd, raw_log, total_frames, label, progress=True, **kw):
+        entries.append({"cmd": list(cmd), "hw": "--avhw" in cmd,
+                        "preexisting_output": out.is_file()})
+        commands.append(list(cmd))
+        Path(raw_log).parent.mkdir(parents=True, exist_ok=True)
+        Path(raw_log).write_text(
+            "NVEncC (x64) 9.31\nInput Info avcuvid: 3840x2160\n"
+            "encoded 240 frames, 100.0 fps\n", encoding="utf-8")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"\0" * 64)
+        return 0, 0.01
+
+    sink = logging.getLogger("hwdecode_route_trace")
+    sink.addHandler(logging.NullHandler())
+    batch_hw.run_hw_tool = fake_run
+    try:
+        batch_hw.hw_encode_with_fallback(
+            label="nvencc", backend=_Backend(),
+            source=tmp / "src.mp4", output=out,
+            profile={}, src_info=_SrcInfo(), vfr=False,
+            work_dir=tmp, total_frames=240, ffprobe=tmp / "ffprobe.exe",
+            audio_copy=False, do_frame_check=False, no_downgrade=False,
+            gpac=None, logger=sink, file_logger=sink,
+            hw_decode="auto", hw_decode_memo={}, source_kind=source_kind,
+        )
+    except RuntimeError:
+        # `require` or an exhausted ladder: the trace is still the evidence.
+        pass
+    finally:
+        batch_hw.run_hw_tool = real_run
+    return entries, commands
 
 
 def do_encode(
@@ -619,67 +747,234 @@ def a09(t, ctx):
 
 @impl("b01_sony_hs_routing")
 def b01(t, ctx):
-    from encoders.hwdecode import route_decode
+    """Sony XAVC HS routing under the source-aware policy.
+
+    **Stale expectation replaced.** This test used to require
+    ``auto -> avhw`` with ``reason=proven_combination`` for Sony XAVC HS.
+    That described the allowlist policy, in which Sony was eligible for the
+    rigaya hardware reader. It is not the current rule: Sony is decoded in
+    software *before any attempt*, because the rigaya ``--avhw`` reader loses
+    leading pictures on these timelines (measured 30 -> 27 frames, rc=0, both
+    tools). So the assertions are now the opposite of the old ones, and they
+    are stated as such rather than silently inverted.
+
+    What is asserted:
+
+    * the fixture really is classified Sony, by the product's own probe and
+      classifier (not by a hand-written stream list);
+    * both backends choose ``avsw`` with
+      ``reason=sony_hardware_decode_safety``;
+    * no ``--avhw`` is attempted at all -- checked on the argv the state
+      machine builds, not on a log string;
+    * the preventive decision is **not** reported as a fallback, and emits no
+      warning claiming hardware decode failed;
+    * the ``DECODE_DECISION`` line records it correctly.
+
+    Note the subject is the *rigaya* path. The FFmpeg path (x265/SVT-AV1)
+    must still prefer hardware for this same file, and that is asserted
+    separately in ``b11_ffmpeg_path_hardware_first``.
+    """
+    from encoders.hwdecode import (
+        R_SONY_SOFTWARE, SOURCE_SONY, route_decode,
+    )
     fx = FX.SONY_HS
     skip = _require_fixture(fx, "HD-B01", ctx)
     if skip:
         return skip
     facts = ctx.fact(fx)
     v = facts.video
-    ev, problems = {}, []
+    kind, streams = source_kind_of(fx.path)
+    ev, problems = {"source_kind": kind,
+                    "rtmd_evidence": _sony_evidence(streams),
+                    "codec": f"{v.codec}/{v.chroma}/{v.bit_depth}bit"}
+    if kind != SOURCE_SONY:
+        return _res(
+            t, "HD-B01", STATUS_BLOCKED,
+            actual=f"source_kind={kind}",
+            reason=("the fixture is not classified Sony by the product's own "
+                    "probe, so this test cannot assert the Sony branch on it"),
+            evidence=ev,
+        )
+
     for backend in ("nvenc", "qsv"):
         r = route_decode(policy="auto", backend=backend, codec=v.codec,
-                         chroma=v.chroma, depth=v.bit_depth)
+                         chroma=v.chroma, depth=v.bit_depth,
+                         source_kind=kind)
         ev[backend] = r.to_json()
-        if not r.hardware:
-            problems.append(f"{backend}: routed to software ({r.reason})")
-    er, _ = do_encode(ctx, tid="HD-B01", fx=fx, backend="nvenc", reader="avhw",
-                      tag="route", frames=8)
-    ev["real_run"] = {"reader_identity": er.reader_identity, "rc": er.rc}
-    if er.reader_identity != "avcuvid":
-        problems.append("real run did not construct avcuvid")
+        if r.reader != "avsw" or r.hardware:
+            problems.append(
+                f"{backend}: reader={r.reader} hardware={r.hardware}; Sony "
+                f"must be avsw before any attempt")
+        if r.reason != R_SONY_SOFTWARE:
+            problems.append(
+                f"{backend}: reason={r.reason}, expected {R_SONY_SOFTWARE}")
+        if r.warnings:
+            problems.append(
+                f"{backend}: the preventive software decision emitted a "
+                f"warning; it is policy, not a hardware failure: {r.warnings}")
+
+    # The decision must land before any encode, so the argv never asks for
+    # --avhw. Driven through the real state machine.
+    tmp = RESULTS / "b01_route"
+    tmp.mkdir(parents=True, exist_ok=True)
+    nv_hits = []
+    for backend in ("nvenc", "qsv"):
+        hits, _cmds = _route_trace(tmp, backend, source_kind=kind,
+                                   out_name=f"b01_{backend}.mov")
+        nv_hits.extend(h for h in hits if h["hw"])
+        ev[f"{backend}_avhw_attempted"] = any(h["hw"] for h in hits)
+        ev[f"{backend}_rungs"] = len(hits)
+    if nv_hits:
+        problems.append(
+            f"--avhw was attempted {len(nv_hits)} time(s) on a Sony source")
+
     return _res(
         t, "HD-B01", STATUS_PASS if not problems else STATUS_FAIL,
-        actual=f"nvenc={ev['nvenc']['reason']} qsv={ev['qsv']['reason']}",
+        actual=(f"Sony classified from real probe ({', '.join(ev['rtmd_evidence'])}); "
+                f"nvenc/qsv -> avsw/{R_SONY_SOFTWARE}; --avhw never attempted"),
         reason="; ".join(problems), evidence=ev,
     )
 
 
 @impl("b02_sony_422_routing")
 def b02(t, ctx):
-    from encoders.hwdecode import route_decode
+    """Sony H.264 4:2:2: routing decision vs hardware capability evidence.
+
+    **Stale expectation split in two.** This test used to assert
+    "nvenc eligible (avhw); qsv capability_refused -> software" for a *Sony*
+    fixture. That conflated two different facts, and the first half is no
+    longer the production rule:
+
+    1. **Production routing (current policy).** Both backends choose ``avsw``
+       before any attempt, because the source is Sony. The backend is
+       irrelevant to that decision: Sony is not routed to a hardware reader at
+       all. Asserted in the "routing" section below, with the real probe
+       supplying the classification.
+
+    2. **Hardware capability research (preserved).** Whether NVEncC's cuvid
+       reader *can* decode H.264 4:2:2 10-bit, and whether QSVEncC refuses it,
+       is a separate question about the hardware, measured on **non-Sony**
+       media. That evidence is kept -- deliberately not deleted to make the
+       routing assertion easier -- and asserted on a non-Sony classification,
+       where it still describes the code path that decides eligibility for the
+       media that does use a hardware reader.
+
+    The two must not be confused: a capability refusal on non-Sony media is a
+    hardware fact; a Sony route to software is a policy decision. Only the
+    latter applies to Sony material.
+    """
+    from encoders.hwdecode import (
+        R_SONY_SOFTWARE, SOURCE_NON_SONY, SOURCE_SONY,
+        source_kind_from_streams, route_decode,
+    )
     fx = FX.SONY_422_C9037
     skip = _require_fixture(fx, "HD-B02", ctx)
     if skip:
         return skip
     v = ctx.fact(fx).video
-    ev, problems = {}, []
+    kind, streams = source_kind_of(fx.path)
+    ev, problems = {
+        "fixture": f"{v.codec}/{v.chroma}/{v.bit_depth}bit",
+        "source_kind": kind,
+        "rtmd_evidence": _sony_evidence(streams),
+    }
+    if kind != SOURCE_SONY:
+        return _res(
+            t, "HD-B02", STATUS_BLOCKED,
+            actual=f"source_kind={kind}",
+            reason=("the fixture is not classified Sony by the product's own "
+                    "probe, so the Sony branch cannot be asserted on it"),
+            evidence=ev,
+        )
+
+    # --- 1. production routing: Sony -> software, on both backends ---------
+    for backend in ("nvenc", "qsv"):
+        r = route_decode(policy="auto", backend=backend, codec=v.codec,
+                         chroma=v.chroma, depth=v.bit_depth, source_kind=kind)
+        ev[f"routing/{backend}"] = r.to_json()
+        if r.reader != "avsw" or r.hardware:
+            problems.append(
+                f"routing/{backend}: reader={r.reader} hardware={r.hardware}; "
+                f"Sony must be avsw on both backends")
+        if r.reason != R_SONY_SOFTWARE:
+            problems.append(
+                f"routing/{backend}: reason={r.reason}, expected {R_SONY_SOFTWARE}")
+        if r.warnings:
+            problems.append(
+                f"routing/{backend}: preventive software decision warned "
+                f"({r.warnings})")
+
+    # The Sony decision must precede any encode, on both backends.
+    tmp = RESULTS / "b02_route"
+    tmp.mkdir(parents=True, exist_ok=True)
+    for backend in ("nvenc", "qsv"):
+        hits, _ = _route_trace(tmp, backend, source_kind=kind,
+                               out_name=f"b02_{backend}.mov")
+        ev[f"routing/{backend}_avhw_attempted"] = any(h["hw"] for h in hits)
+        if any(h["hw"] for h in hits):
+            problems.append(f"routing/{backend}: --avhw attempted on Sony")
+
+    # --- 2. capability research, preserved, asserted on NON-Sony ----------
+    # Same codec/chroma/depth, different source class: this isolates the
+    # hardware capability question from the Sony policy question.
     nv = route_decode(policy="auto", backend="nvenc", codec=v.codec,
-                      chroma=v.chroma, depth=v.bit_depth)
+                      chroma=v.chroma, depth=v.bit_depth,
+                      source_kind=SOURCE_NON_SONY)
     qs = route_decode(policy="auto", backend="qsv", codec=v.codec,
-                      chroma=v.chroma, depth=v.bit_depth)
-    ev["nvenc"] = nv.to_json()
-    ev["qsv"] = qs.to_json()
+                      chroma=v.chroma, depth=v.bit_depth,
+                      source_kind=SOURCE_NON_SONY)
+    ev["capability/nvenc_non_sony"] = nv.to_json()
+    ev["capability/qsv_non_sony"] = qs.to_json()
     if not nv.hardware:
-        problems.append(f"nvenc should be eligible, got {nv.reason}")
+        problems.append(
+            f"capability/nvenc: non-Sony H.264 4:2:2 10-bit is not eligible "
+            f"({nv.reason}); the research record says cuvid handles it")
     if qs.hardware:
-        problems.append("qsv should refuse, got hardware")
+        problems.append(
+            "capability/qsv: non-Sony H.264 4:2:2 10-bit was offered hardware, "
+            "but the measured refusal is that avqsv cannot decode it")
     if qs.reason != "capability_refused":
-        problems.append(f"qsv reason should be capability_refused, got {qs.reason}")
+        problems.append(
+            f"capability/qsv: reason={qs.reason}, expected capability_refused")
     if not qs.warnings:
-        problems.append("qsv refusal produced no warning (silent fallback)")
-    # both must still deliver a frame-exact result
+        problems.append("capability/qsv: refusal produced no warning")
+
+    # The refusal is a property of (backend, codec, chroma, depth) and must
+    # not depend on the source class -- otherwise it would be policy in
+    # disguise.
+    qs_sony = route_decode(policy="auto", backend="qsv", codec=v.codec,
+                           chroma=v.chroma, depth=v.bit_depth,
+                           source_kind=SOURCE_SONY)
+    ev["capability/qsv_sony_reason"] = qs_sony.reason
+    if qs_sony.reason != R_SONY_SOFTWARE:
+        problems.append(
+            f"capability: a Sony source took reason={qs_sony.reason}; the Sony "
+            f"rule must outrank the capability table so the log says why")
+
+    # both backends must still deliver a frame-exact result in software
     for backend in ("nvenc", "qsv"):
         er, cm = do_encode(ctx, tid="HD-B02", fx=fx, backend=backend,
                            reader="avsw", tag="fallback")
         ok, reasons = checks.reconcile(cm)
         ev[f"{backend}_software"] = {"rc": er.rc, "reconcile_ok": ok,
-                                     "reasons": reasons, "reader": er.reader_identity}
+                                     "reasons": reasons,
+                                     "reader": er.reader_identity}
+        if er.reader_identity != "avsw":
+            problems.append(
+                f"{backend} software run built reader {er.reader_identity}")
         if not ok:
-            problems.append(f"{backend} software fallback not exact: {reasons}")
+            problems.append(f"{backend} software run not exact: {reasons}")
+
+    # consistency: the classifier and the refusal table must agree on which
+    # source class this fixture is, so the two sections above cannot drift
+    if source_kind_from_streams(streams) != kind:
+        problems.append("classifier is not deterministic for this fixture")
+
     return _res(
         t, "HD-B02", STATUS_PASS if not problems else STATUS_FAIL,
-        actual=f"nvenc={nv.reason} qsv={qs.reason}",
+        actual=(f"Sony ({', '.join(ev['rtmd_evidence'])}) -> avsw on both "
+                f"backends, no --avhw; capability research preserved on "
+                f"non-Sony: nvenc={nv.reason}, qsv={qs.reason}"),
         reason="; ".join(problems), evidence=ev,
     )
 
@@ -1083,6 +1378,163 @@ def b10(t, ctx):
         actual="production runs the deployed binary with the reader chosen by "
                "source class (Sony->avsw, other->avhw); the research resolver "
                "still refuses missing or hash-mismatched builds",
+        reason="; ".join(problems), evidence=ev,
+    )
+
+
+@impl("b11_ffmpeg_path_hardware_first")
+def b11(t, ctx):
+    """The FFmpeg path prefers hardware decode for Sony *and* non-Sony.
+
+    This is a **different path** from the rigaya native reader, and the Sony
+    rule must not leak into it. The rigaya loss is a property of the rigaya
+    reader on XAVC open-GOP timelines; FFmpeg's NVDEC/QSV is a different
+    implementation, and there is no measurement saying it loses frames on Sony
+    material. So ``x265``/``svtav1`` must attempt hardware decode for a Sony
+    source exactly as they do for any other.
+
+    Asserted:
+
+    * ``plan_decode`` returns the hardware substrate for Sony material across
+      x265's and SVT-AV1's input codecs, for a source class the planner is not
+      even told about (it takes no ``source_kind``);
+    * when hardware is *not* chosen, a concrete fallback reason is recorded --
+      a capability boundary, not a policy decision;
+    * ``encoders.hwdecode_ffmpeg`` contains no Sony branch at all, so the
+      rigaya policy cannot reach it by import or by argument.
+
+    The exhaustive device matrix is deliberately not asserted here: which
+    codec/chroma/depth combinations decode in hardware on a given machine is a
+    measured capability, reported in ``evidence`` per combination rather than
+    claimed as universally supported.
+    """
+    import inspect
+
+    from encoders import hwdecode_ffmpeg as H
+
+    caps, ffmpeg = _ffmpeg_caps()
+    ev: dict = {"ffmpeg": str(ffmpeg), "ffmpeg_present": ffmpeg.is_file()}
+    problems: list[str] = []
+
+    if caps is None or not ffmpeg.is_file():
+        return _res(
+            t, "HD-B11", STATUS_BLOCKED,
+            actual="FFmpeg absent",
+            reason=(f"the FFmpeg decode planner needs {ffmpeg}; without it "
+                    f"neither the planner nor its hardware preference can be "
+                    f"exercised"),
+            evidence=ev,
+        )
+
+    ev["hwaccels"] = list(caps.hwaccels)
+    ev["devices"] = [f"{d.get('hwaccel')}[{d.get('index')}]"
+                     f"={d.get('init', {}).get('status')}"
+                     for d in caps.devices]
+
+    # --- the planner is not told the source class -------------------------
+    sig = inspect.signature(H.plan_decode)
+    ev["plan_decode_params"] = sorted(sig.parameters)
+    if "source_kind" in sig.parameters or "is_sony" in sig.parameters:
+        problems.append(
+            "plan_decode takes a source-class argument; the FFmpeg path must "
+            "not be able to make a Sony-specific decision")
+
+    src = inspect.getsource(H)
+    # Docstrings legitimately *state* that Sony is not special-cased here ("Sony
+    # is not special-cased", "is_sony_source() must not reach this module"), so
+    # a substring search would flag the very comment that records the rule.
+    # Inspect the code instead: identifiers and imports.
+    import ast as _ast
+
+    tree = _ast.parse(src)
+    docstrings = set()
+    for node in _ast.walk(tree):
+        if isinstance(node, (_ast.Module, _ast.FunctionDef,
+                             _ast.AsyncFunctionDef, _ast.ClassDef)):
+            body = getattr(node, "body", None)
+            if body and isinstance(body[0], _ast.Expr) and \
+                    isinstance(body[0].value, _ast.Constant) and \
+                    isinstance(body[0].value.value, str):
+                docstrings.add(body[0].value.value)
+    code_idents = {
+        n.id for n in _ast.walk(tree) if isinstance(n, _ast.Name)
+    } | {n.attr for n in _ast.walk(tree) if isinstance(n, _ast.Attribute)}
+    code_idents |= {
+        (a.asname or a.name)
+        for n in _ast.walk(tree) if isinstance(n, (_ast.Import, _ast.ImportFrom))
+        for a in n.names
+    }
+    code_idents |= {
+        n.module or "" for n in _ast.walk(tree)
+        if isinstance(n, _ast.ImportFrom)
+    }
+    ev["sony_identifiers_in_code"] = sorted(
+        i for i in code_idents if "sony" in i.lower())
+    ev["sony_mentions_are_docstrings_only"] = not ev["sony_identifiers_in_code"]
+    if ev["sony_identifiers_in_code"]:
+        problems.append(
+            f"encoders/hwdecode_ffmpeg.py references Sony in code "
+            f"({ev['sony_identifiers_in_code']}); the rigaya Sony policy must "
+            f"stay out of the FFmpeg path")
+    ev["docstring_records_the_rule"] = any(
+        "is_sony_source" in d and "must not reach" in d for d in docstrings)
+
+    # --- hardware preferred for every encoder's input codec ---------------
+    # A Sony XAVC HS file probes as exactly this; the planner cannot tell the
+    # difference, which is the point.
+    codecs = [
+        ("HEVC 4:2:0 10-bit (x265/SVT-AV1 on Sony XAVC HS)",
+         "hevc", "4:2:0", 10),
+        ("H.264 4:2:0 8-bit (control)", "h264", "4:2:0", 8),
+        ("HEVC 4:2:2 10-bit (Sony XAVC S)", "hevc", "4:2:2", 10),
+    ]
+    for label, codec, chroma, depth in codecs:
+        plan = H.plan_decode(caps=caps, ffmpeg=ffmpeg, codec=codec,
+                             chroma=chroma, depth=depth)
+        ev[label] = {"substrate": plan.substrate, "hwaccel": plan.hwaccel,
+                     "decoder": plan.decoder, "reason": plan.reason,
+                     "detail": (plan.detail or "")[:200]}
+        if not plan.hardware:
+            # Not automatically a failure: a machine without that capability
+            # is a legitimate capability boundary. But it must say why, and it
+            # must not be the generic "not proven" of a policy refusal.
+            if not plan.reason or plan.reason in ("not_proven", "sony"):
+                problems.append(
+                    f"{label}: software with reason {plan.reason!r}; a "
+                    f"capability fallback must be a concrete measured reason")
+
+    # The primary combination must actually reach hardware on this machine.
+    primary = ev[codecs[0][0]]
+    if primary["substrate"] != H.SUBSTRATE_FFMPEG_HW:
+        problems.append(
+            f"HEVC 4:2:0 10-bit did not select hardware on this machine "
+            f"(substrate={primary['substrate']}, reason={primary['reason']}); "
+            f"the FFmpeg path is supposed to prefer it")
+
+    # --- and the rigaya policy is not what decides it ---------------------
+    # route_decode refuses hardware for Sony; if the FFmpeg planner shared
+    # that rule, HEVC 4:2:0 10-bit above would have come back software.
+    from encoders.hwdecode import (
+        SOURCE_SONY, decode_tool_is_stock, route_decode,
+    )
+    rigaya_sony = route_decode(policy="auto", backend="nvenc", codec="hevc",
+                               chroma="4:2:0", depth=10, source_kind=SOURCE_SONY)
+    ev["rigaya_sony_reader"] = rigaya_sony.reader
+    ev["separated"] = (rigaya_sony.reader == "avsw"
+                       and primary["substrate"] == H.SUBSTRATE_FFMPEG_HW)
+    if not ev["separated"]:
+        problems.append(
+            f"the two paths are not separated: rigaya Sony -> "
+            f"{rigaya_sony.reader}, FFmpeg HEVC 4:2:0 10-bit -> "
+            f"{primary['substrate']}")
+    ev["rigaya_uses_deployed_binary"] = decode_tool_is_stock(
+        "nvenc", ROOT / "tools" / "NVEncC_9.31_x64" / "NVEncC64.exe")
+
+    return _res(
+        t, "HD-B11", STATUS_PASS if not problems else STATUS_FAIL,
+        actual=(f"FFmpeg planner has no Sony branch; HEVC 4:2:0 10-bit -> "
+                f"{primary['substrate']}/{primary['decoder']} while the rigaya "
+                f"Sony route is {rigaya_sony.reader}"),
         reason="; ".join(problems), evidence=ev,
     )
 
@@ -4155,28 +4607,91 @@ def j05(t, ctx):
 def j06(t, ctx):
     """The final gate, computed over every test except itself.
 
-    A gate that includes its own previous verdict is self-referential: one
-    failure poisons every later summary, so the report keeps claiming
-    BLOCKED after the underlying test has been fixed and re-run. The
-    gate's own result is not evidence about the system, so it is excluded.
+    Two corrections over the original form:
+
+    * A gate that includes its own previous verdict is self-referential: one
+      failure poisons every later summary, so the report keeps claiming
+      BLOCKED after the underlying test has been fixed and re-run. Its own
+      result is excluded, as before.
+    * It used to return FAIL whenever *any* test was BLOCKED. Under the
+      source-aware policy a research case that needs the patched build is
+      correctly BLOCKED -- that is the honest status, not a failure of this
+      gate. Reporting FAIL for it made "the research dependency is missing"
+      indistinguishable from "the system is broken". The gate now mirrors
+      ``summary``: a **FAIL** means a test ran and found the system wrong; a
+      **BLOCKED** means a test could not run and must not be counted as
+      passing. Both are surfaced, separately.
+
+    Results from earlier invocations are excluded, as in ``summary``.
     """
+    from_path = getattr(ctx, "run_started", None)
     results = [r for r in load_results() if r["test_id"] != "HD-J06"]
     if not results:
         return _res(t, "HD-J06", STATUS_BLOCKED,
                     reason="no results recorded yet")
-    summary = summarise(results)
-    gate = summary["gate"]
+    summary = summarise(results, from_path)
+    gates = summary.get("gates") or {}
     ev = {"summary": summary,
           "excluded_from_gate": ["HD-J06 (self)"],
           "note": ("the gate judges the other tests; its own verdict is "
                    "recorded but never fed back into the summary")}
-    status = STATUS_PASS if gate["final_status"] == "READY FOR REVIEW" else STATUS_FAIL
+
+    prod = gates.get("production") or {}
+    res = gates.get("research") or {}
+    p0_fail = max(prod.get("p0_fail", 0), res.get("p0_fail", 0)) \
+        if gates else summary["gate"]["p0_fail"]
+    ev["production"] = {k: prod.get(k) for k in
+                        ("status", "total", "PASS", "FAIL", "BLOCKED",
+                         "SKIP", "skip_kinds")}
+    ev["research"] = {k: res.get(k) for k in
+                      ("status", "total", "PASS", "FAIL", "BLOCKED", "SKIP")}
+
+    if p0_fail:
+        # Only *failures* belong in a FAIL reason. A BLOCKED case is a
+        # different thing and lives in the evidence/blocked list; mixing the
+        # two made a single real failure read as though the whole research
+        # dependency had failed too.
+        fails = [
+            f"{r['test_id']}: {r['status']} ({r.get('reason', '')})"
+            for r in results
+            if r["severity"] == "P0" and r["status"] == "FAIL"
+        ]
+        return _res(
+            t, "HD-J06", STATUS_FAIL,
+            actual=(f"P0 FAIL present: production={prod.get('p0_fail')} "
+                    f"research={res.get('p0_fail')}"),
+            reason="; ".join(fails),
+            evidence=ev,
+        )
+    # No failures. If the research gate is BLOCKED it is because its subject
+    # is absent, and this gate cannot certify it.
+    if res and res.get("status") == "BLOCKED":
+        return _res(
+            t, "HD-J06", STATUS_BLOCKED,
+            actual=(f"no P0 FAIL; production={prod.get('status')} "
+                    f"({prod.get('PASS')}/{prod.get('total')} pass, "
+                    f"{prod.get('BLOCKED', 0)} blocked, "
+                    f"{prod.get('SKIP', 0)} skipped); research BLOCKED "
+                    f"({res.get('BLOCKED', 0)} blocked)"),
+            reason=("the production gate has no P0 failure, but the research "
+                    "gate cannot run: its subject, the patched research build, "
+                    "is absent. This gate therefore cannot certify the matrix "
+                    "as complete."),
+            evidence=ev,
+        )
+    if prod.get("status") == "BLOCKED":
+        return _res(
+            t, "HD-J06", STATUS_BLOCKED,
+            actual=f"production BLOCKED ({prod.get('BLOCKED', 0)} blocked)",
+            reason="a production P0 case could not run",
+            evidence=ev,
+        )
     return _res(
-        t, "HD-J06", status,
-        actual=(f"P0 PASS {gate['p0_pass']}/{gate['p0_total']}; "
-                f"{summary['PASS']}/{summary['total']} tests pass; final status "
-                f"{gate['final_status']}"),
-        reason="; ".join(gate["blockers"]) if gate["blockers"] else "",
+        t, "HD-J06", STATUS_PASS,
+        actual=(f"no P0 FAIL; production={prod.get('status')} "
+                f"({prod.get('PASS')}/{prod.get('total')} pass) and research="
+                f"{res.get('status', 'n/a')}"),
+        reason="",
         evidence=ev,
     )
 
@@ -4596,7 +5111,8 @@ def cmd_run(args) -> int:
         print("no tests selected")
         return 1
 
-    ctx = Ctx(deep=args.deep, verbose=not args.quiet)
+    ctx = Ctx(deep=args.deep, verbose=not args.quiet,
+              run_started=getattr(args, "run_started", None))
     # Stamped so `summary` can tell this invocation's results apart from
     # entries earlier runs left in the accumulated results file.
     args.run_started = datetime.now(timezone.utc).isoformat(timespec="seconds")

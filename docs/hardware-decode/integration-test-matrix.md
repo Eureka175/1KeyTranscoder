@@ -165,8 +165,8 @@ eligible(backend, codec, chroma, depth) := 该四元组在 runtime-proven allowl
 
 | ID | Sev | Input | Backend | Expected behaviour | Verification method | Auto | Result |
 |---|---|---|---|---|---|---|---|
-| HD-B01 | P0 | `sony_hs_c0886`（HEVC Main10 4:2:0 3840×2160 59.94p LongGOP, 360 samples, leading=3） | NVEncC / QSVEncC | 两者均判 `eligible`；`auto` 下选中 `avhw`；reason code = `proven_combination` | harness 调用路由函数并断言决策对象；再实跑一次断言 A-03 reader 标识 | auto | |
-| HD-B02 | P0 | `sony_422_c9037`（H.264 High 4:2:2 10-bit, 195 samples, leading=2）等 5 个样本 | NVEncC → **hardware**；QSVEncC → **refuse/software** | **两个 backend 允许得出不同结果**。NVENC 判 `eligible`；QSV 判 `capability_refused` 且 `auto` 下落到 `avsw` 且输出正确 | 对同一输入分别跑两 backend 的路由；QSV 侧断言 reason code 且产物帧精确 | auto | |
+| HD-B01 | P0 | `sony_hs_c0886`（HEVC Main10 4:2:0 3840×2160 59.94p LongGOP, 360 samples, leading=3） | NVEncC / QSVEncC | **Sony → 编码前即选 `avsw`**（本行已于来源感知改造中重写；旧断言"两者均判 eligible、`auto` 下选 `avhw`"描述的是已被取代的白名单策略）。断言：fixture 由**产品自己的** probe + classifier 判为 Sony；两个 backend 均为 `avsw` 且 reason=`sony_hardware_decode_safety`；状态机构造的 argv 中**从未出现 `--avhw`**；该预防性决定不记为回退、不产生"硬解失败"告警。FFmpeg 路径（x265/SVT-AV1）对同一素材仍须优先硬解，由 B-11 单独断言 | 真实 probe → `source_kind_from_streams`；再对每个 backend 跑一次 `route_decode` 与带 argv 记录的 `hw_encode_with_fallback` | auto | |
+| HD-B02 | P0 | `sony_422_c9037`（H.264 High 4:2:2 10-bit, 195 samples, leading=2）等 5 个样本 | NVEncC → 软件；QSVEncC → 软件（**Sony 路由**）；能力证据另计 | **本行把两件不同的事分开**（旧断言把"H.264 4:2:2 的硬件能力"当作 Sony 的生产 reader 决策）。①**生产路由**：两个 backend 都因 Sony 在编码前选 `avsw`，与 backend 无关。②**硬件能力研究（保留）**：NVENC 的 cuvid 能解 h264 4:2:2 10-bit、QSV 以 `capability_refused` 拒绝——这是**硬件事实**，在**非 Sony** 分类上断言，历史证据不删除。两者都须交付帧精确的软件结果 | 真实 probe 分类；两个来源类别下各跑 `route_decode`；argv 记录确认无 `--avhw`；软件编码用容器帧数对账 | auto | |
 | HD-B03 | P0 | `dji_0009`（105 samples, leading=0）、`dji_0010`（330 samples, leading=0） | 两者 | 均判 `eligible` | 同 B-01 | auto | |
 | HD-B04 | P0 | 未声明支持的输入（8-bit HEVC、All-I/INTRA、1080p、AV1 源） | 两者 | 决策必须是 **`not_proven` → 软件**，**不得**"unknown → hardware anyway"。允许 software 或 explicit reject，不允许静默冒险 | 构造/指定这些输入，断言决策为软件且 reason code 明确 | auto | |
 | HD-B05 | P0 | 任意输入 | 两者 | `policy=off`（默认，不传任何开关）时**行为与 v0.6.2 完全一致**：reader 恒 `avsw`，命令行参数逐 token 相同 | 对同一输入，用默认参数构造命令并与集成前的 argv 做逐 token diff | auto | |
@@ -174,7 +174,8 @@ eligible(backend, codec, chroma, depth) := 该四元组在 runtime-proven allowl
 | HD-B07 | P1 | VFR 源 | 两者 | VFR 源的 `--avsync forcecfr` 与 reader 选择互不干扰；VFR + hardware 组合有明确决策（不得因 VFR 而静默改 reader 或反之） | 构造 VFR 输入，断言参数组合与日志 | auto | |
 | HD-B08 | P1 | 任意输入 | 两者 | 路由决策**确定性**且**可审计**：同输入同环境两次决策完全一致；决策与 reason code 进 per-file 日志与 CSV | 两次独立运行比对决策 JSON；检查日志字段存在 | auto | |
 | HD-B09 | P0 | 任意输入 | 两者 | **能力拒绝与丢帧在决策与日志中可区分**：`capability_refused` / `not_proven` / `reader_unavailable` / `count_mismatch` / `sequence_mismatch` 各自独立 reason code，不得都写成 "failed" | 触发各类失败，断言 reason code 互不相同且语义正确 | auto | |
-| HD-B10 | P0 | 同时存在两套 build 的 `tools/` 树 | 两者 | **硬件解码必须绑定在 provenance 校验过的 patched build 上**。`policy=off` 时不做任何 override；`auto`/`require` 时按 sha256 绑定；build 缺失或 hash 不符时给出 reason code，**绝不静默改用 shipped build**。理由：用 shipped build 是"安全但无用"——每份结果都会被 integrity gate 拒绝，功能看似开启实则从未运行 | 三档 policy 各解析一次 + 伪造 hash 的副本 + 缺失 build | auto | |
+| HD-B10 | P0 | `tools/` 树 | 两者 | **解码二进制与 reader 由来源类别决定**（本行已于来源感知改造中重写，旧断言"`auto` 必须按 sha256 绑定 patched build"已作废）。生产 `--avhw` 跑的是**已部署二进制**：Sony → `avsw`（reason=`sony_hardware_decode_safety`，不尝试编码）；非 Sony 与未分类 → `avhw`。研究版解析器仍拒绝缺失或哈希不符的构建并给出 reason code，**不得静默改用已部署二进制** | 来源类别网格上的 `route_decode`；断言生产编码路径不调用 `resolve_decode_tool`；再对伪造副本与空目录各解析一次 | auto | |
+| HD-B11 | P0 | FFmpeg 能力快照 + HEVC 4:2:0 10-bit / H.264 / HEVC 4:2:2 | x265 + SVT-AV1 | **FFmpeg 路径对 Sony 同样优先硬解**。`plan_decode` 对 Sony 素材与对其它素材一样选择硬件 substrate；`encoders/hwdecode_ffmpeg.py` 内**没有** Sony 分支，`plan_decode` 也不接收来源类别，因此 rigaya 的 Sony 规则无法到达该路径。软件选择必须带具体的实测能力理由，而不是策略性理由 | 三种输入编码格式各跑一次 `plan_decode` + 对 `hwdecode_ffmpeg` 做 AST 级"代码中不出现 Sony 标识符"断言 + 交叉断言同一编码格式在 rigaya 侧对 Sony 走 `avsw` | auto | |
 
 ---
 
