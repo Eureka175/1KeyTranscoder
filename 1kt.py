@@ -1310,10 +1310,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--jobs",
-        default="1",
+        default="auto",
         help=(
-            "同一硬件后端的工作调度: 1(默认, 单线程) | N(固定并发) | "
-            "auto(波次实测聚合吞吐动态调整工作数, 无写死预算表)."
+            "同一后端的工作调度: auto(默认, 按实测吞吐在波次间调整并发, "
+            "不写死预算表) | 1(单线程, 确定性) | N(固定并发). "
+            "并发上限取 min(32, 2×CPU 核数): 更大的值不会更快, 只会让 "
+            "x265 线程与文件并发过度订阅."
         ),
     )
     parser.add_argument(
@@ -1814,35 +1816,39 @@ def main() -> int:
         is_hardware = encoder_name in (
             "nvenc", "qsv", "nvenc-av1", "qsv-av1"
         )
-        # v0.6.2: --experimental-multihw no longer demands an explicit
-        # --encoder; it probes the hardware backends itself. An explicitly
-        # requested AV1 or software backend still conflicts (multihw only
-        # schedules HEVC NVENC+QSV).
+        # --experimental-multihw owns hardware-backend selection: it probes,
+        # ranks and schedules NVENC+QSV itself. Any explicit --encoder is a
+        # conflict and is rejected up front -- including `nvenc`/`qsv`, which
+        # previously acted as a silent "pin the primary backend" hint. A mode
+        # that picks its own backends cannot also be told which to use, and a
+        # hint that only sometimes wins is the kind of ambiguity that produces
+        # a report whose stated backend is not the one that ran.
         multihw_backends: list[str] = []
         if args.experimental_multihw:
-            if args.encoder and args.encoder not in ("nvenc", "qsv"):
+            if args.encoder:
                 raise ValueError(
-                    f"--experimental-multihw manages HEVC NVENC+QSV itself; "
-                    f"--encoder {args.encoder} conflicts with it "
-                    f"(drop --encoder to let it probe the backends)."
+                    f"--experimental-multihw selects its own hardware "
+                    f"encoders; --encoder {args.encoder} conflicts with it. "
+                    f"Drop --encoder to let multihw probe and schedule the "
+                    f"available hardware backends."
                 )
             print("--experimental-multihw: probing hardware backends "
                   "(no --encoder required):")
             multihw_backends = _hw_encoders_available(script_dir, print)
             if not multihw_backends:
                 raise ValueError(
-                    "--experimental-multihw requires at least one usable "
-                    "HEVC hardware backend (NVENC or QSV); none was found. "
-                    "Run `1kt.py --check-features` to inspect this machine."
+                    "no usable hardware encoder: --experimental-multihw "
+                    "requires at least one usable HEVC hardware backend "
+                    "(NVENC or QSV) and none was found. It does not fall back "
+                    "to x265 by design. Run `1kt.py --check-features` to "
+                    "inspect this machine."
                 )
             if len(multihw_backends) == 1:
                 print(f"  [WARN] only {multihw_backends[0]} is available — "
                       f"multihw degrades to a single-backend pool "
                       f"(quality-consistency caveat no longer applies)")
-            # An explicit --encoder among the probed backends still pins
-            # the primary backend (secondary queue keeps the other one).
-            if not (args.encoder and args.encoder in multihw_backends):
-                encoder_name = multihw_backends[0]
+            # multihw owns the choice outright; no --encoder hint to honour.
+            encoder_name = multihw_backends[0]
             is_hardware = True
 
         classifier = engine = scaling_config = scaling_path = None
@@ -2038,11 +2044,27 @@ def main() -> int:
         sources = discover_sources(input_root)
 
     jobs_value = args.jobs
+    # Bounded and positive. The previous check accepted anything `int()` took,
+    # so `--jobs 0` and `--jobs -3` silently meant single-threaded and
+    # `--jobs 256` was handed straight to ThreadPoolExecutor. A concurrency
+    # cap is a machine fact, not a preference: past it the work is oversubscribed
+    # against x265's own frame threads and gets slower, not faster.
     if jobs_value not in ("1", "auto"):
         try:
-            int(jobs_value)
+            jobs_n = int(jobs_value)
         except ValueError:
             print(f"[FATAL] --jobs must be 1, N or auto (got {jobs_value!r})",
+                  file=sys.stderr)
+            return 2
+        jobs_cap = max(2, min(32, (os.cpu_count() or 4) * 2))
+        if jobs_n < 1:
+            print(f"[FATAL] --jobs must be >= 1 (got {jobs_n}); "
+                  f"use 1 for single-threaded.", file=sys.stderr)
+            return 2
+        if jobs_n > jobs_cap:
+            print(f"[FATAL] --jobs {jobs_n} exceeds this machine's cap "
+                  f"({jobs_cap} = min(32, 2xCPU)); higher concurrency "
+                  f"oversubscribes the encoder's own threads.",
                   file=sys.stderr)
             return 2
 
@@ -2080,6 +2102,16 @@ def main() -> int:
     logger.info("Files: %d", len(sources))
     logger.info("Check level: %s", args.check)
     logger.info("Jobs: %s", jobs_value)
+    if not is_hardware and jobs_value != "1":
+        # Disclosed rather than implied. --jobs is honoured by the hardware
+        # pools; the software path is still a sequential loop, so a run that
+        # asks for concurrency there would otherwise look like it got some.
+        logger.warning(
+            "[JOBS] --jobs %s has no effect on the software backend "
+            "(%s): this path is sequential. Concurrency applies to the "
+            "hardware backends (nvenc/qsv).",
+            jobs_value, backend.name,
+        )
     logger.info("Experimental multihw: %s", args.experimental_multihw)
     logger.info("Headless: %s", args.headless)
     logger.info("Keep work dirs: %s", args.keep_work)

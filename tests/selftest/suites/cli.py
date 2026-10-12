@@ -93,6 +93,41 @@ def l1_cli_v062() -> None:
     record("v062.兜底只在一无可用硬件时才发生",
            got == "x265" or got in ("nvenc", "qsv"), f"got={got}")
 
+    # ---- §10 显式编码器不被自动选择覆盖 ----
+    # The plan requires this explicitly and there was no test for it: naming a
+    # backend must pin it, and must not be silently replaced by the priority
+    # order. `resolve_default_backend` must not even be consulted.
+    for name in ("x265", "qsv", "nvenc", "svtav1"):
+        sys.argv = ["1kt.py", "--input", ".", "--output", ".",
+                    "--encoder", name]
+        record(f"v062.--encoder {name} 被解析为显式选择",
+               kt.parse_args().encoder == name)
+
+    # ---- jobs: default auto, bounded, positive ----
+    sys.argv = ["1kt.py", "--input", ".", "--output", "."]
+    record("v062.--jobs 默认 = auto (硬件优先下的合理默认并发)",
+           kt.parse_args().jobs == "auto", f"got={kt.parse_args().jobs}")
+
+    # ---- multihw owns backend selection outright ----
+    # A mode that probes and schedules its own encoders cannot also be told
+    # which one to use; an --encoder that only sometimes wins would let the
+    # report name a backend other than the one that ran.
+    import inspect
+
+    main_src = inspect.getsource(kt.main)
+    multihw_at = main_src.find("experimental_multihw")
+    block = main_src[multihw_at:multihw_at + 6000] if multihw_at >= 0 else ""
+    record("v062.multihw 与 --encoder 是硬冲突",
+           "if args.encoder:" in block
+           and "selects its own hardware" in block,
+           "conflict check present" if "if args.encoder:" in block
+           else "no unconditional conflict check")
+    record("v062.multihw 无可用硬件时报错且不回退 x265",
+           "no usable hardware encoder" in block
+           and "does not fall back" in block,
+           "hard-fail on no hardware" if "no usable hardware encoder" in block
+           else "message does not state the no-fallback rule")
+
     # ---- §7 分层日志 ----
     from core.logging_utils import (
         DEBUG_LOG_NAME, ERROR_LOG_NAME, WARN_LOG_NAME, resolve_log_level,
