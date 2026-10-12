@@ -1,5 +1,23 @@
 # Hardware Decode Integration — 详细结构化报告
 
+> ## ⚠️ 历史档案 + 当前状态 BLOCKED
+>
+> 本文件是 `feature/hardware-decode-integration` session 的**历史报告**，
+> 记录 v0.7.0 时代的 `--hw-decode off|auto|require` 策略。那个开关**已移除**
+> （无兼容别名），现行架构见
+> [`../design/architecture.md`](../design/architecture.md) §8。
+>
+> **正文中的 `--hw-decode` 用法均为历史记录，不代表当前 CLI。**
+>
+> **矩阵当前状态 = BLOCKED，不是 PASS。** 83 例矩阵依赖 `tools/avhw/` 下
+> provenance 固定的 patched 构建；本机该目录不存在，`verify_provenance()`
+> 报 2 failure，矩阵不可运行。本机也无 MSVC / oneVPL / rigaya 源码，
+> 无法重建。**本文件的结论不得被引用为"硬件解码已在本机验证"。**
+>
+> 仍然成立、且已在本机复核的部分：stock 构建在 Sony XAVC 上丢帧
+> （4:2:0 10-bit 源 30 帧 → `--avhw` 27 帧、`rc=0`；4:2:2 同为 27/30；
+> `--avsw` 均为 30 帧）。因此 patched 构建仍然是使用原生 `--avhw` 的前提。
+>
 > **报告定位。** 本文件是 `feature/hardware-decode-integration` 这个 session 的完整结构化报告，
 > **以 test matrix 为主体，不以代码 diff 为主体**。
 > 矩阵本体（每条测试的完整定义与成功条件）见

@@ -12,9 +12,23 @@
 > |---|---|
 > | §9.2 / OD-1：硬件解码设为默认，需要 production benchmark 前置 | **已被覆盖**：所有输入类别、所有编码后端统一硬件优先，**不再以 benchmark 为前置条件** |
 > | §9.2.1 / OD-2：普通 Sony 模式默认不得硬解 | **已被覆盖**：Sony 不再因身份被排除在硬解候选之外 |
+> | 所有后端统一"FFmpeg 硬解 + 帧传递到任意编码器" | **已被覆盖**：解码路径按后端分家。rigaya 编码器用**自己的** `--avhw` 读端；FFmpeg 硬解只服务于 FFmpeg 自己的编码器（x265/SVT-AV1） |
 >
 > 现行策略一句话：**所有视频输入统一硬件优先解码；Sony 保留管线照常运行，
 > 但不再单纯因 Sony 身份强制软解。** 性能事实仍据实记录，不宣称普遍加速。
+>
+> 现行架构（**解码器选择与编码器选择是两个独立决策**）：
+>
+> ```
+> x265 / svtav1   source -> FFmpeg NVDEC/QSV -> hwdownload + 像素转换
+>                        -> FFmpeg libx265/libsvtav1 -> output
+>
+> nvenc / qsv     source -> NVEncC/QSVEncC --avhw（原生读端） -> 编码器 -> output
+>                 不可用时 -> 同一个编码器的 --avsw（仍由它自己读文件）
+> ```
+>
+> **不存在** `source -> FFmpeg NVDEC/QSV -> hwdownload -> Y4M -> NVEncC/QSVEncC stdin`
+> 这条路。它在实施过程中曾短暂存在（提交 `eaf8034`），随后按架构决定整体移除。
 >
 > **实施状态摘要**（完整报告见实施 session 的输出）：
 >
@@ -22,15 +36,18 @@
 > |---|---|
 > | FFmpeg 硬解规划器 + 逐设备能力探测 + 传输链探测 | **已实现** |
 > | x265/SVT-AV1 路径消费 DecodePlan | **已实现** |
-> | Sony 4:2:0 保留 + 硬解端到端 | **通过**（PRESERVED=37 / MODIFIED=0） |
+> | Sony 4:2:0 保留 + FFmpeg 硬解端到端 | **通过**（PRESERVED=37 / MODIFIED=0） |
 > | 移除 3 个旧开关 + `--preset all`，双侧 V080_BASELINE | **已实现** |
 > | `--no-metadata` | **已实现并端到端验证** |
 > | 每 job `.1ktwork` 清理 | **已实现** |
 > | `--jobs auto` 默认 + 上限校验 + multihw 冲突 | **已实现** |
-> | 硬件编码器路径的硬解（FFmpeg 解码 → rigaya 编码） | **PENDING**（需重写 run_hw_tool 的进程管道） |
+> | FFmpeg → Y4M → rigaya stdin 管道 | **已移除**（`ffmpeg_pipe_args` / `apply_stdin_pipe` / `run_hw_tool(decode_pipe=)` 三者都已删除，无残留调用点） |
+> | rigaya 原生 `--avhw` 路由恢复 | **已实现**（`hw_encode_with_fallback` 按读者选择可执行文件；`--avhw` 用 patched 构建、`--avsw` 用装船构建） |
+> | rigaya 原生 `--avhw` 实际运行 | **BLOCKED**：`tools/avhw/` 下的 patched 构建缺失，且本机无 MSVC / oneVPL / rigaya 源码，无法重建；解析结果 `not_proven` → `--avsw` |
+> | 完整性闸门（丢产物 + 有界重试 `--avsw`） | **已实现并单测钉住**（37 例 `native_decode` 套件） |
 > | 软件路径并发接入 | **PENDING**（需 x265 线程标定，§14.6） |
 > | 多设备资源预算（每设备 VRAM） | **PENDING** |
-> | hwdecode 83 用例矩阵 | **BLOCKED**（`tools/avhw/` 缺失，provenance 失败） |
+> | hwdecode 83 用例矩阵 | **BLOCKED**（`tools/avhw/` 缺失，provenance 失败：2 failure） |
 > | Sony 4:2:2 保留校验 | **既有缺陷，非本次回归**（FFmpeg 中间体 mvhd timescale=1000 的毫秒量化；30 帧 @59.94p = 500.5ms 无法表示） |
 >
 > ---

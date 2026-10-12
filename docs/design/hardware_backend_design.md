@@ -6,6 +6,21 @@
 > 测试机器：Windows 11（26200），Intel Core Ultra 9 285H（16C/16T），
 > NVIDIA GeForce RTX 5070 Laptop（8 GB，driver 596.36），
 > Intel Arc 140T 核显（16 GB，driver 32.0.101.8974）
+>
+> ⚠️ **§4.3 与 §8 的"解码恒软解 `--avsw`"已不是当前策略。** 本文记录的是
+> v0.3.0-beta 时代的决定（当时硬解 reader 无可用构建，`avsw` 是唯一帧精确路径）。
+> 现行解码架构见 [`architecture.md`](architecture.md) §8：
+>
+> ```
+> x265 / svtav1   source -> FFmpeg NVDEC/QSV -> hwdownload -> FFmpeg 编码器
+> nvenc / qsv     source -> NVEncC/QSVEncC --avhw（原生读端） -> 编码器
+>                 patched 构建不可用时 -> 同一个编码器的 --avsw
+> ```
+>
+> 本文 §5.2 的丢帧实测**仍然成立**，而且已在本机复核
+> （NVEncC stock `--avhw`：4:2:0 10-bit 源 30 帧 → 27 帧；4:2:2 → 27/30；
+> `--avsw` 均 30/30）。变的不是事实，而是处置方式：不再是"因此恒用 avsw"，
+> 而是"用 patched 构建 + 完整性闸门，闸门不过先删产物再回退 `--avsw`"。
 
 ---
 

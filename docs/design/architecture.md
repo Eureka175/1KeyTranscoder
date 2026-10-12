@@ -75,11 +75,12 @@ HW_AUTOSELECT_FALLBACK = "x265"              # 1kt.py:1108
 |---|---|---|
 | **后端选择** | 自动选择可以选到 x265（因为压根没有硬件后端） | `resolve_default_backend()` |
 | **单次运行** | 一旦选定硬件后端，**轨道内**绝不改成软件编码 | `hw_encode_with_fallback()` |
-| **硬件解码** | 默认 `--hw-decode off` = **软解 `--avsw`**；`auto`/`require` 时由**能力路由**决定读者 | `encoders/hwdecode.py`、`core/batch_hw.py:243` |
+| **硬件解码** | **两条独立路径**：`x265`/`svtav1` 走 FFmpeg 原生 NVDEC/QSV；`nvenc`/`qsv` 走各自编码器的 `--avhw` 读端。白名单外或探测不兼容时出声退到软件解码 | `encoders/hwdecode_ffmpeg.py`（FFmpeg 侧）、`encoders/hwdecode.py`（rigaya 侧）、`core/batch_hw.py` |
 
-第三行是 v0.7.0 起的实际状态（v0.7.0 已并入 `main`）：**默认仍是软解**，
-硬件解码是**显式启用**的能力，且只在白名单内、且必须通过完整性闸门才被接受。
-细节见 §8。
+第三行是当前的实际状态，注意它与 v0.7.0 的差别：**解码器选择与编码器选择
+解耦**，两条路径各自的硬件优先策略都是内建行为，不再有 `--hw-decode` 开关；
+而且 rigaya 的 `--avhw` 需要 **patched 构建**，缺失时该路径为 `not_proven`
+（软解），不是"不可用即失败"。细节见 §8。
 
 ### 2.2 三级降级梯（`core/batch_hw.py:245 hw_encode_with_fallback`）
 
@@ -1562,40 +1563,59 @@ flag，并且需要"OFF 路径逐字节一致"的审计。
 > [`olddocs/docs/hardware-decode/`](../olddocs/docs/hardware-decode/README.md)，
 > integration 交付物在 [`docs/hardware-decode/`](../hardware-decode/README.md)。
 
-### 8.1 策略：`--hw-decode off|auto|require`（默认 `off`）
+### 8.1 两条**互相独立**的解码架构
 
-| 策略 | 行为 |
+编码器选择与解码器选择是两个独立决策。它们按后端分成两条不同的路径，
+**不可互换，也不能互相兜底**：
+
+| 后端 | 解码路径 |
 |---|---|
-| `off`（**默认**） | 软解。行为与 v0.6.2 **逐字节一致**：不尝试硬件解码，不改变任何默认 |
-| `auto` | 输入命中 **runtime-proven 白名单**时用硬件读者，否则软解。**每次降级都出声**：WARNING + reason code 进主日志/单文件日志/report |
-| `require` | 必须硬件解码；不可用则报错（`require_unmet`），**绝不静默降级** |
+| `x265` / `svtav1` | **FFmpeg 原生硬解**：`-init_hw_device` / `-hwaccel` / `-hwaccel_device` / `-hwaccel_output_format` / `-c:v hevc_cuvid\|hevc_qsv`，随后 `hwdownload` + 像素格式转换，在**同一进程**内交给 `libx265` / `libsvtav1` |
+| `nvenc` / `qsv` | **rigaya 自带读端**：`NVEncC64.exe --avhw` / `QSVEncC64.exe --avhw` 直接打开源文件（NVDEC/CUVID 或 QSV 硬件解码器），再由同一个编码器编码 |
 
-路由实现：`encoders/hwdecode.py::decide_route()`。它回答且只回答一个问题
-——"这个输入、这个后端、这个策略下，**必须**用哪个解码读者，**为什么**"。
-判定依据是**闭集白名单** `PROVEN`（`(backend, codec, chroma, depth)` 四元组，
-每行必须引用一次实测），白名单外一律 `not_proven` → 软解。理由写在模块里：
-这个 integration 存在的意义就是防止硬件路径**静默产出"看着对但实际错"的结果**，
-而未测过的 profile 正是它出现的场景。
+x265/SVT-AV1 侧的执行计划由
+`encoders/hwdecode_ffmpeg.py::plan_decode()` 决定并 `apply_decode_plan()`
+写入既有 argv；能力探测与实际执行**共用同一份计划结果**，不存在"探测用 A、
+执行用 B"。
+
+rigaya 侧的执行路由由 `encoders/hwdecode.py::route_decode()` 决定，它回答且
+只回答一个问题——"这个输入、这个后端、这个策略下，**必须**用哪个解码读者，
+**为什么**"。判定依据是**闭集白名单** `PROVEN`（`(backend, codec, chroma,
+depth)` 四元组，每行必须引用一次实测），白名单外一律 `not_proven` → 软解。
+理由写在模块里：这个 integration 存在的意义就是防止硬件路径**静默产出"看着对
+但实际错"的结果**，而未测过的 profile 正是它出现的场景。
 
 `REFUSED` 记录硬件读者**明确拒绝**的组合（如 QSV 的 H.264 4:2:2，`rc=-31`，
 读者根本没被构造出来）——日志要说"refused"，不是"failed"。
+
+**不存在**"FFmpeg 解码 → `hwdownload` → y4m → NVEncC/QSVEncC stdin"这条路径。
+它曾在 `feature/hardware-codec-policy-redesign` 的一轮实现中短暂存在，已按
+架构决定移除：rigaya 编码器的硬件解码就是它自己的读端，不可用时退到**同一个
+编码器的** `--avsw`，而 `--avsw` 同样由该编码器自己读取源文件。
+
+`--hw-decode` / `--hw-decode-verify` / `--no-hw-autoselect` 三个开关已移除，
+且**不提供兼容别名**；硬件优先路由是内建行为。
 
 ### 8.2 完整性闸门：`encoders/integrity.py`
 
 闸门存在的理由是一个真实缺陷：stock 硬件读者在 Sony 素材上只吐 `N−3` 帧，
 `rc = 0`、无任何错误文本、文件完全可播放。只看"进程成功了吗"的闸门会放它过去
-——事实上过去就是放过去的。
+——事实上过去就是放过去的。本机复核（`tools/NVEncC_9.31_x64/NVEncC64.exe`，
+Sony XAVC HS 4:2:0 10-bit，源 30 帧）：`--avhw` 得 **27 帧**、`rc=0`；
+`--avsw` 得 30 帧。4:2:2 10-bit 同样是 27/30。
 
 | 级别 | 触发 | 检查内容 | 代价 |
 |---|---|---|---|
-| `count` | 硬件解码开启时**恒开** | 五方帧数对账 + **读者身份断言** | 一次容器解析 + 两次**输出**解码 |
-| `sequence` | `--hw-decode-verify` 显式开启 | 硬件与软件结果**逐帧有序指纹比对** | 多一次完整编码 |
+| `count` | rigaya `--avhw` 路径**恒开** | 五方帧数对账 + **读者身份断言** | 一次容器解析 + 两次**输出**解码 |
+| `sequence` | 诊断 API（`encoders/integrity.verify_sequence`），**未接入任何 CLI** | 硬件与软件结果**逐帧有序指纹比对** | 多一次完整编码 |
 
 规则是 research 线自己的结论：**以交付容器的实际内容为准，绝不以解码器/读者的
 自述为准**。读者的 `N frames` 只作证据记录 —— XAVC 上它按构造就少报
 （`FramePosList::setPocAndFix`），信它反而会掩盖要找的丢帧。
 
-闸门不过 → **丢弃硬件产物 + 出声 + 改用软解重跑**（`HD-C11..C13`/`HD-F05`）。
+闸门不过 → **先删除硬件产物**（`safe_unlink`），再出声，再用 `--avsw` 重跑
+同一 format rung，最多一次（`MAX_HW_DECODE_FALLBACKS = 1`）；软解若再失败，
+整个文件判失败。**不允许**补帧、重复末帧或裁掉源帧来凑数。
 
 ### 8.3 `--seek` 拒绝（`seek_not_equivalent`）
 
