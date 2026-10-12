@@ -2433,12 +2433,20 @@ def run_multihw_pool(
     backend_qsv,
     sources: list[Path],
     logger: logging.Logger,
+    workers: int | str = "auto",
 ) -> dict[str, int]:
     """EXPERIMENTAL dual-backend scheduling (adaptive per backend).
 
     Static routing v1 (4:2:2 -> NVENC, others alternate) + one adaptive
     worker controller per backend, waves taken from both queues
-    concurrently."""
+    concurrently.
+
+    ``workers`` is the same ``--jobs`` value the single-backend pool takes.
+    It is honoured here as a **global** budget across both queues rather than
+    per backend: previously this function ignored ``--jobs`` entirely and the
+    two controllers grew independently, so a wave could reach
+    ``cap_nvenc + cap_qsv`` = up to 16 concurrent encodes.
+    """
     nvenc_sources: deque[Path] = deque()
     qsv_sources: deque[Path] = deque()
     flip = False
@@ -2459,13 +2467,38 @@ def run_multihw_pool(
     ctx.show_progress = False
     ctrl_n = AdaptiveJobs(logger, start=2)
     ctrl_q = AdaptiveJobs(logger, start=1)
+
+    # Global concurrency budget. Without this the two per-backend controllers
+    # grow independently (each capped at min(8, cpu_count)), so the wave size
+    # could reach 16 concurrent encodes on a 16-core machine -- and `--jobs`
+    # was not consulted at all on this path. The brief is explicit that
+    # jobs=auto must still bound multihw: it is a resource constraint, not a
+    # licence to create as many tasks as there are queues.
+    if workers == "auto":
+        budget = ctrl_n.cap
+        budget_source = f"auto -> cap {budget} (min(8, cpu_count))"
+    else:
+        budget = max(1, int(workers))
+        budget_source = f"explicit --jobs {budget}"
+    logger.info(
+        "[MULTIHW] global concurrency budget = %d (%s); per-backend "
+        "controllers: nvenc=%d qsv=%d",
+        budget, budget_source, ctrl_n.current, ctrl_q.current,
+    )
+
     counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0}
 
     while nvenc_sources or qsv_sources:
+        remaining = budget
         wave: list[tuple[Path, Any]] = []
-        for _ in range(min(ctrl_n.current, len(nvenc_sources))):
+        # Take from each queue up to its own controller's allowance, but never
+        # more than the global budget: the two limits compose, they do not add.
+        take_n = min(ctrl_n.current, len(nvenc_sources), remaining)
+        for _ in range(take_n):
             wave.append((nvenc_sources.popleft(), backend_nvenc))
-        for _ in range(min(ctrl_q.current, len(qsv_sources))):
+        remaining -= take_n
+        take_q = min(ctrl_q.current, len(qsv_sources), remaining)
+        for _ in range(take_q):
             wave.append((qsv_sources.popleft(), backend_qsv))
         if not wave:
             break
@@ -2477,6 +2510,10 @@ def run_multihw_pool(
             }
             for fut in as_completed(futures):
                 counters[fut.result()] += 1
+        if len(wave) >= budget:
+            logger.debug(
+                "[MULTIHW] wave hit the global budget (%d/%d)", len(wave), budget
+            )
         agg_n = sum(
             fps for name, fps in ctx.throughput if name == "nvenc"
         )

@@ -2421,8 +2421,11 @@ def main() -> int:
 
         if args.experimental_multihw:
             if len(multihw_backends) >= 2:
+                # jobs_value is passed here too: multihw obeys the same global
+                # resource budget as the single-backend pool rather than
+                # letting two per-backend controllers add up.
                 round_counters = run_multihw_pool(
-                    ctx, backend, backend_qsv, sources, logger
+                    ctx, backend, backend_qsv, sources, logger, jobs_value
                 )
             else:
                 # Only one backend is usable: a single-backend pool with
