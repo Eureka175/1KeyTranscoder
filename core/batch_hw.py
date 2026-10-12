@@ -1888,23 +1888,59 @@ def remux_container_lossless(
     threaded through because GPAC otherwise resets it to the first
     track's media timescale.
 
+    Tracks MP4Box cannot import are excluded, and the exclusion is logged
+    rather than silent.  Measured case: a Sony source transcoded on the
+    ordinary path carries its ``rtmd`` data track into the intermediate
+    (FFmpeg ``-map 0`` copies it), and that track has neither handler nor
+    sample entry, so ``-add file#N`` fails the whole re-mux with
+    ``Failure while importing media: Bad Parameter`` and the delivery is
+    lost entirely.  Copying the remaining tracks yields a valid MP4 whose
+    video elementary stream is byte-identical to the intermediate's.
+
     Returns a human-readable description for the file log.
     """
     movie_ts, tracks = dji.track_manifest(gpac, src)
     if not tracks:
         raise RuntimeError(f"no tracks in {src} to re-mux")
+
+    usable = [t for t in tracks if _is_remuxable_track(t)]
+    skipped = [t for t in tracks if t not in usable]
+    for t in skipped:
+        log(
+            f"container re-mux: skipping track #{t.get('id')} "
+            f"(handler={t.get('handler')!r} entry={t.get('entry')!r}) — "
+            f"MP4Box cannot import it"
+        )
+    if not usable:
+        raise RuntimeError(
+            f"no importable tracks in {src} to re-mux "
+            f"({len(tracks)} present, all unusable)"
+        )
+
     previous = gpac.movie_timescale
     gpac.movie_timescale = movie_ts or previous
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
-        gpac.mux_new(dst, [f"{src}#{t['id']}" for t in tracks])
+        gpac.mux_new(dst, [f"{src}#{t['id']}" for t in usable])
     finally:
         gpac.movie_timescale = previous
     return (
-        f"container-only re-mux: {src.name} ({len(tracks)} track(s), "
-        f"movie timescale {movie_ts}) -> {dst.name} "
-        f"[stream copy, no re-encode]"
+        f"container-only re-mux: {src.name} ({len(usable)} track(s), "
+        f"{len(skipped)} skipped, movie timescale {movie_ts}) -> "
+        f"{dst.name} [stream copy, no re-encode]"
     )
+
+
+def _is_remuxable_track(track: dict) -> bool:
+    """Can MP4Box ``-add`` this track by id?
+
+    A track with no sample entry has no media to import; the measured failure
+    mode is the Sony ``rtmd`` data track, which the manifest reports with both
+    ``handler`` and ``entry`` empty.  This requires an entry rather than
+    allow-listing known handlers, so an unfamiliar but well-formed track is
+    still copied.
+    """
+    return bool(str(track.get("entry") or "").strip())
 
 
 def place_final(

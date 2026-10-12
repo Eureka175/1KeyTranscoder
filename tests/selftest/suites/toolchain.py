@@ -185,29 +185,96 @@ def l2_file_level_meta() -> None:
 
 
 def _sony_rtmd_sample() -> Path | None:
-    """First Sony source under ``testsets/`` that carries an rtmd track.
+    """First Sony source under ``testsets/`` carrying rtmd **and** nrtm.
 
     Probed rather than hard-coded: `testsets/` is a working scratch area
-    whose contents change, and a pinned filename would rot into a
-    permanent "sample missing" failure.
+    whose contents change, and a pinned filename rots into a permanent
+    "sample missing" failure -- which is what happened. The previous version
+    probed two pinned filenames and two pinned folder names; the corpus was
+    then reorganised (Sony material now lives under ``a7m5_4ch_*/...``) and
+    every hard-coded path missed, so the suite reported "no Sony rtmd sample"
+    while 94 valid Sony files were on disk.
+
+    The caller's first assertion is `handler_type == "nrtm"`, and not every
+    Sony file has a file-level meta box -- the long 4CH clips carry rtmd but
+    no nrtm -- so the picker has to check both properties, not just rtmd.
+    Camera A7M5 material carries both, hence the probe order.
+
+    Ordering is sorted and the probe budget is bounded: this runs inside the
+    toolchain suite, and an unbounded walk over a 940-file corpus (one
+    ffprobe per file) times the suite out -- the first version of this fix
+    did exactly that.
     """
     base = ROOT / "testsets"
     if not base.is_dir():
         return None
-    preferred = [
+
+    # Cheap pinned hints first: a known-good path needs no probing at all.
+    for preferred in (
         base / "20260903" / "A7M5" / "20260903_C1170.MP4",
         base / "v0.8.0_failed" / "_evidence" / "SOURCE_20260901_C0955.MP4",
-    ]
-    candidates = [p for p in preferred if p.is_file()]
-    for folder in ("a7m5_4k60p_265_10bit420_150m_xavchs_4ch",
-                   "a7m5_4k30p_264_hi422p_xavcs"):
-        d = base / folder
-        if d.is_dir():
-            candidates += sorted(d.glob("*.MP4"))[:1]
-    for cand in candidates:
-        if cand.is_file():
-            return cand
-    return None
+    ):
+        if preferred.is_file():
+            return preferred
+
+    ordered: list[Path] = []
+    for pattern in ("a7m5_4ch_speech/*/A7M5", "a7m5_4ch_speech/*/*",
+                    "a7m5_4ch_*/A7M5", "a7m5_4ch_long", "a7m5_4ch_*",
+                    "a7m5_4k60p_*", "a7m5_4k30p_*"):
+        for p in sorted(base.glob(pattern)):
+            if p.is_dir() and p not in ordered:
+                ordered.append(p)
+    if not ordered:
+        ordered = [base]
+
+    ffprobe = _find_ffprobe()
+    if ffprobe is None:
+        return None
+    budget = 4
+    fallback: Path | None = None
+    for d in ordered:
+        for cand in sorted(d.glob("*.MP4"))[:budget]:
+            if not _has_rtmd_track(ffprobe, cand):
+                continue
+            if _has_nrtm_meta(cand):
+                return cand
+            if fallback is None:
+                fallback = cand
+    return fallback
+
+
+def _find_ffprobe() -> Path | None:
+    from core.config import find_executable
+
+    try:
+        return find_executable("ffprobe", ROOT)
+    except Exception:                              # noqa: BLE001
+        return None
+
+
+def _has_rtmd_track(ffprobe: Path, path: Path) -> bool:
+    """True when the file exposes an rtmd data stream (the Sony marker)."""
+    try:
+        r = sh(str(ffprobe), "-v", "error", "-show_entries",
+               "stream=codec_tag_string", "-of", "csv=p=0", str(path),
+               timeout=60)
+    except Exception:                              # noqa: BLE001
+        return False
+    return "rtmd" in (r.stdout or "")
+
+
+def _has_nrtm_meta(path: Path) -> bool:
+    """True when the file carries a file-level ``nrtm`` meta box."""
+    from preservation.gpac import (
+        GpacContainerBackend, GpacError, _diso_meta_info,
+    )
+
+    try:
+        gpac = GpacContainerBackend()
+        info = _diso_meta_info(gpac.diso_xml(path))
+    except (GpacError, OSError, ValueError):
+        return False
+    return bool(info and info.get("handler_type") == "nrtm")
 
 
 def _write_manifest(work: Path, src: Path, info: dict) -> Path:
