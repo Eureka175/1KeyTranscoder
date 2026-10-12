@@ -478,8 +478,7 @@ def l3_production_output() -> None:
         """
         out_dir = d / f"out_{name}"
         out_dir.mkdir(parents=True, exist_ok=True)
-        extra = ["--output", str(out_dir), "--encoder", "x265",
-                 "--no-hw-autoselect"]
+        extra = ["--output", str(out_dir), "--encoder", "x265"]
         if plan_path is not None:
             extra += ["--audio-plan", str(plan_path)]
         r = _run_1kt(src_dir, *extra)
@@ -572,8 +571,7 @@ def l3_production_output() -> None:
         out_dir = d / "out_route"
         out_dir.mkdir(parents=True, exist_ok=True)
         run = _run_1kt(
-            quad_dir, "--output", str(out_dir), "--encoder", "x265",
-            "--no-hw-autoselect", "--audio-plan", str(quad_plan_file),
+            quad_dir, "--output", str(out_dir), "--encoder", "x265", "--audio-plan", str(quad_plan_file),
         )
         produced = sorted(out_dir.rglob("*.MP4"))
         route_out = produced[0] if produced else Path("")
@@ -713,7 +711,6 @@ def l3_production_output() -> None:
     quad_out_dir.mkdir(parents=True, exist_ok=True)
     quad_run = _run_1kt(
         quad_base_dir, "--output", str(quad_out_dir), "--encoder", "x265",
-        "--no-hw-autoselect",
     )
     quad_produced = sorted(quad_out_dir.rglob("*.MP4"))
     quad_baseline = (
@@ -819,7 +816,7 @@ def l3_production_output() -> None:
     sync_conflict = sh(
         __import__("sys").executable, ROOT / "1kt.py",
         "--input", src_dir, "--output", d / "out_conflict2",
-        "--encoder", "x265", "--no-hw-autoselect",
+        "--encoder", "x265",
         "--channel-sync", "--audio-plan", str(keep_two),
         "--headless", timeout=600,
     )

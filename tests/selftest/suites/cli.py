@@ -31,12 +31,25 @@ def l1_cli_v062() -> None:
             sys.modules["kt_mod"] = kt
             spec.loader.exec_module(kt)
         for argv_preset, want in (("HQ", "hq"), ("hq", "hq"), ("Hq", "hq"),
-                                  ("uhq", "uhq"), ("ALL", "all")):
+                                  ("uhq", "uhq"), ("FAST", "fast")):
             sys.argv = ["1kt.py", "--input", ".", "--output", ".",
                         "--preset", argv_preset]
             ns = kt.parse_args()
             record(f"v062.preset 大小写 {argv_preset} -> {want}",
                    ns.preset == want, f"got={ns.preset}")
+        # `--preset all` was removed: fanning one run over every preset
+        # multiplied output layout, retry semantics and multihw combinations
+        # by four. It must now be rejected rather than silently accepted.
+        parser_ok = True
+        try:
+            sys.argv = ["1kt.py", "--input", ".", "--output", ".",
+                        "--preset", "all"]
+            kt.parse_args()
+            record("v062.--preset all 已移除 (不再接受)", False,
+                   "parse_args accepted 'all'")
+        except SystemExit:
+            record("v062.--preset all 已移除 (不再接受)", True,
+                   "argparse rejected 'all' as expected")
         sys.argv = ["1kt.py", "--input", ".", "--output", ".",
                     "--encoder", "NVENC"]
         record("v062.encoder 大小写 NVENC -> nvenc",
@@ -66,12 +79,19 @@ def l1_cli_v062() -> None:
            all("av1" not in n for n in kt.AUTOSELECT_ORDER))
     seen: list[str] = []
 
+    # `--no-hw-autoselect` was removed. It existed to restore the pre-v0.6.2
+    # fixed-x265 default; `--encoder x265` expresses that intent explicitly,
+    # and `resolve_default_backend` must now always probe (never silently
+    # return x265 without probing, which is what the flag used to do).
     class _Ns:
-        no_hw_autoselect = True
+        pass
+
     got = kt.resolve_default_backend(_Ns(), ROOT, log=lambda m: seen.append(m))
-    record("v062.--no-hw-autoselect 固定 x265", got == "x265", f"got={got}")
-    record("v062.--no-hw-autoselect 不探测硬件",
-           any("disabled" in m for m in seen), f"{seen[:1]}")
+    record("v062.resolve_default_backend 现在总是探测硬件",
+           any("autoselect" in m for m in seen),
+           f"probe log={seen[:2]}")
+    record("v062.兜底只在一无可用硬件时才发生",
+           got == "x265" or got in ("nvenc", "qsv"), f"got={got}")
 
     # ---- §7 分层日志 ----
     from core.logging_utils import (

@@ -314,22 +314,52 @@ def l1_hardware_audio() -> None:
     args_now = set(re.findall(r'add_argument\(\s*["\'](--[a-z0-9-]+)', entry))
     P46_ADDED = {"--channel-sync-tv", "--channel-sync-tv-policy",
                  "--channel-sync-tv-coordinate"}
+    # REVISED BY THE HARDWARE-FIRST DECODE PHASE. This set is deliberately
+    # hand-maintained: it is the thing that makes an argument add/remove
+    # impossible to slip in silently. Two edits landed together here, which is
+    # the whole reason both assertions are stated separately:
+    #
+    #   removed --hw-decode / --hw-decode-verify / --no-hw-autoselect
+    #       `--hw-decode` and its verify companion pinned hardware decode to
+    #       sha256-verified patched research builds under tools/avhw/, a tree
+    #       excluded from the release package -- so in a shipped install the
+    #       feature was structurally unreachable, while its stock reader
+    #       silently dropped leading pictures on Sony XAVC. Hardware decode is
+    #       now decided per input by encoders/hwdecode_ffmpeg.py (FFmpeg
+    #       NVDEC/QSV, which ships), so the switch has no meaning left.
+    #       `--hw-decode-verify` was never wired to anything at all.
+    #       `--no-hw-autoselect` is expressed by `--encoder x265`.
+    #
+    #   added   --no-metadata
+    #       the metadata-preservation policy switch. It is NOT a decode
+    #       switch: hardware-first decode applies in both modes.
+    HW_DECODE_REMOVED = {"--hw-decode", "--hw-decode-verify",
+                         "--no-hw-autoselect"}
+    THIS_PHASE_ADDED = {"--no-metadata"}
     V080_BASELINE = {
         "--version", "--input", "--output", "--preset", "--encoder", "--config",
         "--scaling-config", "--tool-nvencc", "--tool-qsvencc",
         "--ffmpeg", "--ffprobe", "--gpac-dir", "--gyroflow",
         "--channel-sync", "--channel-sync-transparent", "--audio-plan",
         "--check", "--jobs", "--experimental-multihw", "--log-level",
-        "--verbose", "--fresh-log", "--hw-decode", "--hw-decode-verify",
-        "--no-hw-autoselect", "--headless", "--retry-list", "--keep-work",
-        "--no-downgrade", "--dry-run",
+        "--verbose", "--fresh-log", "--headless", "--retry-list",
+        "--keep-work", "--no-downgrade", "--dry-run",
     }
     record("v08hw.cli v0.8.0 的 CLI 参数一个都没少 (仍含 --audio-plan)",
-           "--audio-plan" in args_now and V080_BASELINE <= args_now,
-           f"missing: {sorted(V080_BASELINE - args_now)}")
-    record("v08hw.cli 除 P4.6 的时变 opt-in 三个参数外, 没有其它新增 CLI 参数",
-           args_now - P46_ADDED <= V080_BASELINE,
-           f"unexpected: {sorted(args_now - P46_ADDED - V080_BASELINE)}")
+           "--audio-plan" in args_now
+           and (V080_BASELINE - THIS_PHASE_ADDED) <= args_now,
+           f"missing: {sorted((V080_BASELINE - THIS_PHASE_ADDED) - args_now)}")
+    record("v08hw.cli 除 P4.6 时变 opt-in 与本阶段新增外, 没有其它参数",
+           args_now - P46_ADDED - THIS_PHASE_ADDED <= V080_BASELINE,
+           f"unexpected: "
+           f"{sorted(args_now - P46_ADDED - THIS_PHASE_ADDED - V080_BASELINE)}")
+    # The removals are asserted as *gone*, not merely absent from the list --
+    # otherwise a future re-add would pass unnoticed.
+    record("v08hw.cli 旧硬解开关已移除 (不是保留为别名)",
+           not (args_now & HW_DECODE_REMOVED),
+           f"still present: {sorted(args_now & HW_DECODE_REMOVED)}")
+    record("v08hw.cli --no-metadata 已加入 (元数据策略, 非解码开关)",
+           "--no-metadata" in args_now)
     _tv_at = entry.find("--channel-sync-tv")
     record("v08hw.cli P4.6 的三个参数就是时变 opt-in, 且默认关闭",
            P46_ADDED <= args_now
@@ -526,17 +556,21 @@ def l3_hardware_audio() -> None:
                [ln for ln in text.splitlines() if "offset" in ln][:1])
 
         # --- 硬件解码 + 硬件编码 + 计划 ------------------------------
+        # The `--hw-decode auto` switch is gone; hardware decode is the
+        # default policy for every input now and is decided by
+        # encoders/hwdecode_ffmpeg.py. NOTE: this case runs a *rigaya hardware
+        # encoder*, whose decode reader is still `--avsw` (FFmpeg-decode ->
+        # rigaya-encode is not implemented yet), so what is asserted here is
+        # that the plan does not change the video elementary stream -- not
+        # that a hardware reader was used. The FFmpeg-decode route itself is
+        # asserted by the x265-path cases, where it is actually applied.
         result_def, produced_def, text_def = _run_case(
-            hwdec_dir, d / f"hwdec_base_{encoder}", encoder,
-            select_one, "--hw-decode", "auto")
+            hwdec_dir, d / f"hwdec_base_{encoder}", encoder, select_one)
         result_plan, produced_plan, text_plan = _run_case(
-            hwdec_dir, d / f"hwdec_plan_{encoder}", encoder,
-            select_one, "--hw-decode", "auto")
-        hw_route = "-> HARDWARE" in text_def and "-> HARDWARE" in text_plan
-        record(f"v08hw.{encoder} 硬件解码 + 硬件编码 + 计划: 解码仍走 avhw",
-               hw_route and result_plan.returncode == 0,
-               [ln[-90:] for ln in text_plan.splitlines()
-                if "decode route" in ln][:1])
+            hwdec_dir, d / f"hwdec_plan_{encoder}", encoder, select_one)
+        record(f"v08hw.{encoder} 硬件编码 + 计划: 编码成功",
+               result_def.returncode == 0 and result_plan.returncode == 0,
+               f"rc={result_def.returncode}/{result_plan.returncode}")
         record(f"v08hw.{encoder} 计划不改变硬件解码下的视频基本流",
                produced_def.is_file() and produced_plan.is_file()
                and _video_elementary_hash(produced_def)
@@ -564,9 +598,10 @@ def l3_hardware_audio() -> None:
     # ------------------------------------------------- 跨后端音频等价 (§26)
     parity: dict[str, tuple] = {}
     for encoder in ("x265", "svtav1", "nvenc", "qsv"):
-        extra = ("--no-hw-autoselect",) if encoder in ("x265", "svtav1") else ()
+        # `--no-hw-autoselect` removed: `_run_case` already passes an explicit
+        # --encoder, which pins the backend without a second flag.
         result, produced, text = _run_case(
-            quad_dir, d / f"parity_{encoder}", encoder, subset_aac, *extra)
+            quad_dir, d / f"parity_{encoder}", encoder, subset_aac)
         parity[encoder] = (
             tuple(_audio_signature(produced)) if produced.is_file() else ()
         )

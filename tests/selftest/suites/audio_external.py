@@ -536,8 +536,7 @@ def l3_audio_external() -> None:
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     out_dir = d / "cli_out"
     out_dir.mkdir(parents=True, exist_ok=True)
-    r = _run_1kt(src_dir, "--output", str(out_dir), "--encoder", "x265",
-                 "--no-hw-autoselect", "--audio-plan", str(plan_file))
+    r = _run_1kt(src_dir, "--output", str(out_dir), "--encoder", "x265", "--audio-plan", str(plan_file))
     produced = sorted(out_dir.rglob("*.MP4"))
     text = (r.stdout or "") + (r.stderr or "")
     ok_cli = bool(produced) and "[AUDIO-FAIL]" not in text
