@@ -503,6 +503,7 @@ def encode_one(
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
+    decode_plan: Any = None,
 ) -> str:
     """Classic single-pass (x265/svtav1 software backends). At
     check_level='full' the PSNR/SSIM sample gates delivery; with
@@ -510,7 +511,13 @@ def encode_one(
 
     With an explicit audio plan the same encoder command is derived into a
     video-only one and the audio is produced separately, then composed at the
-    end (Phase 4C). Without a plan nothing here changes."""
+    end (Phase 4C). Without a plan nothing here changes.
+
+    ``decode_plan`` is the hardware-first decode decision (see
+    ``encoders/hwdecode_ffmpeg.plan_decode``). It is applied to the argv here
+    rather than inside the encoder backend, so that "which decoder" and
+    "which encoder" stay independent: selecting x265 must not force software
+    decode."""
     from core.paths import safe_unlink
 
     safe_unlink(part_dst)
@@ -521,6 +528,11 @@ def encode_one(
         ffmpeg, src, part_dst, profile, prepared.effective,
         source_summary["video_streams"], prepared.src_info,
     )
+    if decode_plan is not None:
+        from encoders.hwdecode_ffmpeg import apply_decode_plan
+
+        cmd = apply_decode_plan(cmd, decode_plan, src)
+        file_logger.info("DECODE_ROUTE | %s", decode_plan.log_line())
     # 显式音频计划: 视频产物必须独立, 否则 Composer 没有可编排的视频输入。
     # 派生只去掉音频 token, 不碰任何编码参数 (视频 bitstream 因此不变)。
     if audio_plan_request is not None:
@@ -708,10 +720,16 @@ def encode_one_sony(
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
+    decode_plan: Any = None,
 ) -> str:
     """Sony preservation path (rtmd) for ffmpeg software backends
     (x265 / svtav1; --check levels apply like on hardware backends).
-    codec="av1" 保留元数据但不恢复 XAVC brand (AV1 不在 XAVC 规范内)。"""
+    codec="av1" 保留元数据但不恢复 XAVC brand (AV1 不在 XAVC 规范内)。
+
+    ``decode_plan`` supplies the hardware-first decode route for the
+    video-only intermediate. Sony is **not** special-cased here: the rtmd
+    payload is re-added from the preservation bundle by MP4Box, so it does
+    not constrain which decoder produced the video track."""
     import time
 
     from core.paths import job_id_for, safe_unlink
@@ -728,6 +746,11 @@ def encode_one_sony(
         ffmpeg, src, encoded_mov, profile,
         prepared.effective, prepared.src_info,
     )
+    if decode_plan is not None:
+        from encoders.hwdecode_ffmpeg import apply_decode_plan
+
+        cmd = apply_decode_plan(cmd, decode_plan, src)
+        file_logger.info("DECODE_ROUTE | %s", decode_plan.log_line())
     log_encode_header(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
         prepared=prepared, engine=engine,
@@ -935,13 +958,18 @@ def encode_one_dji_x265(
     logger: logging.Logger,
     file_logger: logging.Logger,
     dry_run: bool,
+    decode_plan: Any = None,
 ) -> str:
     """DJI preservation path for ffmpeg software backends (x265/svtav1).
 
     Video-only encode (video intermediate is an FFmpeg MOV — no rigaya
     millisecond quantization, so fix_hw_timing=False) + shared GPAC
     rebuild (djmd/dbgi/tmcd native copies) + dji check.
-    video_entry: "hvc1" (HEVC) / "av01" (AV1)."""
+    video_entry: "hvc1" (HEVC) / "av01" (AV1).
+
+    ``decode_plan`` supplies the hardware-first decode route; the djmd/dbgi/
+    tmcd payloads are native track copies in the rebuild step, so they do not
+    constrain the decoder choice."""
     import time
 
     from core.paths import job_id_for, safe_unlink
@@ -958,6 +986,11 @@ def encode_one_dji_x265(
         ffmpeg, src, encoded_mov, profile,
         prepared.effective, prepared.src_info,
     )
+    if decode_plan is not None:
+        from encoders.hwdecode_ffmpeg import apply_decode_plan
+
+        cmd = apply_decode_plan(cmd, decode_plan, src)
+        file_logger.info("DECODE_ROUTE | %s", decode_plan.log_line())
     log_encode_header(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
         prepared=prepared, engine=engine,
@@ -1139,9 +1172,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--preset",
         type=str.lower,                      # accept UHQ / Hq / hQ / uhq alike
-        choices=[p.lower() for p in PRESETS] + ["all"],
+        choices=[p.lower() for p in PRESETS],
         default="hq",
-        help="UHQ/HQ/SMALL/FAST/all (case-insensitive). Default: HQ.",
+        help="UHQ/HQ/SMALL/FAST (case-insensitive). Default: HQ.",
     )
     parser.add_argument(
         "--encoder",
@@ -1316,37 +1349,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--hw-decode",
-        choices=("off", "auto", "require"),
-        default="off",
-        help=(
-            "硬件解码策略 (默认 off = 软解, 即 v0.6.2 行为). "
-            "auto: 输入在 runtime-proven 白名单内时用硬件解码, 否则软解 "
-            "(降级会出 WARNING + reason code). "
-            "require: 必须硬件解码, 不可用则报错, 绝不静默降级. "
-            "无论哪种策略, 硬件结果都必须通过帧完整性闸门 "
-            "(五方帧数对账 + reader 身份断言); 闸门不过则丢弃硬件产物并"
-            "改用软解重跑, 且该失败一定会出声. "
-            "注意: patched 硬件解码 binary 是 research build, 且 QSVEncC "
-            "的补丁仅对 pinned 8.26 版本成立."
-        ),
-    )
-    parser.add_argument(
-        "--hw-decode-verify",
+        "--no-metadata",
         action="store_true",
         help=(
-            "在硬件解码之上追加 ordered fingerprint 校验: 同时跑软件解码, "
-            "逐帧比较画面序列. 能抓到「帧数不变但画面错序/替换」的缺陷, "
-            "代价是每个文件多一次编码. 仅在 --hw-decode 非 off 时有意义."
-        ),
-    )
-    parser.add_argument(
-        "--no-hw-autoselect",
-        action="store_true",
-        help=(
-            "禁用默认后端的硬件自动选择. 未指定 --encoder 时按 "
-            "NVENC -> QSV -> x265 探测可用后端; 加此旗标则固定 x265 "
-            "(即 v0.6.1 及更早的默认行为)."
+            "不保留相机厂商元数据 (Sony rtmd/nrtm/uuid, DJI djmd/dbgi/tmcd). "
+            "**这是元数据保留策略, 不是解码开关**: 硬件优先解码对普通模式与 "
+            "本模式一视同仁. 启用后 Sony/DJI 走普通转码路径 (容器级重建被"
+            "跳过), 但输出有效性、音视频流完整性、帧数与失败检测**一项都"
+            "不减** —— 进程失败、产物缺失/损坏、不支持的输入都不会被当成"
+            "成功. 音频轨与 channel-sync 行为不变."
         ),
     )
     parser.add_argument(
@@ -1448,17 +1459,16 @@ def resolve_default_backend(
     """Pick the backend when the user did not name one.
 
     Priority: NVENC -> QSV -> x265, each gated on a real capability probe.
-    ``--no-hw-autoselect`` restores the pre-v0.6.2 default (x265) without
-    probing anything.
+
+    ``--no-hw-autoselect`` was removed: it existed to restore the pre-v0.6.2
+    fixed-x265 default, and ``--encoder x265`` expresses the same intent
+    explicitly without a second flag whose absence had to be probed for.
 
     NOTE (behaviour boundary, deliberately kept): this only chooses the
     *initial* backend. The existing promise "hardware paths never fall back
     to software encoding" is untouched — a hardware run that fails still
     fails rather than silently re-encoding with x265.
     """
-    if args.no_hw_autoselect:
-        log("  autoselect: disabled by --no-hw-autoselect -> x265")
-        return HW_AUTOSELECT_FALLBACK
     available = _hw_encoders_available(script_dir, log)
     if available:
         return available[0]
@@ -1964,12 +1974,14 @@ def main() -> int:
     except Exception as exc:
         logger.warning("ENV VERSIONS FAILED | %s", exc)
 
-    requested = (
-        list(PRESETS)
-        if args.preset == "all"
-        else [args.preset.upper()]
-    )
-    multiple_presets = len(requested) > 1
+    # ``--preset all`` was removed: it fanned one run out over every preset,
+    # which multiplied output layout, retry-list semantics and (with multihw)
+    # backend combinations by four. Running the CLI once per preset is
+    # explicit and produces the same per-preset output paths, because each
+    # single-preset run never inserts the <PRESET>/ level.
+    requested = [args.preset.upper()]
+    multiple_presets = len(requested) > 1        # always False; kept for the
+    #                                              shared output-layout helper
 
     if args.retry_list:
         retry_sources = load_retry_list(Path(args.retry_list))
@@ -2033,6 +2045,40 @@ def main() -> int:
 
     counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0}
 
+    # ------------------------------------------------------------------
+    # Hardware-first decode capability snapshot (probed once per run).
+    #
+    # Built AFTER the output tree exists so the audit artefact can be saved
+    # next to the rigaya caps, and BEFORE any encoding so every command is
+    # constructed from the same snapshot the selection used -- otherwise a
+    # re-probe could disagree with the plan that was already chosen.
+    # ------------------------------------------------------------------
+    decode_caps = None
+    decode_memo: dict = {}
+    try:
+        from encoders.hwdecode_ffmpeg import build_caps, save_caps
+
+        decode_caps = build_caps(ffmpeg, logger=logger)
+        dc_json, dc_raw = save_caps(decode_caps, work_root / "caps")
+        logger.info(
+            "DECODE CAPS | ffmpeg=%s | hwaccels=%s | devices=%s",
+            decode_caps.ffmpeg_version or "?",
+            ",".join(decode_caps.hwaccels) or "none",
+            ", ".join(
+                f"{d['hwaccel']}[{d['index']}]={d['init']['status']}"
+                for d in decode_caps.devices
+            ) or "none",
+        )
+        logger.info("Decode caps files: %s | %s", dc_json, dc_raw)
+    except Exception as exc:                       # noqa: BLE001
+        # A failed capability probe must not abort the run, and must not be
+        # recorded as "hardware unsupported": plan_decode() treats a missing
+        # snapshot as no_hw_caps and falls back to software, out loud.
+        logger.warning(
+            "[DECODE CAPS] probe failed (%s); software decode will be used",
+            exc,
+        )
+
     for preset in requested:
         profile = config["profile"][preset]
         logger.info("---------- PRESET %s ----------", preset)
@@ -2090,6 +2136,44 @@ def main() -> int:
                     continue
                 codec = "av1" if getattr(backend, "name", "") == "svtav1" else "hevc"
                 video_entry = "av01" if codec == "av1" else "hvc1"
+
+                # --- hardware-first decode decision (independent of encoder) ---
+                # Sony / DJI / generic are NOT distinguished here: the policy is
+                # hardware-first for every input, and the preservation payloads
+                # are re-added from the bundle by MP4Box afterwards, so they do
+                # not constrain which decoder produced the video track.
+                decode_plan = None
+                if decode_caps is not None:
+                    from encoders.hwdecode_ffmpeg import plan_decode
+
+                    decode_plan = plan_decode(
+                        caps=decode_caps,
+                        ffmpeg=ffmpeg,
+                        codec=prepared.src_info.codec,
+                        chroma=prepared.src_info.chroma,
+                        depth=prepared.src_info.bit_depth,
+                        # Probe fixtures are small clips keyed by
+                        # (codec, chroma, depth, geometry), so they are shared
+                        # across runs and live outside the output tree. Putting
+                        # them under .1ktwork would accumulate: per-job cleanup
+                        # removes only <job_id>/, never the work root, so a
+                        # decode_probe/ there would grow with every new format.
+                        # `preservation/gpac.py` uses the same system-temp
+                        # scratch convention.
+                        probe_work_dir=None,
+                        memo=decode_memo,
+                    )
+                    file_logger.info(
+                        "DECODE_ROUTE | %s", decode_plan.log_line()
+                    )
+                    if decode_plan.hardware:
+                        logger.info(
+                            "[DECODE] %s | %s", src.name, decode_plan.log_line()
+                        )
+                    for w in decode_plan.warnings:
+                        logger.info("[DECODE] %s | %s", src.name, w)
+                        file_logger.info("DECODE_NOTE | %s", w)
+
                 if (
                     codec == "av1"
                     and prepared.src_info.chroma not in ("4:2:0", "mono", "")
@@ -2107,11 +2191,39 @@ def main() -> int:
                     logs_root / "quality_samples.csv"
                     if args.check == "full" else None
                 )
-                if any(
+                # --no-metadata: the metadata-preservation policy, NOT a decode
+                # switch. Hardware-first decode was already decided above and
+                # is unaffected. What changes is only whether the source family
+                # gets its container-rebuild pipeline: with the flag set, Sony
+                # and DJI files take the ordinary transcode path, so the
+                # rtmd/nrtm/djmd/dbgi/tmcd tracks are not rebuilt and the
+                # XAVC/DJI branding is not restored.
+                #
+                # Everything that protects output *correctness* still runs:
+                # probe, encode return code, non-empty output, ffprobe
+                # readability, audio stream copy, place_final's container
+                # handling and the frame checks. Skipping preservation must
+                # never be read as "skip validation".
+                no_metadata = bool(getattr(args, "no_metadata", False))
+                is_sony = any(
                     st.get("codec_type") == "data"
                     and st.get("codec_tag_string") == "rtmd"
                     for st in prepared.streams
-                ):
+                )
+                if no_metadata:
+                    keep = ("sony" if is_sony
+                            else "dji" if is_dji_source(prepared.streams)
+                            else "generic")
+                    logger.info(
+                        "[META_POLICY] %s | no_metadata: %s preservation "
+                        "skipped, ordinary transcode path used",
+                        src.name, keep,
+                    )
+                    file_logger.info(
+                        "META_POLICY | no_metadata | source_family=%s | "
+                        "container rebuild skipped", keep,
+                    )
+                if is_sony and not no_metadata:
                     result = encode_one_sony(
                         src=src, dst=dst, prepared=prepared, profile=profile,
                         preset=preset, backend=backend, engine=engine,
@@ -2126,8 +2238,9 @@ def main() -> int:
                         channel_sync_opts=channel_sync_opts,
                         logger=logger, file_logger=file_logger,
                         dry_run=args.dry_run,
+                        decode_plan=decode_plan,
                     )
-                elif is_dji_source(prepared.streams):
+                elif is_dji_source(prepared.streams) and not no_metadata:
                     result = encode_one_dji_x265(
                         src=src, dst=dst, prepared=prepared, profile=profile,
                         preset=preset, backend=backend, engine=engine,
@@ -2142,6 +2255,7 @@ def main() -> int:
                         channel_sync_opts=channel_sync_opts,
                         logger=logger, file_logger=file_logger,
                         dry_run=args.dry_run,
+                        decode_plan=decode_plan,
                     )
                 else:
                     result = encode_one(
@@ -2160,6 +2274,7 @@ def main() -> int:
                         work_dir=work_root / job_id_for(src),
                         logger=logger,
                         file_logger=file_logger, dry_run=args.dry_run,
+                        decode_plan=decode_plan,
                     )
                 if result == "failed":
                     record_failure(
@@ -2193,7 +2308,13 @@ def main() -> int:
             multiple_presets=multiple_presets,
             keep_work=args.keep_work,
             no_downgrade=args.no_downgrade,
-            hw_decode=args.hw_decode,
+            # The rigaya ``--avhw`` route is now always off. Its decode reader
+            # is a *different implementation* from FFmpeg's NVDEC/QSV and the
+            # stock build silently drops leading pictures on Sony XAVC; with
+            # ``--hw-decode`` removed there is no longer any switch that could
+            # ask for it, and the hardware-first policy is served by the
+            # FFmpeg route above. See encoders/hwdecode_ffmpeg.py.
+            hw_decode="off",
             hw_decode_memo={},
             check_level=args.check,
             ffmpeg=ffmpeg,

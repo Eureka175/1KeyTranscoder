@@ -88,11 +88,12 @@ class DecodePlan:
     hwaccel: str = ""               # "cuda" | "qsv"
     device: str = ""                # ffmpeg device spec, e.g. "cuda=cu:0"
     device_index: int = 0
-    surface_format: str = ""        # what the hw surface holds, e.g. "p010le"
+    surface_format: str = ""        # what the hw surface nominally holds
     target_format: str = ""         # what the encoder will receive
     reason: str = ""
     detail: str = ""
     needs_format_conversion: bool = False
+    transfer: "Transfer | None" = None
     warnings: list[str] = field(default_factory=list)
 
     @property
@@ -112,20 +113,16 @@ class DecodePlan:
         ]
 
     def ffmpeg_filter_args(self) -> list[str]:
-        """Args placed after ``-i`` to land in frames libx265 accepts.
+        """Args placed after ``-i`` to land in frames the encoder accepts.
 
-        ``hwdownload`` accepts only the hardware surface's own system-memory
-        formats (``p010le`` for 10-bit 4:2:0 on both cuda and qsv here), never
-        planar ``yuv*p*le``. So a hardware route always costs one CPU-side
-        conversion that the software route does not need -- which is why
-        hardware decode is not automatically faster.
+        The chain is the **probed** transfer, never a guess at the surface
+        format: for HEVC 4:2:2 10-bit on this machine no direct
+        ``hwdownload`` format is accepted at all and the working route goes
+        through a device-side scale filter.
         """
-        if not self.hardware:
+        if not self.hardware or self.transfer is None:
             return []
-        chain = [f"hwdownload,format={self.surface_format}"]
-        if self.needs_format_conversion:
-            chain.append(f"format={self.target_format}")
-        return ["-vf", ",".join(chain)]
+        return ["-vf", ",".join(self.transfer.filters)]
 
     def log_line(self) -> str:
         if not self.hardware:
@@ -133,11 +130,13 @@ class DecodePlan:
                 f"decode route: SW substrate=sw decoder=ffmpeg-native "
                 f"reason={self.reason} {self.detail}"
             )
+        to = self.transfer.format if self.transfer else self.target_format
+        via = "" if (self.transfer and self.transfer.direct) else " (via scale)"
         return (
             f"decode route: HW substrate={SUBSTRATE_FFMPEG_HW} "
             f"decoder={self.decoder} hwaccel={self.hwaccel} "
-            f"device={self.device_index} surface={self.surface_format} -> "
-            f"{self.target_format} reason={self.reason} {self.detail}"
+            f"device={self.device_index} -> {to}{via} "
+            f"reason={self.reason} {self.detail}"
         )
 
     def to_json(self) -> dict:
@@ -150,6 +149,13 @@ class DecodePlan:
             "target_format": self.target_format,
             "hardware": self.hardware,
             "needs_format_conversion": self.needs_format_conversion,
+            "transfer": (
+                None if self.transfer is None else {
+                    "format": self.transfer.format,
+                    "filters": self.transfer.filters,
+                    "direct": self.transfer.direct,
+                }
+            ),
             "reason": self.reason,
             "detail": self.detail,
         }
@@ -176,9 +182,18 @@ _PLANAR = {
     ("mono", 10): "gray10le",
 }
 
-# The system-memory format a hardware surface downloads as. These are the
-# values ``hwdownload,format=`` actually accepts -- verified by probe, not
-# assumed: p010le works for 10-bit 4:2:0 on cuda and qsv, yuv420p10le does not.
+# The system-memory format a hardware surface *usually* downloads as. These
+# are starting guesses only, never trusted: the transfer chain is resolved by
+# probing (see resolve_transfer), because the real surface format depends on
+# the device, the codec and the bit depth in ways that canot be predicted.
+#
+# Measured counter-example that forced this: HEVC 4:2:2 10-bit on this
+# machine has a CUDA/QSV surface that will NOT download as p210le, nv16,
+# yuv422p10le, p010le or yuv420p -- every direct hwdownload format is
+# rejected with "Invalid output format". The working route is
+# scale_cuda=format=yuv422p10le,hwdownload,format=yuv422p10le, and it is
+# bit-exact against software decode (verified: identical raw SHA256), so it
+# preserves 4:2:2 rather than subsampling to 4:2:0.
 _SURFACE = {
     ("4:2:0", 8): "nv12",
     ("4:2:0", 10): "p010le",
@@ -190,6 +205,10 @@ _SURFACE = {
     ("4:4:4", 10): "yuv444p10le",
 }
 
+# Per-hwaccel device-side filters that can write a *different* surface format
+# before download. Tried in order when a direct hwdownload is refused.
+_SCALE_FILTER = {"cuda": "scale_cuda", "qsv": "vpp_qsv"}
+
 # codec -> {hwaccel: decoder name}
 _DECODERS = {
     "hevc": {"cuda": "hevc_cuvid", "qsv": "hevc_qsv"},
@@ -198,6 +217,149 @@ _DECODERS = {
     "mpeg2video": {"cuda": "mpeg2_cuvid", "qsv": "mpeg2_qsv"},
     "vp9": {"cuda": "vp9_cuvid", "qsv": "vp9_qsv"},
 }
+
+
+@dataclass
+class Transfer:
+    """A **probed** route from a hardware surface to a CPU pixel format.
+
+    ``filters`` is the filter chain to place after ``-i`` (without ``-vf``).
+    ``format`` is the system-memory format the chain ends in.
+
+    This exists because the surface format is not predictable. For HEVC
+    4:2:2 10-bit on this machine no direct ``hwdownload`` format works at
+    all, while ``scale_cuda=format=yuv422p10le,hwdownload,format=yuv422p10le``
+    works and is bit-exact against software decode.
+    """
+
+    format: str
+    filters: list[str]
+    direct: bool
+    evidence: str = ""
+
+    def log_line(self) -> str:
+        kind = "direct hwdownload" if self.direct else "via device-side scale"
+        return f"transfer {kind}: {','.join(self.filters)} -> {self.format}"
+
+
+def _transfer_candidates(hwaccel: str, surface: str, target: str) -> list[Transfer]:
+    """Routes to try, in preference order.
+
+    Direct download first: it is the cheapest and the only one that involves
+    no device-side pixel work at all. The device-side scale filter is the
+    fallback, and it is deliberately asked to produce ``target`` (the format
+    the encoder wants) rather than the nominal surface format, so a 4:2:2
+    source stays 4:2:2 instead of being silently subsampled.
+    """
+    out: list[Transfer] = []
+    for fmt in dict.fromkeys([surface, target]):
+        out.append(Transfer(
+            format=fmt,
+            filters=[f"hwdownload,format={fmt}"],
+            direct=True,
+        ))
+    scale = _SCALE_FILTER.get(hwaccel)
+    if scale:
+        for fmt in dict.fromkeys([target, surface]):
+            # No hwdownload in between: the filter writes straight to the
+            # requested system format, which is what makes this work where a
+            # direct download has no matching surface format.
+            out.append(Transfer(
+                format=fmt,
+                filters=[f"{scale}=format={fmt}", f"hwdownload,format={fmt}"],
+                direct=False,
+            ))
+    return out
+
+
+def resolve_transfer(
+    ffmpeg: Path, hwaccel: str, index: int, decoder: str, codec: str,
+    chroma: str, depth: int, *, work_dir: Path | None = None,
+    caps: "HwDecodeCaps | None" = None,
+) -> tuple[Transfer | None, Probe]:
+    """Find a working surface -> CPU transfer for this combination.
+
+    The result is cached on ``caps`` (keyed by hwaccel/device/format) so the
+    search runs at most once per combination per run, not once per file.
+    Returns ``(transfer, probe)``; ``transfer`` is None when nothing worked.
+    """
+    target = planar_format(chroma, depth)
+    surface = surface_format(chroma, depth)
+    if target is None or surface is None:
+        return None, Probe(ST_UNAVAILABLE, value=False,
+                           detail=f"no format mapping for {chroma}/{depth}bit")
+
+    cache_key = ("transfer", hwaccel, index, codec, chroma, int(depth))
+    if caps is not None:
+        cached = caps.acceptance.get(cache_key)
+        if cached is not None and cached.status == ST_MEASURED:
+            if cached.value and cache_key in caps.transfers:
+                return caps.transfers[cache_key], cached
+            if not cached.value:
+                return None, cached
+
+    fixture = _ensure_fixture(ffmpeg, codec, chroma, depth, work_dir)
+    if fixture is None:
+        return None, Probe(
+            ST_UNAVAILABLE, value=False,
+            detail=f"cannot synthesise a {chroma}/{depth}bit probe fixture",
+        )
+
+    spec = _device_spec(hwaccel, index)
+    attempts: list[str] = []
+    for cand in _transfer_candidates(hwaccel, surface, target):
+        rc, out = _run([
+            str(ffmpeg), "-hide_banner", "-v", "error",
+            "-init_hw_device", spec,
+            "-hwaccel", hwaccel,
+            "-hwaccel_device", hwaccel,
+            "-hwaccel_output_format", hwaccel,
+            "-c:v", decoder,
+            "-i", str(fixture),
+            "-vf", ",".join(cand.filters),
+            "-frames:v", "2", "-f", "null", "-",
+        ], timeout=120)
+        if rc == 0:
+            cand.evidence = f"accepted after {len(attempts)} rejected route(s)"
+            probe = Probe(
+                ST_MEASURED, value=True,
+                detail=f"transfer via {','.join(cand.filters)}",
+            )
+            if caps is not None:
+                caps.transfers[cache_key] = cand
+                caps.acceptance[cache_key] = probe
+            return cand, probe
+        first = next((ln for ln in out.splitlines() if ln.strip()), "")
+        attempts.append(f"{','.join(cand.filters)}: {first.strip()[:70]}")
+
+        # Distinguish "this decoder cannot hold the format at all" from "no
+        # download route worked". Measured: on the Intel Arc 140T the QSV
+        # HEVC 4:2:2 10-bit path fails with
+        # `[AVHWFramesContext] Unsupported pixel format` -- the decoder never
+        # produces a surface -- whereas a genuine transfer problem would
+        # report an unsupported hwdownload format against a real frame. Both
+        # route to software/another device, but the reason code has to say
+        # which one happened, so it can be diagnosed later.
+        low = first.lower()
+        if "hwframescontext" in low or "unsupported pixel format" in low:
+            decode_probe = Probe(
+                ST_MEASURED, value=False,
+                detail=f"{decoder} cannot allocate a {chroma}/{depth}bit "
+                       f"surface on {hwaccel}[{index}]: {first.strip()[:140]}",
+            )
+            if caps is not None:
+                caps.acceptance[cache_key] = decode_probe
+            return None, decode_probe
+
+    probe = Probe(
+        ST_MEASURED, value=False,
+        detail=f"no working transfer for {codec} {chroma}/{depth}bit on "
+               f"{hwaccel}[{index}]: " + " | ".join(attempts),
+    )
+    if caps is not None:
+        caps.acceptance[cache_key] = probe
+    return None, probe
+
 
 # Candidate order when several hardware routes are compatible. This is a
 # decode-side policy and is deliberately **not** the encoder order
@@ -251,6 +413,8 @@ class HwDecodeCaps:
     registered_decoders: tuple[str, ...] = ()
     devices: list[dict] = field(default_factory=list)
     acceptance: dict = field(default_factory=dict)
+    #: (hwaccel, index, codec, chroma, depth) -> Transfer resolved by probe
+    transfers: dict = field(default_factory=dict)
     raw_probe_log: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict:
@@ -262,10 +426,20 @@ class HwDecodeCaps:
             "devices": self.devices,
             "acceptance": [
                 {"key": list(k), **v.to_json()}
-                for k, v in sorted(self.acceptance.items(), key=lambda i: str(i[0]))
+                for k, v in sorted(caps_items(self.acceptance))
+            ],
+            "transfers": [
+                {"key": list(k), "filters": v.filters, "format": v.format,
+                 "direct": v.direct}
+                for k, v in sorted(caps_items(self.transfers))
             ],
             "probe_log": self.raw_probe_log[-200:],
         }
+
+
+def caps_items(d: dict):
+    """Deterministic iteration for the caps JSON (keys are mixed types)."""
+    return sorted(d.items(), key=lambda i: str(i[0]))
 
 
 def _run(cmd: list[str], timeout: int = 120) -> tuple[int, str]:
@@ -338,6 +512,100 @@ def probe_device(ffmpeg: Path, hwaccel: str, index: int = 0) -> Probe:
     return Probe(ST_PROBE_FAILED, value=None, detail=detail)
 
 
+def _device_identity(hwaccel: str, index: int) -> dict:
+    """Best-effort identity of the physical device behind an ffmpeg hwaccel.
+
+    Capability facts are properties of a *device*, not of "NVIDIA" or of this
+    program, so every acceptance record is stored against this. NVEncC's
+    ``--check-features`` reports the adapter and driver without needing any
+    media, which is the cheapest authoritative source available here; the
+    vendor's own tool is preferred over inferring from the ffmpeg build.
+    """
+    ident: dict = {"hwaccel": hwaccel, "index": index}
+    if hwaccel == "cuda":
+        exe = _find_tool("NVEncC64.exe")
+        if exe is not None:
+            rc, out = _run([str(exe), "--check-features"], timeout=120)
+            if rc == 0:
+                for line in out.splitlines():
+                    m = re.match(r"#(\d+):\s*(.+?)\[([^\]]*)\]\s*$", line.strip())
+                    if m and int(m.group(1)) == index:
+                        ident["name"] = m.group(2).split(" (")[0].strip()
+                        ident["driver"] = m.group(3).strip()
+                        break
+    elif hwaccel == "qsv":
+        exe = _find_tool("QSVEncC64.exe")
+        if exe is not None:
+            rc, out = _run([str(exe), "--check-features"], timeout=120)
+            if rc == 0:
+                m = re.search(r"GPU:\s*([^\r\n]+)", out)
+                if m:
+                    ident["name"] = m.group(1).strip()
+                m = re.search(r"\((\d+\.\d+\.\d+\.\d+)\)", out)
+                if m:
+                    ident["driver"] = m.group(1)
+    return ident
+
+
+def _find_tool(exe_name: str) -> Path | None:
+    """Locate a bundled rigaya tool, or None.
+
+    Kept local (and tolerant) so the decode capability probe never depends on
+    the encoder backends being importable.
+    """
+    import shutil as _shutil
+
+    try:
+        from core.config import find_hw_tool
+        return find_hw_tool(Path(__file__).resolve().parent.parent, exe_name)
+    except Exception:                              # noqa: BLE001
+        found = _shutil.which(exe_name)
+        return Path(found) if found else None
+
+
+def _ensure_fixture(
+    ffmpeg: Path, codec: str, chroma: str, depth: int,
+    work_dir: Path | None,
+) -> Path | None:
+    """Synthesise (or reuse) a clip in the exact (codec, chroma, depth).
+
+    Returns None when the fixture cannot be built -- which means the
+    combination cannot be *tested* here, never that hardware fails it.
+    """
+    target = planar_format(chroma, depth)
+    if target is None:
+        return None
+    encoder = {"hevc": "libx265", "h264": "libx264", "av1": "libsvtav1"}.get(codec)
+    if encoder is None:
+        return None
+
+    import tempfile
+
+    tmpdir = Path(work_dir) if work_dir else Path(tempfile.gettempdir())
+    try:
+        tmpdir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        tmpdir = Path(tempfile.gettempdir())
+    fx = tmpdir / _probe_fixture_name(codec, chroma, depth)
+    if fx.is_file():
+        return fx
+
+    gen = [
+        str(ffmpeg), "-hide_banner", "-v", "error", "-y",
+        "-f", "lavfi",
+        "-i", f"testsrc2=s={_PROBE_GEOMETRY}:r=5:{_PROBE_DURATION}",
+        "-vf", f"format={target}",
+        "-c:v", encoder, "-pix_fmt", target,
+    ]
+    if encoder == "libx265":
+        gen += ["-x265-params", "log-level=error:keyint=5:min-keyint=5"]
+    elif encoder == "libx264":
+        gen += ["-preset", "ultrafast"]
+    gen += [str(fx)]
+    rc, _out = _run(gen, timeout=120)
+    return fx if (rc == 0 and fx.is_file()) else None
+
+
 def probe_acceptance(
     ffmpeg: Path, hwaccel: str, index: int, codec: str, chroma: str, depth: int,
     *, work_dir: Path | None = None,
@@ -347,6 +615,11 @@ def probe_acceptance(
     A registered decoder is not a working decoder, so this performs a real
     decode. The fixture is synthesised in the exact pixel format via
     ``lavfi -> encoder`` so the test needs no corpus media.
+
+    This probe covers *decode only*. A working decode is not the same as a
+    usable hardware route -- HEVC 4:2:2 10-bit decodes and then refuses every
+    direct download format -- so ``plan_decode`` additionally requires
+    ``resolve_transfer`` to succeed before it offers a hardware route.
     """
     decoder = decoder_for(codec, hwaccel)
     if decoder is None:
@@ -357,39 +630,12 @@ def probe_acceptance(
         return Probe(ST_UNAVAILABLE, value=False,
                      detail=f"no planar format mapped for {chroma}/{depth}bit")
 
-    import tempfile
-
-    tmpdir = Path(work_dir) if work_dir else Path(tempfile.gettempdir())
-    try:
-        tmpdir.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        tmpdir = Path(tempfile.gettempdir())
-    fx = tmpdir / _probe_fixture_name(codec, chroma, depth)
-
-    encoder = {"hevc": "libx265", "h264": "libx264", "av1": "libsvtav1"}.get(codec)
-    if encoder is None:
-        return Probe(ST_UNAVAILABLE, value=False,
-                     detail=f"no fixture encoder for codec {codec!r}")
-    if not fx.is_file():
-        gen = [
-            str(ffmpeg), "-hide_banner", "-v", "error", "-y",
-            "-f", "lavfi",
-            "-i", f"testsrc2=s={_PROBE_GEOMETRY}:r=5:{_PROBE_DURATION}",
-            "-vf", f"format={target}",
-            "-c:v", encoder, "-pix_fmt", target,
-        ]
-        if encoder == "libx265":
-            gen += ["-x265-params", "log-level=error:keyint=5:min-keyint=5"]
-        elif encoder == "libx264":
-            gen += ["-preset", "ultrafast"]
-        gen += [str(fx)]
-        rc, out = _run(gen, timeout=120)
-        if rc != 0 or not fx.is_file():
-            return Probe(
-                ST_UNAVAILABLE, value=False,
-                detail=f"cannot synthesise {target} fixture with {encoder}: "
-                       f"{out[-200:]}",
-            )
+    fx = _ensure_fixture(ffmpeg, codec, chroma, depth, work_dir)
+    if fx is None:
+        return Probe(
+            ST_UNAVAILABLE, value=False,
+            detail=f"cannot synthesise a {codec} {chroma}/{depth}bit fixture",
+        )
 
     spec = _device_spec(hwaccel, index)
     rc, out = _run([
@@ -546,23 +792,42 @@ def plan_decode(
                 )
                 continue
 
+            # Decode was accepted; now establish a working surface -> CPU
+            # transfer. Probing decode alone is not enough: HEVC 4:2:2 10-bit
+            # decodes fine and then fails to download in every direct format,
+            # so a decode-only probe reports a false positive.
+            transfer = caps.transfers.get(key)
+            transfer_probe = None
+            if transfer is None:
+                transfer, transfer_probe = resolve_transfer(
+                    ffmpeg, hwaccel, idx, decoder, codec, chroma, depth,
+                    work_dir=probe_work_dir, caps=caps,
+                )
+            if transfer is None:
+                rejections.append(
+                    f"{hwaccel}[{idx}]: no working frame transfer"
+                    + (f" ({transfer_probe.detail[:70]})"
+                       if transfer_probe is not None else "")
+                )
+                continue
+
             plan = DecodePlan(
                 substrate=SUBSTRATE_FFMPEG_HW,
                 decoder=decoder, hwaccel=hwaccel,
                 device=_device_spec(hwaccel, idx), device_index=idx,
                 surface_format=surface, target_format=target,
+                transfer=transfer,
                 reason="hardware_compatible",
                 detail=f"{decoder} accepted {codec} {chroma}/{depth}bit "
-                       f"on device {idx}",
+                       f"on device {idx}; {transfer.log_line()}",
             )
-            # hwdownload yields the surface format; converting to the planar
-            # format the encoder needs costs one CPU pass.
-            plan.needs_format_conversion = surface != target
-            if plan.needs_format_conversion:
+            if not transfer.direct:
                 plan.warnings.append(
-                    f"hardware decode needs one CPU-side format conversion "
-                    f"{surface} -> {target} before encoding"
+                    f"hardware decode needs a device-side format conversion "
+                    f"({' ,'.join(transfer.filters)}) before encoding"
                 )
+            if transfer.format != target:
+                plan.needs_format_conversion = True
             return plan
 
     return plan_software(
@@ -608,13 +873,17 @@ def build_caps(
             continue
         for idx in device_indices:
             p = probe_device(ffmpeg, hwaccel, idx)
-            caps.devices.append({
+            entry = {
                 "hwaccel": hwaccel, "index": idx, "init": p.to_json(),
-            })
+            }
+            if p.status == ST_MEASURED and p.value:
+                entry.update(_device_identity(hwaccel, idx))
+            caps.devices.append(entry)
             if logger is not None:
                 logger.info(
-                    "[DECODE CAPS] device %s[%d]: %s %s",
-                    hwaccel, idx, p.status, p.detail[:120],
+                    "[DECODE CAPS] device %s[%d]: %s %s %s",
+                    hwaccel, idx, p.status,
+                    entry.get("name", "?"), p.detail[:80],
                 )
     return caps
 
