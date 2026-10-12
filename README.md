@@ -495,11 +495,21 @@ The correctness matrix for the rigaya hardware path is `tests/hwdecode/`
 `docs/hardware-decode/README.md`. It is **not** part of
 `tests/full_autotest.py --level full`, and it now reports two separate gates:
 
-- **production** (76 cases, everything that runs on the deployed binaries) —
-  runnable without any research build;
-- **research** (7 cases: the patched-build identity, provenance and
-  stock-vs-patched defect comparisons) — **BLOCKED** here, because `tools/avhw/`
-  is absent. Those are reported BLOCKED and are never counted as passing.
+- **production** — everything that runs on the deployed binaries, i.e. the
+  behaviour a release actually has. Runnable without any research build.
+- **research** — the cases whose subject *is* the patched build (its identity
+  and provenance, and the stock-vs-patched defect comparisons). These are
+  **BLOCKED** here because `tools/avhw/` is absent, and they are reported as
+  blocked rather than failed: a missing binary cannot be examined and found
+  wrong. They are never counted as passing.
+
+On this installation much of the matrix also **skips** for want of the original
+research corpus, which the restored `testsets/` does not contain under the old
+names. `summary` reports those skip reasons, so a green count cannot hide a
+test that never ran. The source-aware policy itself is validated by
+`tests/selftest/suites/native_decode.py` (83 cases, no fixtures required) and by
+the real-material runs recorded in
+`docs/hardware-decode/final-report.md`.
 
 
 ## Testing
@@ -599,14 +609,28 @@ Legacy names (`full_autotest.SUITES`, `full_autotest.record`, …) still forward
 real implementation, and no suite display name changed, so report filtering by name
 keeps working.
 
-Scheduled hardware-decode verification is separate:
+Scheduled hardware-decode verification is separate, and reports **two gates**:
 
 ```powershell
 python -m tests.hwdecode.harness provenance      # binary/patch identity; mismatch = FAIL
 python -m tests.hwdecode.harness check-matrix    # documentation vs matrix drift check
 python -m tests.hwdecode.harness run --phase 1   # A toolchain + B routing
-python -m tests.hwdecode.harness summary         # aggregate gate
+python -m tests.hwdecode.harness summary         # aggregate gate, plus per-gate split
 ```
+
+`summary` prints `gate production` and `gate research`. The split is by what each
+test needs, not by convenience:
+
+- **production** — everything that runs on the deployed binaries, i.e. the
+  behaviour a release actually has. Runnable with no research build present.
+- **research** — the cases whose subject *is* the patched build (identity,
+  provenance, and the stock-vs-patched defect comparison). These are **BLOCKED**
+  here because `tools/avhw/` is absent, and they are reported as blocked rather
+  than failed: a missing binary cannot be examined and found wrong.
+
+Results written by an *earlier* invocation are excluded from both gates and
+listed as sat-out, so a `--phase 1` summary can no longer count a previous
+session's PASS as its own.
 
 Targeted self-checks: `python tests\run_selfcheck.py --encoder nvenc|qsv|x265` and
 `python -m preservation.selfcheck <original> <final> <log_dir>`.

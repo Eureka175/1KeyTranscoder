@@ -25,18 +25,27 @@ nvenc / qsv     Sony      -> 原生 --avsw（编码前决定，预防性）
 因此本矩阵现在报**两道闸门**（`python -m tests.hwdecode.harness summary`）：
 
 ```text
-production  76 例  在已部署二进制上运行，无需任何研究构建        <- 可运行
-research     7 例  研究对象就是 patched 构建本身                  <- BLOCKED
-                   HD-A01/A02/A05/A06/A08（身份与 provenance）
-                   HD-C01（stock vs patched 缺陷对照）
-                   HD-D09（Sony 上 avhw vs avsw 的 trim 语义）
+production  在已部署二进制上运行的用例                        <- 可运行
+research    研究对象就是 patched 构建本身                     <- BLOCKED
+            HD-A01/A02/A05/A06/A08（身份与 provenance）
+            HD-C01/C02/C07/C08（reader 完整性行为）
+            HD-D09（Sony 上 avhw vs avsw 的 trim 语义）
+            HD-J05（长片段 reader 行为）
 ```
 
 ```text
 python -m tests.hwdecode.harness provenance
     -> ok=False, 2 failure(s)   (NVEncC / QSVEncC patched 构建缺失)
-    这 7 例如实记为 BLOCKED，绝不记为 PASS。
+    research 用例如实记为 BLOCKED，绝不记为 PASS。
+```
 
+**注意**：本机 `testsets/` 的目录名与矩阵期望的 research 语料不同，
+`production` 闸门内大量用例因此 **SKIP**（`summary` 会打印 skip 原因，
+不会让绿色计数掩盖"从未运行"）。来源感知策略本身由
+`tests/selftest/suites/native_decode.py`（83 例，不需要 fixture）与真实素材
+端到端运行覆盖，见 [`final-report.md`](final-report.md) 的"现行策略下的实测"。
+
+```text
 重建前提（本机核查，未变）：
     cl / msbuild (MSVC)      NOT FOUND       <- 硬阻塞
     Visual Studio            NOT FOUND       <- 硬阻塞

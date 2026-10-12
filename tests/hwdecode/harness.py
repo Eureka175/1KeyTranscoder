@@ -451,6 +451,18 @@ def a05(t, ctx):
 def a06(t, ctx):
     prov = sources.load_provenance()
     target = ROOT / prov["backends"]["nvenc"]["hardware_decode"]["binary"]
+    # The decoy is a corrupted copy of the research build, so without it there
+    # is nothing to plant and nothing to compare against.
+    if not target.is_file():
+        return _res(
+            t, "HD-A06", STATUS_BLOCKED,
+            actual="binary absent",
+            reason=(f"the research build is not present at "
+                    f"{prov['backends']['nvenc']['hardware_decode']['binary']} "
+                    f"and cannot be built here, so the PATH-decoy comparison "
+                    f"has no subject; the production resolver never consults "
+                    f"PATH for this path in the first place"),
+        )
     decoy_dir = Path(tempfile.mkdtemp(prefix="1kt-decoy-"))
     decoy = decoy_dir / target.name
     try:
@@ -514,6 +526,15 @@ def a07(t, ctx):
 
 @impl("a08_provenance_selfcheck")
 def a08(t, ctx):
+    """The provenance check must *gate* -- i.e. raise on a wrong expectation.
+
+    That is the assertion, and it is independent of whether the real toolchain
+    happens to be complete: `verify_provenance(strict=True)` must reject a
+    deliberately falsified hash. The old form also required ``real["ok"]``,
+    which conflated "the check works" with "the binaries are installed" and
+    reported FAIL -- implying the check was broken -- on a machine that simply
+    lacks the research build. The two are separated here.
+    """
     prov = sources.load_provenance()
     real = sources.verify_provenance(strict=False)
     # a deliberately wrong expectation must be caught
@@ -529,13 +550,34 @@ def a08(t, ctx):
             caught = True
     finally:
         sources.load_provenance = orig_load
-    ok = real["ok"] and caught
+
+    if not caught:
+        return _res(
+            t, "HD-A08", STATUS_FAIL,
+            actual=f"real_ok={real['ok']} wrong_expectation_raised=False",
+            reason="provenance self-check did not gate correctly: a falsified "
+                   "hash was accepted",
+            evidence={"real": {"ok": real["ok"], "failures": real["failures"]},
+                      "wrong_expectation_raised": False},
+        )
+    if not real["ok"]:
+        return _res(
+            t, "HD-A08", STATUS_BLOCKED,
+            actual=f"gating_works=True real_ok=False "
+                   f"({len(real['failures'])} failure(s))",
+            reason=("the self-check does gate a falsified hash, which is what "
+                    "this test asserts; the real toolchain is incomplete "
+                    "because the research build is absent and cannot be built "
+                    "here: " + "; ".join(real["failures"])[:300]),
+            evidence={"real": {"ok": real["ok"], "failures": real["failures"]},
+                      "wrong_expectation_raised": True},
+        )
     return _res(
-        t, "HD-A08", STATUS_PASS if ok else STATUS_FAIL,
-        actual=f"real_ok={real['ok']} wrong_expectation_raised={caught}",
-        reason="" if ok else "provenance self-check did not gate correctly",
+        t, "HD-A08", STATUS_PASS,
+        actual="real_ok=True wrong_expectation_raised=True",
+        reason="",
         evidence={"real": {"ok": real["ok"], "failures": real["failures"]},
-                  "wrong_expectation_raised": caught},
+                  "wrong_expectation_raised": True},
     )
 
 
@@ -2874,34 +2916,54 @@ def f06(t, ctx):
 
 @impl("f07_fallback_is_loud")
 def f07(t, ctx):
-    from encoders.hwdecode import route_decode, memoize_unavailable
+    """Every route that is *not* hardware-for-a-non-Sony-source is announced.
+
+    **Adjusted, not weakened.** The old form asserted that an unproven
+    combination routes to software *and warns*. Hardware is now the default
+    for non-Sony material regardless of the allowlist, so that assertion no
+    longer describes the system -- a silent route to hardware is the designed
+    behaviour there, and the integrity gate is what makes it safe.
+
+    What must stay loud, and is asserted here: a capability refusal, a
+    remembered device failure, a Sony preventive software decision and a
+    seek refusal each carry a reason code, and the ones that are *decisions to
+    stop trying hardware* also emit a warning. The Sony case is deliberately
+    the exception -- it is prevention before any attempt, so it must not be
+    dressed up as a failure -- and that distinction is asserted rather than
+    assumed.
+    """
+    from encoders.hwdecode import (
+        R_SONY_SOFTWARE, SOURCE_NON_SONY, SOURCE_SONY,
+        memoize_unavailable, route_decode,
+    )
     ev, problems = {}, []
+
+    # A capability refusal warns, and keeps its specific reason once memoized.
     r = route_decode(policy="auto", backend="qsv", codec="h264",
-                     chroma="4:2:2", depth=10)
+                     chroma="4:2:2", depth=10, source_kind=SOURCE_NON_SONY)
     ev["capability_refusal"] = {"warnings": r.warnings, "reason": r.reason}
     if not r.warnings:
         problems.append("capability refusal produced no warning")
-    # A capability refusal stays a capability refusal even once memoized:
-    # the specific reason must not degrade into a generic one.
     memo: dict = {}
     memoize_unavailable(memo, r, "capability_refused", "test detail")
     r2 = route_decode(policy="auto", backend="qsv", codec="h264",
-                      chroma="4:2:2", depth=10, memo=memo)
-    ev["memoized_refusal"] = {"warnings": r2.warnings, "reason": r2.reason,
-                              "memo": {str(k): v for k, v in memo.items()}}
+                      chroma="4:2:2", depth=10, memo=memo,
+                      source_kind=SOURCE_NON_SONY)
+    ev["memoized_refusal"] = {"warnings": r2.warnings, "reason": r2.reason}
     if not r2.warnings:
         problems.append("memoized refusal produced no warning")
     if r2.reason != "capability_refused":
         problems.append(
             f"memoized refusal lost its specific reason (got {r2.reason})")
-    # The memo must actually suppress a *runtime* unavailability: use an
-    # otherwise-proven combination so the memo is the only reason to refuse.
+
+    # A runtime unavailability remembered for this run refuses and warns.
     r3 = route_decode(policy="auto", backend="nvenc", codec="hevc",
-                      chroma="4:2:0", depth=10)
+                      chroma="4:2:0", depth=10, source_kind=SOURCE_NON_SONY)
     memo2: dict = {}
     memoize_unavailable(memo2, r3, "device_unavailable", "no usable device")
     r4 = route_decode(policy="auto", backend="nvenc", codec="hevc",
-                      chroma="4:2:0", depth=10, memo=memo2)
+                      chroma="4:2:0", depth=10, memo=memo2,
+                      source_kind=SOURCE_NON_SONY)
     ev["memoized_runtime"] = {"before": r3.to_json(), "after": r4.to_json()}
     if r3.hardware is not True:
         problems.append("baseline combination is not hardware-eligible")
@@ -2910,21 +2972,54 @@ def f07(t, ctx):
             f"memoized runtime unavailability not honoured (got {r4.reason})")
     if not r4.warnings:
         problems.append("memoized runtime unavailability produced no warning")
-    # unproven combinations must warn too
-    r3 = route_decode(policy="auto", backend="nvenc", codec="av1",
-                      chroma="4:2:0", depth=10)
-    ev["not_proven"] = {"warnings": r3.warnings, "reason": r3.reason}
-    if not r3.warnings:
-        problems.append("not_proven produced no warning")
-    # the ladder writes them through emit_warning, which records in logs
+
+    # A non-Sony source outside the allowlist goes to hardware, silently,
+    # and says so in its reason code (this is the changed behaviour).
+    r5 = route_decode(policy="auto", backend="nvenc", codec="av1",
+                      chroma="4:2:0", depth=10, source_kind=SOURCE_NON_SONY)
+    ev["allowlist_miss"] = {"hardware": r5.hardware, "reason": r5.reason,
+                            "warnings": r5.warnings}
+    if not r5.hardware:
+        problems.append("non-Sony allowlist miss did not attempt hardware")
+    if r5.reason == "not_proven":
+        problems.append("allowlist miss still reports the removed not_proven "
+                        "gate")
+    if r5.warnings:
+        problems.append("allowlist miss warned; attempting hardware is the "
+                        "designed behaviour, not a downgrade")
+
+    # A seek refusal warns.
+    r6 = route_decode(policy="auto", backend="nvenc", codec="hevc",
+                      chroma="4:2:0", depth=10, source_kind=SOURCE_NON_SONY,
+                      seek_requested=True)
+    ev["seek"] = {"warnings": r6.warnings, "reason": r6.reason}
+    if not r6.warnings:
+        problems.append("seek refusal produced no warning")
+
+    # A Sony preventive decision carries its reason and is *not* a warning:
+    # nothing was attempted, so there is nothing to warn about.
+    r7 = route_decode(policy="auto", backend="nvenc", codec="hevc",
+                      chroma="4:2:0", depth=10, source_kind=SOURCE_SONY)
+    ev["sony_preventive"] = {"warnings": r7.warnings, "reason": r7.reason}
+    if r7.reason != R_SONY_SOFTWARE:
+        problems.append(f"Sony route reason is {r7.reason}")
+    if r7.warnings:
+        problems.append("Sony preventive software decode is dressed up as a "
+                        "warning/failure")
+
+    # the ladder writes route and integrity messages through to the logs
     src = (ROOT / "core" / "batch_hw.py").read_text(encoding="utf-8")
     ev["wired_into_ladder"] = (
-        "for w in route.warnings:" in src and "INTEGRITY |" in src
+        "for w in route.warnings:" in src
+        and "INTEGRITY |" in src
+        and "DECODE_DECISION |" in src
     )
     if not ev["wired_into_ladder"]:
         problems.append("routing/integrity messages are not written to logs")
     return _res(t, "HD-F07", STATUS_PASS if not problems else STATUS_FAIL,
-                actual="every software fallback carries a warning and a reason code",
+                actual="refusals, remembered failures and the seek rule carry a "
+                       "warning plus a reason code; the Sony preventive decision "
+                       "carries its reason and no false failure",
                 reason="; ".join(problems), evidence=ev)
 
 
@@ -4229,6 +4324,15 @@ def _requirement_map() -> dict[str, str]:
     cannot run without it and are reported BLOCKED. Everything else runs
     against the deployed binary, which is what production uses, so the absence
     of a research build must not block the production path's validation.
+
+    Deliberately a short, hand-audited list rather than a mechanical scan of
+    `role=`. Most of the matrix encodes without an explicit role, which means
+    the patched default -- but those same tests also require the *original*
+    research corpus, which is not on this installation, so they SKIP for that
+    reason first. Counting them as "blocked on the patched binary" would claim
+    the production gate is unrunnable, and measured end-to-end runs on the
+    restored corpus (`--encoder nvenc` and `qsv` over Sony 4:2:0/4:2:2, DJI
+    HEVC, H.264) show it is not.
     """
     try:
         matrix = load_matrix()
@@ -4238,6 +4342,57 @@ def _requirement_map() -> dict[str, str]:
         t["id"]: t.get("requires", "deployed_binary")
         for t in matrix.get("tests", [])
     }
+
+
+def _missing_binary(test: dict) -> str:
+    """Why this test cannot run at all, or "" when its binaries are present.
+
+    Only the research-build requirement is checked here. Everything else runs
+    on the deployed binaries, and a *fixture* that is absent is handled by the
+    individual test as SKIP (the fixture set is a corpus question, not a
+    toolchain one).
+    """
+    if test.get("requires") != "patched_binary":
+        return ""
+    try:
+        prov = sources.load_provenance()
+    except Exception as exc:                       # noqa: BLE001
+        return f"provenance record unreadable: {exc}"
+    absent = []
+    for backend, bspec in prov["backends"].items():
+        spec = bspec.get("hardware_decode")
+        if spec and not (ROOT / spec["binary"]).is_file():
+            absent.append(f"{backend}:{spec['binary']}")
+    if not absent:
+        return ""
+    return (
+        "this test's subject is the patched research build, which is not "
+        "present and cannot be built here (no MSVC/oneVPL/rigaya sources): "
+        + ", ".join(absent)
+        + "; the patch files themselves still match their recorded sha256"
+    )
+
+
+def _skip_kinds(rows: list[dict], req: dict[str, str]) -> dict[str, int]:
+    """Why the SKIPs skipped, so a green gate count cannot hide a dead test.
+
+    A gate that reports ``PASS=9`` out of 76 is only meaningful alongside the
+    reason the other 67 did not run. These are the reasons this installation
+    actually produces.
+    """
+    kinds: dict[str, int] = {}
+    for r in rows:
+        if r["status"] != "SKIP":
+            continue
+        reason = (r.get("reason") or "").lower()
+        if "fixture" in reason or "corpus" in reason or "no real" in reason:
+            kinds["fixture_absent"] = kinds.get("fixture_absent", 0) + 1
+        elif "research build" in reason or "tools/avhw" in reason:
+            kinds["patched_binary_absent"] = kinds.get(
+                "patched_binary_absent", 0) + 1
+        else:
+            kinds["other"] = kinds.get("other", 0) + 1
+    return kinds
 
 
 def summarise(results: list[dict], run_started: str | None = None) -> dict:
@@ -4318,6 +4473,7 @@ def summarise(results: list[dict], run_started: str | None = None) -> dict:
                 for r in stale
                 if r["severity"] == "P0" and r["status"] != "PASS"
             ],
+            "skip_kinds": _skip_kinds(fresh, req),
             "p0_total": len(p0r),
             "p0_pass": sum(1 for r in p0r if r["status"] == "PASS"),
             "p0_fail": sum(1 for r in p0r if r["status"] == "FAIL"),
@@ -4365,8 +4521,12 @@ def cmd_summary(args) -> int:
         for label, g in s["gates"].items():
             note = ""
             if g.get("stale_total"):
-                note = (f"  [{g['stale_total']} result(s) sat out as stale, "
-                        f"{g['stale_pass']} of them PASS]")
+                note += (f"  [{g['stale_total']} result(s) sat out as stale, "
+                         f"{g['stale_pass']} of them PASS]")
+            if g.get("skip_kinds"):
+                sk = ", ".join(f"{k}={v}" for k, v in sorted(
+                    g["skip_kinds"].items()))
+                note += f"  [skipped: {sk}]"
             print(f"gate {label}: {g['status']}  "
                   f"fresh={g['total']} PASS={g['PASS']} FAIL={g['FAIL']} "
                   f"BLOCKED={g['BLOCKED']} SKIP={g['SKIP']}  "
@@ -4450,6 +4610,18 @@ def cmd_run(args) -> int:
                      reason=f"implementation {t['impl']!r} not registered")
             save_result(r)
             print(f"[{r.status:7s}] {t['id']} {t['title']}")
+            continue
+        # A test whose subject is the research build cannot run without it, and
+        # must say BLOCKED rather than FAIL: a missing file cannot be examined
+        # and found wrong. Enforced here so it holds for every such test, not
+        # just the ones whose body happens to check first.
+        missing = _missing_binary(t)
+        if missing:
+            r = _res(t, t["id"], STATUS_BLOCKED, actual="binary absent",
+                     reason=missing)
+            save_result(r)
+            print(f"[{r.status:7s}] {t['id']} {t['title']}  << {missing[:110]}",
+                  flush=True)
             continue
         t0 = time.monotonic()
         try:
