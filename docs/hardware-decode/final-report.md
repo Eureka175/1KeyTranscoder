@@ -20,10 +20,16 @@
 > 依赖 `tools/avhw/`，也不再要求 sha256 匹配才启用原生硬解；`resolve_decode_tool`
 > 只服务于研究线与本目录的历史矩阵。
 >
-> **矩阵分两道闸门**：production 76 例在已部署二进制上可运行；research 7 例
-> （HD-A01/A02/A05/A06/A08 身份与 provenance、HD-C01 缺陷对照、HD-D09 trim 语义）
-> 因 patched 构建缺失而 **BLOCKED**，**不得记为 PASS**。本文档中的 83 例结论
-> 不得被引用为"生产硬解已在本机验证"。
+> **矩阵分两道闸门**：production 闸门在已部署二进制上运行；research 闸门
+> （HD-A01/A02/A05/A06/A08 身份与 provenance、HD-C01/C02/C07/C08 reader 完整性
+> 行为、HD-D09 trim 语义、HD-J05 长片段 reader 行为）因 patched 构建缺失而
+> **BLOCKED**，**不得记为 PASS**。本文档中的历史结论不得被引用为"生产硬解已在
+> 本机验证"。
+>
+> 矩阵现为 **84 条**（本文档正文写作时为 83 条；后续来源感知改造新增 `HD-B11`
+> "FFmpeg 路径对 Sony 同样优先硬解"，并重写了 `HD-B01`/`HD-B02`/`HD-B04`/
+> `HD-B06`/`HD-B07`/`HD-B10`/`HD-F07` 中已被取代的断言。下文"83 条"指的是
+> 本 session 当时的规模。）
 >
 > 仍然成立、且已在本机复核的部分：stock 构建在 Sony XAVC 上丢帧，NVEncC 与
 > QSVEncC 均如此（4:2:0 10-bit 源 30 帧 → `--avhw` 27 帧、`rc=0`；4:2:2 同为
@@ -75,6 +81,21 @@
 **x265 / SVT-AV1 路线未受影响**：同一批 Sony 素材仍走 FFmpeg
 （`hevc_cuvid`，`hardware_compatible`），硬解生效。本文档 §8 的
 `--hw-decode` 描述不适用于它。
+
+**FFmpeg 路径的 Sony / 非 Sony 组合实测**（六组，逐组确认**实际 decoder**
+而不是只看 argv 里有 `-hwaccel`）：
+
+| 后端 | 素材 | 计划 substrate | 实际 decoder | `-hwaccel` | 帧数 | 结果 |
+|---|---|---|---|---|---|---|
+| x265 | Sony XAVC HS 4:2:0 10-bit | `ffmpeg_hw` / `hardware_compatible` | `hevc_cuvid` | yes | 30 | 解码为硬解；产出因**时间轴量化缺陷**未交付（见下），非解码问题 |
+| x265 | DJI HEVC 4:2:0 10-bit | `ffmpeg_hw` | `hevc_cuvid` | yes | 16 → 16 | PASS，`PRESERVED=12 MODIFIED=0` |
+| x265 | H.264 4:2:0 8-bit | `ffmpeg_hw` | `h264_cuvid` | yes | 150 → 150 | PASS |
+| svtav1 | Sony XAVC HS 4:2:0 10-bit | `ffmpeg_hw` | `hevc_cuvid` | yes | 30 | 同 x265：硬解生效，产出受同一时间轴缺陷影响 |
+| svtav1 | DJI HEVC 4:2:0 10-bit | `ffmpeg_hw` | `hevc_cuvid` | yes | 16 → 16 | PASS |
+| svtav1 | H.264 4:2:0 8-bit | `ffmpeg_hw` | `h264_cuvid` | yes | 150 → 150 | PASS |
+
+**Sony 在 FFmpeg 路径上没有被强制软解**，这与 rigaya 路径的选择相反，正是设计
+要求。两条路径的分工与理由见 [`../design/architecture.md`](../design/architecture.md) §8.1。
 
 **Sony 时间轴时长缺陷是"片段长度相关"，不是本次回归**——补一条对照，免得后来者
 重新查一遍：

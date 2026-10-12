@@ -1573,6 +1573,30 @@ flag，并且需要"OFF 路径逐字节一致"的审计。
 | `x265` / `svtav1` | **FFmpeg 原生硬解**：`-init_hw_device` / `-hwaccel` / `-hwaccel_device` / `-hwaccel_output_format` / `-c:v hevc_cuvid\|hevc_qsv`，随后 `hwdownload` + 像素格式转换，在**同一进程**内交给 `libx265` / `libsvtav1` |
 | `nvenc` / `qsv` | **rigaya 自带读端**：`NVEncC64.exe` / `QSVEncC64.exe` 直接打开源文件，读者由**来源类别**决定（Sony → `--avsw`；其余 → `--avhw`） |
 
+**两条路径的 Sony 处置是相反的，而且必须相反。** 这是本节最容易读错的一点：
+
+```text
+FFmpeg 路径（x265 / svtav1）
+    Sony + 非 Sony      -> 一律优先尝试 FFmpeg 的硬件解码
+                            （能力不允许时才回退，回退理由是实测能力理由）
+
+rigaya 原生 reader 路径（nvenc / qsv）
+    Sony                -> --avsw，编码前决定，绝不尝试 --avhw
+    非 Sony             -> --avhw
+    来源未分类           -> --avhw，记录 source_kind=unknown
+```
+
+理由不同、层次不同，不能互相推演：
+
+* rigaya 的丢帧是**那个 reader** 在 XAVC open-GOP 时间轴上的行为（实测
+  NVEncC 与 QSVEncC 各自 `--avhw` 30 帧只出 27 帧、`rc=0`、文件可播放）。
+  **没有**任何测量说 FFmpeg 的 NVDEC/QSV 也会丢帧；把前者的结论外推到后者
+  是错误推理，而且会让 Sony 素材无谓地失去硬解。
+* 因此 Sony 分类**只作用于 rigaya 原生 reader**。`encoders/hwdecode_ffmpeg.py`
+  不导入 `is_sony_source`，`plan_decode()` 也不接收任何来源类别参数——这条
+  规则在结构上就传不过去。`HD-B11` 用 AST 断言"该模块的**代码**里不出现
+  Sony 标识符"（文档字符串里出现是允许的，它记录的正是这条规则）。
+
 x265/SVT-AV1 侧的执行计划由
 `encoders/hwdecode_ffmpeg.py::plan_decode()` 决定并 `apply_decode_plan()`
 写入既有 argv；能力探测与实际执行**共用同一份计划结果**，不存在"探测用 A、
@@ -1688,7 +1712,7 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 
 ### 8.6 测试矩阵
 
-`tests/hwdecode/`（83 个用例，A–K 十一类），入口见
+`tests/hwdecode/`（84 个用例，A–K 十一类），入口见
 [`docs/hardware-decode/README.md`](../hardware-decode/README.md)。三条硬规则：
 
 1. **`exit code = 0` 不是正确性证据**（上面那个 N−3 就是 `rc=0`）。
@@ -1923,7 +1947,7 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | `tests/hwdecode/sources.py` | 239 | **provenance 校验**（sha256 + 版本 token，不符即 FAIL） |
 | `tests/hwdecode/fixtures.py` | 238 | control fixtures 生成 |
 | `tests/hwdecode/inventory.py` | 80 | 语料盘点 + fixture 刷新 |
-| `tests/hwdecode/matrix.json` | 351 | **机器可读矩阵**（83 用例，与 harness 双向漂移检查） |
+| `tests/hwdecode/matrix.json` | 351 | **机器可读矩阵**（84 用例，与 harness 双向漂移检查） |
 | `tests/full_autotest.py` | 6505 | 全量自动回归（档位改动的唯一依据） |
 | `tests/run_selfcheck.py` | 189 | 自检驱动 |
 | `tests/sony_selfcheck.py` | 21 | Sony 自检入口 |

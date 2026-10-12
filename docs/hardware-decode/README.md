@@ -7,16 +7,23 @@
 
 ## 当前状态：生产路径可用；仅**研究**用例 BLOCKED
 
-现行解码策略是**来源感知**的（见
+现行解码策略是**来源感知**的，两条路径的 Sony 处置**相反且必须相反**（见
 [`../design/architecture.md`](../design/architecture.md) §8）：
 
 ```text
 x265 / svtav1   source -> FFmpeg NVDEC/QSV -> hwdownload -> FFmpeg 编码器
+                Sony 与 非 Sony 一律**优先硬解**；能力不允许时才回退，
+                回退理由是实测能力理由。"Sony 必须软解"**不适用于这条路径**：
+                rigaya reader 的丢帧没有被证明存在于 FFmpeg 的 NVDEC/QSV。
 
-nvenc / qsv     Sony      -> 原生 --avsw（编码前决定，预防性）
+nvenc / qsv     Sony      -> 原生 --avsw（编码前决定，预防性，绝不尝试 --avhw）
                 非 Sony   -> 原生 --avhw + 完整性闸门（失败则删产物 + 一次 --avsw 重试）
                 未分类    -> 原生 --avhw，记录为 source_kind=unknown
 ```
+
+Sony 分类只作用于 rigaya 原生 reader：`encoders/hwdecode_ffmpeg.py` 不导入
+`is_sony_source`，`plan_decode()` 也不接收来源类别，所以这条规则在结构上传不
+过去（`HD-B11` 有 AST 级断言）。
 
 **生产不使用 `tools/avhw/` 下的 patched 研究构建**，也不要求 sha256 匹配才启用
 原生硬解。`encoders.hwdecode.resolve_decode_tool()` 仍然存在且仍按 sha256 校验，
