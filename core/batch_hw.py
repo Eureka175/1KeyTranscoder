@@ -57,15 +57,15 @@ from encoders.hw import (
     run_hw_tool,
 )
 from encoders.hwdecode import (
-    POLICY_AUTO as HW_DECODE_AUTO,
     POLICY_OFF as HW_DECODE_OFF,
     POLICY_REQUIRE as HW_DECODE_REQUIRE,
-    R_NOT_PROVEN,
     R_REQUIRE_UNMET,
+    SOURCE_SONY,
+    SOURCE_UNKNOWN,
     classify_reader_failure,
     memoize_unavailable,
-    resolve_decode_tool,
     route_decode,
+    source_kind_from_streams,
 )
 from encoders.integrity import verify_encode
 from encoders.nvencc import NvencBackend
@@ -205,86 +205,37 @@ MAX_HW_DECODE_FALLBACKS = 1
 # ---------------------------------------------------------------------------
 # which binary performs the rigaya hardware decode
 # ---------------------------------------------------------------------------
-
-#: Why the last `_resolve_hw_decode_tool` call did not return a binary. Kept
-#: module-level (not per-file) because the reason is a property of the
-#: installation, and re-hashing the binary for every file in a batch would be
-#: pure waste. The cache key includes the tool path, so two backends -- or a
-#: test that points at a different tree -- still resolve independently.
-_HW_TOOL_CACHE: dict[tuple[str, str, str], tuple[Path | None, str]] = {}
-_HW_TOOL_REASON = "not resolved"
-
-
-def _resolve_hw_decode_tool(
-    backend,
-    *,
-    script_dir: Path | None,
-    logger: logging.Logger,
-    file_logger: logging.Logger,
-) -> Path | None:
-    """The binary allowed to run ``--avhw``, or None with a logged reason.
-
-    ``encoders.hwdecode.resolve_decode_tool`` pins hardware decode to the
-    sha256-verified patched research build under ``tools/avhw/``: the shipped
-    NVEncC/QSVEncC drop leading pictures on Sony XAVC with rc=0 and a
-    playable-looking file, so they must never be the ones asked for
-    ``--avhw``. When that build is absent or does not match its recorded hash
-    there is no hardware-decode binary at all, and this returns None -- the
-    caller then decides between a loud software fallback (``auto``) and a
-    hard failure (``require``). Guessing is not an option here: a silently
-    substituted stock binary is exactly the defect this gate exists for.
-    """
-    global _HW_TOOL_REASON
-
-    root = Path(script_dir) if script_dir is not None else Path.cwd()
-    explicit = getattr(backend, "explicit_tool", None)
-    key = (
-        backend.kind,
-        str(root),
-        str(explicit) if explicit else "",
-    )
-    cached = _HW_TOOL_CACHE.get(key)
-    if cached is None:
-        dt = resolve_decode_tool(
-            kind=backend.kind,
-            script_dir=root,
-            explicit=explicit,
-            policy=HW_DECODE_AUTO,
-        )
-        path = Path(dt.path) if dt.usable else None
-        reason = (
-            f"{dt.detail}" if dt.usable
-            else f"no usable hardware-decode build ({dt.reason}): {dt.detail}"
-        )
-        cached = (path, reason)
-        _HW_TOOL_CACHE[key] = cached
-
-    tool, reason = cached
-    _HW_TOOL_REASON = reason
-    if tool is None:
-        file_logger.warning("HWDEC_TOOL | %s", reason)
-        return None
-
-    logger.info("[HWDEC] %s decode binary: %s", backend.name, tool)
-    file_logger.info("HWDEC_TOOL | %s | %s", backend.name, reason)
-    return tool
+#
+# **The deployed binary.**  Production does not consult `tools/avhw/` and does
+# not require a sha256 match to enable native `--avhw`: the defect the patched
+# build existed for is Sony-specific, Sony is now decoded in software before
+# any attempt, and `--avhw` is therefore only ever asked of material that
+# defect was not measured on.  The integrity gate below is what decides
+# whether a hardware result may be delivered.
+#
+# `use_decode_binary` remains the single place that pins argv[0], so a future
+# experimental binary can be substituted without touching any backend
+# signature -- and so a mismatch is refused rather than silently accepted.
+#
+# `encoders.hwdecode.resolve_decode_tool` still resolves the research build by
+# hash.  It is not called from this module: it serves the research line and the
+# historical matrix, which still need it (see that function's docstring).
 
 
 def use_decode_binary(
     cmd: list[str], default_tool: Path, decode_tool: Path
 ) -> list[str]:
-    """Point an already-built argv at the binary allowed to do hardware decode.
+    """Point an already-built argv at the binary that will perform the decode.
 
-    The backends build argv against the *shipped* tool, because that is the
-    only build the capability probe was run on and the only one a software
-    rung may use. A hardware rung has to use the patched build instead, and
-    that substitution happens here rather than inside every backend
-    signature: the backends own *encoding* arguments, not which build of the
-    tool performs *decoding*.
+    Both must be the same file in the production configuration: the backends
+    build argv against the deployed tool, and the deployed tool is what runs
+    hardware decode.  The check is kept because argv and the binary that
+    executes it drifting apart is exactly how a logged reader identity stops
+    meaning anything, and because it is the seam an experimental binary would
+    use.
 
     Refuses rather than guesses when argv does not start with the expected
-    executable: silently running an argv built for another binary would make
-    the logged reader identity meaningless.
+    executable.
     """
     if not cmd:
         raise ValueError("use_decode_binary: empty command")
@@ -496,7 +447,7 @@ def hw_encode_with_fallback(
     hw_decode: str = HW_DECODE_OFF,
     hw_decode_memo: dict | None = None,
     seek_requested: bool = False,
-    script_dir: Path | None = None,
+    source_kind: str = SOURCE_UNKNOWN,
 ) -> tuple[list[str], tuple[str, int], float]:
     """Automatic three-tier downgrade ladder (NO prompt window).
 
@@ -505,13 +456,15 @@ def hw_encode_with_fallback(
     rung; reader failures use the MP4Box strip fallback once.
 
     Hardware **decode** on this path is the encoder's *own* reader, chosen
-    by ``encoders.hwdecode.route_decode``: ``--avhw`` on the
-    provenance-verified patched build when the input is in the proven
-    allowlist, ``--avsw`` on the shipped build otherwise. There is no
-    FFmpeg frame feed here -- the encoder opens the source file itself.
+    by ``encoders.hwdecode.route_decode`` from the **source class**:
+    Sony sources are decoded in software before any attempt
+    (``sony_hardware_decode_safety``), everything else uses native
+    ``--avhw`` on the deployed binary.  There is no FFmpeg frame feed here
+    -- the encoder opens the source file itself, in both cases.
     Every ``--avhw`` result must pass the integrity gate
     (``encoders.integrity.verify_encode``) before it is accepted; a failed
-    gate deletes the artifact and reruns the same rung with ``--avsw``.
+    gate deletes the artifact and reruns the same rung with ``--avsw``,
+    at most once.
     Returns (warnings, final_format). Raises RuntimeError on fatal."""
     warnings: list[str] = []
     caps = backend.caps
@@ -544,7 +497,7 @@ def hw_encode_with_fallback(
             f"[FATAL] no encodable format rung for {chroma}/{depth}"
         )
 
-    # --- hardware-decode routing (HD-B01..B10) ---------------------------
+    # --- source-aware hardware-decode routing (HD-B01..B10) --------------
     memo = hw_decode_memo if hw_decode_memo is not None else {}
     route = route_decode(
         policy=hw_decode,
@@ -554,6 +507,7 @@ def hw_encode_with_fallback(
         depth=depth,
         memo=memo,
         seek_requested=seek_requested,
+        source_kind=source_kind,
     )
     file_logger.info("DECODE_ROUTE | %s", route.log_line())
     if route.hardware:
@@ -569,40 +523,49 @@ def hw_encode_with_fallback(
     reader_expected = READER_IDENTITY[backend.kind][reader]
     hw_fallbacks = 0
     discarded: list[str] = []
+    #: Set only when a *completed* hardware attempt was rejected by the
+    #: integrity gate. A source-driven software decision must never be
+    #: reported as a fallback (see R_SONY_SOFTWARE).
+    fallback_reason = ""
 
-    # The binary that may perform hardware decode. `--avhw` runs it; `--avsw`
-    # runs the shipped build, so a fallback never depends on a research build
-    # being present. Resolved once per file: it is a property of the machine,
-    # not of a format rung.
-    hw_tool = _resolve_hw_decode_tool(
-        backend, script_dir=script_dir, logger=logger,
-        file_logger=file_logger,
-    )
-    if hw_tool is None and reader == "avhw":
-        detail = (
-            f"{backend.name} hardware decode is not available: "
-            f"{_HW_TOOL_REASON}"
-        )
-        if hw_decode == HW_DECODE_REQUIRE:
-            raise RuntimeError(f"[FATAL] {detail}")
-        emit_warning(logger, file_logger, detail, warnings)
-        reader = "avsw"
-        reader_expected = READER_IDENTITY[backend.kind][reader]
-        # The route was chosen before the binary could be checked, so correct
-        # the record now. Without this the per-file log keeps a `HARDWARE`
-        # DECODE_ROUTE line above the warning that contradicts it, and the
-        # audit trail then says the opposite of what will actually run.
-        file_logger.info(
-            "DECODE_ROUTE_EFFECTIVE | backend=%s codec=%s %s/%sbit -> "
-            "SOFTWARE (reader=avsw, reason=%s) %s",
-            route.backend, route.codec, route.chroma, route.depth,
-            R_NOT_PROVEN, detail,
-        )
+    # Hardware decode runs on the **deployed** binary, in both reader modes.
+    # The patched research build is no longer a precondition for --avhw: the
+    # defect it existed for is Sony-specific and Sony is now decoded in
+    # software before any attempt, so `--avhw` is only ever asked of material
+    # that defect was not measured on, and the integrity gate below decides
+    # whether the result may be delivered.
+    hw_tool = backend.tool
 
     cur_input = source
     stripped = False
     rung_idx = 0
     color = src_info.color
+
+    def route_summary(integ, status: str, used_binary) -> str:
+        """One line answering "why did this file use --avhw or --avsw?".
+
+        Every field is a value this run established rather than a restatement
+        of the request, so the line reads as evidence: `actual_encoder` is the
+        binary the process was given, `decode_reader` is the reader requested
+        of it, and `software_fallback` is set **only** by an integrity
+        rejection.  A source-driven software decision is `route_reason=
+        sony_hardware_decode_safety` (or a capability refusal) with
+        `software_fallback=False`, because nothing was attempted and nothing
+        failed -- reporting that as a fallback would be a lie about the run.
+        """
+        return (
+            f"source_kind={route.source_kind} "
+            f"requested_encoder={backend.name} "
+            f"actual_encoder={Path(used_binary).name} "
+            f"decode_reader={reader} "
+            f"decode_policy={route.policy} "
+            f"route_reason={route.reason} "
+            f"hardware_integrity={integ} "
+            f"software_fallback={bool(fallback_reason)} "
+            f"fallback_reason={fallback_reason or 'none'} "
+            f"final_status={status}"
+        )
+
     while rung_idx < len(rungs):
         c, d = rungs[rung_idx]
         cmd, skipped, color_notes = backend.command(
@@ -610,7 +573,7 @@ def hw_encode_with_fallback(
             reader=reader,
             container=intermediate_container(backend.codec),
         )
-        if reader == "avhw" and hw_tool is not None:
+        if reader == "avhw":
             cmd = use_decode_binary(cmd, backend.tool, hw_tool)
         if skipped and rung_idx == 0:
             emit_warning(
@@ -680,6 +643,7 @@ def hw_encode_with_fallback(
                     )
                 reader = "avsw"
                 reader_expected = READER_IDENTITY[backend.kind][reader]
+                fallback_reason = f"{reason}: {verdict.detail}"
                 emit_warning(
                     logger,
                     file_logger,
@@ -716,6 +680,11 @@ def hw_encode_with_fallback(
             else:
                 ok = True
         if ok:
+            integ = "PASS" if (verdict is None or verdict.ok) else "FAIL"
+            summary = route_summary(integ, "ok", cmd[0])
+            file_logger.info("DECODE_DECISION | %s", summary)
+            if route.hardware:
+                logger.info("[HWDEC] %s | %s", source.name, summary)
             if discarded:
                 file_logger.info(
                     "HWDEC_SUMMARY | fallbacks=%d discarded=%s",
@@ -1026,7 +995,7 @@ def encode_one_sony_hw(
     no_downgrade: bool,
     hw_decode: str = HW_DECODE_OFF,
     hw_decode_memo: dict | None = None,
-    script_dir: Path | None = None,
+    source_kind: str = SOURCE_UNKNOWN,
     check_level: str,
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
@@ -1095,7 +1064,7 @@ def encode_one_sony_hw(
             ffprobe=ffprobe, audio_copy=False, do_frame_check=True,
             no_downgrade=no_downgrade, gpac=gpac,
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
-            script_dir=script_dir,
+            source_kind=source_kind,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -1283,7 +1252,7 @@ def encode_one_hw_classic(
     no_downgrade: bool,
     hw_decode: str = HW_DECODE_OFF,
     hw_decode_memo: dict | None = None,
-    script_dir: Path | None = None,
+    source_kind: str = SOURCE_UNKNOWN,
     check_level: str = "basic",
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
@@ -1358,7 +1327,7 @@ def encode_one_hw_classic(
             ffprobe=ffprobe, audio_copy=audio_copy, do_frame_check=False,
             no_downgrade=no_downgrade, gpac=gpac,
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
-            script_dir=script_dir,
+            source_kind=source_kind,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -1599,7 +1568,7 @@ def encode_one_dji_hw(
     no_downgrade: bool,
     hw_decode: str = HW_DECODE_OFF,
     hw_decode_memo: dict | None = None,
-    script_dir: Path | None = None,
+    source_kind: str = SOURCE_UNKNOWN,
     check_level: str,
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
@@ -1685,7 +1654,7 @@ def encode_one_dji_hw(
             ffprobe=ffprobe, audio_copy=False, do_frame_check=not vfr,
             no_downgrade=no_downgrade, gpac=gpac,
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
-            script_dir=script_dir,
+            source_kind=source_kind,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -2226,10 +2195,10 @@ class BatchCtx:
     no_downgrade: bool = False
     hw_decode: str = HW_DECODE_OFF
     hw_decode_memo: dict = field(default_factory=dict)
-    #: Project root, used to resolve the binary permitted to run `--avhw`
-    #: (`encoders.hwdecode.resolve_decode_tool`, which pins it to the
-    #: sha256-verified patched build under `tools/avhw/`).
-    script_dir: Path | None = None
+    #: Requested hardware-decode policy. The reader is resolved per file by
+    #: ``encoders.hwdecode.route_decode`` from the **source class**, and the
+    #: binary that runs ``--avhw`` is the backend's deployed tool, so no tool
+    #: path or provenance marker is carried here any more.
     check_level: str = "basic"
     ffmpeg: Path | None = None
     quality_opts: dict[str, Any] | None = None
@@ -2313,11 +2282,21 @@ def process_file_hw(
     )
 
     # Hardware decode on this path is the rigaya readers, decided per file by
-    # `encoders.hwdecode.route_decode` inside `hw_encode_with_fallback` -- there
-    # is nothing to plan up front and no FFmpeg frame feed. The decision is
-    # independent of the encoder and of the Sony/DJI/metadata policy: the
-    # reader that produced the pictures is recorded, and every `--avhw` result
-    # is gated on the integrity check.
+    # `encoders.hwdecode.route_decode` inside `hw_encode_with_fallback` from the
+    # **source class**: Sony -> software before any attempt, everything else ->
+    # native --avhw on the deployed binary. There is nothing to plan up front
+    # and no FFmpeg frame feed. The classification is computed once, here, from
+    # the probe result that the Sony/DJI dispatch below already uses, so there
+    # is one Sony detector and every path (classic, Sony preservation, DJI
+    # preservation, any preset, any worker) gets the same answer.
+    source_kind = source_kind_from_streams(source_streams)
+    file_logger.info(
+        "SOURCE_KIND | %s | %s",
+        source_kind,
+        "Sony rtmd track present -> preventive software decode"
+        if source_kind == SOURCE_SONY
+        else "no Sony marker -> native hardware decode attempted",
+    )
 
     # 注册了接手方 (显式音频计划) 时, Sony / DJI 保留路径**明确拒绝该文件**:
     # 那两条管线有自己的音频处理方式, 让它们照常跑就等于"计划被静默忽略"。
@@ -2358,7 +2337,7 @@ def process_file_hw(
             no_downgrade=ctx.no_downgrade,
             hw_decode=ctx.hw_decode,
             hw_decode_memo=ctx.hw_decode_memo,
-            script_dir=ctx.script_dir,
+            source_kind=source_kind,
             check_level=ctx.check_level,
             ffmpeg=ctx.ffmpeg,
             quality_opts=ctx.quality_opts,
@@ -2395,7 +2374,7 @@ def process_file_hw(
             no_downgrade=ctx.no_downgrade,
             hw_decode=ctx.hw_decode,
             hw_decode_memo=ctx.hw_decode_memo,
-            script_dir=ctx.script_dir,
+            source_kind=source_kind,
             check_level=ctx.check_level,
             ffmpeg=ctx.ffmpeg,
             quality_opts=ctx.quality_opts,
@@ -2429,7 +2408,7 @@ def process_file_hw(
             no_downgrade=ctx.no_downgrade,
             hw_decode=ctx.hw_decode,
             hw_decode_memo=ctx.hw_decode_memo,
-            script_dir=ctx.script_dir,
+            source_kind=source_kind,
             check_level=ctx.check_level,
             ffmpeg=ctx.ffmpeg,
             quality_opts=ctx.quality_opts,

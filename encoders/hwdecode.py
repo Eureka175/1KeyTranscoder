@@ -1,36 +1,54 @@
-"""Hardware-decode capability routing.
+"""Source-aware hardware-decode routing for the rigaya encoders.
 
-This module answers exactly one question, loudly and auditably:
+This module answers exactly two questions, loudly and auditably:
 
-    for this input, this backend and this policy, which decode reader
-    must be used, and **why**?
+    which decode reader must this input use, **why**, and what was it
+    about the *source* that decided it?
 
-It deliberately does **not** guess.  The proven set of (codec, chroma,
-depth) triples is a closed allowlist derived from the hardware-decode
-research line and extended only by measurements recorded in
-``docs/hardware-decode/integration-test-matrix.md`` (categories C/J).
-Anything outside it routes to software with reason code
-``not_proven`` — because the failure mode this whole integration exists
-to prevent is a hardware path silently producing *plausible but wrong*
-output, and an untested profile is exactly where that happens.
+The policy is source-first, because the one measured defect is
+source-specific:
+
+* **Sony XAVC** (a data stream carrying the ``rtmd`` tag) is decoded in
+  software, decided before any attempt (``sony_hardware_decode_safety``).
+  Measured on this installation, the deployed NVEncC's own ``--avhw``
+  reader returns rc=0, a playable file, and **27 frames of 30** on both
+  XAVC HS 4:2:0 10-bit and XAVC 4:2:2 10-bit, while ``--avsw`` returns 30.
+  The same class of loss exists in QSVEncC.  A Sony title therefore does
+  not get hardware decode even if some short clip once happened to pass.
+* **Everything else** uses the native ``--avhw`` reader of the deployed
+  encoder binary.  Non-Sony material is **not** required to appear in the
+  research allowlist to be attempted: the allowlist is evidence, and the
+  binding decision is the integrity gate in ``core.batch_hw``, which runs
+  after the encoder and can reject the result.
+
+What this module still refuses, and must keep refusing:
+
+* a requested time seek — the two rigaya readers are not seek-equivalent
+  (same count, same PTS, different pictures);
+* a format the hardware is *known* to refuse on this machine;
+* a device/format failure remembered for this run.
+
+Those are capability and semantics facts, not policy preferences.  Losing
+them would not make hardware "more available", it would move a certain
+refusal to runtime where it reads as a failure.
 
 Policy
 ------
 
-``off`` (default)
-    Software. Byte-for-byte the v0.6.2 behaviour; no hardware decode is
-    attempted and no default changes.
+``off``
+    Software.  No hardware decode is attempted.
 ``auto``
-    Hardware when the input is proven eligible, software otherwise.  Any
-    fallback is announced: WARNING plus a reason code in the main log,
-    the per-file log and the report.
+    The source-aware decision above.  Every non-hardware outcome is
+    announced: WARNING plus a reason code in the main log, the per-file
+    log and the report.
 ``require``
     Hardware or an error.  Never silently degrades.
 
-Reason codes are part of the contract: a capability refusal, an
-unavailable reader, a startup failure and a frame-count mismatch must be
-distinguishable in a log, because on a real machine they coexist in the
-same tool on adjacent files.  ``unsupported`` is not ``frame drop``.
+Reason codes are part of the contract: a Sony preventive software
+decision, a capability refusal, an unavailable reader, a startup failure
+and a frame-count mismatch must all be distinguishable in a log, because
+on a real machine they coexist in the same tool on adjacent files.
+``sony_hardware_decode_safety`` is **not** ``hardware_integrity_failed``.
 """
 
 from __future__ import annotations
@@ -49,6 +67,27 @@ POLICIES = (POLICY_OFF, POLICY_AUTO, POLICY_REQUIRE)
 READER_HW = "avhw"
 READER_SW = "avsw"
 
+# --- source classes ---------------------------------------------------------
+#
+# The decode decision is made **primarily on where the material came from**,
+# because the one measured defect is source-specific: the rigaya hardware
+# reader drops leading pictures on Sony XAVC open-GOP timelines, silently,
+# with rc=0 and a playable file. Source therefore precedes every other
+# consideration except an explicitly requested time seek.
+#
+# ``unknown`` is a real state, not a synonym for "not Sony". It means the
+# stream probe returned nothing usable, so no claim about the source can be
+# made. It is routed like a non-Sony source -- no provenance signal is
+# evidence about the *reader*, so withholding a measured-safe path on the
+# absence of evidence would disable hardware decode for every remuxed file
+# -- but the classification is recorded as unknown so the decision is
+# auditable. Nothing is inferred from filename, resolution or encoder model.
+
+SOURCE_SONY = "sony"
+SOURCE_NON_SONY = "non_sony"
+SOURCE_UNKNOWN = "unknown"
+SOURCE_KINDS = (SOURCE_SONY, SOURCE_NON_SONY, SOURCE_UNKNOWN)
+
 # --- reason codes -----------------------------------------------------------
 
 R_POLICY_OFF = "policy_off"
@@ -64,6 +103,16 @@ R_SEQUENCE_MISMATCH = "sequence_mismatch"
 R_METADATA_MISMATCH = "metadata_mismatch"
 R_INTEGRITY_OK = "integrity_ok"
 R_REQUIRE_UNMET = "require_unmet"
+#: Sony material is decoded in software **by policy**, before any attempt.
+#: This is a preventive decision, not a failure, and must never be logged or
+#: reported as "hardware decode failed" or as a fallback.
+R_SONY_SOFTWARE = "sony_hardware_decode_safety"
+#: The source could not be classified. Hardware is still attempted (see
+#: SOURCE_UNKNOWN above); the code exists so the log says why the source
+#: class is what it is rather than implying a positive non-Sony finding.
+R_SOURCE_UNKNOWN = "source_unclassified"
+#: A non-Sony source passed native hardware decode and the integrity gate.
+R_NATIVE_HW_ACCEPTED = "native_hw_integrity_ok"
 # Measured in this session (matrix HD-D02/D-04/D-05): on a time seek the
 # rigaya hardware reader delivers *different pictures* than the software
 # reader, deterministically, with the same count and the same PTS
@@ -76,11 +125,43 @@ R_SEEK_NOT_EQUIVALENT = "seek_not_equivalent"
 # reason codes that mean "the hardware path was never usable here"
 _HARDWARE_UNAVAILABLE = frozenset({
     R_CAPABILITY_REFUSED, R_READER_UNAVAILABLE, R_DEVICE_UNAVAILABLE,
-    R_STARTUP_FAILED, R_NOT_PROVEN, R_POLICY_OFF,
+    R_STARTUP_FAILED, R_NOT_PROVEN, R_POLICY_OFF, R_SONY_SOFTWARE,
 })
 
 
-# --- the proven allowlist ---------------------------------------------------
+def source_kind_from_streams(streams) -> str:
+    """Classify a probed source, or :data:`SOURCE_UNKNOWN` if it cannot be.
+
+    Sony detection is **not** re-implemented here: the authoritative model is
+    ``core.batch_hw.is_sony_source`` (a data stream carrying the ``rtmd``
+    codec tag), and the import is local because that module imports this one.
+
+    Guessing is deliberately not attempted. A Sony file whose metadata has
+    been stripped, or a probe that returned nothing, must not be *assumed*
+    Sony (which would silently disable hardware decode for real non-Sony
+    material) nor assumed non-Sony (which would claim a safety property that
+    was never established). Callers that already know the answer pass it
+    explicitly.
+    """
+    if not streams:
+        return SOURCE_UNKNOWN
+    try:
+        from core.batch_hw import is_sony_source
+
+        if is_sony_source(streams):
+            return SOURCE_SONY
+    except Exception:                              # noqa: BLE001
+        return SOURCE_UNKNOWN
+    return SOURCE_NON_SONY
+
+
+# --- the research allowlist ------------------------------------------------
+#
+# This is **no longer a precondition** for hardware decode. It is the set of
+# combinations the hardware-decode research line measured as byte-identical
+# to software decoding, and it is kept as *evidence*: a hit is reported with
+# reason `proven_combination`, a miss with `native_hw_integrity_ok`. Either
+# way the integrity gate decides whether the result may be delivered.
 #
 # Every entry must cite a measurement.  Adding a row without a matching
 # matrix result is a policy violation, not a configuration change.
@@ -97,7 +178,10 @@ PROVEN: dict[tuple[str, str, str, int], str] = {
 }
 
 # Combinations the hardware reader refuses outright on this machine.
-# Recorded so the decision log says "refused", not "failed".
+# Recorded so the decision log says "refused", not "failed". This is a real
+# capability fact, not a policy preference -- removing it would only move the
+# refusal to runtime, where it would be misread as a failure and would cost a
+# full encode attempt per file.
 REFUSED: dict[tuple[str, str, str, int], str] = {
     ("qsv", "h264", "4:2:2", 10):
         "avqsv: codec h264(yuv422p10le) unable to decode by qsv. rc=-31, "
@@ -118,6 +202,7 @@ class DecodeRoute:
     codec: str
     chroma: str
     depth: int
+    source_kind: str = SOURCE_UNKNOWN
     warnings: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict:
@@ -126,7 +211,8 @@ class DecodeRoute:
     def log_line(self) -> str:
         return (
             f"decode route: backend={self.backend} codec={self.codec} "
-            f"{self.chroma}/{self.depth}bit policy={self.policy} -> "
+            f"{self.chroma}/{self.depth}bit source={self.source_kind} "
+            f"policy={self.policy} -> "
             f"{'HARDWARE' if self.hardware else 'SOFTWARE'} "
             f"(reader={self.reader}, reason={self.reason}) {self.detail}"
         )
@@ -141,34 +227,75 @@ def route_decode(
     depth: int,
     memo: dict | None = None,
     seek_requested: bool = False,
+    source_kind: str = SOURCE_UNKNOWN,
 ) -> DecodeRoute:
     """Decide the decode reader for one input.
+
+    The decision is **source-aware**.  ``source_kind`` (see
+    :func:`source_kind_from_streams`) is the primary input:
+
+    ``SOURCE_SONY``
+        Software reader, decided **before** any attempt, with reason
+        ``sony_hardware_decode_safety``.  Measured: the rigaya ``--avhw``
+        reader loses leading pictures on Sony XAVC with rc=0 and a playable
+        file (30-frame XAVC HS 4:2:0 10-bit -> 27 frames; 4:2:2 10-bit ->
+        27; ``--avsw`` -> 30 in both).  A Sony format that once passed on a
+        short clip therefore does **not** enable hardware decode by default.
+        This is prevention, not a fallback: nothing is attempted and nothing
+        fails.
+
+    ``SOURCE_NON_SONY`` / ``SOURCE_UNKNOWN``
+        The native hardware reader is the default.  Non-Sony material is no
+        longer required to appear in the closed research allowlist: the
+        deployed binary is used, and whether the result may be delivered is
+        decided by the integrity gate in ``core.batch_hw`` *after* the run,
+        not by a pre-emptive allowlist.  ``SOURCE_UNKNOWN`` takes the same
+        path but is recorded as unknown (see :data:`SOURCE_UNKNOWN`).
+
+    What still refuses hardware, and must keep doing so:
+
+    * an explicitly requested time seek (``seek_requested``) -- the two
+      rigaya readers are not seek-equivalent;
+    * a format the hardware is **known** to refuse on this machine
+      (:data:`REFUSED`) -- so the log says "refused", not "failed";
+    * a *device/format* fact remembered for this run (``memo``).
 
     ``memo`` is an optional per-run dictionary of runtime-discovered
     facts (see :func:`memoize_unavailable`); it lets a reader that failed
     to initialise once stop being retried for every subsequent file
     without turning "failed once" into a permanent global claim.
-
-    ``seek_requested`` must be set when the encode carries a temporal
-    window (``--seek``).  Hardware decode is then refused outright: the
-    two rigaya readers are not seek-equivalent, and a transcode whose
-    delivered pictures depend on which reader ran is exactly the silent
-    behaviour change this integration exists to prevent.
     """
     key = (backend, codec, chroma, depth)
+    if source_kind not in SOURCE_KINDS:
+        raise ValueError(f"unknown source kind: {source_kind!r}")
 
     def _sw(reason: str, detail: str, warn: bool) -> DecodeRoute:
         r = DecodeRoute(
             reader=READER_SW, hardware=False, reason=reason, detail=detail,
             policy=policy, backend=backend, codec=codec, chroma=chroma,
-            depth=depth,
+            depth=depth, source_kind=source_kind,
         )
         if warn:
             r.warnings.append(
                 f"hardware decode not used ({reason}): {detail} — "
-                "falling back to software decode"
+                "using software decode"
             )
         return r
+
+    def _require_unmet(detail: str) -> DecodeRoute:
+        return DecodeRoute(
+            reader=READER_HW, hardware=False, reason=R_REQUIRE_UNMET,
+            detail=f"policy=require but {detail}", policy=policy,
+            backend=backend, codec=codec, chroma=chroma, depth=depth,
+            source_kind=source_kind,
+        )
+
+    def _hw(reason: str, detail: str) -> DecodeRoute:
+        return DecodeRoute(
+            reader=READER_HW, hardware=True, reason=reason, detail=detail,
+            policy=policy, backend=backend, codec=codec, chroma=chroma,
+            depth=depth, source_kind=source_kind,
+        )
 
     if policy not in POLICIES:
         raise ValueError(f"unknown hardware-decode policy: {policy!r}")
@@ -184,46 +311,59 @@ def route_decode(
             "count and PTS, different pictures, deterministic on both sides)"
         )
         if policy == POLICY_REQUIRE:
-            return DecodeRoute(
-                reader=READER_HW, hardware=False, reason=R_REQUIRE_UNMET,
-                detail=f"policy=require but {detail}", policy=policy,
-                backend=backend, codec=codec, chroma=chroma, depth=depth,
-            )
+            return _require_unmet(detail)
         return _sw(R_SEEK_NOT_EQUIVALENT, detail, warn=True)
 
+    # --- Sony: preventive software decode --------------------------------
+    if source_kind == SOURCE_SONY:
+        detail = (
+            "Sony XAVC source (rtmd track present): the hardware reader "
+            "loses leading pictures on these open-GOP timelines with rc=0 "
+            "and a playable file (measured 30 -> 27 frames on 4:2:0 and "
+            "4:2:2 10-bit); software decoding is selected up front"
+        )
+        if policy == POLICY_REQUIRE:
+            return _require_unmet(detail)
+        return _sw(R_SONY_SOFTWARE, detail, warn=False)
+
+    # --- known refusals: a capability fact, not a failure -----------------
     if key in REFUSED:
         detail = REFUSED[key]
         if policy == POLICY_REQUIRE:
-            return DecodeRoute(
-                reader=READER_HW, hardware=False, reason=R_REQUIRE_UNMET,
-                detail=f"policy=require but hardware refuses {key}: {detail}",
-                policy=policy, backend=backend, codec=codec, chroma=chroma,
-                depth=depth,
-            )
+            return _require_unmet(f"hardware refuses {key}: {detail}")
         return _sw(R_CAPABILITY_REFUSED, detail, warn=True)
 
     if memo and memo.get(key):
-        return _sw(R_READER_UNAVAILABLE, str(memo[key]), warn=True)
-
-    evidence = PROVEN.get(key)
-    if evidence is None:
-        detail = (
-            f"{codec} {chroma}/{depth}bit is not in the runtime-proven "
-            f"allowlist for {backend}; not activating an unverified "
-            f"hardware-decode path"
-        )
+        detail = str(memo[key])
+        # `require` must not be satisfied by a remembered failure either: the
+        # caller asked for hardware, and a *previous* file proved this format
+        # or device cannot provide it. Returning a software reader here would
+        # let require silently degrade, which is the one thing it must not do.
         if policy == POLICY_REQUIRE:
-            return DecodeRoute(
-                reader=READER_HW, hardware=False, reason=R_REQUIRE_UNMET,
-                detail=f"policy=require but {detail}", policy=policy,
-                backend=backend, codec=codec, chroma=chroma, depth=depth,
+            return _require_unmet(
+                f"hardware is unavailable for {key} in this run: {detail}"
             )
-        return _sw(R_NOT_PROVEN, detail, warn=True)
+        return _sw(R_READER_UNAVAILABLE, detail, warn=True)
 
-    return DecodeRoute(
-        reader=READER_HW, hardware=True, reason=R_PROVEN, detail=evidence,
-        policy=policy, backend=backend, codec=codec, chroma=chroma,
-        depth=depth,
+    # --- everything else: try the deployed binary's native reader ---------
+    if source_kind == SOURCE_UNKNOWN:
+        return _hw(
+            R_SOURCE_UNKNOWN,
+            f"source could not be classified (no usable stream probe), so it "
+            f"is not known to carry the Sony rtmd marker; attempting the "
+            f"native {backend} hardware reader and requiring the integrity "
+            f"gate to accept the result",
+        )
+
+    proven = PROVEN.get(key)
+    return _hw(
+        R_PROVEN if proven else R_NATIVE_HW_ACCEPTED,
+        proven or (
+            f"{codec} {chroma}/{depth}bit is not in the research allowlist "
+            f"for {backend}, but the source is not Sony, so the native "
+            f"hardware reader is attempted and the integrity gate decides "
+            f"whether the result may be delivered"
+        ),
     )
 
 
@@ -315,24 +455,30 @@ def is_hardware_unavailable(reason: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# which binary may perform hardware decode
+# which binary performs hardware decode
 # ---------------------------------------------------------------------------
 #
-# The shipped `tools/NVEncC_9.31_x64` and `tools/QSVEncC_8.26_x64` builds
-# carry the Sony head-loss defect. Asking them for `--avhw` would lose
-# frames on every XAVC file — the integrity gate would then reject every
-# result and the hardware path would never actually run, which is safe but
-# useless. So hardware decode is pinned to the patched research builds by
-# hash, and the hash is asserted before the binary is used.
+# **Production uses the deployed binary.**  The reason the patched research
+# build used to be mandatory is Sony-specific: the shipped NVEncC/QSVEncC
+# drop leading pictures on XAVC.  That defect is handled by decoding Sony in
+# software *before* any attempt (`sony_hardware_decode_safety`), so the
+# patched build is no longer required for -- and no longer gates -- the
+# production path.  Non-Sony material runs `--avhw` on the deployed binary
+# and is judged by the integrity gate.
+#
+# What that costs, stated plainly: the research allowlist covered Sony
+# formats (XAVC HS 4:2:0 10-bit, XAVC S H.264 4:2:2 10-bit).  Those entries
+# are now unreachable in production by design, because Sony is software-
+# decoded.  The allowlist is retained as evidence, not as a gate.
+#
+# `resolve_decode_tool` below is the **experimental** escape hatch and is
+# deliberately isolated: it is not called by any production path.  It keeps
+# the provenance-verified research build reachable for the hardware-decode
+# research line and for the historical matrix, which still needs it.
 #
 # Those builds are **research builds and must not be distributed**
 # (`release/build_release.py` does not whitelist `tools/avhw/`, and `docs/`
-# is excluded from the package). The practical consequence, stated plainly:
-# where they are absent, native rigaya hardware decode is unreachable and
-# `resolve_decode_tool` returns an unusable tool with reason `not_proven`,
-# so routing falls back to the shipped build's `--avsw`. That is the
-# intended behaviour, not a bug — this hardware decode is a validated
-# optional path in a developer checkout, never a shipped default.
+# is excluded from the package).
 
 PATCHED_BUILD: dict[str, dict] = {
     "nvenc": {
@@ -378,11 +524,16 @@ def _sha256(path) -> str | None:
 def resolve_decode_tool(
     *, kind: str, script_dir, explicit=None, policy: str = POLICY_OFF
 ) -> DecodeTool:
-    """Pick the binary allowed to do hardware decode.
+    """Resolve the **experimental** patched hardware-decode build.
+
+    NOT a production path: ``core.batch_hw`` runs hardware decode on the
+    deployed binary and does not call this.  It exists so the research line
+    and the historical matrix can still reach the provenance-verified build,
+    and so the provenance check itself stays exercisable.
 
     ``kind`` is ``"nvencc"`` or ``"qsvencc"``.  An explicit operator path
-    wins; otherwise the provenance-recorded patched build is used and must
-    hash-match before it is trusted.
+    wins; otherwise the recorded research build is used and must hash-match
+    before it is trusted.
     """
     from pathlib import Path
 
@@ -405,9 +556,10 @@ def resolve_decode_tool(
     if not p.is_file():
         return DecodeTool(
             None, "unusable", R_NOT_PROVEN,
-            f"the patched hardware-decode build is not present at "
-            f"{spec['rel']}; the shipped {base} build must not be used for "
-            f"hardware decode because it loses frames on Sony material",
+            f"the experimental patched build is not present at "
+            f"{spec['rel']}; this is the research path only -- production "
+            f"hardware decode runs on the deployed binary and is gated by "
+            f"source classification plus the integrity check",
         )
     actual = _sha256(p)
     if actual != spec["sha256"]:
@@ -415,7 +567,7 @@ def resolve_decode_tool(
             None, "unusable", R_NOT_PROVEN,
             f"{spec['rel']} does not match the recorded provenance "
             f"(got {actual}, expected {spec['sha256']}); refusing to use an "
-            f"unverified hardware-decode build",
+            f"unverified build for the research path",
         )
     return DecodeTool(p, "patched", R_PROVEN,
                       f"patched build verified by sha256 {actual[:16]}")

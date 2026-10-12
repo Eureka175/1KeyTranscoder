@@ -2395,15 +2395,16 @@ def main() -> int:
             multiple_presets=multiple_presets,
             keep_work=args.keep_work,
             no_downgrade=args.no_downgrade,
-            # Hardware decode for NVENC/QSV is the encoders' *own* --avhw
-            # reader, resolved per file by encoders.hwdecode.route_decode:
-            # --avhw on the provenance-verified patched build when the input is
-            # in the proven allowlist, --avsw on the shipped build otherwise.
-            # There is no FFmpeg frame feed on this path (the x265/SVT-AV1
-            # paths use FFmpeg's NVDEC/QSV directly, above).
+            # Hardware decode for NVENC/QSV is the encoders' *own* reader,
+            # resolved per file by encoders.hwdecode.route_decode from the
+            # **source class**: Sony -> --avsw before any attempt (the deployed
+            # reader drops leading pictures on XAVC), everything else -> --avhw
+            # on the deployed binary, with the integrity gate deciding whether
+            # the result may be delivered. There is no FFmpeg frame feed on
+            # this path (the x265/SVT-AV1 paths use FFmpeg's NVDEC/QSV
+            # directly, above), and no patched research build is required.
             hw_decode="auto",
             hw_decode_memo=decode_memo,
-            script_dir=script_dir,
             check_level=args.check,
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,
