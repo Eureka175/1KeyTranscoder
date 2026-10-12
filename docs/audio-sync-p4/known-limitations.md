@@ -99,8 +99,17 @@ FAILs are still not edited.)*
 
 ## 2. Blocked by machine resources — distinguished from real failures
 
-`tests/audio_sync_p311/test_coordinates.py` is **BLOCKED**, and has been since
-P4.2:
+> **RESOLVED — the block is lifted, and that is recorded rather than deleted.**
+> `tests/audio_sync_p311/test_coordinates.py` **runs and passes**:
+> **71 PASS / 0 FAIL in ~8 s**, re-run most recently in P4.11 at HEAD `463b3e0`
+> and reported by P4.8 before that. It first ran again during P4.8, so the block
+> below describes **P4.2–P4.7**, not the current tree. Nothing was changed in the
+> harness or the test to lift it: the host simply had the memory. Per this file's
+> own rule, a retry that succeeds is the evidence that the earlier block was
+> environmental, and **a resource block is never reported as a pass** — so the
+> block is kept as history and the current PASS is recorded next to it.
+
+`tests/audio_sync_p311/test_coordinates.py` **was BLOCKED**, from P4.2 until P4.8:
 
 ```text
 error      : numpy._ArrayMemoryError: Unable to allocate 1.72 GiB
@@ -167,6 +176,21 @@ It flips when D8 wires a producer that carries plan-window counts.
 
 None of these is a documentation gap, and none of them blocks the enabled
 fixed-delay path.
+
+### 4.1 What P4.6–P4.11 added to this table, without moving any status
+
+| id | state | what the later phases did to the *reason*, not the decision |
+|---|---|---|
+| **D2** | **still `DEFERRED`** | P4.11's acquisition tooling now refuses to run a time-varying analysis unless a policy is named, so the deferral is enforced by construction rather than by convention |
+| **D3** | **still `NOT ESTABLISHED`** | P4.9B executed the R1–R4 study that this table's reason refers to. It measured the synthetic residual exactly (0 samples on constant integer delays) and confirmed that **`uncertainty_samples` is not emitted by any production module at all** — the field exists only in P3 research documents. The blocker is now narrower and specific: there is no accuracy measurement on **real** material with an independent truth, and no population large enough to set a quantile. See `p4.9b-residual-calibration.md` §6 |
+| **D5** | **still `DEFERRED`** | unchanged; the same explicit-argument enforcement applies |
+| — | enablement of the **per-window** path | **NOT TAKEN** — unchanged |
+| — | **real wireless ground truth** | **`BLOCKED`** — and this is now an enumerated data gap rather than an open question. P4.10 probed **193 containers / 173 with audio / 148 multi-mono** on this machine, graded them **G0 27 / G1 166 / G2 0 / G3 0**, and rejected the one candidate a file name suggested (it has no audio stream at all). It also measured *why* P4.9A's `CH3→CH4` zero means nothing about a wireless link: those two streams are the same feed, internally coincident (median lag 0.06 samples, range 4.55 over 109 resolved clips) while cross-group correlation is ≈0. **P4.11 built and tested the tooling that runs the moment 16 takes exist.** |
+
+**No status in the main table moved.** What changed is the quality of the reason
+each one carries: `BLOCKED` now names the evidence that must be created, and D3's
+gap is enumerated item by item instead of being described as "no reference for good
+enough".
 
 ---
 
@@ -291,8 +315,10 @@ not inside the history.
 | `../audio-sync-p3/README.md` | header `P3 NOT JUSTIFIED`; describes the original P3 phase only |
 | `../audio-sync-p3/PRODUCTION-REQUIREMENTS.md` §5/§6 | *"no plan has ever been applied to real audio and re-measured"* — P3.10 and P3.11 did exactly that |
 | `../audio-sync-p3/FINAL-RESEARCH-SUMMARY.md` | covers P1–P3.8 only; its closing section predates the real-PCM apply |
-| `README.md` (this directory) | the P4-era status block says the feature is OFF and the status is `READY FOR PRODUCTION POLICY`. **True of P4**; superseded by P4.2–P4.4, and a current-status block now precedes it |
-| `P4-FINAL-REPORT.md` | states `core/audio_plan.py` byte-identical to HEAD. True of P4/P4.2; **P4.3 changed that file** to carry evidence through the plan boundary |
+| `README.md` (this directory) | the P4-era status block says the feature is OFF and the status is `READY FOR PRODUCTION POLICY`. **True of P4**; superseded by P4.2–P4.4, and a current-status block now precedes it. **Updated in P4.11**: that block now names all eleven later phases, lists the four superseded lines and the three superseded *statuses*, and points at `validation.md` -> V10 |
+| `P4-FINAL-REPORT.md` | states `core/audio_plan.py` byte-identical to HEAD. True of P4/P4.2; **P4.3 changed that file** to carry evidence through the plan boundary. It is also a **P4-era document covering P4–P4.4 only** — the current validation roll-up is `validation.md` -> V10, not this report |
+| `production-readiness.md` §3 | the overall verdict `READY FOR PRODUCTION POLICY` is **unchanged and still correct** — P4.5–P4.11 moved no status in that table. Recorded so a reader does not look for a later revision that does not exist |
+| `validation.md` (top half) | the V1–V9 record is P4's own; its V9 row and the *"What is NOT validated"* table are superseded by the **V10** roll-up appended in P4.11. The top half is not rewritten |
 
 ---
 
@@ -306,6 +332,13 @@ almost entirely regenerable measurement data and real camera media.
 | `work/p3/P3-FINAL-REPORT.md` and the P3.1–P3.8 per-phase reports | local only | **yes** — `../audio-sync-p3/FINAL-RESEARCH-SUMMARY.md` (P1–P3.8) and `P3-RESEARCH-OVERVIEW.md` |
 | `work/p3/p310`, `p311`, `p312` reports | local only | **yes** — `p3.10/p3.11/p3.12-provenance.md` pin identity, files and reproduction commands |
 | `work/p4.1`/`p4.2`/`p4.3`/`p4.4` harnesses and JSON | local only | **partly** — the conclusions and numbers are in the phase documents; the harness sources are not tracked |
+| `work/p4.6`–`work/p4.8` harnesses, `results.jsonl` and matrices | local only | **partly** — same shape: the conclusions are tracked, the 5 571 MB of P4.6 artifacts and the P4.8 append-only results are not |
+| `work/p4.9a-short` (manifest, `results.jsonl`, `derived.json`) | local only | **partly** — the numbers are in `p4.9a-short-clip-revalidation.md`; the harness is not tracked |
+| `work/p4.9b` (R1–R4 harnesses, per-frame vectors) | local only | **partly** — same; `p4.9b-residual-calibration.md` carries the tables and the limits |
+| `work/p4.10-source` (193-container inventory, truth-anchor audit) | local only | **partly** — `p4.10-real-source-qualification.md` carries the graded counts and the channel-forensics table |
+| `work/p4.11-acquisition` fixtures (1.4 GB of generated media) | local only | **yes, and this one is different — see below** |
+| **the acquisition tooling itself** | **TRACKED** — `tests/audio_sync_acquisition/` | **yes** — this is the first P4 research/tooling phase whose code is in the repository rather than only under `work/`. It generates its own signal on demand and its fixture generator (`make_fixtures.py`) is tracked too, so the test suite rebuilds its own 23 fixtures from source |
+| **the acquisition fixture generator** | **TRACKED** — `tests/audio_sync_acquisition/make_fixtures.py` | **yes** — added at P4 closure. Without it `test_e2e.py` could not run on a clean clone: its 23 fixtures were built by an untracked `work/` script, and a test whose inputs cannot be rebuilt is not a test. It writes ~1.4 GB into the gitignored `work/`; the generator is tracked, its output is not |
 | the P2 corpus (104 GB) and the real candidates | local only | **yes** for the conclusion: the frozen 137-corpus CSV is tracked with a recorded hash, and the P1 guard reproduces against it |
 | the empirical p3 corpus (24 GB) | local only | **no** — by design; the conclusions, hashes and reproduction commands are tracked instead |
 

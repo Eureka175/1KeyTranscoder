@@ -440,7 +440,7 @@ def main(argv: list[str] | None = None) -> int:
     WORK.mkdir(parents=True, exist_ok=True)
 
     if not (args.fixtures / "fixture-manifest.json").is_file():
-        print("fixtures missing; run work/p4.11-acquisition/make_fixtures.py")
+        print("fixtures missing; run: python tests/audio_sync_acquisition/make_fixtures.py")
         return 2
 
     t01_signal_reproducible(args.signal_out)

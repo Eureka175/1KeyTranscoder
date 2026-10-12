@@ -34,6 +34,8 @@ python tests/audio_sync_acquisition/test_e2e.py
 | file | role |
 |---|---|
 | `generate_signal.py` | the deterministic test signal and its manifest |
+| `make_operator_package.py` | signal + note templates + take checklist, generated together |
+| `make_fixtures.py` | builds the 23 deterministic take fixtures the test needs (writes ~1.4 GB into the gitignored `work/`) |
 | `preflight.py` | is this take usable at all, and what kind of data is it |
 | `ingest.py` | take it through the production estimator / gate / plan / apply / verifier |
 | `test_e2e.py` | the fixture-based end-to-end test, with negative controls |

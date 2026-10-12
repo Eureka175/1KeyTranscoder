@@ -444,11 +444,21 @@ whose *contract* P4.5 deliberately replaced — see C26 and
 ### V9's status changed, recorded rather than rewritten
 
 Section V9 above records `tests/audio_sync_p311/test_coordinates.py` as
-**71 PASS / 0 FAIL**. It was true when P4 ran it. Since P4.2 it is **BLOCKED by
-machine memory** (a 1.72 GiB allocation in P3.11 research code, with 3.8 GB free
-of 31.5 GB). The earlier result is left standing as history; the current state is
-row C25. This is a resource block, not a code failure, and it is **not** counted
-as a pass in the roll-up.
+**71 PASS / 0 FAIL**. It was true when P4 ran it. Between P4.2 and P4.7 it was
+**BLOCKED by machine memory** (a 1.72 GiB allocation in P3.11 research code, with
+3.8 GB free of 31.5 GB). The earlier result is left standing as history; the
+current state is row C25.
+
+```text
+status now : the block is LIFTED. The test runs and passes — 71 PASS / 0 FAIL
+             in ~8 s — first again during P4.8, and re-run by P4.11 at HEAD
+             463b3e0 with the same result. Nothing in the harness or the test was
+             changed to lift it; the host had the memory.
+```
+
+A resource block is still never counted as a pass retroactively: the block is kept
+as history *and* the current PASS is recorded next to it, which is the only honest
+way to report "it works now" without rewriting what happened then.
 
 ## What is NOT validated (updated)
 
@@ -468,3 +478,94 @@ C1305/C1306, the offline `linear` / `next` arms.
 Added by P4.4 and still open: the enabled path's cost profile (§5 of
 [`known-limitations.md`](known-limitations.md)) — it measures every stream,
 including the ones it then refuses.
+
+
+---
+
+# V10 — P4 closure roll-up (P4.6 – P4.11)
+
+Written at HEAD `463b3e0`, on the branch
+`research/audio-sync-p3-production-semantics`. **Every row below was executed in
+this session**, not copied from a previous phase's record. The four sections above
+are P4's own history and are left as written; this is the current state.
+
+## Where each suite stands at HEAD `463b3e0`
+
+| # | suite | command | result |
+|---|---|---|---|
+| 1 | `test_time_varying_exec` | `python tests/audio_sync_p4/test_time_varying_exec.py` | **PASS** — 380 cases, 337 value / 23 refusal / 20 control, `SILENT_WRONG 0` |
+| 2 | `test_production_sync` | `python tests/audio_sync_p4/test_production_sync.py` | **PASS** — 184 cases, 121 value / 49 raise / 14 control, `SILENT_WRONG 0` |
+| 3 | `test_production_semantics` | `python tests/audio_sync_p4/test_production_semantics.py` | **PASS** — 63 cases, 10 controls |
+| 4 | `test_production_eligibility` | `python tests/audio_sync_p4/test_production_eligibility.py` | **PASS** — 58 cases, 9 controls |
+| 5 | `test_evidence_integrity` | `python tests/audio_sync_p4/test_evidence_integrity.py` | **PASS** — 35 cases, 3 controls |
+| 6 | `test_downstream_state` | `python tests/audio_sync_p4/test_downstream_state.py` | **PASS** — 58 behaviours, **1 contract gap OPEN (owner D8)**, 7 controls. The suite states that XFAIL cases are not passes |
+| 7 | `test_baseline_hash_portability` | `python tests/audio_sync_p4/test_baseline_hash_portability.py` | **PASS** — 65 cases, 10 controls |
+| 8 | `test_coordinates` (P3.11) | `python tests/audio_sync_p311/test_coordinates.py` | **PASS** — **71 PASS / 0 FAIL**. The memory block recorded above is lifted |
+| 9 | `test_p37_known_truth_summary` | `python tests/audio_sync_p37/test_p37_known_truth_summary.py` | **PASS** — 24 cases, 6 controls; its **21 historical FAILs are retained** |
+| 10 | P1 regression guard | `python work/p2/scripts/p1_regression_guard.py` | **PASS** — 27 PASS / 0 FAIL |
+| 11 | acquisition tooling E2E | `python tests/audio_sync_acquisition/test_e2e.py` | **PASS** — **33 value / 9 control / 0 FAIL / 0 CONTROL_FAILED** on 23 generated fixtures |
+| 12 | signal reproducibility | `python tests/audio_sync_acquisition/generate_signal.py --verify` | **PASS** — re-derived and byte-identical |
+| 13 | P4.9B R1 known-truth chain | `python work/p4.9b/r1_run.py --controls` | **PASS** — 15 cases, 3 `CONTROL_FIRED`, 14 applied / 1 refused, mechanics EXACT on all 14 |
+| 14 | P4.9A short-clip sweep | `python work/p4.9a-short/sweep.py --pairs "2-0 2-1 2-3"` | **PASS** — reproduced 381 PASS / 30 FAIL / 323 refusals, gate OK 88, all `CH3→CH4` |
+
+Not run in this session, and **not** counted as passes:
+
+```text
+full_autotest --level full   NOT RUN — drives hardware/video suites, outside P4
+```
+
+## What the two re-runs established
+
+Rows 13 and 14 are re-measurements of the headline P4.9A/P4.9B results, run to
+confirm the published numbers still reproduce rather than copying them.
+
+**P4.9A reproduced exactly**: 411 cases → `PASS 381 / FAIL 30`, gate OK **88** (all
+`CH3→CH4`), verifier `AGREE 145 / DISAGREE 30 / NOT_COMPARABLE 6 /
+VERIFIER_NOT_QUALIFIED 230`, `CH3→CH4` offset p50 **0.0** with range 3.0 samples,
+block-lag range p50 0.467 / p90 116.455, 117 cases ≤2 samples and 41 >10. Every
+published figure matched.
+
+**P4.9B R1 reproduced exactly**: 15 cases, all PASS; estimate error **0.000** and
+known-truth residual **−0.000** on every constant-delay case; mechanics EXACT on
+all 14 applied cases; the gap/reentry case refused correctly; all three controls
+fired.
+
+## The P4.6 – P4.11 record, and what each changed
+
+| phase | what it established | production effect |
+|---|---|---|
+| P4.6 | the per-window path is executable as an **explicit opt-in** that refuses without a named policy and coordinate | entry added; default path unchanged |
+| P4.7 | what actually reaches apply on real material — the evidence gate refuses the long corpus before the time-varying step | **3 defects found and fixed** in the production reachability gate |
+| P4.8 | no measurement geometry dominates: the shipped 200/100 ms is best on drifting material, 2000/1000 is best on real material, at an 18× transition-resolution cost | **none** — geometry is not a production knob |
+| P4.9A | the short clips suit the fixed-delay path, and the correct number of applied corrections there is **zero** | **none** |
+| P4.9B | known-truth residual is exactly 0 on constant integer delays; `uncertainty_samples` is not emitted by any production module | **none** |
+| P4.10 | **no source on this machine carries an independent delay truth** (G0 27 / G1 166 / G2 0 / G3 0), and P4.9A's `CH3→CH4` zero is a property of the wiring, not a link measurement | **none** |
+| P4.11 | the acquisition protocol is executable, tested and tracked | **none** |
+
+Across P4.6–P4.11 the only production change is P4.7's reachability fix, which
+**restricts** what may proceed (`core/audio_sync_tv_exec.py`, `core/channel_sync.py`).
+Every other phase is measurement, tooling or documentation.
+
+## What is validated now that was not before
+
+| item | then | now |
+|---|---|---|
+| error size against a known truth | not measured | **0 samples** on constant integer delays, up to 700 on within-window transitions — bounded by the step size, measured on 15 fixtures |
+| which gate term binds | unknown | measured per corpus (P4.9B R2): `min_usable_fraction` on short clips, the **finite-frame count itself** on long clips |
+| estimator error vs bandwidth and SNR | unknown | ≤ 1 sample over 10 233 frames across 5 bands × 3 SNRs; and the narrowest bands yield **zero** measurable frames because they stay outside the estimator's own band |
+| real wireless ground truth | assumed absent | **proven** absent on this machine, with the reason measured rather than inferred |
+
+## What is still not validated
+
+Unchanged from the sections above, plus what the later phases added:
+
+```text
+in-gap delay                                  UNOBSERVABLE
+a calibrated per-window sigma                 NOT AVAILABLE — no production field emits one
+C1306 ch3->ch2 instrument disagreement        UNRESOLVED
+behaviour outside C1305/C1306                 NOT MEASURED
+offline linear / next arms                    NOT RUN
+real wireless latency accuracy                BLOCKED — no independent truth exists yet
+D3 residual acceptance                        NOT ESTABLISHED
+the enabled path's cost profile               KNOWN LIMITATION (known-limitations.md section 5)
+```

@@ -8,16 +8,58 @@ and is frozen. P4 is the **production** line.
 ## ⚠️ Current status first — the P4 text below is P4's own record
 
 Everything from **"One-paragraph status"** down to the end of this file describes
-**P4 alone**, written when P4 finished. Its claims were true of P4. Four phases
-have happened since, and two of its lines are superseded. Read this block for the
-current state; read the rest as P4's history, which is preserved unaltered.
+**P4 alone**, written when P4 finished. Its claims were true of P4. **Eleven**
+phases have been recorded since, and four of its lines are superseded. Read this
+block and the two tables marked *current* for the state at HEAD `463b3e0`; read the
+rest as P4's history, which is preserved unaltered.
 
 ```text
-P4.1  D6 downstream audit                       COMPLETE — D6 = BLOCKED (record not rewritten)
-P4.2  evidence-integrity fix                    COMPLETE — the adoption gate now covers the ADOPTED estimate
-P4.3  production-semantics decision closure     COMPLETE — D1 implemented; D2/D5 DEFERRED; D6 revalidated
-P4.4  production enablement                     COMPLETE — validated FIXED-DELAY path ENABLED
+P4.1   D6 downstream audit                      COMPLETE — D6 = BLOCKED (record not rewritten)
+P4.2   evidence-integrity fix                   COMPLETE — the adoption gate now covers the ADOPTED estimate
+P4.3   production-semantics decision closure    COMPLETE — D1 implemented; D2/D5 DEFERRED; D6 revalidated
+P4.4   production enablement                    COMPLETE — validated FIXED-DELAY path ENABLED
+P4.5   baseline integrity / P3.7 forensics      COMPLETE — baseline identity line-ending independent; P3.7 conflict is definitional
+P4.6   time-varying production                  COMPLETE — explicit opt-in path; refuses without a named policy and coordinate
+P4.7   production reachability                  COMPLETE — 3 production defects found and FIXED in the reachability gate
+P4.8   measurement geometry calibration         COMPLETE — no geometry dominates; shipped geometry UNCHANGED
+P4.9A  short-clip fixed-delay revalidation      COMPLETE — the clips suit the path; 0 of 136 needed a correction
+P4.9B  residual calibration / uncertainty       COMPLETE — known-truth residual exactly 0; R3 = INSUFFICIENT_DATA (no production uncertainty field)
+P4.10  real-source qualification                COMPLETE — no independent truth exists on this machine; REAL_GROUND_TRUTH = BLOCKED
+P4.11  acquisition tooling                      COMPLETE — protocol executable, tested and tracked; ACQUISITION_READY = YES
 ```
+
+```text
+P4 closure        ENGINEERING CLOSED / REAL-WORLD VALIDATION BLOCKED
+                  see validation.md -> V10 for the executed evidence
+```
+
+### Four P4-era lines that are superseded
+
+1. *"imported by no production module"* and *"Default OFF is structural, not a
+   flag"* — P4.6 added `core/audio_sync_tv_exec.py` and wired `channel_sync.py` to
+   it from function scope, so the path is reachable by an **explicit opt-in**;
+   `time_varying` defaults to `False` and the default run never evaluates the
+   branch, which is asserted rather than assumed.
+2. *"the overall status is `READY FOR PRODUCTION POLICY`"* — P4.4 enabled the
+   **validated fixed-delay subset**. The per-window module is still not enabled by
+   default, so *"the time-varying production feature: OFF"* **remains correct**.
+3. *`core/audio_plan.py` byte-identical to HEAD* (in `P4-FINAL-REPORT.md`) — true
+   of P4/P4.2; P4.3 changed that file to carry evidence through the plan boundary.
+4. **`P4-FINAL-REPORT.md` is a P4-era document.** It is not the current final
+   report; it covers P4–P4.4 only. `validation.md` → **V10** is the current
+   validation roll-up.
+
+The **Memory / Performance / Compatibility** rows describe the P4 module's own
+path. The enabled path's cost is different and is recorded in
+[`known-limitations.md`](known-limitations.md) §5.
+
+### Superseded *statuses* (not text) recorded by the later phases
+
+| line above | now |
+|---|---|
+| *"Blocked by machine resources"* — `test_coordinates.py` | **lifted** — `71 PASS / 0 FAIL`, re-run at HEAD `463b3e0`; the block is kept as history |
+| *"no calibrated per-window σ"* as the D3 reason | **still `NOT ESTABLISHED`**, but for a narrower reason: `uncertainty_samples` is not emitted by **any** production module, so there is nothing to calibrate. See [`p4.9b-residual-calibration.md`](p4.9b-residual-calibration.md) §6 |
+| *"no reference for good enough"* | the reference cannot be **found** on this machine — P4.10 graded 193 containers and found no G2/G3 source. It must be **created**; the procedure and the tooling now exist |
 
 ### What is actually enabled now
 
@@ -88,6 +130,12 @@ Algorithm changes     0
 | **P4.4** | enable the validated subset, safely | `COMPLETE` — one `correction_eligibility()` decision, a plan object that cannot carry a refused offset, fixed-delay **ENABLED** |
 | **P4.5** | can the frozen validation asset be identified across platforms, and why did two P3.7 totals disagree? | `COMPLETE` — baseline identity is now line-ending independent (`sha256-lf-normalized-v1`, fixture **unchanged**); the P3.7 conflict is a **definitional** one (check 1a `111/132` vs check 1b `132/132`), **`D2` still `DEFERRED`**, no production code touched |
 | **P4.6** | can the per-window capability built in P4 actually be executed, without deciding D2/D5 for the product? | `COMPLETE` — an **explicit opt-in** path that refuses when `policy` or `coordinate` is unspecified; it plans, applies and independently verifies per-window correction, is chunk-invariant and flat at ~173 MiB; **D2/D5/D3 all still open**, fixed-delay and default paths unchanged |
+| **P4.7** | what actually reaches apply on real material, and what does not? | `COMPLETE` — three separate conclusions (mechanics / reachable / refused); **three production defects found and fixed** in the reachability gate; the long corpus is refused by the **evidence gate** before the time-varying step |
+| **P4.8** | which measurement geometry is usable on real material without hiding delay change? | `COMPLETE` — **no geometry dominates**: shipped 200/100 ms is best on drifting material (coverage 1.000 vs 0.189), 2000/1000 is best on the real corpus (0.748 vs 0.458); the transition-resolution cost is 18×. Shipped geometry **UNCHANGED**, D2/D3/D5 unchanged |
+| **P4.9A** | do the 20260903/20260904 short clips suit the **fixed-delay** path? | `COMPLETE` — they do, and the correct number of applied corrections is **zero**: 88 gate-OK cases are all `CH3→CH4` with offset p50 0.0, while `CH1`/`CH2` are refused on **100 %** of clips. 0 of 136 production runs needed a correction |
+| **P4.9B** | how large is the error against known truth, and is the reported uncertainty calibrated? | `COMPLETE` — known-truth residual **exactly 0** on constant integer delays; transition error bounded by the step (≤700 samples); gate sensitivity measured per corpus; **R3 = `INSUFFICIENT_DATA`** because `uncertainty_samples` is emitted by no production module. **D3 still `NOT ESTABLISHED`** |
+| **P4.10** | does this machine hold a verifiable wireless signal **and** an independent truth? | `COMPLETE` — **no**. 193 containers probed, graded **G0 27 / G1 166 / G2 0 / G3 0**; the one candidate a file name suggested has no audio stream. `CH3→CH4` is proven to be the same feed, internally coincident, so P4.9A's zero is a wiring property, **not** a link measurement. `REAL_GROUND_TRUTH = BLOCKED` |
+| **P4.11** | is the acquisition protocol executable, or only prose? | `COMPLETE` — the audit found the tooling did **not** exist in the repository (only under gitignored `work/`), then built and tested it: deterministic signal, operator package, preflight and ingest through the real production API, **33 value / 9 control / 0 FAIL**. `ACQUISITION_READY = YES` |
 
 ---
 
@@ -300,6 +348,11 @@ on a clone for exactly that reason (`current-state-audit.md` §6).
 | [`p4.10-real-source-qualification.md`](p4.10-real-source-qualification.md) | **P4.10** — real-source qualification: a full probe of every media container on the machine, truth grading (G0/G1/G2/G3) with the one proposed anchor rejected, a measured demonstration that the production corpus's only eligible channel pair is internally coincident, a cross-method agreement check on real stereo audio, and an executable acquisition protocol |
 | [`p4.10-provenance.md`](p4.10-provenance.md) | **P4.10** — what was read rather than recomputed, the cross-phase verifier dependency stated rather than assumed, and the decision record |
 | [`p4.10-acquisition-protocol.md`](p4.10-acquisition-protocol.md) | **P4.10** — the executable acquisition protocol: equipment and wiring, recording format, test signal, reference events, duration and repeats with their reasons, how the truth is established by construction, reference-path calibration, expected truth resolution, the operator-note fields, and the acceptance and failure conditions |
+| [`p4.9a-short-clip-revalidation.md`](p4.9a-short-clip-revalidation.md) | **P4.9A** — the short-clip fixed-delay revalidation: inventory and channel identity, per-pair gate outcome, within- and between-clip stability, real correction with independent residual, and a known-delay positive control |
+| [`p4.9b-residual-calibration.md`](p4.9b-residual-calibration.md) | **P4.9B** — controlled residual calibration: R1 known-truth end-to-end residual, R2 accepted-population sensitivity, R3 error versus bandwidth and SNR, R4 verifier disagreement |
+| [`p4.10-real-source-qualification.md`](p4.10-real-source-qualification.md) | **P4.10** — the real-source qualification: 193 containers probed, truth grading, and the measurement showing why `CH3→CH4` cannot be read as a link latency |
+| [`p4.11-acquisition-tooling.md`](p4.11-acquisition-tooling.md) | **P4.11** — the tooling that makes the protocol runnable, and the audit finding that P4.10's "already automated" claim was not supportable |
+| [`p4.11-provenance.md`](p4.11-provenance.md) | **P4.11** — where the tracked tooling lives and why not `tools/`, and the eight harness defects found |
 | [`p4.11-acquisition-tooling.md`](p4.11-acquisition-tooling.md) | **P4.11** — the tooling that makes the protocol runnable: the pipeline audit that found P4.10's "already automated" claim unsupported, the four protocol ambiguities resolved by measurement, deterministic signal generation, operator package, preflight, ingest through the real production API, and the end-to-end test with its negative controls |
 | [`p4.11-provenance.md`](p4.11-provenance.md) | **P4.11** — where the tracked code lives and why not `tools/`, what was reused rather than rewritten, the eight harness defects found, and the decision record |
 | [`P4-FINAL-REPORT.md`](P4-FINAL-REPORT.md) | the 22-section final report |
