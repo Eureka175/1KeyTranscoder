@@ -100,17 +100,20 @@ copies without losing the motion and lens metadata that post-processing tools
 
 - Two independent routes: `x265`/`svtav1` decode in **FFmpeg** (NVDEC/QSV →
   `hwdownload` → `libx265`/`libsvtav1`); `nvenc`/`qsv` decode with their **own**
-  rigaya reader (`--avhw`). No FFmpeg frame feed into the rigaya encoders.
+  rigaya reader. No FFmpeg frame feed into the rigaya encoders.
+- The rigaya reader is chosen by **source**: Sony → `--avsw` before any attempt
+  (the hardware reader loses 3 frames of 30 on XAVC, silently, with `rc=0`);
+  non-Sony → `--avhw` on the deployed binary. The old codec allowlist is
+  evidence, not a gate.
+- Every `--avhw` result is gated on frame count plus reader identity. A failing
+  artifact is deleted and the rung is re-run once with `--avsw`; it is never
+  delivered.
 - The retired switches `--hw-decode`, `--hw-decode-verify` and
-  `--no-hw-autoselect` are gone and have no aliases; hardware-first routing is
-  built in.
-- A frame-count integrity gate plus reader-identity assertion always guards the
-  rigaya `--avhw` path: a failing artifact is deleted and re-run once with
-  `--avsw`, never delivered.
-- **Currently BLOCKED**: the native `--avhw` route needs the patched research
-  binaries under `tools/avhw/`, which are absent and excluded from the release
-  package by design. The shipped builds lose 3 frames on Sony XAVC with `rc=0`
-  and must not run `--avhw`. See [Hardware Decode](#hardware-decode).
+  `--no-hw-autoselect` are gone and have no aliases.
+- **Research builds are not required.** `tools/avhw/` is excluded from the
+  release package and production does not consult it; those builds are used only
+  by the research line and the historical matrix. See
+  [Hardware Decode](#hardware-decode).
 
 ### x265 encoding profiles
 
@@ -148,7 +151,7 @@ Current release: **v0.8.0** (`VERSION` = `0.8.0`, tag `v0.8.0`).
 | `--channel-sync` (integer-sample delay correction, P1) | Available |
 | `--channel-sync-transparent` (video stream copy) | Available |
 | Hardware decode (`x265`/`svtav1`: FFmpeg NVDEC/QSV) | Available |
-| Native rigaya hardware decode (`nvenc`/`qsv`: `--avhw`) | **BLOCKED** — patched research binaries (`tools/avhw/`) absent; falls back to `--avsw` with reason `not_proven` |
+| Native rigaya decode (`nvenc`/`qsv`) | Available — Sony `--avsw` (preventive), non-Sony `--avhw` with the integrity gate |
 | Audio model (source / stream / track / channel) | Available (internal layer) |
 | Audio selection and channel mapping (`AudioMapSpec`, dry-run) | Available (internal layer, no CLI) |
 | PCM routing (1 output channel ← 1 source channel) | Available (internal layer, no CLI) |
@@ -423,64 +426,80 @@ interchangeable and neither is a fallback for the other:
 | Encoders | Decode route |
 |---|---|
 | `x265`, `svtav1` | FFmpeg native NVDEC/QSV (`-hwaccel … -c:v hevc_cuvid|hevc_qsv`), `hwdownload` + format conversion, then `libx265`/`libsvtav1` in the same process. No external pipe. |
-| `nvenc`, `qsv` | The encoder's **own** reader: `NVEncC64.exe --avhw` / `QSVEncC64.exe --avhw` opens the source file directly (NVDEC/CUVID, or the QSV hardware decoder), then encodes. |
+| `nvenc`, `qsv` | The encoder's **own** reader. `Sony` → `--avsw`; anything else → `--avhw`. Both open the source file directly (NVDEC/CUVID, or the QSV hardware decoder). |
 
 There is deliberately **no** FFmpeg frame feed into the rigaya encoders — no
-`hwdownload → y4m → NVEncC/QSVEncC stdin` path exists in the code. When a
-rigaya hardware reader is not usable, the fallback is the **same encoder's**
-`--avsw` software reader, which still opens the source file itself.
+`hwdownload → y4m → NVEncC/QSVEncC stdin` path exists in the code.
+
+The rigaya reader is chosen by **where the material came from**, because the one
+measured defect is source-specific:
+
+| Source | Reader | Why |
+|---|---|---|
+| **Sony** (a data stream carrying the `rtmd` tag) | `--avsw` | The hardware reader loses leading pictures on XAVC open-GOP timelines, silently: `rc=0`, a playable file, and **27 frames of 30**. Decided *before* any encode — this is prevention, not a failed attempt or a fallback. A Sony title does not get hardware decode even if some short clip once passed. |
+| **non-Sony** | `--avhw` | The deployed NVEncC/QSVEncC binary decodes it and the integrity gate judges the result. No codec allowlist is required to *attempt* hardware. |
+| **unclassified** (probe returned nothing usable) | `--avhw`, recorded as `source_kind=unknown` | Nothing is inferred from filename, resolution or camera model. An absent provenance marker says nothing about the *reader*, so the measured-safe path is not withheld on no evidence — but the classification is recorded rather than silently treated as a positive non-Sony finding. |
 
 `--hw-decode` (and `--hw-decode-verify`, `--no-hw-autoselect`) were removed; the
-retired switches have no aliases. Hardware-first routing is now the built-in
-behaviour:
+retired switches have no aliases. Routing is built in, and the decision is
+recorded per file.
 
-| Backend | Decode decision |
-|---|---|
-| x265 / svtav1 | FFmpeg hardware decode whenever a decoder for this `(codec, chroma, depth)` is probed compatible on this device; otherwise FFmpeg software decode. Recorded in the per-file log as `DECODE_ROUTE`. |
-| nvenc / qsv | The encoder's `--avhw` reader when the input is in the runtime-proven allowlist **and** a provenance-verified decode build is installed; otherwise `--avsw`. Recorded as `DECODE_ROUTE`. |
+What still refuses hardware, and is **not** negotiable:
 
-The allowlist is a closed set in which every entry references a measurement.
-Profiles outside it resolve to `not_proven` and software decode. Currently
-proven: NVENC HEVC 4:2:0 10-bit, NVENC H.264 4:2:2 10-bit, QSV HEVC 4:2:0 10-bit.
+- a requested time seek — the two rigaya readers are not seek-equivalent (same
+  count and PTS, different pictures);
+- a format the hardware is *known* to refuse on the machine (measured, e.g. QSV
+  H.264 4:2:2 10-bit: `unable to decode by qsv`, no reader constructed);
+- a device/format failure already seen in this run.
+
+Those are capability and semantics facts, not policy preferences. Dropping them
+would not make hardware "more available"; it would move a certain refusal to
+runtime, where it reads as a failure.
 
 Every `--avhw` run is gated on a frame-count integrity check plus a
 reader-identity assertion read from the tool log (never inferred from the
-command line, because QSVEncC silently constructs `avsw` when hardware is
-unavailable). A failing artifact is **deleted**, then the same format rung is
-re-run with `--avsw` at most once; if software decode also fails the file is
+command line, because QSVEncC silently constructs `avsw` when it cannot build
+the hardware one). A failing artifact is **deleted**, then the same format rung
+is re-run with `--avsw` at most once; if software decode also fails, the file is
 reported as failed. Nothing is padded, duplicated or trimmed to make counts
-agree.
+agree, and a Sony source that was decoded in software up front is never recorded
+as a "hardware failure fallback".
 
-Temporal windows and hardware decode are mutually exclusive: with a time seek
-the two rigaya readers are not equivalent (same frame count and PTS, different
-pictures), so the router refuses hardware decode with `seek_not_equivalent` and
-uses software decode. `--trim` is reader-equivalent and unrestricted. These
-parameters are not exposed as `1kt.py` flags; the router reacts to them when a
-temporal window is passed to the readers.
+Each per-file log carries one `DECODE_DECISION` line answering *why this reader*:
+`source_kind`, `requested_encoder`, `actual_encoder`, `decode_reader`,
+`decode_policy`, `route_reason`, `hardware_integrity`, `software_fallback`,
+`fallback_reason`, `final_status`.
 
 Three boundaries matter when reading results:
 
-- **Native NVENC/QSV hardware decode is BLOCKED on this installation.** It runs
-  only from the patched research builds under `tools/avhw/`, which are absent
-  here and are excluded from the release package by design. Until those builds
-  exist and hash-match, `nvenc`/`qsv` decode resolves to `avsw` with reason
-  `not_proven`, and the hardware-decode matrix cannot be run at all. The
-  FFmpeg route for x265/SVT-AV1 is unaffected and **is** active.
-- **The shipped rigaya builds must never run `--avhw`.** Measured on this
-  installation with `tools/NVEncC_9.31_x64/NVEncC64.exe`: Sony XAVC HS 4:2:0
-  10-bit returns `rc=0`, a playable file and **27 frames of 30**; Sony XAVC 4:2:2
-  10-bit likewise 27 of 30. `--avsw` returns all 30 in both cases. The integrity
-  gate is what prevents the short file from being delivered when a stock reader
-  is used, and the resolver is what prevents it from being used at all.
-- **The patches are version-bound.** The NVEncC patch is verified only on 9.31
-  (`2cb9d810`); the QSVEncC patch is runtime-proven on the pinned 8.26 revision
-  only (8.27–8.30 untested).
+- **The deployed builds are used for `--avhw`, and they must not be pointed at
+  Sony material.** Measured here with `tools/NVEncC_9.31_x64/NVEncC64.exe`:
+  Sony XAVC HS 4:2:0 10-bit returns `rc=0`, a playable file and **27 frames of
+  30**; XAVC 4:2:2 10-bit likewise 27 of 30; `--avsw` returns 30 in both cases.
+  QSVEncC shows the same loss. That is what the source rule exists for.
+- **Not every non-Sony format works on every device.** Measured: QSV `--avhw`
+  fails to start on 6000×4000 H.264 (`MFXDEC: … undeveloped feature`), while
+  NVENC `--avhw` decodes it frame-exactly. The integrity gate turns that into a
+  deleted artifact plus a bounded `--avsw` retry rather than a delivered short
+  file.
+- **The research builds are not a production gate.** `tools/avhw/` is excluded
+  from the release package, and `encoders.hwdecode.resolve_decode_tool` (which
+  still resolves it by sha256) is confined to the research line and the
+  historical matrix. Production does not consult it. The research patches are
+  version-bound: the NVEncC patch is verified only on 9.31 (`2cb9d810`); the
+  QSVEncC patch is runtime-proven on the pinned 8.26 revision only
+  (8.27–8.30 untested).
 
 The correctness matrix for the rigaya hardware path is `tests/hwdecode/`
 (83 cases, classes A–K), with entry points in
-`docs/hardware-decode/README.md`. It requires a real GPU **and** the patched
-binaries, and is **not** part of `tests/full_autotest.py --level full`. It is
-currently **BLOCKED**, not passing.
+`docs/hardware-decode/README.md`. It is **not** part of
+`tests/full_autotest.py --level full`, and it now reports two separate gates:
+
+- **production** (76 cases, everything that runs on the deployed binaries) —
+  runnable without any research build;
+- **research** (7 cases: the patched-build identity, provenance and
+  stock-vs-patched defect comparisons) — **BLOCKED** here, because `tools/avhw/`
+  is absent. Those are reported BLOCKED and are never counted as passing.
 
 
 ## Testing

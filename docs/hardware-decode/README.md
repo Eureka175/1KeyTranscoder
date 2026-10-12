@@ -5,16 +5,39 @@
 > 本目录是 **integration session 的产出**：测试矩阵、机器可读矩阵、provenance 记录
 > 与最终报告。
 
-## ⚠️ 当前状态：**BLOCKED**（不是 PASS）
+## 当前状态：生产路径可用；仅**研究**用例 BLOCKED
 
-本目录描述的 83 例矩阵**当前无法运行**：它依赖 `tools/avhw/` 下两个
-provenance 固定（sha256 + 版本串）的 **patched 研究构建**，而本机该目录不存在。
+现行解码策略是**来源感知**的（见
+[`../design/architecture.md`](../design/architecture.md) §8）：
+
+```text
+x265 / svtav1   source -> FFmpeg NVDEC/QSV -> hwdownload -> FFmpeg 编码器
+
+nvenc / qsv     Sony      -> 原生 --avsw（编码前决定，预防性）
+                非 Sony   -> 原生 --avhw + 完整性闸门（失败则删产物 + 一次 --avsw 重试）
+                未分类    -> 原生 --avhw，记录为 source_kind=unknown
+```
+
+**生产不使用 `tools/avhw/` 下的 patched 研究构建**，也不要求 sha256 匹配才启用
+原生硬解。`encoders.hwdecode.resolve_decode_tool()` 仍然存在且仍按 sha256 校验，
+但只服务于研究线与本目录的历史矩阵。
+
+因此本矩阵现在报**两道闸门**（`python -m tests.hwdecode.harness summary`）：
+
+```text
+production  76 例  在已部署二进制上运行，无需任何研究构建        <- 可运行
+research     7 例  研究对象就是 patched 构建本身                  <- BLOCKED
+                   HD-A01/A02/A05/A06/A08（身份与 provenance）
+                   HD-C01（stock vs patched 缺陷对照）
+                   HD-D09（Sony 上 avhw vs avsw 的 trim 语义）
+```
 
 ```text
 python -m tests.hwdecode.harness provenance
-    -> 2 failure(s)   (NVEncC / QSVEncC: 二进制缺失)
+    -> ok=False, 2 failure(s)   (NVEncC / QSVEncC patched 构建缺失)
+    这 7 例如实记为 BLOCKED，绝不记为 PASS。
 
-重建前提（本机核查结果）：
+重建前提（本机核查，未变）：
     cl / msbuild (MSVC)      NOT FOUND       <- 硬阻塞
     Visual Studio            NOT FOUND       <- 硬阻塞
     Intel oneVPL / vcpkg     NOT FOUND       <- QSV 硬阻塞
@@ -22,24 +45,9 @@ python -m tests.hwdecode.harness provenance
     CUDA Toolkit             present (不足以免除以上阻塞)
 ```
 
-两个 patch 本身已核对为**修复原生 reader 丢帧**的补丁
-（`NVEncCore/NVEncPipeline.h` 的 leading-picture 释放条件、
-`QSVPipeline/qsv_pipeline_ctrl.h` 的 pts 拒绝逻辑），补丁文件与
-`toolchain-provenance.json` 的 sha256 一致；缺的是**编译产物**，不是补丁。
-
-后果，按当前生效架构逐条写明：
-
-* `nvenc` / `qsv` 的**原生 `--avhw` 路径 = BLOCKED**。产品运行时该路径解析为
-  `not_proven` 并出声退到同一编码器的 `--avsw`（`docs/design/architecture.md` §8）。
-* `encoders/hwdecode.py::resolve_decode_tool` 的防误用闸门**正常工作**：
-  `tools/NVEncC_9.31_x64/NVEncC64.exe`（stock）被 `decode_tool_is_stock` 识别，
-  绝不被当作 `--avhw` 的承担者。
-* `x265` / `svtav1` 的 **FFmpeg 原生硬解路径不受影响**，实测生效。
-* **本目录的矩阵结果不得被引用为"硬件解码已验证"**，直到 patched 构建重建且
-  provenance 通过。
-
-未重建的原因不是缺步骤文档，而是缺**编译器与依赖**；本轮未下载任何其它版本
-二进制来冒充已验证构建（见 `docs/hardware-codec-policy-redesign` 系列决策）。
+两个 patch 本身已核对为**修复原生 reader 丢帧**的补丁，且与
+`toolchain-provenance.json` 记录的 sha256 一致；缺的是**编译产物**，不是补丁。
+本轮未下载任何其它版本二进制来冒充已验证构建。
 
 | 我想… | 去哪里 |
 |---|---|
@@ -99,22 +107,31 @@ work/avhw_integration/            (gitignored)
    无任何报错、文件完全可播放；4:2:2 10-bit 同为 27/30。`--avsw` 两种都给出 30 帧。
 2. **reader 身份必须从工具日志读，不能从命令行推断。**
    QSVEncC 会在硬件不可用时**静默构造 avsw**。把这种情况记成 hardware pass
-   等于把整个特性做成假的（HD-A03 / HD-B10）。
-3. **默认路径必须解析到 shipped build，硬件解码必须解析到 patched build。**
-   两个 build 只在行为上不同，误换后要到丢帧才被发现（HD-A09 / HD-B10）。
+   等于把整个特性做成假的（HD-A03 / HD-B10）。本轮实测又遇到一次同类拒绝：
+   QSV `--avhw` 在 6000×4000 H.264 上直接起不来
+   （`MFXDEC: Failed to get required buffer size … undeveloped feature`，
+   `rc=1`，读者未被构造），而 NVENC `--avhw` 同一素材逐帧精确（402/402）。
+3. **默认路径必须解析到 shipped build。** 两个 build 只在行为上不同，误换后要到
+   丢帧才被发现（HD-A09）。注意 HD-B10 的旧断言（"policy auto 必须钉住
+   patched build"）**已被取代**：生产按来源分流，`--avhw` 跑的就是已部署二进制；
+   该用例现在断言的是这一点，加上研究版解析器仍然拒绝缺失/哈希不符的构建。
 
 ## 边界声明（引用时必须带上）
 
-* **矩阵状态 BLOCKED**（见本文开头）：`tools/avhw/` 缺失，provenance 不通过，
-  83 例不可运行，**不得记为 PASS**。
+* **矩阵分两道闸门**（见本文开头）：production 76 例在已部署二进制上可运行；
+  research 7 例（patched 构建身份/provenance 与 stock-vs-patched 缺陷对照）
+  因 `tools/avhw/` 缺失而 **BLOCKED**，**不得记为 PASS，也不得据此说"生产
+  硬解未经验证"**——生产路径的验证在 production 闸门与
+  `tests/selftest/suites/native_decode.py`。
 * QSVEncC 补丁：**Runtime-proven on QSVEncC 8.26 pinned revision;
   not yet a general claim for later releases.**（8.27–8.30 未检验）
 * NVEncC 补丁：仅在 9.31（`2cb9d810`）验证。
 * 两个 patched binary 都是 **research build，不得分发**；
   `release/build_release.py` 不把 `tools/avhw/` 入包，`docs/` 也排除在包外。
-  因此**在发布安装中原生 `--avhw` 会以 `not_proven` 降级到同一编码器的
-  `--avsw`**——这是设计行为，不是缺陷。
+  生产路径**不依赖**它们：`--avhw` 使用已部署二进制，Sony 由来源规则改为软解。
+* 本目录的 7 例 research 用例覆盖的是 **patched 构建**，不是生产路径。生产用
+  shipped 构建的 `--avhw` 行为由 production 闸门覆盖；两者不可互相替代引用。
 * `FramePosList::setPocAndFix` 不在本 session 范围内。
-* 本目录只覆盖 **rigaya 原生 `--avhw`** 路径。`x265`/`svtav1` 的 FFmpeg 原生硬解
+* 本目录只覆盖 **rigaya 原生读端**路径。`x265`/`svtav1` 的 FFmpeg 原生硬解
   是**另一条独立路径**，不在本矩阵范围内：见 `docs/design/architecture.md` §8
   与 `tests/selftest/suites/native_decode.py`。

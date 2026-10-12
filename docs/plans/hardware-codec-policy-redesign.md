@@ -23,31 +23,46 @@
 > x265 / svtav1   source -> FFmpeg NVDEC/QSV -> hwdownload + 像素转换
 >                        -> FFmpeg libx265/libsvtav1 -> output
 >
-> nvenc / qsv     source -> NVEncC/QSVEncC --avhw（原生读端） -> 编码器 -> output
->                 不可用时 -> 同一个编码器的 --avsw（仍由它自己读文件）
+> nvenc / qsv     Sony（数据轨带 rtmd）
+>                     -> NVEncC/QSVEncC --avsw（编码前决定，预防性）
+>                 非 Sony
+>                     -> NVEncC/QSVEncC --avhw（已部署二进制）
+>                     -> 完整性闸门 ├─ PASS -> 交付
+>                                  └─ FAIL -> 删除产物 -> 一次 --avsw 重试
+>                 来源未分类 -> --avhw，记录 source_kind=unknown
 > ```
+>
+> 判定依据是**来源类别**，不是 codec 白名单：`PROVEN` 白名单降级为**证据**
+> （命中报 `proven_combination`，未命中报 `native_hw_integrity_ok`），不再是
+> 准入门槛。仍然拒绝硬解的是**能力与语义事实**：seek 不等价、硬件明确拒绝的
+> 格式、本运行记住的设备失败。
 >
 > **不存在** `source -> FFmpeg NVDEC/QSV -> hwdownload -> Y4M -> NVEncC/QSVEncC stdin`
 > 这条路。它在实施过程中曾短暂存在（提交 `eaf8034`），随后按架构决定整体移除。
+>
+> **生产不依赖研究版 patched 构建**：`encoders.hwdecode.resolve_decode_tool()`
+> 仍按 sha256 校验，但只服务于研究线与历史矩阵；生产 `--avhw` 跑已部署二进制。
 >
 > **实施状态摘要**（完整报告见实施 session 的输出）：
 >
 > | 项 | 状态 |
 > |---|---|
 > | FFmpeg 硬解规划器 + 逐设备能力探测 + 传输链探测 | **已实现** |
-> | x265/SVT-AV1 路径消费 DecodePlan | **已实现** |
+> | x265/SVT-AV1 路径消费 DecodePlan | **已实现并实测** |
 > | Sony 4:2:0 保留 + FFmpeg 硬解端到端 | **通过**（PRESERVED=37 / MODIFIED=0） |
 > | 移除 3 个旧开关 + `--preset all`，双侧 V080_BASELINE | **已实现** |
 > | `--no-metadata` | **已实现并端到端验证** |
 > | 每 job `.1ktwork` 清理 | **已实现** |
 > | `--jobs auto` 默认 + 上限校验 + multihw 冲突 | **已实现** |
-> | FFmpeg → Y4M → rigaya stdin 管道 | **已移除**（`ffmpeg_pipe_args` / `apply_stdin_pipe` / `run_hw_tool(decode_pipe=)` 三者都已删除，无残留调用点） |
-> | rigaya 原生 `--avhw` 路由恢复 | **已实现**（`hw_encode_with_fallback` 按读者选择可执行文件；`--avhw` 用 patched 构建、`--avsw` 用装船构建） |
-> | rigaya 原生 `--avhw` 实际运行 | **BLOCKED**：`tools/avhw/` 下的 patched 构建缺失，且本机无 MSVC / oneVPL / rigaya 源码，无法重建；解析结果 `not_proven` → `--avsw` |
-> | 完整性闸门（丢产物 + 有界重试 `--avsw`） | **已实现并单测钉住**（37 例 `native_decode` 套件） |
+> | FFmpeg → Y4M → rigaya stdin 管道 | **已移除**（实现、参数、测试全部删除，无残留调用点） |
+> | 来源感知路由（Sony → `--avsw`，非 Sony → `--avhw`） | **已实现并实测**（真实 Sony 4:2:0/4:2:2 → `--avsw`；DJI HEVC 与 H.264 → `--avhw`，NVENC；QSV H.264 被拒后闸门回退） |
+> | `PROVEN` 白名单不再是硬解准入门槛 | **已实现**（降级为证据，`route_reason` 区分命中/未命中） |
+> | 生产路径不再依赖 `tools/avhw/` | **已实现**（`--avhw` 用已部署二进制；研究版 resolver 隔离保留） |
+> | 完整性闸门（丢产物 + 有界重试 `--avsw`） | **已实现并单测钉住**（83 例 `native_decode` 套件） |
+> | 每 job `DECODE_DECISION` 审计行 | **已实现**（10 字段，`software_fallback` 只由完整性拒绝置位） |
+> | hwdecode 矩阵分两道闸门 | **已实现**：production 76 例可运行；research 7 例 **BLOCKED** |
 > | 软件路径并发接入 | **PENDING**（需 x265 线程标定，§14.6） |
 > | 多设备资源预算（每设备 VRAM） | **PENDING** |
-> | hwdecode 83 用例矩阵 | **BLOCKED**（`tools/avhw/` 缺失，provenance 失败：2 failure） |
 > | Sony 4:2:2 保留校验 | **既有缺陷，非本次回归**（FFmpeg 中间体 mvhd timescale=1000 的毫秒量化；30 帧 @59.94p = 500.5ms 无法表示） |
 >
 > ---

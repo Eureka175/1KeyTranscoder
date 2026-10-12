@@ -1571,22 +1571,43 @@ flag，并且需要"OFF 路径逐字节一致"的审计。
 | 后端 | 解码路径 |
 |---|---|
 | `x265` / `svtav1` | **FFmpeg 原生硬解**：`-init_hw_device` / `-hwaccel` / `-hwaccel_device` / `-hwaccel_output_format` / `-c:v hevc_cuvid\|hevc_qsv`，随后 `hwdownload` + 像素格式转换，在**同一进程**内交给 `libx265` / `libsvtav1` |
-| `nvenc` / `qsv` | **rigaya 自带读端**：`NVEncC64.exe --avhw` / `QSVEncC64.exe --avhw` 直接打开源文件（NVDEC/CUVID 或 QSV 硬件解码器），再由同一个编码器编码 |
+| `nvenc` / `qsv` | **rigaya 自带读端**：`NVEncC64.exe` / `QSVEncC64.exe` 直接打开源文件，读者由**来源类别**决定（Sony → `--avsw`；其余 → `--avhw`） |
 
 x265/SVT-AV1 侧的执行计划由
 `encoders/hwdecode_ffmpeg.py::plan_decode()` 决定并 `apply_decode_plan()`
 写入既有 argv；能力探测与实际执行**共用同一份计划结果**，不存在"探测用 A、
 执行用 B"。
 
-rigaya 侧的执行路由由 `encoders/hwdecode.py::route_decode()` 决定，它回答且
-只回答一个问题——"这个输入、这个后端、这个策略下，**必须**用哪个解码读者，
-**为什么**"。判定依据是**闭集白名单** `PROVEN`（`(backend, codec, chroma,
-depth)` 四元组，每行必须引用一次实测），白名单外一律 `not_proven` → 软解。
-理由写在模块里：这个 integration 存在的意义就是防止硬件路径**静默产出"看着对
-但实际错"的结果**，而未测过的 profile 正是它出现的场景。
+rigaya 侧的执行路由由 `encoders/hwdecode.py::route_decode()` 决定，它回答
+"这个输入、这个后端、这个策略下，**必须**用哪个解码读者，**为什么**"。
+判定依据是**来源类别**（`source_kind`），不是 codec 白名单：
 
-`REFUSED` 记录硬件读者**明确拒绝**的组合（如 QSV 的 H.264 4:2:2，`rc=-31`，
-读者根本没被构造出来）——日志要说"refused"，不是"failed"。
+| source_kind | 读者 | reason |
+|---|---|---|
+| `sony`（数据轨带 `rtmd` tag） | `--avsw` | `sony_hardware_decode_safety`——**编码前就决定**，不尝试、不失败、不算回退 |
+| `non_sony` | `--avhw` | `proven_combination`（研究线测过）或 `native_hw_integrity_ok`（未测过，由闸门判定） |
+| `unknown`（探测为空） | `--avhw`，记录为未分类 | `source_unclassified` |
+
+理由是一个真实测量：stock 硬件读者在 Sony XAVC 上丢前导帧——`rc=0`、可播放、
+**30 帧只出 27 帧**（4:2:0 与 4:2:2 10-bit 均为 27/30，NVEncC 与 QSVEncC 均如此；
+`--avsw` 均为 30）。缺陷是**来源特异**的，所以处置也是来源特异的。
+**某个 Sony 格式曾在短片段上通过，不构成默认启用硬解的理由。**
+
+`PROVEN` 白名单**不再是准入门槛**，只作为证据保留：命中报
+`proven_combination`，未命中报 `native_hw_integrity_ok`，两者都要过闸门。
+未测过的 profile 不再被预先拒绝——因为缺陷的来源条件已经被来源分流挡住了，
+而真正的判定权在 §8.2 的闸门。
+
+以下条件**仍然**拒绝硬解，且不得为了"多走硬解"而删除：
+
+| 条件 | reason | 性质 |
+|---|---|---|
+| 请求了时间 seek | `seek_not_equivalent` | 两个 reader 语义不等价（帧数与 PTS 相同、画面不同） |
+| 硬件明确拒绝该格式 | `capability_refused` | 实测能力事实（如 QSV H.264 4:2:2 10-bit：`unable to decode by qsv`，读者未被构造） |
+| 本运行已记住的设备/格式失败 | `reader_unavailable` | 设备事实，非单文件事实 |
+
+删掉这些不会让硬解"更可用"，只会把一次确定的拒绝推迟到运行期，在那里被读成失败，
+并让每个文件多付一次完整编码尝试。
 
 **不存在**"FFmpeg 解码 → `hwdownload` → y4m → NVEncC/QSVEncC stdin"这条路径。
 它曾在 `feature/hardware-codec-policy-redesign` 的一轮实现中短暂存在，已按
@@ -1594,7 +1615,19 @@ depth)` 四元组，每行必须引用一次实测），白名单外一律 `not_
 编码器的** `--avsw`，而 `--avsw` 同样由该编码器自己读取源文件。
 
 `--hw-decode` / `--hw-decode-verify` / `--no-hw-autoselect` 三个开关已移除，
-且**不提供兼容别名**；硬件优先路由是内建行为。
+且**不提供兼容别名**；路由是内建行为。
+
+**生产不使用研究版 patched 构建。** `tools/avhw/` 被排除在发布包外，且
+`encoders.hwdecode.resolve_decode_tool()`（仍按 sha256 校验）只服务于研究线与
+历史矩阵；生产编码路径不调用它。`use_decode_binary()` 保留为 argv[0] 的唯一
+锚点，二者不一致时拒绝而不是静默接受。
+
+每个 job 写一行 `DECODE_DECISION`，回答"这个文件为什么用 `--avhw` / `--avsw`"：
+`source_kind`、`requested_encoder`、`actual_encoder`、`decode_reader`、
+`decode_policy`、`route_reason`、`hardware_integrity`、`software_fallback`、
+`fallback_reason`、`final_status`。`software_fallback` **只**由完整性拒绝置位；
+Sony 的预防性软解是 `route_reason=sony_hardware_decode_safety` +
+`software_fallback=False`——把它记成回退是对这次运行的错误陈述。
 
 ### 8.2 完整性闸门：`encoders/integrity.py`
 

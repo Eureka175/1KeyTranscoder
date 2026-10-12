@@ -13,14 +13,16 @@
 >
 > ```
 > x265 / svtav1   source -> FFmpeg NVDEC/QSV -> hwdownload -> FFmpeg 编码器
-> nvenc / qsv     source -> NVEncC/QSVEncC --avhw（原生读端） -> 编码器
->                 patched 构建不可用时 -> 同一个编码器的 --avsw
+> nvenc / qsv     Sony      -> 原生 --avsw（编码前决定，预防性）
+>                 非 Sony   -> 原生 --avhw（已部署二进制）+ 完整性闸门
 > ```
 >
 > 本文 §5.2 的丢帧实测**仍然成立**，而且已在本机复核
-> （NVEncC stock `--avhw`：4:2:0 10-bit 源 30 帧 → 27 帧；4:2:2 → 27/30；
-> `--avsw` 均 30/30）。变的不是事实，而是处置方式：不再是"因此恒用 avsw"，
-> 而是"用 patched 构建 + 完整性闸门，闸门不过先删产物再回退 `--avsw`"。
+> （NVEncC 与 QSVEncC stock `--avhw`：4:2:0 10-bit 源 30 帧 → 27 帧；
+> 4:2:2 → 27/30；`--avsw` 均 30/30）。变的不是事实，而是处置方式：不再是
+> "因此恒用 avsw"，而是**按来源分流**——Sony 在编码前就走 `--avsw`（预防），
+> 非 Sony 走 `--avhw`，其产物由完整性闸门判定，失败则删除并做一次有界 `--avsw`
+> 重试。本文的实测正是"Sony 必须软解"这条规则的证据来源。
 
 ---
 

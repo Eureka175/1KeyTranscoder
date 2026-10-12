@@ -1,22 +1,35 @@
 # Hardware Decode Integration — 详细结构化报告
 
-> ## ⚠️ 历史档案 + 当前状态 BLOCKED
+> ## ⚠️ 历史档案 — 生产策略已改为**来源感知**
 >
 > 本文件是 `feature/hardware-decode-integration` session 的**历史报告**，
 > 记录 v0.7.0 时代的 `--hw-decode off|auto|require` 策略。那个开关**已移除**
-> （无兼容别名），现行架构见
-> [`../design/architecture.md`](../design/architecture.md) §8。
+> （无兼容别名）。**正文中的 `--hw-decode` 用法均为历史记录，不代表当前 CLI。**
 >
-> **正文中的 `--hw-decode` 用法均为历史记录，不代表当前 CLI。**
+> 现行架构见 [`../design/architecture.md`](../design/architecture.md) §8：
 >
-> **矩阵当前状态 = BLOCKED，不是 PASS。** 83 例矩阵依赖 `tools/avhw/` 下
-> provenance 固定的 patched 构建；本机该目录不存在，`verify_provenance()`
-> 报 2 failure，矩阵不可运行。本机也无 MSVC / oneVPL / rigaya 源码，
-> 无法重建。**本文件的结论不得被引用为"硬件解码已在本机验证"。**
+> ```text
+> x265 / svtav1   source -> FFmpeg NVDEC/QSV -> hwdownload -> FFmpeg 编码器
 >
-> 仍然成立、且已在本机复核的部分：stock 构建在 Sony XAVC 上丢帧
-> （4:2:0 10-bit 源 30 帧 → `--avhw` 27 帧、`rc=0`；4:2:2 同为 27/30；
-> `--avsw` 均为 30 帧）。因此 patched 构建仍然是使用原生 `--avhw` 的前提。
+> nvenc / qsv     Sony      -> 原生 --avsw（编码前决定，预防性）
+>                 非 Sony   -> 原生 --avhw（已部署二进制）+ 完整性闸门
+>                 未分类    -> 原生 --avhw，记录为 unknown
+> ```
+>
+> **本文件正文关于"硬件解码必须钉在 patched 构建上"的结论已被取代。** 生产不再
+> 依赖 `tools/avhw/`，也不再要求 sha256 匹配才启用原生硬解；`resolve_decode_tool`
+> 只服务于研究线与本目录的历史矩阵。
+>
+> **矩阵分两道闸门**：production 76 例在已部署二进制上可运行；research 7 例
+> （HD-A01/A02/A05/A06/A08 身份与 provenance、HD-C01 缺陷对照、HD-D09 trim 语义）
+> 因 patched 构建缺失而 **BLOCKED**，**不得记为 PASS**。本文档中的 83 例结论
+> 不得被引用为"生产硬解已在本机验证"。
+>
+> 仍然成立、且已在本机复核的部分：stock 构建在 Sony XAVC 上丢帧，NVEncC 与
+> QSVEncC 均如此（4:2:0 10-bit 源 30 帧 → `--avhw` 27 帧、`rc=0`；4:2:2 同为
+> 27/30；`--avsw` 均为 30 帧）。变的不是事实，而是处置方式：不再是"因此必须
+> 用 patched 构建"，而是"Sony 来源在编码前就走软解，其余走已部署 `--avhw`
+> 并由完整性闸门判定"。
 >
 > **报告定位。** 本文件是 `feature/hardware-decode-integration` 这个 session 的完整结构化报告，
 > **以 test matrix 为主体，不以代码 diff 为主体**。
@@ -25,6 +38,43 @@
 > 机器可读结果见 `work/avhw_integration/results/`。
 >
 > 本文件中所有数字均由 `results.json` / `summary.json` 导出，不是手工填写的。
+
+---
+
+## 现行策略下的实测（后续 session 追加，非本文档 83 例结果）
+
+以下数字是**来源感知策略**在本机的实测，与本文档的 83 例历史结果无关，
+单独列出以免混淆。
+
+**source-aware 路由（产品端到端，4 个文件 × `--encoder nvenc` / `qsv`）**
+
+| 文件 | 源类别 | NVENC | QSV |
+|---|---|---|---|
+| Sony XAVC HS 4:2:0 10-bit（30 帧，rtmd） | sony | `--avsw`，`sony_hardware_decode_safety`，fallback=False，30/30 | 同左，30/30 |
+| Sony XAVC 4:2:2 10-bit（30 帧，rtmd） | sony | `--avsw`，同上，30/30，4:2:2 保持 | `--avsw`，4:2:2→4:2:0 降级，30/30 |
+| DJI HEVC 4:2:0 10-bit（16 帧，djmd/dbgi） | non_sony | `--avhw`，`native_hw_integrity_ok`，integrity=PASS，16/16 | `--avhw`，`proven_combination`，integrity=PASS，16/16 |
+| H.264 4:2:0 8-bit（150 帧，6000×4000） | non_sony | `--avhw`，integrity=PASS，150/150 | **`--avhw` 失败**（`MFXDEC … undeveloped feature`，rc=4294967293）→ 闸门删除产物 → 一次 `--avsw` 重试 → 150/150，fallback=True + 原因 |
+
+所有输出与源在**帧数、分辨率、帧率、音轨数量/顺序、`rtmd`/`djmd`/`dbgi`
+数据轨**上一致；每个文件 `final_status=ok`。
+
+**直接测量（绕过产品，只比较 reader）** —— 源帧数 / 输出帧数：
+
+| 素材 | NVEncC `--avhw` | NVEncC `--avsw` | QSVEncC `--avhw` | QSVEncC `--avsw` |
+|---|---|---|---|---|
+| Sony XAVC HS 4:2:0 10-bit | 27/30 ❌ | 30/30 ✅ | 27/30 ❌ | 30/30 ✅ |
+| Sony XAVC 4:2:2 10-bit | 27/30 ❌ | 30/30 ✅ | 27/30 ❌ | 30/30 ✅ |
+| DJI HEVC 4:2:0 10-bit | 16/16 ✅ | 16/16 ✅ | 16/16 ✅ | 16/16 ✅ |
+| H.264 4:2:0 8-bit | 402/402 ✅ | 402/402 ✅ | 无法启动 ❌ | 402/402 ✅ |
+
+这就是"Sony 必须预防性软解、非 Sony 可以 `--avhw`、结果由闸门判定"三条规则的
+全部实测依据：**丢帧是 Sony 特异的**（NVEncC 与 QSVEncC 都丢同样 3 帧），
+而非 Sony 素材上已部署二进制逐帧完整——除 QSV 个别格式直接起不来，那正是闸门
+与理由码要处理的情形。
+
+**x265 / SVT-AV1 路线未受影响**：同一批 Sony 素材仍走 FFmpeg
+（`hevc_cuvid`，`hardware_compatible`），硬解生效。本文档 §8 的
+`--hw-decode` 描述不适用于它。
 
 ---
 
