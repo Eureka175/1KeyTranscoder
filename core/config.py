@@ -254,12 +254,12 @@ def find_hw_tool(
     """Locate a rigaya encoder executable (tools/<ToolVer>/<exe>.exe).
 
     Deliberately **excludes** ``tools/avhw/``.  That tree holds the
-    hardware-decode research builds, which must be selected explicitly by
-    the ``--hw-decode`` path (``encoders.hwdecode.resolve_decode_tool``)
-    and never picked up by a directory glob: the two builds differ only in
-    behaviour, so an accidental swap would be invisible until frames went
-    missing.  Selection here is deterministic — the shipped build under
-    ``tools/<ToolVer>`` — rather than dependent on sort order.
+    hardware-decode research builds, which must be selected by
+    ``encoders.hwdecode.resolve_decode_tool`` (the per-file ``--avhw``
+    route) and never picked up by a directory glob: the two builds differ
+    only in behaviour, so an accidental swap would be invisible until
+    frames went missing.  Selection here is deterministic — the shipped
+    build under ``tools/<ToolVer>`` — rather than dependent on sort order.
     """
     if explicit:
         p = Path(explicit)

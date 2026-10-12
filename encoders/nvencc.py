@@ -6,12 +6,15 @@ tool's own --help before use (flags a given NVEncC version does not
 advertise are skipped and reported as warnings).
 
 The decode reader is **not** decided here.  It arrives as an explicit
-``reader`` argument produced by ``encoders.hwdecode.route_decode``, and
-its default is ``avsw`` (software) — the v0.6.2 behaviour.  Hardware
-decode is opt-in via ``--hw-decode`` and is gated on the runtime-proven
-codec/chroma/depth allowlist plus the frame-integrity gate, because the
-stock hardware reader loses frames silently on Sony timelines
-(docs/hardware-decode/integration-test-matrix.md, category C).
+``reader`` argument produced by ``encoders.hwdecode.route_decode``.  This
+backend always reads the source file itself: ``avhw`` selects its native
+hardware reader, ``avsw`` its software reader, and neither is fed decoded
+frames from another process.  Hardware decode is gated on the
+runtime-proven codec/chroma/depth allowlist plus the frame-integrity gate,
+because the stock hardware reader loses frames silently on Sony timelines
+(docs/hardware-decode/integration-test-matrix.md, category C).  Which
+*binary* may perform ``--avhw`` is decided per file in
+``core.batch_hw`` (``resolve_decode_tool``), not here.
 
 Output is a video-only **MOV** (explicit ``-f mov``, never MP4).  MOV is
 the hardware-encode *working* container: every consumer downstream

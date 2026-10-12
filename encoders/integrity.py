@@ -12,11 +12,11 @@ Two levels, both required by the integration test matrix:
     and truncation — the measured defect class — at the cost of one
     container parse and two decode passes over the *output*.
 
-``sequence`` (opt-in via ``--hw-decode-verify``)
+``sequence`` (diagnostic API: ``verify_sequence``, not wired to any CLI)
     Ordered per-frame fingerprint comparison between the hardware and
     software results.  Catches count-preserving corruption (reordering,
     substitution, duplication) that no counting gate can see.  Costs a
-    second encode, so it is not the default.
+    second encode, so it is not run by default.
 
 The rule the gate enforces is the research line's own conclusion:
 **reconcile against the delivered container, never against a decoder's
@@ -407,8 +407,8 @@ def verify_sequence(
 
     This is the check a counting gate cannot make: it compares the
     *pictures* position-for-position, so a count-preserving reorder,
-    substitution or duplication is caught.  Used by
-    ``--hw-decode-verify`` and by matrix test HD-C12.
+    substitution or duplication is caught.  Reachable as a diagnostic API
+    and through matrix test HD-C12; it is **not** wired to any CLI switch.
     """
     a, err_a = frame_signatures(hw_output, width, height, pix_fmt=pix_fmt,
                                 limit=limit, ffmpeg=ffmpeg)

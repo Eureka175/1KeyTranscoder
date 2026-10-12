@@ -7,12 +7,14 @@ a 4:2:0 conversion — direct 4:2:2 HEVC encode on Arc is the slow path
 at all (silent avsw fallback confirmed empirically).
 
 The decode reader is **not** decided here.  It arrives as an explicit
-``reader`` argument produced by ``encoders.hwdecode.route_decode``, and
-its default is ``avsw`` (software) — the v0.6.2 behaviour.  QSV is the
-tool where "the tool chose differently than you asked" is most likely:
-it silently constructs an ``avsw`` reader when the hardware one cannot
-handle the input, so the integrity gate asserts the reader identity
-printed in ``Input Info`` rather than trusting the command line.
+``reader`` argument produced by ``encoders.hwdecode.route_decode``.  This
+backend always reads the source file itself: ``avhw`` selects its native
+hardware reader, ``avsw`` its software reader, and neither is fed decoded
+frames from another process.  QSV is the tool where "the tool chose
+differently than you asked" is most likely: it silently constructs an
+``avsw`` reader when the hardware one cannot handle the input, so the
+integrity gate asserts the reader identity printed in ``Input Info``
+rather than trusting the command line.
 
 QSVEncC's hardware-decode patch is runtime-proven **on the pinned 8.26
 revision only**; releases 8.27–8.30 were not examined and are not

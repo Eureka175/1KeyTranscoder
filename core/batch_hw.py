@@ -4,10 +4,14 @@ failure records, and worker schedulers.
 Extracted from the main program so 1kt.py stays a thin orchestrator.
 
 Key behaviors (final design):
-- hardware encode paths decode with `--avsw` (software) by default;
-  hardware decode is opt-in via `--hw-decode auto|require` and is
-  gated by capability routing plus the frame-integrity gate
-  (encoders/hwdecode.py, encoders/integrity.py);
+- hardware encode paths decode with the encoder's **own** reader, chosen
+  per file by `encoders.hwdecode.route_decode`: `--avhw` on the
+  sha256-pinned patched build when the input is in the runtime-proven
+  allowlist, `--avsw` on the shipped build otherwise.  There is no FFmpeg
+  frame feed into a rigaya encoder (the x265/SVT-AV1 backends decode with
+  FFmpeg's NVDEC/QSV in-process instead -- see encoders/hwdecode_ffmpeg.py);
+  every `--avhw` result is gated on the frame-integrity check
+  (encoders/integrity.py);
 - runtime encode failures NO LONGER open a prompt window: the
   downgrade ladder runs automatically (source -> 10bit 4:2:0 ->
   8bit 4:2:0) with a prominent WARNING per rung printed in the work

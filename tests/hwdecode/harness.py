@@ -3269,8 +3269,7 @@ def h01(t, ctx):
     ev, problems = {}, []
     inp, out = _scratch_io("h01", fx.path)
     args = ["--input", str(inp), "--output", str(out), "--check", "basic",
-            "--headless", "--encoder", "nvenc", "--hw-decode", "auto",
-            "--preset", "HQ"]
+            "--headless", "--encoder", "nvenc", "--preset", "HQ"]
     first = _run_app(args)
     ev["first_rc"] = first.returncode
     produced = list(out.rglob("*.MP4")) + list(out.rglob("*.mp4"))
@@ -3307,10 +3306,9 @@ def h02(t, ctx):
     # first run at a bad resolution to create a failed-run cache
     bad = _run_app(["--input", str(inp), "--output", str(out), "--check",
                     "basic", "--headless", "--encoder", "nvenc",
-                    "--hw-decode", "auto", "--no-downgrade"])
+                    "--no-downgrade"])
     good = _run_app(["--input", str(inp), "--output", str(out), "--check",
-                     "basic", "--headless", "--encoder", "nvenc",
-                     "--hw-decode", "auto"])
+                     "basic", "--headless", "--encoder", "nvenc"])
     produced = list(out.rglob("*.MP4")) + list(out.rglob("*.mp4"))
     ev = {"first_rc": bad.returncode, "second_rc": good.returncode,
           "produced": [p.name for p in produced]}
@@ -3320,8 +3318,7 @@ def h02(t, ctx):
     else:
         sha = checks.sha256_file(produced[0])
         again = _run_app(["--input", str(inp), "--output", str(out), "--check",
-                          "basic", "--headless", "--encoder", "nvenc",
-                          "--hw-decode", "auto"])
+                          "basic", "--headless", "--encoder", "nvenc"])
         ev["third_rc"] = again.returncode
         ev["sha_stable"] = checks.sha256_file(produced[0]) == sha
         if not ev["sha_stable"]:
@@ -3344,7 +3341,7 @@ def h03(t, ctx):
     inp, out = _scratch_io("h03", fx.path)
     args = [sys.executable, str(ROOT / "1kt.py"), "--input", str(inp),
             "--output", str(out), "--check", "basic", "--headless",
-            "--encoder", "nvenc", "--hw-decode", "auto"]
+            "--encoder", "nvenc"]
     proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, text=True,
                             encoding="utf-8", errors="replace")

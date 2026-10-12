@@ -328,10 +328,11 @@ def is_hardware_unavailable(reason: str) -> bool:
 # Those builds are **research builds and must not be distributed**
 # (`release/build_release.py` does not whitelist `tools/avhw/`, and `docs/`
 # is excluded from the package). The practical consequence, stated plainly:
-# in a shipped installation `--hw-decode auto` degrades to software with
-# reason `not_proven`, and `--hw-decode require` fails loudly. That is the
-# intended behaviour, not a bug — hardware decode is a validated optional
-# path in a developer checkout, never a shipped default.
+# where they are absent, native rigaya hardware decode is unreachable and
+# `resolve_decode_tool` returns an unusable tool with reason `not_proven`,
+# so routing falls back to the shipped build's `--avsw`. That is the
+# intended behaviour, not a bug — this hardware decode is a validated
+# optional path in a developer checkout, never a shipped default.
 
 PATCHED_BUILD: dict[str, dict] = {
     "nvenc": {
