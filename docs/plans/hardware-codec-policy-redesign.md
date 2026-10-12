@@ -1,7 +1,41 @@
 # Hardware Codec Policy & Execution Pipeline Redesign — 规划书
 
-> **文档类型**：独立规划书（planning-only）。本 session **不修改任何生产代码、CLI、
-> 配置、测试、release 文件或既有研究成果**。
+> ## ⚠️ 实施状态（此区块由实施 session 添加，正文保持不变）
+>
+> **本规划书已被实施。** 实施分支 `feature/hardware-codec-policy-redesign`，
+> 从 `fc183b6` 起，最新提交见该分支。
+>
+> **维护者的后续指令覆盖了本文的两项设计**，正文中对应段落仍按原样保留，
+> 但**以下两项不再是当前策略**（详见 §9.2 与 §19 的 `SUPERSEDED` 标注）：
+>
+> | 原设计 | 现状 |
+> |---|---|
+> | §9.2 / OD-1：硬件解码设为默认，需要 production benchmark 前置 | **已被覆盖**：所有输入类别、所有编码后端统一硬件优先，**不再以 benchmark 为前置条件** |
+> | §9.2.1 / OD-2：普通 Sony 模式默认不得硬解 | **已被覆盖**：Sony 不再因身份被排除在硬解候选之外 |
+>
+> 现行策略一句话：**所有视频输入统一硬件优先解码；Sony 保留管线照常运行，
+> 但不再单纯因 Sony 身份强制软解。** 性能事实仍据实记录，不宣称普遍加速。
+>
+> **实施状态摘要**（完整报告见实施 session 的输出）：
+>
+> | 项 | 状态 |
+> |---|---|
+> | FFmpeg 硬解规划器 + 逐设备能力探测 + 传输链探测 | **已实现** |
+> | x265/SVT-AV1 路径消费 DecodePlan | **已实现** |
+> | Sony 4:2:0 保留 + 硬解端到端 | **通过**（PRESERVED=37 / MODIFIED=0） |
+> | 移除 3 个旧开关 + `--preset all`，双侧 V080_BASELINE | **已实现** |
+> | `--no-metadata` | **已实现并端到端验证** |
+> | 每 job `.1ktwork` 清理 | **已实现** |
+> | `--jobs auto` 默认 + 上限校验 + multihw 冲突 | **已实现** |
+> | 硬件编码器路径的硬解（FFmpeg 解码 → rigaya 编码） | **PENDING**（需重写 run_hw_tool 的进程管道） |
+> | 软件路径并发接入 | **PENDING**（需 x265 线程标定，§14.6） |
+> | 多设备资源预算（每设备 VRAM） | **PENDING** |
+> | hwdecode 83 用例矩阵 | **BLOCKED**（`tools/avhw/` 缺失，provenance 失败） |
+> | Sony 4:2:2 保留校验 | **既有缺陷，非本次回归**（FFmpeg 中间体 mvhd timescale=1000 的毫秒量化；30 帧 @59.94p = 500.5ms 无法表示） |
+>
+> ---
+>
+> **文档类型**：独立规划书（planning-only，撰写时）。
 >
 > **基线**：分支 `research/audio-sync-p3-production-semantics`
 > @ `2b34d41589d448439e835e1cf289962b5bc95fe2`，工作树含 8 个未提交修改 + 4 个未跟踪目录。
@@ -1005,6 +1039,30 @@ prompt 要求不得把三者混成一个 `hardware mode` 布尔值。**今天就
 ---
 
 # 9. 新的默认解码策略
+
+> ## ⚠️ SUPERSEDED —— 本节 §§9.2 与 §9.2.1 已不再代表当前策略
+>
+> 维护者在实施阶段明确指示：**所有视频解码路径都必须优先使用硬件解码**，
+> 适用于全部输入类别（Sony XAVC HS / XAVC S、DJI、其它相机、普通视频）
+> 与全部编码后端（NVENC / QSV / x265 / 其它）。
+>
+> 具体覆盖：
+>
+> * **§9.2 的"Sony 源 → 默认软解"被撤销。** 不得因 `is_sony_source()`
+>   返回真就跳过硬解候选。
+> * **§9.2.1 的"Sony 普通模式不得自动硬解"被撤销。** Sony 保留管线照常
+>   运行（rtmd/nrtm/uuid 抽取与重建、stts 时长修复、`validate.compare`
+>   全部保留），但不再因 Sony 身份强制软解。
+> * **OD-1 的"production benchmark 是改默认的硬前置"被撤销。** 硬件优先
+>   是维护者已作出的决定，不再以 benchmark 为门槛。性能仍**据实记录**：
+>   实施期实测表明硬解 + x265 单任务**并非普遍更快**（详见 §5.5 与实施报告），
+>   这一点不得被改写。
+>
+> 本节正文按原样保留，作为"撰写时如何判断"的记录。**现行策略以本区块为准。**
+>
+> 实施结果：Sony 4:2:0 素材在真实 CLI 上以 NVDEC 硬解跑通完整保留管线
+> （`PRESERVED=37 MODIFIED=0 MISSING=0`）；4:2:2 素材经 `scale_cuda`
+> 传输链同样逐字节保真，色度与位深未被降级。
 
 > **本节是本次重构的核心策略变更。** 所有默认值变更都是 **PROPOSED**，
 > 并且**部分与归档的既有产品决策相冲突**（§7.4 第 9 条）——冲突已在
@@ -2972,8 +3030,8 @@ L3 --level full   859 PASS / 0 FAIL   (unit 590 + toolchain 16 + full 253)
 
 | # | 决策 | 选项 | 本文建议 | 阻塞什么 |
 |---|---|---|---|---|
-| **OD-1** | **是否把硬解设为默认**（与 `final-report.md` §11 第 9 条"需要矩阵全绿 + production benchmark 之后再决定"的关系） | ① 按 prompt 执行（改默认）② 先满足归档的前置条件再改 | **② 的前置条件必须满足，然后执行 ①**：即**先做 baseline benchmark，再改默认**。见 §19.2 | **§9.2 的全部** |
-| **OD-2** | **Sony 普通模式是否允许显式 `ffmpeg_hw`** | A 不允许（建议）／B 允许 opt-in，默认仍软解 | **A** | §9.2.1 |
+| **OD-1** **SUPERSEDED** | ~~是否把硬解设为默认~~（与 `final-report.md` §11 第 9 条"需要矩阵全绿 + production benchmark 之后再决定"的关系） | ① 按 prompt 执行（改默认）② 先满足归档的前置条件再改 | ~~**② 的前置条件必须满足，然后执行 ①**~~ **已由维护者指令覆盖：统一硬件优先，不再以 benchmark 为前置**。见 §9.2 | — |
+| **OD-2** **SUPERSEDED** | ~~Sony 普通模式是否允许显式 `ffmpeg_hw`~~ | ~~A 不允许（建议）／B 允许 opt-in，默认仍软解~~ | **已覆盖：Sony 不再因身份被排除在硬解候选之外**。见 §9.2.1 | — |
 | **OD-3** | **`require` 硬解语义的替代品** | A 接受能力丢失／B 新增独立强制开关／C 挂到 `--no-metadata`/multihw | **A** + 文档明确写出能力移除 | §15.2-G |
 | **OD-4** | **`--no-metadata` 下 `--check` 的语义** | A 降级为 output-validity only／B 拒绝非 basic／C 标记 SKIPPED | **A** | §11.3 |
 | **OD-5** | **`--no-metadata` 下容器 brand** | ① 不设 brand／② 通用 brand | **①** | §11.4 |
