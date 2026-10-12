@@ -401,15 +401,9 @@ def hw_backend_for(
         caps.codecs.get("av1", CodecCaps()).bit10,
     )
     logger.info("Caps files: %s | %s", json_path, raw_path)
-    backend = (
-        NvencBackend(tool, caps, codec=codec) if kind == "nvencc"
-        else QsvBackend(tool, caps, codec=codec)
-    )
-    #: The operator's explicit tool path, when one was given. Carried so
-    #: `resolve_decode_tool` can honour it for `--avhw` without this
-    #: function having to pre-empt the per-file routing decision.
-    backend.explicit_tool = explicit
-    return backend
+    if kind == "nvencc":
+        return NvencBackend(tool, caps, codec=codec)
+    return QsvBackend(tool, caps, codec=codec)
 
 
 def _last_encode_fps(raw_log: Path) -> float:

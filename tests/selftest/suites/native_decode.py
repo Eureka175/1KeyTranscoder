@@ -42,7 +42,6 @@ class _FakeBackend:
         self.tool = Path(tool)
         self.codec = codec
         self.name = "nvenc" if kind == "nvencc" else "qsv"
-        self.explicit_tool = None
         from encoders.caps import BackendCaps, CodecCaps
 
         self.caps = BackendCaps(

@@ -76,6 +76,21 @@
 （`hevc_cuvid`，`hardware_compatible`），硬解生效。本文档 §8 的
 `--hw-decode` 描述不适用于它。
 
+**Sony 时间轴时长缺陷是"片段长度相关"，不是本次回归**——补一条对照，免得后来者
+重新查一遍：
+
+| Sony A7M5 XAVC HS 4:2:0 10-bit | 帧数 | x265 结果 |
+|---|---|---|
+| `20260903_C1170.MP4` | 30 | **FAIL**：`timeline.movie_duration original='30030' final='30060'` |
+| `20260903_C1087.MP4` | 240 | **PASS**：`PRESERVED=37 MODIFIED=0 MISSING=0 structural_success=True` |
+
+30 帧 @59.94p = 500.5 ms，而 FFmpeg 中间体 `mvhd` 的 timescale 为 1000，
+无法表示 0.5 ms，因此取整为 501 ms → 最终容器 30060 ≠ 源 30030。240 帧
+= 4004 ms 是整数毫秒，所以通过。**同一个源、同一条 FFmpeg 路径**，差别只在片段
+长度，因此与解码策略无关。4:2:2 的 30 帧片段同样失败（**未测**更长的 4:2:2
+片段，所以"4:2:2 也一样"这句话只对 30 帧成立）。
+修这条属于 preservation 议题，不在本次来源策略任务范围内，未修改任何时长校验。
+
 ---
 
 # 目录
