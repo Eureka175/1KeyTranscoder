@@ -274,37 +274,28 @@ def cleanup_work_dir(
     logger: logging.Logger,
     file_logger: logging.Logger,
 ) -> None:
-    """Post-delivery GC: keep report.json in logs, remove the rest."""
-    if keep_work:
-        file_logger.info("KEEP-WORK | work dir retained | %s", work_dir)
-        return
-    report_src = work_dir / "report.json"
-    if report_src.is_file():
-        try:
-            preserve_reports.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(report_src, preserve_reports / f"{job_id}.json")
-            file_logger.info(
-                "GC | preservation report kept | %s",
-                preserve_reports / f"{job_id}.json",
-            )
-        except OSError as exc:
-            file_logger.warning(
-                "GC | report copy failed (work dir still removed) | %s", exc
-            )
-    for attempt in range(3):
-        try:
-            shutil.rmtree(work_dir)
-            file_logger.info("GC | work dir removed | %s", work_dir)
-            return
-        except OSError as exc:
-            if attempt == 2:
-                emit_warning(
-                    logger,
-                    file_logger,
-                    f"GC failed, work dir retained: {work_dir} | {exc}",
-                )
-                return
-            time.sleep(1.0)
+    """Post-delivery GC: keep report.json in logs, remove the rest.
+
+    Thin wrapper over :func:`core.workdir.gc_job_dir` so the hardware and
+    software paths share one implementation. Two behaviours changed when the
+    two were merged, both deliberate:
+
+    * a failure to copy ``report.json`` out now **retains** the directory
+      instead of warning and deleting it anyway -- deleting the only copy of
+      the report is data loss;
+    * the root ``.1ktwork`` and any sibling job directory are still never
+      touched (``gc_job_dir`` removes only ``work_dir``).
+    """
+    from core.workdir import gc_job_dir
+
+    gc_job_dir(
+        work_dir=work_dir,
+        job_id=job_id,
+        preserve_reports=preserve_reports,
+        keep_work=keep_work,
+        logger=logger,
+        file_logger=file_logger,
+    )
 
 
 def hw_backend_for(

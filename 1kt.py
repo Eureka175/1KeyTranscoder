@@ -17,6 +17,7 @@ x265 路径作为显式手动选项保留在本文件 (legacy, 永不自动回�
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import logging
 import os
@@ -68,6 +69,7 @@ from core.postprobe import postprobe_and_log
 from core.probe import build_source_info, count_frames, probe_source
 from core.scaling import ScalingEngine
 from core.source_classifier import SourceClassifier
+from core.workdir import gc_job_dir
 from core.version import version_string
 from encoders.svtav1 import SvtAv1Backend
 from encoders.x265 import X265Backend
@@ -1388,6 +1390,46 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+@contextlib.contextmanager
+def _job_scratch(
+    *,
+    work_root: Path,
+    src: Path,
+    keep_work: bool,
+    preserve_reports: Path | None,
+    logger: logging.Logger,
+    file_logger: logging.Logger,
+    create: bool = True,
+):
+    """Bracket one software-path job's scratch directory.
+
+    The software paths compute ``work_dir`` themselves inside each encode
+    function, so the lifetime is bracketed here at the dispatch site rather
+    than re-indenting a 200-line loop body only to add a ``try/finally``.
+    Bracketing the dispatch also covers what a per-``return`` cleanup would
+    miss: an exception and a ``KeyboardInterrupt`` both run the exit path.
+
+    ``create=False`` is for the case that does no work at all (an existing
+    output is skipped), where creating then deleting a directory is noise.
+    """
+    job = job_id_for(src)
+    work_dir = work_root / job
+    if create:
+        work_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        yield work_dir
+    finally:
+        if create or work_dir.exists():
+            gc_job_dir(
+                work_dir=work_dir,
+                job_id=job,
+                preserve_reports=preserve_reports,
+                keep_work=keep_work,
+                logger=logger,
+                file_logger=file_logger,
+            )
+
+
 def spawn_dashboard(json_path: Path, script_dir: Path):
     """Open the nvidia-smi style dashboard in a separate console."""
     try:
@@ -2102,7 +2144,11 @@ def main() -> int:
                 file_logger = build_file_logger(file_log)
                 if status is not None:
                     status.start(src, preset, backend.name)
-                if dst.is_file() and dst.stat().st_size > 0:
+                # Whether this iteration will do any work at all: a file whose
+                # output already exists is skipped, and creating then deleting a
+                # scratch directory for it would be pure noise.
+                skipped_existing = dst.is_file() and dst.stat().st_size > 0
+                if skipped_existing:
                     logger.info("[SKIP] %s | %s", src, dst)
                     file_logger.info(
                         "SKIP | output already exists | output=%s", dst
@@ -2111,182 +2157,191 @@ def main() -> int:
                     if status is not None:
                         status.finish(src, "skipped")
                     continue
-                try:
-                    prepared = prepare_source(
-                        src=src, preset=preset, ffprobe=ffprobe,
-                        preprobe_csv=preprobe_csv,
-                        preprobe_stream_csv=preprobe_stream_csv,
-                        scaling_csv=scaling_csv, profile=profile,
-                        classifier=classifier, engine=engine,
-                        backend=backend, file_logger=file_logger,
-                    )
-                except Exception as exc:
-                    logger.error("[PROBE-FAIL] %s | %s", src, exc)
-                    file_logger.error("PREPROBE FAILED | %s", exc)
-                    record_failure(
-                        failed_path,
-                        source=src, preset=preset,
-                        backend_name=backend.name,
-                        stage="probe", error=str(exc),
-                        log_path=str(file_log),
-                    )
-                    counters["failed"] += 1
-                    if status is not None:
-                        status.finish(src, "failed")
-                    continue
-                codec = "av1" if getattr(backend, "name", "") == "svtav1" else "hevc"
-                video_entry = "av01" if codec == "av1" else "hvc1"
-
-                # --- hardware-first decode decision (independent of encoder) ---
-                # Sony / DJI / generic are NOT distinguished here: the policy is
-                # hardware-first for every input, and the preservation payloads
-                # are re-added from the bundle by MP4Box afterwards, so they do
-                # not constrain which decoder produced the video track.
-                decode_plan = None
-                if decode_caps is not None:
-                    from encoders.hwdecode_ffmpeg import plan_decode
-
-                    decode_plan = plan_decode(
-                        caps=decode_caps,
-                        ffmpeg=ffmpeg,
-                        codec=prepared.src_info.codec,
-                        chroma=prepared.src_info.chroma,
-                        depth=prepared.src_info.bit_depth,
-                        # Probe fixtures are small clips keyed by
-                        # (codec, chroma, depth, geometry), so they are shared
-                        # across runs and live outside the output tree. Putting
-                        # them under .1ktwork would accumulate: per-job cleanup
-                        # removes only <job_id>/, never the work root, so a
-                        # decode_probe/ there would grow with every new format.
-                        # `preservation/gpac.py` uses the same system-temp
-                        # scratch convention.
-                        probe_work_dir=None,
-                        memo=decode_memo,
-                    )
-                    file_logger.info(
-                        "DECODE_ROUTE | %s", decode_plan.log_line()
-                    )
-                    if decode_plan.hardware:
-                        logger.info(
-                            "[DECODE] %s | %s", src.name, decode_plan.log_line()
-                        )
-                    for w in decode_plan.warnings:
-                        logger.info("[DECODE] %s | %s", src.name, w)
-                        file_logger.info("DECODE_NOTE | %s", w)
-
-                if (
-                    codec == "av1"
-                    and prepared.src_info.chroma not in ("4:2:0", "mono", "")
+                # One job = one scratch directory. Bracketed around the whole
+                # dispatch so the exit path runs on an exception or Ctrl-C too,
+                # which a cleanup call at each return would have missed.
+                with _job_scratch(
+                    work_root=work_root, src=src,
+                    keep_work=args.keep_work,
+                    preserve_reports=preserve_reports,
+                    logger=logger, file_logger=file_logger,
                 ):
-                    logger.warning(
-                        "[WARNING] %s | AV1 统一输出 4:2:0: 源色度 %s 降采样"
-                        "为 4:2:0 (SVT-AV1 420 策略)",
-                        src.name, prepared.src_info.chroma,
+                    try:
+                        prepared = prepare_source(
+                            src=src, preset=preset, ffprobe=ffprobe,
+                            preprobe_csv=preprobe_csv,
+                            preprobe_stream_csv=preprobe_stream_csv,
+                            scaling_csv=scaling_csv, profile=profile,
+                            classifier=classifier, engine=engine,
+                            backend=backend, file_logger=file_logger,
+                        )
+                    except Exception as exc:
+                        logger.error("[PROBE-FAIL] %s | %s", src, exc)
+                        file_logger.error("PREPROBE FAILED | %s", exc)
+                        record_failure(
+                            failed_path,
+                            source=src, preset=preset,
+                            backend_name=backend.name,
+                            stage="probe", error=str(exc),
+                            log_path=str(file_log),
+                        )
+                        counters["failed"] += 1
+                        if status is not None:
+                            status.finish(src, "failed")
+                        continue
+                    codec = "av1" if getattr(backend, "name", "") == "svtav1" else "hevc"
+                    video_entry = "av01" if codec == "av1" else "hvc1"
+
+                    # --- hardware-first decode decision (independent of encoder) ---
+                    # Sony / DJI / generic are NOT distinguished here: the policy is
+                    # hardware-first for every input, and the preservation payloads
+                    # are re-added from the bundle by MP4Box afterwards, so they do
+                    # not constrain which decoder produced the video track.
+                    decode_plan = None
+                    if decode_caps is not None:
+                        from encoders.hwdecode_ffmpeg import plan_decode
+
+                        decode_plan = plan_decode(
+                            caps=decode_caps,
+                            ffmpeg=ffmpeg,
+                            codec=prepared.src_info.codec,
+                            chroma=prepared.src_info.chroma,
+                            depth=prepared.src_info.bit_depth,
+                            # Probe fixtures are small clips keyed by
+                            # (codec, chroma, depth, geometry), so they are shared
+                            # across runs and live outside the output tree. Putting
+                            # them under .1ktwork would accumulate: per-job cleanup
+                            # removes only <job_id>/, never the work root, so a
+                            # decode_probe/ there would grow with every new format.
+                            # `preservation/gpac.py` uses the same system-temp
+                            # scratch convention.
+                            probe_work_dir=None,
+                            memo=decode_memo,
+                        )
+                        file_logger.info(
+                            "DECODE_ROUTE | %s", decode_plan.log_line()
+                        )
+                        if decode_plan.hardware:
+                            logger.info(
+                                "[DECODE] %s | %s", src.name, decode_plan.log_line()
+                            )
+                        for w in decode_plan.warnings:
+                            logger.info("[DECODE] %s | %s", src.name, w)
+                            file_logger.info("DECODE_NOTE | %s", w)
+
+                    if (
+                        codec == "av1"
+                        and prepared.src_info.chroma not in ("4:2:0", "mono", "")
+                    ):
+                        logger.warning(
+                            "[WARNING] %s | AV1 统一输出 4:2:0: 源色度 %s 降采样"
+                            "为 4:2:0 (SVT-AV1 420 策略)",
+                            src.name, prepared.src_info.chroma,
+                        )
+                        file_logger.warning(
+                            "CHROMA_DOWNGRADE | av1 420 policy: source chroma "
+                            "%s -> 4:2:0", prepared.src_info.chroma,
+                        )
+                    quality_csv = (
+                        logs_root / "quality_samples.csv"
+                        if args.check == "full" else None
                     )
-                    file_logger.warning(
-                        "CHROMA_DOWNGRADE | av1 420 policy: source chroma "
-                        "%s -> 4:2:0", prepared.src_info.chroma,
+                    # --no-metadata: the metadata-preservation policy, NOT a decode
+                    # switch. Hardware-first decode was already decided above and
+                    # is unaffected. What changes is only whether the source family
+                    # gets its container-rebuild pipeline: with the flag set, Sony
+                    # and DJI files take the ordinary transcode path, so the
+                    # rtmd/nrtm/djmd/dbgi/tmcd tracks are not rebuilt and the
+                    # XAVC/DJI branding is not restored.
+                    #
+                    # Everything that protects output *correctness* still runs:
+                    # probe, encode return code, non-empty output, ffprobe
+                    # readability, audio stream copy, place_final's container
+                    # handling and the frame checks. Skipping preservation must
+                    # never be read as "skip validation".
+                    no_metadata = bool(getattr(args, "no_metadata", False))
+                    is_sony = any(
+                        st.get("codec_type") == "data"
+                        and st.get("codec_tag_string") == "rtmd"
+                        for st in prepared.streams
                     )
-                quality_csv = (
-                    logs_root / "quality_samples.csv"
-                    if args.check == "full" else None
-                )
-                # --no-metadata: the metadata-preservation policy, NOT a decode
-                # switch. Hardware-first decode was already decided above and
-                # is unaffected. What changes is only whether the source family
-                # gets its container-rebuild pipeline: with the flag set, Sony
-                # and DJI files take the ordinary transcode path, so the
-                # rtmd/nrtm/djmd/dbgi/tmcd tracks are not rebuilt and the
-                # XAVC/DJI branding is not restored.
-                #
-                # Everything that protects output *correctness* still runs:
-                # probe, encode return code, non-empty output, ffprobe
-                # readability, audio stream copy, place_final's container
-                # handling and the frame checks. Skipping preservation must
-                # never be read as "skip validation".
-                no_metadata = bool(getattr(args, "no_metadata", False))
-                is_sony = any(
-                    st.get("codec_type") == "data"
-                    and st.get("codec_tag_string") == "rtmd"
-                    for st in prepared.streams
-                )
-                if no_metadata:
-                    keep = ("sony" if is_sony
-                            else "dji" if is_dji_source(prepared.streams)
-                            else "generic")
-                    logger.info(
-                        "[META_POLICY] %s | no_metadata: %s preservation "
-                        "skipped, ordinary transcode path used",
-                        src.name, keep,
-                    )
-                    file_logger.info(
-                        "META_POLICY | no_metadata | source_family=%s | "
-                        "container rebuild skipped", keep,
-                    )
-                if is_sony and not no_metadata:
-                    result = encode_one_sony(
-                        src=src, dst=dst, prepared=prepared, profile=profile,
-                        preset=preset, backend=backend, engine=engine,
-                        ffmpeg=ffmpeg, ffprobe=ffprobe,
-                        postprobe_csv=postprobe_csv,
-                        postprobe_stream_csv=postprobe_stream_csv,
-                        gpac=gpac, gyroflow=gyroflow, work_root=work_root,
-                        check_level=args.check, codec=codec,
-                        quality_opts=quality_opts,
-                        quality_csv=quality_csv,
-                        channel_sync=channel_sync_enabled,
-                        channel_sync_opts=channel_sync_opts,
-                        logger=logger, file_logger=file_logger,
-                        dry_run=args.dry_run,
-                        decode_plan=decode_plan,
-                    )
-                elif is_dji_source(prepared.streams) and not no_metadata:
-                    result = encode_one_dji_x265(
-                        src=src, dst=dst, prepared=prepared, profile=profile,
-                        preset=preset, backend=backend, engine=engine,
-                        ffmpeg=ffmpeg, ffprobe=ffprobe,
-                        postprobe_csv=postprobe_csv,
-                        postprobe_stream_csv=postprobe_stream_csv,
-                        gpac=gpac, gyroflow=gyroflow, work_root=work_root,
-                        check_level=args.check, video_entry=video_entry,
-                        quality_opts=quality_opts,
-                        quality_csv=quality_csv,
-                        channel_sync=channel_sync_enabled,
-                        channel_sync_opts=channel_sync_opts,
-                        logger=logger, file_logger=file_logger,
-                        dry_run=args.dry_run,
-                        decode_plan=decode_plan,
-                    )
-                else:
-                    result = encode_one(
-                        src=src, dst=dst, part_dst=part_dst,
-                        prepared=prepared, ffmpeg=ffmpeg, ffprobe=ffprobe,
-                        postprobe_csv=postprobe_csv,
-                        postprobe_stream_csv=postprobe_stream_csv,
-                        profile=profile, preset=preset, backend=backend,
-                        engine=engine, check_level=args.check,
-                        quality_opts=quality_opts,
-                        quality_csv=quality_csv,
-                        channel_sync=channel_sync_enabled,
-                        channel_sync_opts=channel_sync_opts,
-                        audio_plan_request=audio_plan_request,
-                        gpac=gpac,
-                        work_dir=work_root / job_id_for(src),
-                        logger=logger,
-                        file_logger=file_logger, dry_run=args.dry_run,
-                        decode_plan=decode_plan,
-                    )
-                if result == "failed":
-                    record_failure(
-                        failed_path,
-                        source=src, preset=preset,
-                        backend_name=backend.name,
-                        stage="encode", error="see per-file log",
-                        log_path=str(file_log),
-                    )
-                counters[result] += 1
-                if status is not None:
-                    status.finish(src, result)
+                    if no_metadata:
+                        keep = ("sony" if is_sony
+                                else "dji" if is_dji_source(prepared.streams)
+                                else "generic")
+                        logger.info(
+                            "[META_POLICY] %s | no_metadata: %s preservation "
+                            "skipped, ordinary transcode path used",
+                            src.name, keep,
+                        )
+                        file_logger.info(
+                            "META_POLICY | no_metadata | source_family=%s | "
+                            "container rebuild skipped", keep,
+                        )
+                    if is_sony and not no_metadata:
+                        result = encode_one_sony(
+                            src=src, dst=dst, prepared=prepared, profile=profile,
+                            preset=preset, backend=backend, engine=engine,
+                            ffmpeg=ffmpeg, ffprobe=ffprobe,
+                            postprobe_csv=postprobe_csv,
+                            postprobe_stream_csv=postprobe_stream_csv,
+                            gpac=gpac, gyroflow=gyroflow, work_root=work_root,
+                            check_level=args.check, codec=codec,
+                            quality_opts=quality_opts,
+                            quality_csv=quality_csv,
+                            channel_sync=channel_sync_enabled,
+                            channel_sync_opts=channel_sync_opts,
+                            logger=logger, file_logger=file_logger,
+                            dry_run=args.dry_run,
+                            decode_plan=decode_plan,
+                        )
+                    elif is_dji_source(prepared.streams) and not no_metadata:
+                        result = encode_one_dji_x265(
+                            src=src, dst=dst, prepared=prepared, profile=profile,
+                            preset=preset, backend=backend, engine=engine,
+                            ffmpeg=ffmpeg, ffprobe=ffprobe,
+                            postprobe_csv=postprobe_csv,
+                            postprobe_stream_csv=postprobe_stream_csv,
+                            gpac=gpac, gyroflow=gyroflow, work_root=work_root,
+                            check_level=args.check, video_entry=video_entry,
+                            quality_opts=quality_opts,
+                            quality_csv=quality_csv,
+                            channel_sync=channel_sync_enabled,
+                            channel_sync_opts=channel_sync_opts,
+                            logger=logger, file_logger=file_logger,
+                            dry_run=args.dry_run,
+                            decode_plan=decode_plan,
+                        )
+                    else:
+                        result = encode_one(
+                            src=src, dst=dst, part_dst=part_dst,
+                            prepared=prepared, ffmpeg=ffmpeg, ffprobe=ffprobe,
+                            postprobe_csv=postprobe_csv,
+                            postprobe_stream_csv=postprobe_stream_csv,
+                            profile=profile, preset=preset, backend=backend,
+                            engine=engine, check_level=args.check,
+                            quality_opts=quality_opts,
+                            quality_csv=quality_csv,
+                            channel_sync=channel_sync_enabled,
+                            channel_sync_opts=channel_sync_opts,
+                            audio_plan_request=audio_plan_request,
+                            gpac=gpac,
+                            work_dir=work_root / job_id_for(src),
+                            logger=logger,
+                            file_logger=file_logger, dry_run=args.dry_run,
+                            decode_plan=decode_plan,
+                        )
+                    if result == "failed":
+                        record_failure(
+                            failed_path,
+                            source=src, preset=preset,
+                            backend_name=backend.name,
+                            stage="encode", error="see per-file log",
+                            log_path=str(file_log),
+                        )
+                    counters[result] += 1
+                    if status is not None:
+                        status.finish(src, result)
             continue
 
         # hardware backend(s)
