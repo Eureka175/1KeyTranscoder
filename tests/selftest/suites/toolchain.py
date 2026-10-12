@@ -4,8 +4,11 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
+
 from ..paths import ROOT
+from ..paths import WORK
 from ..paths import record
 from ..paths import section
 from ..paths import sh
@@ -83,6 +86,157 @@ def l2_toolchain() -> None:
                f"movie_ts={movie_ts} tracks={len(tracks)}")
 
 
+
+
+def l2_file_level_meta() -> None:
+    """L2 文件级元数据: 容器重封装不得丢掉 nrtm meta / tref-cdsc。
+
+    回归自真实故障 (v0.8.0, 709 个文件静默通过): Sony MP4 源交付 MP4 时,
+    `place_final` -> `remux_container_lossless` 用 `MP4Box -new -add` 逐轨
+    重建 MP4, 而 `-add` **只搬轨道**, 文件级盒全部丢失。
+
+    症状极具欺骗性: rtmd 载荷逐字节与源一致、stts/stsz/stsd 全对、
+    `-diso` 结构检查 36/36 PRESERVED —— 但 Gyroflow 从同一份 rtmd 轨
+    读出 **0** 个 IMU 样本, 因为它的 Sony 解析器要先看到文件级
+    nrtm meta 才肯解析 rtmd 轨。
+
+    本用例在 L2 复现**那条重封装**, 并钉住三件事:
+      1. 重封装确实会丢 meta/tref (故障前提, 防止用例在无故障的世界里
+         变成永真断言);
+      2. `restore_file_level_meta` 之后 XML 与 Lens profile 逐字节一致;
+      3. `assert_file_level_meta` / `assert_track_refs` 在丢失时**报错**,
+         而不是静默放过。
+    """
+    from preservation.gpac import GpacContainerBackend, GpacError
+
+    section("L2 文件级元数据 (nrtm meta / tref-cdsc 跨重封装)")
+    gpac = GpacContainerBackend()
+
+    src = _sony_rtmd_sample()
+    if src is None:
+        # `testsets/` 是仓库素材, 不进发布包 (见 build_release 的 allowlist)。
+        # 发布包内没有素材时**跳过**: 这里缺的是素材不是代码, 报 FAIL 会让
+        # 包内自测看起来是坏的。若连素材目录都不存在, 那才是真的异常。
+        if not (ROOT / "testsets").is_dir():
+            record("nrtm_跳过 (本布局无 testsets 素材)", True,
+                   "release-package layout — covered by L3 in-repo")
+            return
+        record("nrtm_样本就绪", False, "no Sony rtmd sample under testsets/")
+        return
+
+    work = WORK / "file_level_meta"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True, exist_ok=True)
+
+    # 源必须真的带文件级 nrtm meta, 否则整条用例没有意义。
+    from preservation.gpac import _diso_meta_info, _diso_track_refs
+    s_info = _diso_meta_info(gpac.diso_xml(src))
+    s_refs = _diso_track_refs(gpac.diso_xml(src))
+    if not (s_info and s_info.get("handler_type") == "nrtm"):
+        record("nrtm_源带文件级 nrtm meta", False,
+               f"meta={s_info}")
+        return
+    s_cdsc = any(targets for _, _, targets in s_refs)
+    record("nrtm_源带文件级 nrtm meta", True,
+           f"hdlr={s_info.get('handler_type')} item={s_info.get('item_id')}")
+    record("nrtm_源带 tref/cdsc", s_cdsc, f"refs={s_refs}")
+
+    # 复现故障路径: 逐轨重建 (与 remux_container_lossless 同一条命令)。
+    movie_ts, tracks = gpac.parse_info(gpac.info(src))
+    staged = work / "remuxed.mp4"
+    prev = gpac.movie_timescale
+    gpac.movie_timescale = movie_ts or prev
+    try:
+        gpac.mux_new(staged, [f"{src}#{t['id']}" for t in tracks])
+    finally:
+        gpac.movie_timescale = prev
+    if not staged.is_file():
+        record("nrtm_逐轨重封装可用", False, "no output")
+        return
+    record("nrtm_逐轨重封装可用", True, f"{staged.stat().st_size} B")
+
+    # (1) 故障前提: 未修复时 meta 确实会丢 —— 这条断言让整个用例有意义。
+    lost_info = _diso_meta_info(gpac.diso_xml(staged))
+    record("nrtm_重封装本身会丢 meta (故障前提)", not lost_info,
+           f"meta={lost_info}")
+    try:
+        gpac.assert_file_level_meta(_write_manifest(work, src, s_info), staged)
+        record("nrtm_丢失时 assert 报错", False, "assert 静默放过了")
+    except GpacError as exc:
+        record("nrtm_丢失时 assert 报错", True, str(exc)[:110])
+
+    # (2) 恢复后 XML + Lens profile 逐字节一致。
+    manifest = _write_manifest(work, src, s_info)
+    try:
+        restored = gpac.restore_file_level_meta(manifest, staged)
+        detail = gpac.assert_file_level_meta(manifest, staged)
+        record("nrtm_恢复后内容与源一致", restored, detail[:150])
+    except Exception as exc:  # noqa: BLE001 - 失败要进报告, 不是崩栈
+        record("nrtm_恢复后内容与源一致", False, f"{type(exc).__name__}: {exc}")
+        return
+
+    # (3) tref/cdsc 同样会被重封装丢掉, 恢复后必须在。
+    try:
+        gpac.restore_track_refs(src, staged)
+        record("nrtm_tref_cdsc 恢复", True,
+               gpac.assert_track_refs(src, staged))
+    except Exception as exc:  # noqa: BLE001
+        record("nrtm_tref_cdsc 恢复", False, f"{type(exc).__name__}: {exc}")
+
+
+def _sony_rtmd_sample() -> Path | None:
+    """First Sony source under ``testsets/`` that carries an rtmd track.
+
+    Probed rather than hard-coded: `testsets/` is a working scratch area
+    whose contents change, and a pinned filename would rot into a
+    permanent "sample missing" failure.
+    """
+    base = ROOT / "testsets"
+    if not base.is_dir():
+        return None
+    preferred = [
+        base / "20260903" / "A7M5" / "20260903_C1170.MP4",
+        base / "v0.8.0_failed" / "_evidence" / "SOURCE_20260901_C0955.MP4",
+    ]
+    candidates = [p for p in preferred if p.is_file()]
+    for folder in ("a7m5_4k60p_265_10bit420_150m_xavchs_4ch",
+                   "a7m5_4k30p_264_hi422p_xavcs"):
+        d = base / folder
+        if d.is_dir():
+            candidates += sorted(d.glob("*.MP4"))[:1]
+    for cand in candidates:
+        if cand.is_file():
+            return cand
+    return None
+
+
+def _write_manifest(work: Path, src: Path, info: dict) -> Path:
+    """满足 restore/assert 前置条件的最小 bundle manifest。
+
+    必须带 `nrtm` 键: 没有它 `restore_file_level_meta` 会走"本家族没有
+    文件级 meta"的合法 no-op 分支, 于是整条用例会变成永真断言。
+    """
+    import json
+
+    meta = work / "metadata"
+    meta.mkdir(parents=True, exist_ok=True)
+    manifest = meta / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "source_path": str(src),
+                "nrtm": {
+                    "handler_type": info.get("handler_type") or "nrtm",
+                    "item_id": int(info.get("item_id") or 1),
+                    "item_name": info.get("item_name") or "Lens profile",
+                    "item_mime": "application/octet-stream",
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return manifest
 
 
 # ===========================================================================

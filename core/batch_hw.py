@@ -1074,7 +1074,11 @@ def encode_one_sony_hw(
             report.get("critical_modified"),
         )
         return "failed"
-    if gyro is not None and gyro.get("status") != "PASS":
+    # Only a real FAIL blocks delivery. `SKIPPED` means the consumer-side
+    # check did not run (Gyroflow absent, or check=basic) — a coverage
+    # gap, not a defect in this file. It is surfaced in the preserve log
+    # and in report["gyroflow"], so it cannot pass unnoticed.
+    if gyro is not None and gyro.get("status") == "FAIL":
         logger.error(
             "[FAIL] Gyroflow consumer validation | %s | %s",
             src, gyro.get("detail"),
@@ -1092,6 +1096,7 @@ def encode_one_sony_hw(
     try:
         place_final(
             gpac=gpac, intermediate=final, dst=dst, work_dir=work_dir,
+            meta_source=_meta_manifest(work_dir),
             log=lambda msg: file_logger.info("CONTAINER | %s", msg),
         )
     except (OSError, RuntimeError) as exc:
@@ -1345,6 +1350,7 @@ def encode_one_hw_classic(
         place_final(
             gpac=gpac, intermediate=part_dst, dst=dst,
             work_dir=work_dir,
+            meta_source=_meta_manifest(work_dir),
             log=lambda msg: file_logger.info("CONTAINER | %s", msg),
         )
     except (OSError, RuntimeError) as exc:
@@ -1430,6 +1436,7 @@ def _finish_with_handoff(
             place_final(
                 gpac=gpac, intermediate=part_dst, dst=dst,
                 work_dir=work_dir,
+                meta_source=_meta_manifest(work_dir),
                 log=lambda msg: file_logger.info("CONTAINER | %s", msg),
             )
         except (OSError, RuntimeError) as exc:
@@ -1687,6 +1694,7 @@ def encode_one_dji_hw(
     try:
         place_final(
             gpac=gpac, intermediate=final, dst=dst, work_dir=work_dir,
+            meta_source=_meta_manifest(work_dir),
             log=lambda msg: file_logger.info("CONTAINER | %s", msg),
         )
     except (OSError, RuntimeError) as exc:
@@ -1906,6 +1914,7 @@ def place_final(
     dst: Path,
     work_dir: Path,
     log: Callable[[str], None],
+    meta_source: Path | None = None,
 ) -> None:
     """Put the finished intermediate at ``dst`` with a matching container.
 
@@ -1920,6 +1929,18 @@ def place_final(
     * suffix differs -> lossless container re-mux, built under
       ``work_dir/final/`` and renamed into place only once complete, so
       a half-written delivery is never visible at ``dst``.
+
+    ``meta_source`` is the pre-remux artefact whose **file-level**
+    ``meta`` box (Sony ``nrtm``) must survive the conversion.  A
+    per-track ``-new``+``-add`` re-mux rebuilds the movie from its
+    tracks and drops every file-level box; the ``uuid`` boxes are
+    restored by ``isobmf.insert_uuid_boxes``, but nothing restored
+    ``meta``, so the conversion silently produced a file whose Sony
+    rtmd track no longer satisfied Gyroflow (measured: 14014 IMU
+    samples in, **0** out, with a bit-identical rtmd payload).  That is
+    precisely the "lossless" claim this function makes, so it is now
+    *verified* rather than assumed.  Pass ``None`` for sources with no
+    file-level meta to carry (e.g. DJI).
 
     A difference that *cannot* be re-muxed (non-ISOBMFF intermediate, no
     GPAC backend) **raises** instead of renaming, because an ``.MP4``
@@ -1978,9 +1999,48 @@ def place_final(
     ))
     if not (staged.is_file() and staged.stat().st_size > 0):
         raise RuntimeError(f"container re-mux produced no output: {staged}")
+
+    # A per-track re-mux rebuilds the movie and drops every file-level
+    # box plus the track-reference boxes.  uuid boxes are re-inserted
+    # elsewhere; the file-level meta (Sony nrtm) and tref/cdsc are
+    # re-applied here, and their survival is *asserted*: losing the nrtm
+    # meta silently costs the whole consumer path (Gyroflow reads zero
+    # IMU samples from an otherwise perfect file), which is exactly the
+    # defect this branch used to ship unnoticed.
+    manifest = _meta_manifest(work_dir)
+    if manifest is not None:
+        try:
+            if gpac.restore_file_level_meta(manifest, staged):
+                log(
+                    "container re-mux: file-level meta (nrtm) re-applied "
+                    "from the pre-remux artefact"
+                )
+            log(gpac.assert_file_level_meta(manifest, staged))
+            # The same rebuild also drops tref/cdsc (rtmd -> video), which
+            # validate.compare treats as a critical MISSING item.
+            log(gpac.restore_track_refs(intermediate, staged))
+            log(gpac.assert_track_refs(intermediate, staged))
+        except Exception as exc:
+            safe_unlink(staged)
+            raise RuntimeError(
+                f"container re-mux to {dst.suffix} lost file-level "
+                f"metadata: {exc}"
+            ) from exc
+
     safe_unlink(dst)
     os.replace(staged, dst)
     log(f"final: {staged.name} -> {dst.name}")
+
+
+def _meta_manifest(work_dir: Path) -> Path | None:
+    """``work_dir/metadata/manifest.json`` when a bundle was extracted.
+
+    ``None`` means "this source family has no file-level meta to carry"
+    (e.g. DJI), which is a legitimate no-op — as opposed to a bundle
+    that exists but cannot be honoured, which ``place_final`` raises on.
+    """
+    manifest = work_dir / "metadata" / "manifest.json"
+    return manifest if manifest.is_file() else None
 
 
 # ---------------------------------------------------------------------------

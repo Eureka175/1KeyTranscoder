@@ -360,25 +360,42 @@ def compare(
                     "rtmd.timecode_tag", MISSING,
                     f"original={s_tc!r} final={o_tc!r}"))
 
-    # --- nrtm meta (advanced only) ---
-    if level != "basic" and src.meta and src.meta["handler_type"] == "nrtm":
+    # --- nrtm meta: presence at every level, details at advanced+ ---
+    #
+    # The presence check is *not* gated on level: it is cheap (one
+    # `-diso`, already done) and it is decisive. A Sony file whose final
+    # container has no nrtm meta box is not marginally degraded — Gyroflow
+    # reads **zero** IMU samples from an otherwise perfect rtmd track
+    # (measured: 14014 samples in, 0 out, rtmd payload bit-identical).
+    # This used to sit behind `level != "basic"`, so a batch run at
+    # `basic` reported 36/0/0 PRESERVED on files that had already lost
+    # the whole consumer path.
+    if src.meta and src.meta["handler_type"] == "nrtm":
         if out.meta and out.meta["handler_type"] == "nrtm":
             items.append(_item("nrtm.meta", PRESERVED, "hdlr=nrtm"))
-            eq("nrtm.lens_profile.name",
-               src.meta.get("item_name"), out.meta.get("item_name"))
-            eq("nrtm.lens_profile.item_type",
-               src.meta.get("item_type"), out.meta.get("item_type"))
-            eq("nrtm.lens_profile.size", src.lens_size, out.lens_size)
-            eq("nrtm.lens_profile.sha256",
-               src.lens_sha256, out.lens_sha256)
-            if src.xml_sha256:
-                eq("nrtm.xml.sha256", src.xml_sha256, out.xml_sha256)
-            else:
-                items.append(_item("nrtm.xml", UNKNOWN,
-                                   "no XML in original"))
+            if level != "basic":
+                eq("nrtm.lens_profile.name",
+                   src.meta.get("item_name"), out.meta.get("item_name"))
+                eq("nrtm.lens_profile.item_type",
+                   src.meta.get("item_type"), out.meta.get("item_type"))
+                eq("nrtm.lens_profile.size", src.lens_size, out.lens_size)
+                eq("nrtm.lens_profile.sha256",
+                   src.lens_sha256, out.lens_sha256)
+                if src.xml_sha256:
+                    eq("nrtm.xml.sha256", src.xml_sha256, out.xml_sha256)
+                else:
+                    items.append(_item("nrtm.xml", UNKNOWN,
+                                       "no XML in original"))
         else:
-            items.append(_item("nrtm.meta", MISSING,
-                               "no nrtm meta box in final"))
+            detail = (
+                "source carries the Sony nrtm meta box "
+                "(handler=nrtm) but the final container has none — "
+                "Gyroflow's Sony parser will read zero IMU samples. "
+                "Structural checks still pass, so the loss happened in a "
+                "step with no validation coverage (e.g. the lossless "
+                "container re-mux that runs after validate)."
+            )
+            items.append(_item("nrtm.meta", MISSING, detail))
 
     # --- uuid boxes (advanced only) ---
     def count_by(label: str, inv: list[dict[str, str]]) -> int:

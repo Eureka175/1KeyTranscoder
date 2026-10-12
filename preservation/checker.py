@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .gpac import GpacContainerBackend
+from .gyroflow import SKIPPED as SKIP
 from .gyroflow import check as gyroflow_check
 from .validate import compare
 
@@ -78,11 +79,30 @@ def run_checks(
                     "detail": f"Gyroflow validation error: {exc}",
                 }
                 log(f"gyroflow: FAIL ({exc})")
-        elif level == "full":
-            log(
-                "WARNING: Gyroflow 未安装 — full 检查的消费端对比将跳过"
-                "（结构检查照常执行）"
+        else:
+            # Never silent, at ANY level above basic. The consumer-side
+            # check is the only thing that catches a file whose metadata
+            # structure is intact but unreadable — exactly the v0.8.0
+            # container-remux defect, which shipped through 709 files
+            # because this branch used to warn only for `full` while the
+            # batch ran at `basic`. Recorded in the report as well, so
+            # the skip is auditable after the fact instead of leaving
+            # `"gyroflow": null` to be read as "passed".
+            detail = (
+                "Gyroflow not installed — the consumer-side check "
+                "(IMU sample round-trip) was SKIPPED; container structure "
+                "was still verified. Install Gyroflow or pass --gyroflow "
+                "to make this a real gate."
             )
+            report["gyroflow"] = {"status": SKIP, "detail": detail}
+            log(f"WARNING: {detail}")
+    else:
+        detail = (
+            "check=basic — consumer-side (Gyroflow) validation is not "
+            "part of this level; container structure alone does not prove "
+            "the metadata is readable downstream."
+        )
+        report["gyroflow"] = {"status": SKIP, "detail": detail}
 
     if level == "full":
         from .selfcheck import detailed_compare as detailed

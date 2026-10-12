@@ -56,6 +56,7 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("container/format policy", core.l1_container_format),
             ("classifier/scaling", core.l1_classifier_scaling),
             ("gpac/dji", core.l1_gpac_dji),
+            ("gpac/paths", core.l1_gpac_paths),
             ("x265 P0", codecs.l1_x265),
             ("quality/versions", core.l1_quality),
             ("channel-sync", channel_sync.l1_channel_sync),
@@ -87,7 +88,10 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("av1", codecs.l1_av1),
             ("cli v0.6.2", cli.l1_cli_v062),
         ],
-        "toolchain": [("toolchain", toolchain.l2_toolchain)],
+        "toolchain": [
+            ("toolchain", toolchain.l2_toolchain),
+            ("file-level meta", toolchain.l2_file_level_meta),
+        ],
         "full": [
             ("pipeline", pipeline.l3_pipeline),
             ("container format (hw MOV intermediate)",

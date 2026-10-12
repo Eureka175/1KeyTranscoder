@@ -520,6 +520,95 @@ def l1_quality() -> None:
            f"json={vj.name} csv={vc.name}")
 
 
+def l1_gpac_paths() -> None:
+    """MP4Box 路径改写: 跨卷 (源/输出盘 != 进程 cwd 盘) 不得抛异常.
+
+    回归自真实故障: 从脚本目录 (F:) 启动、素材在 K: 时,
+    `_opt` 内的 `os.path.relpath(p, Path.cwd())` 抛
+    `ValueError: path is on mount 'K:', start on mount 'F:'`,
+    整条 preservation 链路 (DJI/Sony/strip/container 转换) 全灭。
+    """
+    import ast
+    import os
+
+    from preservation.gpac import _opt, _opt_spec, _rel_base
+    section("L1 gpac 路径改写 / MP4Box cwd")
+
+    # 两个不存在的盘符足以让 ntpath.relpath 按"卷不同"报错 —— 纯词法
+    # 判断, 与盘是否真的存在无关, 所以这条断言是离线可复现的。
+    far, near = Path("Z:/a/b.mp4"), Path("Z:/c")
+    other = Path("Y:/c")
+    raised = False
+    try:
+        os.path.relpath(str(far), str(other))
+    except ValueError:
+        raised = True
+    record("gpac 跨卷 relpath 确实会抛 ValueError (故障前提)",
+           raised and far.drive.lower() != other.drive.lower())
+
+    # 跨卷: 不得抛异常, 退回绝对路径 (MP4Box 的 -new/-add 接受绝对路径;
+    # 而 base 永远取自"必须相对化的那条路径", 所以这里只会落在位置参数上)
+    got = _opt(far, other)
+    record("gpac._opt 跨卷不抛异常且退回绝对路径",
+           got == str(far), f"got={got!r}")
+
+    # 同卷: 仍然相对化 (保持 GPAC 26.02 已验证的 a:b:c 语义)。
+    # base 是目录 Z:\c, 所以相对路径要先回到卷根再进 a\。
+    rel = os.path.join("..", "a", "b.mp4")
+    got = _opt(far, near)
+    record("gpac._opt 同卷仍相对化", got == rel, f"got={got!r}")
+
+    # base 缺省时退回进程 cwd (老行为, 供未改写的调用方使用)
+    record("gpac._opt 无 base 时退回 cwd",
+           _opt("relative/x.mp4") == "relative/x.mp4"
+           and _opt(Path.cwd() / "x.mp4") == "x.mp4")
+
+    # -add 片段: 只相对化 '#' 之前的部分
+    got = _opt_spec(f"{far}#video", near)
+    record("gpac._opt_spec 相对化 '#' 前部分",
+           got == rel + "#video", f"got={got!r}")
+
+    # _rel_base: 优先取目标所在目录 (存在即可作为 MP4Box 的 cwd),
+    # 目录尚未建立时退回所在卷根 —— 两种情况都必须能相对化。
+    base_existing = _rel_base(WORK / "gpac_cwd_probe.mov")
+    record("gpac._rel_base 取目标所在目录",
+           base_existing == WORK and _rel_base(Path(__file__)) == Path(__file__).parent,
+           f"base={base_existing}")
+    deep = Path("Z:/nope/deeper/out.mov")
+    record("gpac._rel_base 目录不存在时退回卷根",
+           _rel_base(deep) == Path("Z:\\") and _rel_base("x.mov") == Path.cwd(),
+           f"base={_rel_base(deep)}")
+
+    # 结构守卫: gpac.py 里每一处 _opt/_opt_spec 都必须显式传 base,
+    # 且用了它们的每次 _run 必须钉住 cwd —— 否则跨卷故障会复活。
+    src = (Path(__file__).resolve().parents[2].parent
+           / "preservation" / "gpac.py")
+    tree = ast.parse(src.read_text(encoding="utf-8"))
+    missing_base: list[int] = []
+    missing_cwd: list[int] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        name = fn.id if isinstance(fn, ast.Name) else None
+        if name in ("_opt", "_opt_spec") and len(node.args) < 2 \
+                and not node.keywords:
+            missing_base.append(node.lineno)
+        if name == "_run":
+            uses_opt = any(
+                isinstance(sub, ast.Call)
+                and isinstance(sub.func, ast.Name)
+                and sub.func.id in ("_opt", "_opt_spec")
+                for arg in node.args for sub in ast.walk(arg)
+            )
+            if uses_opt and not any(k.arg == "cwd" for k in node.keywords):
+                missing_cwd.append(node.lineno)
+    record("gpac.py 所有 _opt 调用都显式传 base", not missing_base,
+           f"行号={missing_base}")
+    record("gpac.py 用 _opt 的 _run 都钉住 cwd", not missing_cwd,
+           f"行号={missing_cwd}")
+
+
 # ===========================================================================
 # L1 — 纯逻辑单测
 # ===========================================================================
