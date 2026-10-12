@@ -2395,15 +2395,15 @@ def main() -> int:
             multiple_presets=multiple_presets,
             keep_work=args.keep_work,
             no_downgrade=args.no_downgrade,
-            # The rigaya ``--avhw`` route is now always off. Its decode reader
-            # is a *different implementation* from FFmpeg's NVDEC/QSV and the
-            # stock build silently drops leading pictures on Sony XAVC; with
-            # ``--hw-decode`` removed there is no longer any switch that could
-            # ask for it, and the hardware-first policy is served by the
-            # FFmpeg route above. See encoders/hwdecode_ffmpeg.py.
-            hw_decode="off",
+            # Hardware decode for NVENC/QSV is the encoders' *own* --avhw
+            # reader, resolved per file by encoders.hwdecode.route_decode:
+            # --avhw on the provenance-verified patched build when the input is
+            # in the proven allowlist, --avsw on the shipped build otherwise.
+            # There is no FFmpeg frame feed on this path (the x265/SVT-AV1
+            # paths use FFmpeg's NVDEC/QSV directly, above).
+            hw_decode="auto",
             hw_decode_memo=decode_memo,
-            decode_caps=decode_caps,
+            script_dir=script_dir,
             check_level=args.check,
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,
