@@ -408,6 +408,8 @@ def hw_encode_with_fallback(
     hw_decode: str = HW_DECODE_OFF,
     hw_decode_memo: dict | None = None,
     seek_requested: bool = False,
+    ffmpeg: Path | None = None,
+    hw_decode_plan=None,
 ) -> tuple[list[str], tuple[str, int], float]:
     """Automatic three-tier downgrade ladder (NO prompt window).
 
@@ -482,6 +484,33 @@ def hw_encode_with_fallback(
     stripped = False
     rung_idx = 0
     color = src_info.color
+    # Hardware-first decode for the rigaya encoders. They cannot consume
+    # FFmpeg's hardware frames, and their own --avhw reader must not be used
+    # (the stock build drops leading pictures on Sony XAVC), so when a hardware
+    # decode route is available FFmpeg decodes on the device and streams y4m
+    # into this encoder's stdin. Set once: the route is a property of the
+    # source and the machine, not of a format rung.
+    decode_pipe: list[str] | None = None
+    if hw_decode_plan is not None and hw_decode_plan.hardware:
+        from encoders.hwdecode_ffmpeg import ffmpeg_pipe_args
+
+        try:
+            decode_pipe = ffmpeg_pipe_args(ffmpeg, hw_decode_plan, source)
+            file_logger.info(
+                "DECODE_PIPE | ffmpeg hardware decode -> %s --y4m -i - | %s",
+                backend.name, hw_decode_plan.log_line(),
+            )
+            logger.info(
+                "[HWDEC] %s | FFmpeg %s -> %s stdin (y4m)",
+                source.name, hw_decode_plan.decoder, backend.name,
+            )
+        except ValueError as exc:
+            decode_pipe = None
+            emit_warning(
+                logger, file_logger,
+                f"hardware decode pipe unavailable ({exc}); using the "
+                f"encoder's own reader", warnings,
+            )
     while rung_idx < len(rungs):
         c, d = rungs[rung_idx]
         cmd, skipped, color_notes = backend.command(
@@ -489,6 +518,22 @@ def hw_encode_with_fallback(
             reader=reader,
             container=intermediate_container(backend.codec),
         )
+        # The pipe only makes sense for the *original* input: once a rung has
+        # fallen back to a stripped/re-muxed intermediate, feeding that from a
+        # decoder built for the source would be wrong.
+        rung_pipe = decode_pipe if cur_input == source else None
+        if rung_pipe is not None:
+            try:
+                from encoders.hwdecode_ffmpeg import apply_stdin_pipe
+
+                cmd = apply_stdin_pipe(cmd, cur_input)
+            except ValueError as exc:
+                rung_pipe = None
+                emit_warning(
+                    logger, file_logger,
+                    f"cannot feed {backend.name} from the decoder pipe "
+                    f"({exc}); using the encoder's own reader", warnings,
+                )
         if skipped and rung_idx == 0:
             emit_warning(
                 logger,
@@ -510,7 +555,8 @@ def hw_encode_with_fallback(
         except OSError:
             pass
         rc, elapsed = run_hw_tool(
-            cmd, raw_log, total_frames, label, progress=show_progress
+            cmd, raw_log, total_frames, label, progress=show_progress,
+            decode_pipe=rung_pipe,
         )
 
         # --- integrity gate (HD-C11..C13, HD-F05) ------------------------
@@ -903,6 +949,7 @@ def encode_one_sony_hw(
     no_downgrade: bool,
     hw_decode: str = HW_DECODE_OFF,
     hw_decode_memo: dict | None = None,
+    decode_plan=None,
     check_level: str,
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
@@ -971,6 +1018,7 @@ def encode_one_sony_hw(
             ffprobe=ffprobe, audio_copy=False, do_frame_check=True,
             no_downgrade=no_downgrade, gpac=gpac,
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
+            ffmpeg=ffmpeg, hw_decode_plan=decode_plan,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -1232,6 +1280,7 @@ def encode_one_hw_classic(
             ffprobe=ffprobe, audio_copy=audio_copy, do_frame_check=False,
             no_downgrade=no_downgrade, gpac=gpac,
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
+            ffmpeg=ffmpeg, hw_decode_plan=decode_plan,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -1472,6 +1521,7 @@ def encode_one_dji_hw(
     no_downgrade: bool,
     hw_decode: str = HW_DECODE_OFF,
     hw_decode_memo: dict | None = None,
+    decode_plan=None,
     check_level: str,
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
@@ -1557,6 +1607,7 @@ def encode_one_dji_hw(
             ffprobe=ffprobe, audio_copy=False, do_frame_check=not vfr,
             no_downgrade=no_downgrade, gpac=gpac,
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
+            ffmpeg=ffmpeg, hw_decode_plan=decode_plan,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -2097,6 +2148,11 @@ class BatchCtx:
     no_downgrade: bool = False
     hw_decode: str = HW_DECODE_OFF
     hw_decode_memo: dict = field(default_factory=dict)
+    #: FFmpeg hardware-decode capability snapshot (encoders.hwdecode_ffmpeg).
+    #: Shared across every file and every worker in the run, so a format is
+    #: probed once and a device/combination that failed at runtime is not
+    #: re-attempted per file.
+    decode_caps: object | None = None
     check_level: str = "basic"
     ffmpeg: Path | None = None
     quality_opts: dict[str, Any] | None = None
@@ -2179,6 +2235,39 @@ def process_file_hw(
         else None
     )
 
+    # Hardware-first decode for the rigaya encoder paths too. This decision is
+    # independent of the encoder -- `--encoder nvenc` must not force software
+    # decode any more than `--encoder x265` does -- and independent of Sony /
+    # DJI / metadata policy. The plan is consumed as an FFmpeg y4m pipe into
+    # the encoder's stdin (see hw_encode_with_fallback).
+    decode_plan = None
+    if ctx.decode_caps is not None and ctx.ffmpeg is not None:
+        try:
+            from encoders.hwdecode_ffmpeg import plan_decode
+
+            decode_plan = plan_decode(
+                caps=ctx.decode_caps,
+                ffmpeg=ctx.ffmpeg,
+                codec=src_info.codec,
+                chroma=src_info.chroma,
+                depth=src_info.bit_depth,
+                memo=ctx.hw_decode_memo,
+            )
+            file_logger.info("DECODE_ROUTE | %s", decode_plan.log_line())
+            if decode_plan.hardware:
+                logger.info(
+                    "[DECODE] %s | %s", src.name, decode_plan.log_line()
+                )
+            for w in decode_plan.warnings:
+                logger.info("[DECODE] %s | %s", src.name, w)
+                file_logger.info("DECODE_NOTE | %s", w)
+        except Exception as exc:                   # noqa: BLE001
+            decode_plan = None
+            logger.warning(
+                "[DECODE] %s | plan failed (%s); encoder reader will be used",
+                src.name, exc,
+            )
+
     # 注册了接手方 (显式音频计划) 时, Sony / DJI 保留路径**明确拒绝该文件**:
     # 那两条管线有自己的音频处理方式, 让它们照常跑就等于"计划被静默忽略"。
     # 失败原因直接给出, 不降级、不回退 (与软件路径 rc=2 的拒绝同义)。
@@ -2218,6 +2307,7 @@ def process_file_hw(
             no_downgrade=ctx.no_downgrade,
             hw_decode=ctx.hw_decode,
             hw_decode_memo=ctx.hw_decode_memo,
+            decode_plan=decode_plan,
             check_level=ctx.check_level,
             ffmpeg=ctx.ffmpeg,
             quality_opts=ctx.quality_opts,
@@ -2254,6 +2344,7 @@ def process_file_hw(
             no_downgrade=ctx.no_downgrade,
             hw_decode=ctx.hw_decode,
             hw_decode_memo=ctx.hw_decode_memo,
+            decode_plan=decode_plan,
             check_level=ctx.check_level,
             ffmpeg=ctx.ffmpeg,
             quality_opts=ctx.quality_opts,
@@ -2287,6 +2378,7 @@ def process_file_hw(
             no_downgrade=ctx.no_downgrade,
             hw_decode=ctx.hw_decode,
             hw_decode_memo=ctx.hw_decode_memo,
+            decode_plan=decode_plan,
             check_level=ctx.check_level,
             ffmpeg=ctx.ffmpeg,
             quality_opts=ctx.quality_opts,

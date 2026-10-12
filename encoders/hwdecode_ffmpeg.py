@@ -90,6 +90,9 @@ class DecodePlan:
     device_index: int = 0
     surface_format: str = ""        # what the hw surface nominally holds
     target_format: str = ""         # what the encoder will receive
+    codec: str = ""                 # source codec, recorded for audit
+    chroma: str = ""                # source chroma, recorded for audit
+    depth: int = 0                  # source bit depth, recorded for audit
     reason: str = ""
     detail: str = ""
     needs_format_conversion: bool = False
@@ -161,9 +164,15 @@ class DecodePlan:
         }
 
 
-def plan_software(reason: str, detail: str = "") -> DecodePlan:
+def plan_software(
+    reason: str, detail: str = "", *, codec: str = "", chroma: str = "",
+    depth: int = 0,
+) -> DecodePlan:
     """The deterministic answer when no hardware candidate is compatible."""
-    return DecodePlan(substrate=SUBSTRATE_SW, reason=reason, detail=detail)
+    return DecodePlan(
+        substrate=SUBSTRATE_SW, reason=reason, detail=detail,
+        codec=codec, chroma=chroma, depth=int(depth or 0),
+    )
 
 
 # --- pixel format mapping ---------------------------------------------------
@@ -816,6 +825,7 @@ def plan_decode(
                 decoder=decoder, hwaccel=hwaccel,
                 device=_device_spec(hwaccel, idx), device_index=idx,
                 surface_format=surface, target_format=target,
+                codec=codec, chroma=chroma, depth=int(depth),
                 transfer=transfer,
                 reason="hardware_compatible",
                 detail=f"{decoder} accepted {codec} {chroma}/{depth}bit "
@@ -919,6 +929,121 @@ def record_runtime_failure(
         return
     key = (plan.hwaccel, plan.device_index, codec, chroma, int(depth))
     memo[key] = reason
+
+
+def apply_stdin_pipe(
+    cmd: list[str], source: Path | str, decoder_name: str = "--y4m"
+) -> list[str]:
+    """Rewrite a rigaya command to read YUV4MPEG2 from stdin.
+
+    The encoder backends build argv for a *file* input (``-i <source>``), and
+    always pass an explicit reader flag (``--avsw`` / ``--avhw``) because that
+    determines which reader they build for a file. Both are wrong once the
+    input is a pipe, so two edits are applied here instead of threading a flag
+    through every backend signature -- the same approach, and for the same
+    reason, as :func:`apply_decode_plan`:
+
+    * ``-i <source>`` becomes ``-i -``, the form rigaya documents for pipe
+      input (``avs2pipemod -y4mp x | NVEncC --y4m -i -``). A bare trailing
+      ``-`` is parsed as a filename and the tool exits with "Input file is not
+      specified";
+    * the ``--avsw`` / ``--avhw`` reader selector is **removed**. Measured:
+      leaving ``--avsw`` in place makes the encoder reject the pipe and the
+      ladder falls back to the MP4Box strip, so the hardware decode is
+      silently discarded and the run still reports success -- the exact
+      "looks like it worked" failure this redesign exists to prevent.
+
+    Refuses rather than guesses when the expected ``-i <source>`` is absent:
+    leaving the file input in place would have the encoder read the original
+    file while the log reported a hardware decode that never ran.
+    """
+    src_texts = {str(source)}
+    try:
+        src_texts.add(str(Path(source).resolve()))
+    except OSError:
+        pass
+
+    out = list(cmd)
+    idx = None
+    for i, tok in enumerate(out):
+        if tok == "-i" and i + 1 < len(out) and out[i + 1] in src_texts:
+            idx = i
+            break
+    if idx is None:
+        raise ValueError(
+            f"apply_stdin_pipe: no '-i {source}' in argv; refusing to guess "
+            f"which input to replace with stdin"
+        )
+
+    # Drop the file-input reader selector before touching -i, so its index is
+    # recomputed rather than assumed.
+    out = [t for t in out if t not in _RIGAYA_READER_FLAGS]
+    idx = out.index("-i")
+    out[idx + 1] = "-"
+    out.insert(idx, decoder_name)
+    return out
+
+
+#: rigaya's explicit file-input reader selectors. Incompatible with y4m stdin.
+_RIGAYA_READER_FLAGS = frozenset({
+    "--avsw", "--avhw", "--avhw-bsf", "--avis", "--vpy", "--avs",
+})
+
+
+# --- feeding a rigaya encoder -----------------------------------------------
+
+def ffmpeg_pipe_args(
+    ffmpeg: Path, plan: DecodePlan, source: Path | str
+) -> list[str]:
+    """FFmpeg argv that writes the decoded frames to **stdout as y4m**.
+
+    Needed for the rigaya encoder paths (NVEncC/QSVEncC). They cannot consume
+    FFmpeg's hardware frames and they must not use their own ``--avhw`` reader
+    (the stock build drops leading pictures on Sony XAVC), so the route is:
+    FFmpeg decodes on the device, downloads to CPU, and streams YUV4MPEG2 into
+    the encoder's stdin.
+
+    y4m rather than raw YUV on purpose: the y4m header carries resolution,
+    pixel format and framerate, which is exactly the manifest ``--raw`` would
+    otherwise need (``--input-res``/``--fps``/``--input-csp``) -- and getting
+    that manifest wrong produces silently mis-framed video rather than an
+    error. Verified end to end: 24 frames of 4K HEVC 10-bit through
+    NVDEC -> y4m -> NVEncC ``--y4m -i -``.
+
+    ``-strict -1`` is required because ``yuv420p10le`` is not in FFmpeg's
+    list of "official" yuv4mpegpipe formats; without it the muxer refuses to
+    write the header and the encoder sees an empty stream (measured: "y4m:
+    failed to parse y4m header"). ``-pix_fmt`` is required for the same
+    reason -- the y4m muxer will not infer a 10-bit format from the filter
+    output and fails with "Could not write header (incorrect codec
+    parameters ?)".
+    """
+    if not plan.hardware or plan.transfer is None:
+        raise ValueError("ffmpeg_pipe_args requires a hardware decode plan")
+
+    # What the y4m stream will carry. y4m has no semi-planar formats: it
+    # accepts only the planar family (plus gray), so `p010le` from a direct
+    # hwdownload must be converted to `yuv420p10le` before muxing or the
+    # header is malformed and the encoder reports "y4m: failed to parse y4m
+    # header" while ffmpeg exits non-zero. Same pixels, different memory
+    # layout -- this is a format conversion, not a resample.
+    fmt = planar_format(plan.chroma, plan.depth) or plan.target_format
+    filters = list(plan.transfer.filters)
+    if not plan.transfer.direct or plan.transfer.format != fmt:
+        filters.append(f"format={fmt}")
+
+    return [
+        str(ffmpeg), "-hide_banner", "-nostdin", "-v", "error",
+        *plan.ffmpeg_input_args(),
+        "-i", str(source),
+        "-map", "0:v:0",
+        "-vf", ",".join(filters),
+        "-fps_mode", "passthrough",
+        "-pix_fmt", fmt,
+        "-strict", "-1",
+        "-f", "yuv4mpegpipe",
+        "-",
+    ]
 
 
 # --- applying a plan to an existing argv ------------------------------------

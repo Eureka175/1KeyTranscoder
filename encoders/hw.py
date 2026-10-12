@@ -143,6 +143,7 @@ def run_hw_tool(
     total_frames: int,
     label: str = "hw",
     progress: bool = True,
+    decode_pipe: list[str] | None = None,
 ) -> tuple[int | None, float]:
     """Run one hardware-encoder command with live progress.
 
@@ -152,6 +153,17 @@ def run_hw_tool(
     Returns (return_code, elapsed_sec); return_code is None when the
     run was interrupted or failed to execute (callers treat None like
     a failure and clean up their own outputs).
+
+    ``decode_pipe`` is an FFmpeg argv whose stdout becomes this encoder's
+    stdin (see ``hwdecode_ffmpeg.ffmpeg_pipe_args``). It exists so the rigaya
+    encoders can be fed by FFmpeg's hardware decoder instead of their own
+    ``--avhw`` reader, which drops leading pictures on Sony XAVC. The encoder
+    reads y4m from ``-i -`` and still writes its log to stdout, so the two
+    streams never contend.
+
+    A failing feeder is not ignored: if FFmpeg exits non-zero the encoder will
+    normally see a truncated stream, and this returns None so the caller treats
+    the attempt as failed rather than accepting a partial file.
     """
     started = time.monotonic()
     last_console = 0.0
@@ -162,13 +174,24 @@ def run_hw_tool(
     raw_log_path.parent.mkdir(parents=True, exist_ok=True)
 
     proc: subprocess.Popen[str] | None = None
+    feeder: subprocess.Popen[bytes] | None = None
     try:
         with raw_log_path.open(
             "w", encoding="utf-8", errors="replace"
         ) as raw_log:
+            stdin_arg = subprocess.PIPE if decode_pipe else subprocess.DEVNULL
+            if decode_pipe:
+                # stderr is merged into the same log so a feeder error is not
+                # lost; the encoder's own stdout arrives on the same pipe.
+                feeder = subprocess.Popen(
+                    decode_pipe,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                )
             proc = subprocess.Popen(
                 cmd,
-                stdin=subprocess.DEVNULL,
+                stdin=feeder.stdout if feeder else stdin_arg,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -176,6 +199,10 @@ def run_hw_tool(
                 errors="replace",
                 bufsize=1,
             )
+            if feeder is not None and feeder.stdout is not None:
+                # The child holds the read end; close ours so the encoder sees
+                # EOF when the feeder finishes rather than waiting on us.
+                feeder.stdout.close()
             assert proc.stdout is not None
             for raw_line in proc.stdout:
                 line = raw_line.rstrip("\r\n")
@@ -209,6 +236,19 @@ def run_hw_tool(
                         console_dead = True
                     last_console = now
             return_code = proc.wait()
+            if feeder is not None:
+                feed_rc = feeder.wait()
+                if feed_rc != 0:
+                    raw_log.write(
+                        f"\nDECODE FEEDER FAILED: rc={feed_rc}\n"
+                    )
+                    raw_log.flush()
+                    if not console_dead:
+                        try:
+                            print()
+                        except OSError:
+                            pass
+                    return None, time.monotonic() - started
         if not console_dead:
             try:
                 print()
@@ -223,9 +263,25 @@ def run_hw_tool(
                 proc.wait(timeout=5)
             except Exception:
                 pass
+        if feeder is not None:
+            try:
+                feeder.kill()
+                feeder.wait(timeout=5)
+            except Exception:
+                pass
         return None, time.monotonic() - started
     except Exception:
         print()
+        if proc is not None:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        if feeder is not None:
+            try:
+                feeder.kill()
+            except Exception:
+                pass
         return None, time.monotonic() - started
 
 

@@ -2402,7 +2402,8 @@ def main() -> int:
             # ask for it, and the hardware-first policy is served by the
             # FFmpeg route above. See encoders/hwdecode_ffmpeg.py.
             hw_decode="off",
-            hw_decode_memo={},
+            hw_decode_memo=decode_memo,
+            decode_caps=decode_caps,
             check_level=args.check,
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,
