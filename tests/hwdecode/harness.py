@@ -1476,8 +1476,16 @@ def b11(t, ctx):
             f"encoders/hwdecode_ffmpeg.py references Sony in code "
             f"({ev['sony_identifiers_in_code']}); the rigaya Sony policy must "
             f"stay out of the FFmpeg path")
+    # The module *documents* that it has no Sony branch. Matched loosely:
+    # wording may change, the claim may not. The structural fact (no Sony
+    # identifier in code) is asserted separately just above, so this check is
+    # about the documentation staying honest, not about enforcing a phrase.
     ev["docstring_records_the_rule"] = any(
         "is_sony_source" in d and "must not reach" in d for d in docstrings)
+    if not ev["docstring_records_the_rule"]:
+        problems.append(
+            "encoders/hwdecode_ffmpeg.py no longer documents that "
+            "is_sony_source() must not reach it")
 
     # --- hardware preferred for every encoder's input codec ---------------
     # A Sony XAVC HS file probes as exactly this; the planner cannot tell the
@@ -1535,6 +1543,139 @@ def b11(t, ctx):
         actual=(f"FFmpeg planner has no Sony branch; HEVC 4:2:0 10-bit -> "
                 f"{primary['substrate']}/{primary['decoder']} while the rigaya "
                 f"Sony route is {rigaya_sony.reader}"),
+        reason="; ".join(problems), evidence=ev,
+    )
+
+
+@impl("b12_real_sony_software_end_to_end")
+def b12(t, ctx):
+    """Real Sony material, full route: classified, software reader, delivered.
+
+    `HD-B01` states the same policy but its fixture
+    (`a7m5_4k60p_265_10bit420_150m_xavchs_4ch/20260823_C0886.MP4`) is not on
+    this installation, so it SKIPs and proves nothing here. This test uses real
+    Sony XAVC HS material that *is* present, discovered from the corpus, so the
+    policy is exercised end to end against a genuine probe instead of only
+    against synthetic stream dicts.
+
+    Why a second test rather than repointing B01: these fixtures carry their
+    own recorded facts (container samples, leading pictures). Substituting a
+    different file under B01's id would silently change what its assertions
+    mean. New id, new fixture, no recorded baseline reinterpreted.
+
+    Asserts, for both NVENC and QSV:
+      * the real probe classifies the file Sony (with the `rtmd` evidence);
+      * the decision is `avsw` / `sony_hardware_decode_safety`;
+      * the **actual** encode argv asks for `--avsw` and never `--avhw`;
+      * the encoder's reported reader identity is `avsw`;
+      * the delivered output reconciles with the container frame count.
+    """
+    from encoders.hwdecode import R_SONY_SOFTWARE, SOURCE_SONY, route_decode
+
+    fx = None
+    for cand in FX.discovered_corpus():
+        if cand.group == "sony_a7m5_420" and cand.path.is_file():
+            fx = cand
+            break
+    if fx is None:
+        return _res(
+            t, "HD-B12", STATUS_SKIP,
+            reason=("no real Sony A7X XAVC HS 4:2:0 sample discoverable under "
+                    "testsets/; the real-material branch cannot run here"),
+        )
+    skip = _require_fixture(fx, "HD-B12", ctx)
+    if skip:
+        return skip
+
+    facts = ctx.fact(fx)
+    v = facts.video
+    kind, streams = source_kind_of(fx.path)
+    ev: dict = {
+        "fixture": fx.rel,
+        "codec": f"{v.codec}/{v.chroma}/{v.bit_depth}bit",
+        "container_samples": facts.container_samples,
+        "source_kind": kind,
+        "rtmd_evidence": _sony_evidence(streams),
+    }
+    problems: list[str] = []
+
+    if kind != SOURCE_SONY:
+        return _res(
+            t, "HD-B12", STATUS_BLOCKED,
+            actual=f"source_kind={kind}",
+            reason=("the discovered fixture is not classified Sony by the "
+                    "product's own probe, so the Sony branch cannot be "
+                    "asserted on it"),
+            evidence=ev,
+        )
+
+    for backend, label in (("nvenc", "nvenc"), ("qsv", "qsv")):
+        r = route_decode(policy="auto", backend=backend, codec=v.codec,
+                         chroma=v.chroma, depth=v.bit_depth, source_kind=kind)
+        ev[f"route/{backend}"] = {"reader": r.reader, "reason": r.reason,
+                                  "warnings": r.warnings}
+        if r.reader != "avsw" or r.hardware:
+            problems.append(f"route/{backend}: reader={r.reader} "
+                            f"hardware={r.hardware}")
+        if r.reason != R_SONY_SOFTWARE:
+            problems.append(f"route/{backend}: reason={r.reason}")
+        if r.warnings:
+            problems.append(f"route/{backend}: preventive decision warned")
+
+        # Real encode of the **whole** file: no `--frames` cap, because the
+        # point of the reconciliation below is that the delivered output
+        # carries every source frame. Capping it would make the container
+        # reference (30) unreachable and the assertion vacuous -- measured:
+        # `--frames 24` on this clip yields 21 frames (the cap lands after the
+        # first IRAP), so a capped run cannot demonstrate completeness.
+        # The discovered Sony sample is ~67 MB / 30 frames, so a full encode
+        # is a couple of seconds.
+        er, cm = do_encode(ctx, tid="HD-B12", fx=fx, backend=backend,
+                           reader="avsw", role="stock_control",
+                           tag="sonyreal")
+        ok, reasons = checks.reconcile(cm)
+        ev[f"encode/{backend}"] = {
+            "rc": er.rc,
+            "reader_requested": er.reader_requested,
+            "reader_identity": er.reader_identity,
+            "argv_has_avhw": "--avhw" in er.cmd,
+            "argv_has_avsw": "--avsw" in er.cmd,
+            "output_exists": er.output_exists,
+            "reconcile_ok": ok,
+            "reconcile_reasons": reasons,
+            "encoder_input": cm.encoder_input,
+            "container_expected": cm.container_expected,
+        }
+        if er.rc != 0:
+            problems.append(f"encode/{backend}: rc={er.rc}")
+        if not er.output_exists:
+            problems.append(f"encode/{backend}: no output produced")
+        if "--avhw" in er.cmd:
+            problems.append(f"encode/{backend}: argv asked for --avhw on Sony")
+        if "--avsw" not in er.cmd:
+            problems.append(f"encode/{backend}: argv did not ask for --avsw")
+        if er.reader_identity != "avsw":
+            problems.append(
+                f"encode/{backend}: reader identity {er.reader_identity!r}, "
+                f"expected 'avsw'")
+        if not ok:
+            problems.append(f"encode/{backend}: not frame-exact: {reasons}")
+
+        # The plan must not have been re-derived between decision and argv:
+        # a `--avhw` in the trace would mean the decision was not honoured.
+        hits, _ = _route_trace(RESULTS / "b12_route", backend,
+                               source_kind=kind, out_name=f"b12_{backend}.mov")
+        ev[f"trace/{backend}_avhw_attempts"] = sum(1 for h in hits if h["hw"])
+        if any(h["hw"] for h in hits):
+            problems.append(f"trace/{backend}: --avhw attempted on Sony")
+
+    return _res(
+        t, "HD-B12", STATUS_PASS if not problems else STATUS_FAIL,
+        actual=(f"real Sony ({fx.rel.split('/')[-1]}, "
+                f"{facts.container_samples} samples, "
+                f"rtmd={','.join(ev['rtmd_evidence'])}) -> avsw on both "
+                f"backends; argv never asked for --avhw; "
+                f"reader identity avsw; outputs frame-exact"),
         reason="; ".join(problems), evidence=ev,
     )
 
@@ -4802,14 +4943,45 @@ def k02(t, ctx):
 
 
 def save_result(r: TestResult) -> None:
+    """Record one result: update the latest-per-test file, append to history.
+
+    Two files, because they answer different questions and conflating them is
+    how a summary starts lying:
+
+    ``results.json``
+        **latest result per test** -- the format consumers already read, one
+        record per ``test_id``, replaced on each run for that test.
+    ``results_history.json``
+        **append-only**, every result ever recorded with its timestamp. This is
+        the audit trail. It is never rewritten, so an old PASS is not erased by
+        a later FAIL and a later PASS does not erase the FAIL that preceded it.
+    """
     RESULTS.mkdir(parents=True, exist_ok=True)
     p = RESULTS / "results.json"
     data = json.loads(p.read_text(encoding="utf-8")) if p.is_file() else []
-    data = [x for x in data if x.get("test_id") != r.test_id] + [asdict(r)]
+    row = asdict(r)
+    data = [x for x in data if x.get("test_id") != r.test_id] + [row]
     data.sort(key=lambda x: (x["category"], x["test_id"]))
     p.write_text(json.dumps(data, indent=2, ensure_ascii=False, default=str),
                  encoding="utf-8")
     write_csv(data)
+
+    h = RESULTS / "results_history.json"
+    hist = json.loads(h.read_text(encoding="utf-8")) if h.is_file() else []
+    hist.append(row)
+    h.write_text(json.dumps(hist, indent=2, ensure_ascii=False, default=str),
+                 encoding="utf-8")
+
+
+def load_history() -> list[dict]:
+    """Every recorded result, oldest first. Never deduplicated."""
+    p = RESULTS / "results_history.json"
+    if not p.is_file():
+        return []
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
 
 
 def write_csv(data: list[dict]) -> None:
@@ -4910,24 +5082,86 @@ def _skip_kinds(rows: list[dict], req: dict[str, str]) -> dict[str, int]:
     return kinds
 
 
-def summarise(results: list[dict], run_started: str | None = None) -> dict:
+def _partition(results: list[dict],
+               run_started: str | None) -> tuple[list[dict], list[dict], str]:
+    """Split records into (this invocation's, everything else, scope name).
+
+    The three scopes exist because one number cannot answer three questions:
+
+    ``current_invocation``
+        only results written at or after ``run_started``. ``run_started`` is
+        set by ``cmd_run``, so this is what "did the run I just did pass?"
+        means. A test not selected by this invocation is **absent**, not
+        inherited.
+    ``latest_per_test``
+        every record in ``results.json`` (which holds one per test), i.e. the
+        most recent verdict for each test whenever it happened. This is the
+        default for a bare ``summary``, and ``stale`` is empty by construction
+        because nothing is being filtered out.
+    ``all_results``
+        every record handed in, treated as in scope. Used by maintenance paths.
+
+    A record with an unparsable timestamp cannot be placed in a run window, so
+    under ``current_invocation`` it is treated as *not* this run's -- the safe
+    direction: it can never be counted as fresh evidence.
+    """
+    if not run_started:
+        return list(results), [], "latest_per_test"
+    try:
+        started = datetime.fromisoformat(run_started)
+    except ValueError:
+        return list(results), [], "latest_per_test"
+    fresh, stale = [], []
+    for r in results:
+        try:
+            stamp = datetime.fromisoformat(r.get("timestamp") or "")
+        except ValueError:
+            stale.append(r)
+        else:
+            (fresh if stamp >= started else stale).append(r)
+    return fresh, stale, "current_invocation"
+
+
+def summarise(results: list[dict], run_started: str | None = None,
+              scope: str | None = None) -> dict:
+    """Aggregate results, stating exactly which records it counted.
+
+    Every figure is reported within a named ``scope``. The scope was previously
+    implicit -- a bare ``summary`` printed ``total=84`` with no indication that
+    it meant "latest result per test, accumulated over many runs", which reads
+    as "84 tests just ran". ``matrix_definitions`` is reported alongside so the
+    three quantities (definitions, records in file, records in scope) can never
+    be mistaken for one another.
+    """
+    matrix_definitions = len(_requirement_map())
+
+    fresh, stale, inferred = _partition(results, run_started)
+    if scope in ("all_results",):
+        fresh, stale, inferred = list(results), [], "all_results"
+    elif scope in ("latest_per_test", "current_invocation"):
+        inferred = scope
+        if scope == "current_invocation" and not fresh and not stale:
+            inferred = "current_invocation"
+
+    counted = fresh
     by_status: dict[str, int] = {}
     by_sev: dict[str, dict[str, int]] = {}
     by_cat: dict[str, dict[str, int]] = {}
-    for r in results:
+    for r in counted:
         s = r["status"]
         by_status[s] = by_status.get(s, 0) + 1
-        by_sev.setdefault(r["severity"], {})
-        by_sev[r["severity"]][s] = by_sev[r["severity"]].get(s, 0) + 1
-        by_cat.setdefault(r["category"], {})
-        by_cat[r["category"]][s] = by_cat[r["category"]].get(s, 0) + 1
+        sev = by_sev.setdefault(r["severity"], {})
+        sev[s] = sev.get(s, 0) + 1
+        cat = by_cat.setdefault(r["category"], {})
+        cat[s] = cat.get(s, 0) + 1
 
     p0 = by_sev.get("P0", {})
     p0_fail = p0.get("FAIL", 0)
     p0_blocked = p0.get("BLOCKED", 0)
     blockers = [
-        f"{r['test_id']}: {r['status']}" + (f" ({r['reason']})" if r.get("reason") else "")
-        for r in results
+        f"{r['test_id']}: {r['status']}"
+        + (f" ({r['reason']})" if r.get("reason") else "")
+        for r in counted
         if r["severity"] == "P0" and r["status"] in ("FAIL", "BLOCKED")
     ]
 
@@ -4936,59 +5170,40 @@ def summarise(results: list[dict], run_started: str | None = None) -> dict:
     # never be laundered into a PASS, and it must not take the production gate
     # down with it.
     #
-    # Results from *earlier* runs are excluded from the gates. The results
-    # file accumulates across invocations, so a `--phase 1` run leaves
-    # category C-K entries from a previous session in place -- measured:
-    # a PASS for HD-C01 dated 2026-09-14 was being counted in the same gate
-    # as today's results, which is exactly the "green from stale evidence"
-    # pattern this matrix exists to catch. They are reported as *sat out*
-    # instead. `run_started` is the current invocation's start; when it is not
-    # supplied (a bare `summary` over a finished results file) every result is
-    # treated as fresh, which is the pre-existing behaviour.
-    started = None
-    if run_started:
-        try:
-            started = datetime.fromisoformat(run_started)
-        except ValueError:
-            started = None
+    # Results outside the invocation window are excluded from the gates and
+    # reported as *sat out*, because counting a previous session's PASS in
+    # this run's gate is exactly the "green from stale evidence" pattern this
+    # matrix exists to catch. Measured: a PASS for HD-C01 stamped 2026-09-14
+    # was once counted beside today's results while `tools/avhw/` was absent.
     req = _requirement_map()
     gates: dict[str, dict] = {}
     for label, wanted in (("production", "deployed_binary"),
                           ("research", "patched_binary")):
-        rows = [r for r in results
+        rows = [r for r in counted
                 if req.get(r["test_id"], "deployed_binary") == wanted]
-        if not rows:
+        sat_out = [r for r in stale
+                   if req.get(r["test_id"], "deployed_binary") == wanted]
+        if not rows and not sat_out:
             continue
-        fresh, stale = [], []
-        for r in rows:
-            if started is None:
-                fresh.append(r)
-                continue
-            try:
-                stamp = datetime.fromisoformat(r.get("timestamp") or "")
-            except ValueError:
-                stale.append(r)
-            else:
-                (fresh if stamp >= started else stale).append(r)
         st: dict[str, int] = {}
-        for r in fresh:
+        for r in rows:
             st[r["status"]] = st.get(r["status"], 0) + 1
-        p0r = [r for r in fresh if r["severity"] == "P0"]
+        p0r = [r for r in rows if r["severity"] == "P0"]
         p0r_bad = [r for r in p0r if r["status"] in ("FAIL", "BLOCKED")]
         gates[label] = {
-            "total": len(fresh),
+            "total": len(rows),
             "PASS": st.get("PASS", 0),
             "FAIL": st.get("FAIL", 0),
             "BLOCKED": st.get("BLOCKED", 0),
             "SKIP": st.get("SKIP", 0),
-            "stale_total": len(stale),
-            "stale_pass": sum(1 for r in stale if r["status"] == "PASS"),
+            "stale_total": len(sat_out),
+            "stale_pass": sum(1 for r in sat_out if r["status"] == "PASS"),
             "stale_blockers": [
-                f"{r['test_id']}: {r['status']} ({r.get('timestamp', '?')})"
-                for r in stale
+                f"{r['test_id']}: {r['status']} ({r.get('timestamp') or 'no timestamp'})"
+                for r in sat_out
                 if r["severity"] == "P0" and r["status"] != "PASS"
             ],
-            "skip_kinds": _skip_kinds(fresh, req),
+            "skip_kinds": _skip_kinds(rows, req),
             "p0_total": len(p0r),
             "p0_pass": sum(1 for r in p0r if r["status"] == "PASS"),
             "p0_fail": sum(1 for r in p0r if r["status"] == "FAIL"),
@@ -5002,12 +5217,19 @@ def summarise(results: list[dict], run_started: str | None = None) -> dict:
         }
 
     return {
-        "total": len(results),
+        # --- scope, stated explicitly so no figure is read out of context ---
+        "scope": inferred,
+        "matrix_definitions": matrix_definitions,
+        "records_considered": len(results),
+        "records_in_scope": len(counted),
+        "records_sat_out": len(stale),
+        "run_started": run_started or "",
+        # --- counts within that scope ---------------------------------------
+        "total": len(counted),
         "PASS": by_status.get("PASS", 0),
         "FAIL": by_status.get("FAIL", 0),
         "BLOCKED": by_status.get("BLOCKED", 0),
         "SKIP": by_status.get("SKIP", 0),
-        "started": run_started or "",
         "by_severity": by_sev,
         "by_category": by_cat,
         "gates": gates,
@@ -5027,25 +5249,43 @@ def summarise(results: list[dict], run_started: str | None = None) -> dict:
 
 def cmd_summary(args) -> int:
     results = load_results()
-    s = summarise(results, getattr(args, "run_started", None))
+    run_started = getattr(args, "run_started", None)
+    scope = getattr(args, "scope", None)
+    s = summarise(results, run_started, scope)
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / "summary.json").write_text(
         json.dumps(s, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(s, indent=2, ensure_ascii=False))
+
+    # Printed as a legend, not decoration: `total` alone has been misread as
+    # "84 tests just ran" when it meant "84 tests have a latest verdict".
+    print(f"\nscope: {s['scope']}"
+          + (f"  (run started {s['run_started']})" if s["run_started"] else
+             "  (accumulated latest-per-test file; no run window)"))
+    print(f"  matrix definitions   : {s['matrix_definitions']}")
+    print(f"  records considered   : {s['records_considered']}")
+    print(f"  records in scope     : {s['records_in_scope']}")
+    print(f"  records sat out      : {s['records_sat_out']}"
+          + ("  (earlier runs / unparsable timestamps)"
+             if s["records_sat_out"] else ""))
     if s.get("gates"):
         for label, g in s["gates"].items():
             note = ""
             if g.get("stale_total"):
-                note += (f"  [{g['stale_total']} result(s) sat out as stale, "
+                note += (f"  [{g['stale_total']} sat out, "
                          f"{g['stale_pass']} of them PASS]")
             if g.get("skip_kinds"):
                 sk = ", ".join(f"{k}={v}" for k, v in sorted(
                     g["skip_kinds"].items()))
                 note += f"  [skipped: {sk}]"
-            print(f"gate {label}: {g['status']}  "
-                  f"fresh={g['total']} PASS={g['PASS']} FAIL={g['FAIL']} "
+            print(f"  gate {label}: {g['status']}  "
+                  f"in_scope={g['total']} PASS={g['PASS']} FAIL={g['FAIL']} "
                   f"BLOCKED={g['BLOCKED']} SKIP={g['SKIP']}  "
                   f"P0 {g['p0_pass']}/{g['p0_total']}{note}")
+    hist = load_history()
+    if hist:
+        print(f"  history file         : {len(hist)} record(s) "
+              f"(append-only, never rewritten)")
     return 0
 
 
@@ -5055,31 +5295,45 @@ def cmd_provenance(_args) -> int:
     return 0 if rep["ok"] else 1
 
 
-def cmd_check_matrix(_args) -> int:
-    matrix = load_matrix()
-    doc = (ROOT / "docs" / "hardware-decode" / "integration-test-matrix.md")
-    if not doc.is_file():
-        print("FAIL: matrix document missing")
-        return 1
-    text = doc.read_text(encoding="utf-8")
-    problems = []
-    for t in matrix["tests"]:
-        if t["id"] not in text:
-            problems.append(f"{t['id']} missing from the document")
-    import re as _re
-    doc_ids = set(_re.findall(r"HD-[A-K]\d{2}", text))
-    json_ids = {t["id"] for t in matrix["tests"]}
-    for extra in sorted(doc_ids - json_ids):
-        problems.append(f"{extra} in the document but not in matrix.json")
-    for t in matrix["tests"]:
-        if t.get("impl") not in IMPL:
-            problems.append(f"{t['id']}: impl {t.get('impl')!r} not registered")
+def cmd_check_matrix(args) -> int:
+    """Verify the matrix document against the machine-readable specs.
+
+    Reports exactly what it compared (see :func:`check_matrix_problems`) and
+    says so on success, so a green result is not read as more than it is: it
+    means id/severity/implementation agreement and no superseded policy
+    language, **not** that every field of every row was cross-checked, and
+    certainly not that the matrix semantics are correct.
+    """
+    problems = check_matrix_problems()
+    self_failures: list[str] = []
+    if getattr(args, "selftest", False):
+        self_failures = _matrix_selftest()
+
     if problems:
         print("MATRIX DRIFT:")
         for p in problems:
             print("  -", p)
+    if self_failures:
+        print("CHECKER SELF-TEST FAILED:")
+        for f in self_failures:
+            print("  -", f)
+    if problems or self_failures:
         return 1
-    print(f"matrix consistent: {len(json_ids)} tests, all with implementations")
+
+    matrix = load_matrix()
+    doc = (ROOT / "docs" / "hardware-decode" /
+           "integration-test-matrix.md").read_text(encoding="utf-8")
+    rows = _doc_rows(doc)
+    sev_checked = sum(1 for t in matrix["tests"]
+                      if t["id"] in rows and len(rows[t["id"]][0]) >= 2)
+    print(f"matrix consistent: {len(matrix['tests'])} tests")
+    print(f"  compared: id presence both ways, duplicate ids, impl "
+          f"registration, severity agreement ({sev_checked} rows), "
+          f"superseded-policy language")
+    print(f"  NOT compared (documented, not claimed): title / expected / "
+          f"verification prose")
+    if getattr(args, "selftest", False):
+        print("  negative self-test: 6/6 corruption cases detected")
     return 0
 
 
@@ -5162,6 +5416,194 @@ def cmd_run(args) -> int:
     return 1 if failures else 0
 
 
+#: Phrases that state a policy this branch has superseded. A matrix document
+#: row (or the JSON spec it describes) that still carries one is drift: the
+#: checker would otherwise pass a document that tells a reader to expect
+#: behaviour the code no longer has. Kept as an explicit list so the contract
+#: is auditable and the checker's coverage is honest about what it compares.
+SUPERSEDED_PHRASES = (
+    "not_proven → 软件",
+    "not_proven -> 软件",
+    "not_proven` → 软件",
+    "auto selects avhw",
+    "auto` 下选中 `avhw`",
+    "均判 `eligible`",
+    "硬件解码必须绑定在 provenance 校验过的 patched build 上",
+    "必须用 patched 构建",
+)
+
+
+def _doc_rows(text: str) -> dict[str, list[str]]:
+    """Parse the matrix document's test table: id -> list of cells.
+
+    Deliberately minimal: one regex for pipe rows whose first cell is a test
+    ID. No Markdown parser, because the document's shape is fixed and a
+    full parser would be a new subsystem for no extra assurance.
+    """
+    rows: dict[str, list[str]] = {}
+    for line in text.splitlines():
+        if not line.startswith("| HD-"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not cells:
+            continue
+        rows.setdefault(cells[0], []).append(cells)
+    return rows
+
+
+def check_matrix_problems(matrix: dict | None = None,
+                          doc_text: str | None = None) -> list[str]:
+    """Everything the matrix checker actually verifies, as a list of problems.
+
+    Separated from the command so a negative self-test can drive it with
+    deliberately broken inputs and prove the checks fire. Coverage, stated
+    honestly:
+
+    * every JSON test id appears in the document, and vice versa;
+    * no duplicate id in the JSON, and no duplicate row in the document;
+    * every ``impl`` is registered;
+    * the document's **Sev** column agrees with the JSON ``severity``;
+    * no row (or JSON spec) still carries superseded policy language.
+
+    It does **not** compare titles, expected behaviour or verification prose
+    field-by-field: the document paraphrases in Chinese and the JSON is terse
+    English, so a token comparison would be noise, and claiming it would
+    misrepresent what passing means.
+    """
+    matrix = matrix if matrix is not None else load_matrix()
+    doc_path = ROOT / "docs" / "hardware-decode" / "integration-test-matrix.md"
+    if doc_text is None:
+        if not doc_path.is_file():
+            return ["matrix document missing"]
+        doc_text = doc_path.read_text(encoding="utf-8")
+
+    problems: list[str] = []
+    tests = matrix.get("tests", [])
+
+    # --- JSON side --------------------------------------------------------
+    ids = [t.get("id", "") for t in tests]
+    seen: set[str] = set()
+    for i in ids:
+        if i in seen:
+            problems.append(f"{i}: duplicate test id in matrix.json")
+        seen.add(i)
+    for t in tests:
+        impl = t.get("impl")
+        if impl not in IMPL:
+            problems.append(f"{t.get('id')}: impl {impl!r} not registered")
+        if t.get("severity") not in ("P0", "P1", "P2"):
+            problems.append(
+                f"{t.get('id')}: severity {t.get('severity')!r} is not "
+                f"P0/P1/P2")
+        haystack = json.dumps(t, ensure_ascii=False)
+        for phrase in SUPERSEDED_PHRASES:
+            if phrase in haystack:
+                problems.append(
+                    f"{t.get('id')}: matrix.json still states the superseded "
+                    f"policy {phrase!r}")
+
+    # --- document side ----------------------------------------------------
+    rows = _doc_rows(doc_text)
+    for tid, cells in rows.items():
+        if len(cells) > 1:
+            problems.append(
+                f"{tid}: appears in {len(cells)} document rows (duplicate)")
+        if tid not in seen:
+            problems.append(f"{tid}: in the document but not in matrix.json")
+        for cell_row in cells:
+            for phrase in SUPERSEDED_PHRASES:
+                if any(phrase in c for c in cell_row):
+                    problems.append(
+                        f"{tid}: document row still states the superseded "
+                        f"policy {phrase!r}")
+    for tid in ids:
+        if tid not in rows:
+            problems.append(f"{tid} missing from the document")
+
+    # --- severity agreement ----------------------------------------------
+    by_id = {t.get("id"): t for t in tests}
+    for tid, cells in rows.items():
+        spec = by_id.get(tid)
+        if spec is None or len(cells[0]) < 2:
+            continue
+        doc_sev = cells[0][1]
+        if doc_sev != spec.get("severity"):
+            problems.append(
+                f"{tid}: severity {doc_sev!r} in the document != "
+                f"{spec.get('severity')!r} in matrix.json")
+    return problems
+
+
+def _matrix_selftest() -> list[str]:
+    """Negative checks: deliberately broken inputs the checker must reject.
+
+    A checker that only ever sees valid input proves nothing about what it
+    compares. Each case below corrupts one thing and asserts the corresponding
+    problem is reported.
+    """
+    failures: list[str] = []
+    matrix = load_matrix()
+    doc_path = ROOT / "docs" / "hardware-decode" / "integration-test-matrix.md"
+    doc = doc_path.read_text(encoding="utf-8")
+    base = check_matrix_problems(matrix, doc)
+    if base:
+        failures.append(
+            "baseline is not clean, so the negative cases cannot be "
+            f"interpreted: {base[:3]}")
+
+    # 1. missing JSON id from the document
+    trimmed = dict(matrix)
+    trimmed["tests"] = [t for t in matrix["tests"] if t["id"] != "HD-B01"]
+    if not any("HD-B01" in p and "not in matrix.json" in p
+               for p in check_matrix_problems(trimmed, doc)):
+        failures.append("did not detect a document-only test id")
+
+    # 2. an id in the JSON but absent from the document
+    without_doc_row = "\n".join(
+        l for l in doc.splitlines() if not l.startswith("| HD-B05 "))
+    if not any("HD-B05" in p and "missing from the document" in p
+               for p in check_matrix_problems(matrix, without_doc_row)):
+        failures.append("did not detect a JSON test missing from the document")
+
+    # 3. duplicate id in the JSON
+    dup = dict(matrix)
+    dup["tests"] = matrix["tests"] + [matrix["tests"][0]]
+    if not any("duplicate test id" in p
+               for p in check_matrix_problems(dup, doc)):
+        failures.append("did not detect a duplicate id in matrix.json")
+
+    # 4. severity disagreement
+    bad_sev = "\n".join(
+        l.replace("| HD-B01 | P0 |", "| HD-B01 | P2 |", 1)
+        if l.startswith("| HD-B01 ") else l
+        for l in doc.splitlines())
+    if not any("HD-B01" in p and "severity" in p
+               for p in check_matrix_problems(matrix, bad_sev)):
+        failures.append("did not detect a severity mismatch")
+
+    # 5. superseded policy language left in a row
+    stale = "\n".join(
+        l.replace("**Sony → 编码前即选 `avsw`**",
+                  "决策必须是 **`not_proven` → 软件**", 1)
+        if l.startswith("| HD-B01 ") else l
+        for l in doc.splitlines())
+    if not any("superseded policy" in p
+               for p in check_matrix_problems(matrix, stale)):
+        failures.append("did not detect superseded policy language")
+
+    # 6. unregistered implementation
+    bad_impl = dict(matrix)
+    bad_impl["tests"] = [
+        dict(t, impl="no_such_impl") if t["id"] == "HD-B01" else t
+        for t in matrix["tests"]
+    ]
+    if not any("not registered" in p
+               for p in check_matrix_problems(bad_impl, doc)):
+        failures.append("did not detect an unregistered implementation")
+
+    return failures
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="tests.hwdecode.harness")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -5170,6 +5612,9 @@ def main(argv=None) -> int:
     p.set_defaults(func=cmd_provenance)
 
     p = sub.add_parser("check-matrix")
+    p.add_argument("--selftest", action="store_true",
+                   help="also run the negative cases that prove the checker "
+                        "rejects deliberately broken inputs")
     p.set_defaults(func=cmd_check_matrix)
 
     p = sub.add_parser("list")
@@ -5189,6 +5634,12 @@ def main(argv=None) -> int:
     p.set_defaults(func=cmd_run)
 
     p = sub.add_parser("summary")
+    p.add_argument("--scope",
+                   choices=("latest_per_test", "current_invocation",
+                            "all_results"),
+                   help="which records to count. Default: current_invocation "
+                        "when the command runs after a `run`, otherwise "
+                        "latest_per_test")
     p.set_defaults(func=cmd_summary)
 
     args = ap.parse_args(argv)
