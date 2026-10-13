@@ -491,7 +491,7 @@ Three boundaries matter when reading results:
   (8.27–8.30 untested).
 
 The correctness matrix for the rigaya hardware path is `tests/hwdecode/`
-(84 cases, classes A–K), with entry points in
+(85 cases, classes A–K), with entry points in
 `docs/hardware-decode/README.md`. It is **not** part of
 `tests/full_autotest.py --level full`, and it now reports two separate gates:
 

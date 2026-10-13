@@ -114,6 +114,90 @@
 
 ---
 
+## 收尾审计发现（本轮追加）
+
+### 1. 来源分类的实际边界（含一个未解决的语义缺口）
+
+唯一权威检测是 `rtmd`（data 轨 codec tag）。它在**元数据被剥离**的 Sony 文件上
+不存在，此时分类器给出 `non_sony`：
+
+```text
+rtmd 存在        -> sony      （目标场景；真实素材已复核）
+rtmd 被 remux 掉 -> non_sony  ← 语义缺口：'分类为 not-Sony' != '确认非 Sony 来源'
+probe 无 data 轨 -> non_sony  （与真正的非 Sony 文件不可区分）
+无 streams       -> unknown   （不猜测；与 non_sony 语义不同）
+```
+
+**影响**：剥元数据的 Sony 素材会按非 Sony 分支走 `--avhw`，可能触发 reader 丢帧
+缺陷；**完整性闸门会捕获它**（帧数不吻合 → 删产物 → 一次 `--avsw` 重试），所以
+**不会交付错误产物**，但会多付一次完整编码尝试。这是分类器的适用边界，
+闸门是安全网而不是修复。
+
+**未启用的互补信号（实测，非规则）**：`major_brand` 在剥元数据后仍然保留。
+本机语料逐个 ffprobe：229 个 Sony 文件全部 `XAVC`，26 个 DJI 文件全部 `isom`，
+与 `rtmd` **完全不冲突**。启用它会改变生产路由（把剥元数据 Sony 也导流到软解），
+属于**策略决定**，本轮未实现；详见
+[`../design/architecture.md`](../design/architecture.md) §8.1.1 与
+`tests/selftest/suites/source_contract.py` 的 `cls.finding` 用例。
+
+### 2. 结果汇总曾把一个数字用于三个含义
+
+此前 `summary` 打印 `total=84`，读者会读成"本次跑了 84 个用例"，实际是
+"84 个用例各有一条最新记录，可能来自多次运行"。更严重的是：`results.json`
+是累计文件，一次 `--phase 1` 之后的 summary 会把**上一次 session 的 PASS**
+计入同一道 gate（实测：一条 2026-09-14 的 `HD-C01` PASS 与当天结果并列统计，
+而当时 `tools/avhw/` 并不存在）。
+
+现在：
+
+* `summary` 输出 `scope`（`current_invocation` / `latest_per_test` /
+  `all_results`）以及 `matrix_definitions` / `records_considered` /
+  `records_in_scope` / `records_sat_out`；
+* `run` 给本次执行打时间戳，窗口外的记录列为 *sat out*，不计入 gate，也不会被
+  静默抹除；
+* `results_history.json` **只追加**，保留每一次执行；`results.json` 仍是
+  "每用例一条最新记录"，格式不变；
+* 31 条确定性单测覆盖单次运行、重复运行、先全量后部分、当前运行缺少旧测试、
+  旧 PASS/当前 FAIL、旧 FAIL/当前 PASS、混合 BLOCKED/SKIP、无时间戳记录。
+
+### 3. `check-matrix` 的覆盖范围曾被高估
+
+它过去只比对测试 ID 与 impl 注册。现在还会检查：重复 ID（JSON 与文档两侧）、
+severity 一致性（85 行）、以及文档中残留的**已被取代的策略措辞**——这一条立即
+发现 `HD-B03` / `HD-B04` / `HD-B06` 三行仍在描述白名单策略。命令会打印它
+**没有**比对的部分（title / expected / verification 措辞），并用 `--selftest`
+的 6 个负例证明检查器确实会失败。**"check-matrix 通过"不等于矩阵语义正确。**
+
+### 4. 真实 Sony 素材的存在性（新增 `HD-B12`）
+
+矩阵原先声明的 10 个语料 fixture 在本机全部不存在（目录名与恢复后的语料不同），
+`HD-B01`/`HD-B02` 因此 SKIP——**SKIP 不能当作证据**。但 Sony A7M5 XAVC HS
+4:2:0 素材**确实存在**（229 个带 `rtmd` 的文件）。因此新增 `HD-B12`：
+用 `core.probe.probe_source` 真实探针分类，两个 backend 各跑一次**完整**真实
+编码，断言 argv 请求 `--avsw` 且不含 `--avhw`、工具自报 reader identity 为
+`avsw`、产物与容器样本数对账通过。**已 PASS。**
+
+没有改写 `HD-B01` 的 id 去指向别的文件：那些 fixture 各自带已记录的基线事实
+（container samples、leading pictures），换文件会让断言含义被悄悄改写。
+
+`HD-B02` 依赖的 **Sony H.264 4:2:2 10-bit** 素材在本机**确实不存在**
+（4:2:2 语料是 HEVC Rext，不是 H.264），因此保持 SKIP，而不是用相似的 HEVC
+文件冒充。
+
+### 5. FFmpeg 硬解与最终容器校验分开验证
+
+两层证据不互相替代：
+
+| 层 | 看什么 | 本轮结果 |
+|---|---|---|
+| decode correctness | 计划 substrate、**实际 decoder**、`-hwaccel`、源/输出帧数、独立解码 | 六组组合（x265/SVT-AV1 × Sony/DJI/H.264）全部 `ffmpeg_hw`，decoder 为 `hevc_cuvid` / `h264_cuvid` |
+| final container / preservation | duration、`mvhd` timescale、轨道数、sample entry、metadata、既有严格校验 | 30 帧 Sony 片段**解码为硬解**的同时因时间轴量化未交付 |
+
+所以"Sony 走了硬解"与"最终 MP4 通过校验"是两件事：前者成立不证明后者，后者
+失败也不证明解码丢帧（同源 240 帧版本 `PRESERVED=37, structural_success=True`）。
+
+---
+
 # 目录
 
 | 章节 | 内容 |

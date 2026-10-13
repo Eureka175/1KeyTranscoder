@@ -1612,6 +1612,57 @@ rigaya 侧的执行路由由 `encoders/hwdecode.py::route_decode()` 决定，它
 | `non_sony` | `--avhw` | `proven_combination`（研究线测过）或 `native_hw_integrity_ok`（未测过，由闸门判定） |
 | `unknown`（探测为空） | `--avhw`，记录为未分类 | `source_unclassified` |
 
+#### 8.1.1 来源分类契约（以及它的边界）
+
+上面这张表只在"分类可靠"的前提下成立，所以分类本身要写清楚。唯一权威实现是
+`core.batch_hw.is_sony_source()`（data 轨 `codec_tag_string == "rtmd"`），
+经 `encoders.hwdecode.source_kind_from_streams()` 暴露；项目内**没有**第二套
+检测逻辑，也不按文件名、扩展名、分辨率、码率或相机型号猜测
+（`tests/selftest/suites/source_contract.py` 有 17 条断言钉住这些性质）。
+
+| 场景 | `source_kind` | 说明 |
+|---|---|---|
+| A 原始 Sony XAVC，含 `rtmd` | `sony` | 目标场景；真实素材已复核（4:2:0 与 4:2:2 各一） |
+| B Sony 经 remux **去掉元数据轨** | **`non_sony`** | ⚠️ **语义缺口**，见下 |
+| C probe 未报告 data 轨 | `non_sony` | 与真正的非 Sony 文件在本分类器下**不可区分** |
+| D 普通非 Sony 视频（无 `rtmd`） | `non_sony` | 正确；DJI 的 `djmd`/`dbgi` 不会被误判为 Sony |
+| E 完全取不到 streams（`[]` / `None`） | `unknown` | 不猜测；**`unknown` 与 `non_sony` 语义不同**，不得互相替换 |
+
+**缺口 B 必须明确记录，而不是被当作已解决：**
+
+```text
+"被分类为 non_sony"  !=  "已确认为非 Sony 相机来源"
+```
+
+`rtmd` 是**元数据轨**。一个 Sony 录制文件若在进入本工具之前就被 remux 掉元数据
+（例如 `-map 0:v -map 0:a -c copy`），`rtmd` 随之消失，分类器会给出 `non_sony`，
+于是该文件按非 Sony 分支走 `--avhw`。此时：
+* 预期路径上会发生什么：Sony reader 的丢帧缺陷可能触发 → **由完整性闸门捕获**
+  （帧数不吻合 → 删除产物 → 一次 `--avsw` 重试）。所以**不会交付错误产物**，
+  但会多付一次完整编码尝试；
+* 这**不是**分类器"工作正常"，而是它的已知适用边界。闸门是安全网，不是修复。
+
+已实测到、但**本轮刻意未启用**的一条互补信号：`major_brand`（format box）在
+元数据剥离后仍然保留。本机语料上的实测（逐个 ffprobe，不是抽样）：
+
+```text
+Sony A7M5 / XAVC 语料（a7m5_4ch_speech 去除混入的 DJI 子目录、
+                        a7m5_2ch_10bit422、a7m5_4ch_long）
+    229 个文件，major_brand 全部 = XAVC
+    （同一目录树里另有 9 个 DJI 文件 = isom、1 个重新编码的 H.264 = mp42、
+      以及 Air3S 下 9 个 DJI = isom；
+      这些按 data 轨（djmd/dbgi）与 major_brand **两法一致**地判为非 Sony）
+DJI 语料（Air3S 17 + action4_4x3_long 9）
+    26 个文件，major_brand 全部 = isom
+```
+
+在这份语料上 `major_brand` 与 `rtmd` **完全不冲突**，且比 `rtmd` 多保留一层
+（剥元数据后仍在）。但启用它会改变生产路由——把剥掉元数据的 Sony 文件也导流到
+软解——属于**策略决定**，因此本轮只作为发现记录在
+`source_contract.py` 的 `cls.finding` 用例里，**未实现为规则**，也未据此修改任何
+测试标准。`probe_source()` 目前只把 streams 交给分类器，要用它还需要把 format
+tags 一并传入。
+
 理由是一个真实测量：stock 硬件读者在 Sony XAVC 上丢前导帧——`rc=0`、可播放、
 **30 帧只出 27 帧**（4:2:0 与 4:2:2 10-bit 均为 27/30，NVEncC 与 QSVEncC 均如此；
 `--avsw` 均为 30）。缺陷是**来源特异**的，所以处置也是来源特异的。
@@ -1712,7 +1763,7 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 
 ### 8.6 测试矩阵
 
-`tests/hwdecode/`（84 个用例，A–K 十一类），入口见
+`tests/hwdecode/`（85 个用例，A–K 十一类），入口见
 [`docs/hardware-decode/README.md`](../hardware-decode/README.md)。三条硬规则：
 
 1. **`exit code = 0` 不是正确性证据**（上面那个 N−3 就是 `rc=0`）。
@@ -1947,7 +1998,7 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | `tests/hwdecode/sources.py` | 239 | **provenance 校验**（sha256 + 版本 token，不符即 FAIL） |
 | `tests/hwdecode/fixtures.py` | 238 | control fixtures 生成 |
 | `tests/hwdecode/inventory.py` | 80 | 语料盘点 + fixture 刷新 |
-| `tests/hwdecode/matrix.json` | 351 | **机器可读矩阵**（84 用例，与 harness 双向漂移检查） |
+| `tests/hwdecode/matrix.json` | 351 | **机器可读矩阵**（85 用例，与 harness 双向漂移检查） |
 | `tests/full_autotest.py` | 6505 | 全量自动回归（档位改动的唯一依据） |
 | `tests/run_selfcheck.py` | 189 | 自检驱动 |
 | `tests/sony_selfcheck.py` | 21 | Sony 自检入口 |

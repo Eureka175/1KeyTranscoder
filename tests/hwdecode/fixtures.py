@@ -123,6 +123,74 @@ def real_a7m5() -> list[Fixture]:
     ]
 
 
+#: The restored corpus, by directory, with a stable fixture id prefix.
+#: The three directories above are stale relative to the restored tree
+#: (`testsets/20260904` now holds ARW stills, `adjust`/`validate`/`stress` are
+#: absent), so the real material is discovered here instead.
+#:
+#: Each entry names the narrowest directory that contains one source type.
+#: That matters: `testsets/a7m5_4ch_speech` also holds DJI clips in sibling
+#: subdirectories, so scanning it wholesale picked a DJI file as the "A7M5"
+#: representative.
+#:
+#: Exactly **one** representative file per entry, chosen as the smallest by
+#: byte size after name-sorting: deterministic, cheap to probe, and enough to
+#: exercise source classification and routing against genuine probe output.
+#: These are *additional* fixtures -- no existing fixture id is redirected, so
+#: no recorded baseline silently changes meaning.
+DISCOVERY_DIRS = {
+    # Sony A7M5 XAVC HS, HEVC Main 10, 4:2:0 10-bit, rtmd present
+    "sony_a7m5_420": TESTSETS / "a7m5_4ch_speech" / "20260903" / "A7M5",
+    # Sony A7M5 XAVC, HEVC Rext, 4:2:2 10-bit, rtmd present
+    "sony_a7m5_422": TESTSETS / "a7m5_2ch_10bit422",
+    # Sony A7M5 XAVC HS long-form 4:2:0 10-bit
+    "sony_a7m5_420_long": TESTSETS / "a7m5_4ch_long",
+    # non-Sony control: DJI, djmd/dbgi, no rtmd
+    "dji_action4": TESTSETS / "action4_4x3_long",
+}
+
+
+#: Upper bound on a discovered representative, in bytes. Encoding cost is not
+#: the concern -- the runners bound encodes with ``--frames`` -- the *probe*
+#: cost is: these fixtures are fully probed and frame-counted, and
+#: `a7m5_4ch_long` holds a 46 GB single take (a 69-minute recording) whose
+#: frame count alone would dominate the matrix runtime. 4 GB keeps everything
+#: else, including the 2.9 GB DJI Action 4 clip, and excludes only material
+#: that has its own dedicated long-run fixtures anyway.
+DISCOVERY_MAX_BYTES = 4 * 1024 * 1024 * 1024
+
+
+def _pick_one(d: Path) -> Path | None:
+    """Smallest usable video under ``d``, name-sorted first for determinism.
+
+    Returns None when the directory holds no video, or none under
+    :data:`DISCOVERY_MAX_BYTES` -- a missing representative is reported as an
+    absent fixture rather than silently substituted with a 46 GB file.
+    """
+    if not d.is_dir():
+        return None
+    vids = sorted(
+        (p for p in d.rglob("*")
+         if p.is_file() and p.suffix.lower() in VIDEO_SUFFIXES
+         and p.stat().st_size <= DISCOVERY_MAX_BYTES),
+        key=lambda p: (p.stat().st_size, str(p)),
+    )
+    return vids[0] if vids else None
+
+
+def discovered_corpus() -> list[Fixture]:
+    out: list[Fixture] = []
+    for prefix, d in DISCOVERY_DIRS.items():
+        p = _pick_one(d)
+        if p is None:
+            continue
+        out.append(Fixture(
+            f"{prefix}_{p.stem.lower()}", prefix, str(p.relative_to(ROOT)),
+            f"restored corpus ({prefix}): one representative file",
+        ))
+    return out
+
+
 def real_field() -> list[Fixture]:
     out: list[Fixture] = []
     for group, d in REAL_FIELD_DIRS.items():
@@ -227,7 +295,7 @@ def all_fixtures() -> list[Fixture]:
         SONY_HS, SONY_422_C9037, SONY_422_C9073, SONY_422_C9088,
         SONY_422_C9110, SONY_422_C0887, DJI_0009, DJI_0010,
         *GEN_ALL,
-        *real_a7m5(), *real_field(), *long_inputs(),
+        *real_a7m5(), *real_field(), *long_inputs(), *discovered_corpus(),
     ]
 
 

@@ -46,11 +46,41 @@ python -m tests.hwdecode.harness provenance
     research 用例如实记为 BLOCKED，绝不记为 PASS。
 ```
 
+**读 `summary` 时先看 `scope`。** 汇总现在明确区分三件事，因为一个数字回答不了
+三个问题（此前 `total=84` 被读成"刚跑了 84 个用例"，实际含义是"84 个用例各有
+一条最新记录"）：
+
+```text
+scope: current_invocation   本次运行窗口内（`run` 之后自动如此）
+       latest_per_test      每个用例最近一次结果（裸 summary 的默认）
+       all_results          全部记录，不做窗口过滤
+
+matrix definitions   矩阵 JSON 里的唯一用例数
+records considered   读到的记录数
+records in scope     计入本次统计的记录数
+records sat out      因不属于本次窗口而被排除的记录数
+```
+
+结果文件现在是两份：`results.json` 每用例一条**最新**记录（格式不变），
+`results_history.json` **只追加**、永不改写，保留每一次执行。所以旧 PASS 不会被
+后来的 FAIL 抹掉，反之亦然。旧记录不会被静默计入本次 gate——`run --phase 1`
+之后的 summary 只统计本次真正执行的用例，其余按 *sat out* 列出。
+
 **注意**：本机 `testsets/` 的目录名与矩阵期望的 research 语料不同，
 `production` 闸门内大量用例因此 **SKIP**（`summary` 会打印 skip 原因，
-不会让绿色计数掩盖"从未运行"）。来源感知策略本身由
-`tests/selftest/suites/native_decode.py`（83 例，不需要 fixture）与真实素材
-端到端运行覆盖，见 [`final-report.md`](final-report.md) 的"现行策略下的实测"。
+不会让绿色计数掩盖"从未运行"）。真实素材上可执行的端到端验证见
+`HD-B12`（真实 Sony XAVC HS，两个 backend）与
+[`final-report.md`](final-report.md) 的"现行策略下的实测"。
+
+`check-matrix` 的实际覆盖范围以内建方式打印，避免"通过"被当成矩阵语义正确的
+证明：
+
+```text
+compared: id presence both ways, duplicate ids, impl registration,
+          severity agreement, superseded-policy language
+NOT compared: title / expected / verification prose
+negative self-test: 6/6 corruption cases detected   (--selftest)
+```
 
 ```text
 重建前提（本机核查，未变）：
