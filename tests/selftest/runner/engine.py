@@ -43,8 +43,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
         audio_encode, audio_external, audio_format, audio_integration,
         audio_mix, audio_model, audio_retention, audio_route,
         audio_selection, audio_sync, audio_timeline, channel_sync, cli,
-        codecs, core, hardware, hardware_audio, pipeline, production_output,
-        native_decode, toolchain, workdir,
+        codecs, core, hardware, hardware_audio, hwdecode_results, pipeline,
+        production_output, native_decode, source_contract, toolchain, workdir,
     )
 
     return {
@@ -61,6 +61,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("quality/versions", core.l1_quality),
             ("workdir lifecycle", workdir.l1_workdir),
             ("native decode routing", native_decode.l1_native_decode),
+            ("hwdecode result aggregation", hwdecode_results.l1_hwdecode_results),
+            ("source classification contract", source_contract.l1_source_contract),
             ("channel-sync", channel_sync.l1_channel_sync),
             ("channel-sync P1", channel_sync.l1_channel_sync_p1),
             ("audio model v0.7.1", audio_model.l1_audio_model),
