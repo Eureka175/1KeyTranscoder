@@ -10,27 +10,57 @@ writes it. That separation is the point of the redesign: ``--encoder x265``
 selects an *encoder*, and must not silently drop the input onto software
 decode.
 
-Why FFmpeg rather than the rigaya readers
------------------------------------------
+Why this module exists alongside the rigaya readers
+---------------------------------------------------
 
-``encoders/hwdecode.py`` routes the rigaya ``--avhw`` readers and pins them to
-sha256-verified patched research builds under ``tools/avhw/``. That tree is
-excluded from the release package (``release/build_release.py`` TOOL_DIRS), so
-in a shipped installation that route is structurally unreachable. It also
-carries a measured defect: stock ``--avhw`` drops leading pictures on Sony
-XAVC (N-3 on XAVC HS, N-2 on XAVC S H.264 4:2:2), silently, with rc=0.
+There are **three** separate things in this tree, and they must not be
+conflated. Getting this wrong in either direction is a real defect: assume the
+rigaya defect applies here and Sony loses hardware decode for no measured
+reason; assume the paths are interchangeable and a Sony file's reader
+semantics get decided by the wrong component.
 
-FFmpeg's NVDEC/QSV decoders are a different implementation with no such drop
-stage, and ``tools/ffmpeg.exe`` ships with nvdec/cuvid/libvpl enabled.
+1. **This module — the FFmpeg decode path** (``x265`` / ``svtav1``). FFmpeg
+   owns both decode and encode for these backends, so the plan below is
+   spliced into the FFmpeg argv. It is hardware-first for **every** input,
+   Sony included.
+
+2. **The rigaya production path** (``nvenc`` / ``qsv``), routed by
+   ``encoders/hwdecode.py``. Those encoders read the source with their *own*
+   reader, on the **deployed** ``NVEncC64.exe`` / ``QSVEncC64.exe``. It is
+   source-aware because that reader carries a measured, source-specific
+   defect: ``--avhw`` drops leading pictures on Sony XAVC open-GOP timelines
+   (measured here: 30 frames in, **27** out, on both XAVC HS 4:2:0 10-bit and
+   XAVC 4:2:2 10-bit, with ``rc=0`` and a playable file; ``--avsw`` returns
+   30). Sony is therefore decoded in software *before any attempt* — a policy
+   decision, not a failed attempt.
+
+3. **The patched research builds** ``tools/avhw/``, resolved by
+   ``encoders/hwdecode.resolve_decode_tool`` and pinned by sha256. These are
+   **research artefacts**: they serve the historical hardware-decode matrix and
+   the investigation of the defect above. Production does not consult them and
+   does not require them; that tree is excluded from the release package
+   (``release/build_release.py`` TOOL_DIRS), which is why it must never be a
+   production dependency.
+
+**The rigaya defect is not evidence about FFmpeg.** It is a property of that
+reader's timestamp handling on those timelines. No measurement says FFmpeg's
+NVDEC/QSV loses frames on Sony material, and this module therefore has no Sony
+branch at all — ``is_sony_source()`` must not reach it, and
+``plan_decode()`` takes no source class. The two paths take *opposite* Sony
+decisions on purpose.
+
+FFmpeg's NVDEC/QSV decoders are a different implementation, and
+``tools/ffmpeg.exe`` ships with nvdec/cuvid/libvpl enabled.
 
 Three rules this module obeys
 -----------------------------
 
-1. **Hardware before software, for every input.** Sony is not special-cased.
-   ``is_sony_source()`` must not reach this module.
+1. **Hardware before software, for every input.** Sony is not special-cased;
+   see the three-way split above.
 2. **Decide before encoding, not by failing and retrying.** A route whose
    compatibility was never established is not offered; software is selected
-   deterministically when no hardware candidate is compatible.
+   deterministically when no hardware candidate is compatible, and always with
+   a concrete measured reason.
 3. **A registered decoder is not a working decoder.** ``ffmpeg -decoders``
    lists ``h264_qsv``, yet QSV refuses H.264 4:2:2 10-bit on the measured
    silicon with "Error querying IO surface: unsupported (-3)". Every
