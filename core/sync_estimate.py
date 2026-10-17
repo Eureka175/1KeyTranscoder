@@ -6,7 +6,7 @@
     (fine_delay_samples / fine_delay_ms / fine_fit_r2);
   * summarize_trajectory(): 帧轨迹统计 (MAD / 极差 / 相邻步长 / drift_ppm),
     供集成层恒定性门与报告诊断;
-  * classify_constant(): constant / non_constant 判定 (MAD + 线性漂移 ppm),
+  * classify_constant(): constant / non_constant 判定 (MAD + 实测位移),
     P1 只做二分 — step/ramp 细分属二期, 相邻步长仅作诊断警告;
   * boundary_pileup(): 合格帧落在搜索窗边缘的比例, 供 out_of_range 判定
     (真实时差超出搜索窗时帧测量堆积在窗边缘);
@@ -49,6 +49,7 @@ __all__ = [
     "estimate_pair",
     "summarize_trajectory",
     "classify_constant",
+    "measured_displacement_ms",
     "boundary_pileup",
     "open_source",
     "read_f64",
@@ -737,40 +738,106 @@ def summarize_trajectory(
     )
 
 
+def measured_displacement_ms(
+    frames: list[FrameDelay], sample_rate: int, trim_pct: float = 5.0
+) -> float:
+    """**实测位移** (ms): 合格帧延迟轨迹的稳健极差。
+
+    为什么不用 `TrajectoryStats.spread_samples`: 那是 ``max - min``, 对单个
+    离群帧敏感 —— 一个落在搜索窗边缘的帧就能把一条实际恒定的轨道判成非恒定。
+    实测 (testsets A7M5 20260919_C1306, 80 min, CH3->CH4):
+
+        usable 3985/41645, MAD 0.0208 ms, 原始极差 23.5 ms,
+        p1..p99 1.77 ms, **p5..p95 0.25 ms**
+
+    中位离散只有 1 个样本、核心 90% 只走 0.25 ms, 却被极少数离群帧拉到
+    23.5 ms。稳健极差取 p5..p95, 对离群帧不敏感。帧数 <20 时退化为原始
+    极差, 因为此时裁剪没有统计意义。
+
+    返回的是**观测到的位移**, 不是任何外推预测值。
+    """
+    d = np.array([f.delay_samples for f in frames
+                  if f.delay_samples == f.delay_samples], dtype=np.float64)
+    if d.size == 0:
+        return float("nan")
+    if d.size < 20 or not (0.0 < trim_pct < 50.0):
+        rng = float(d.max() - d.min())
+    else:
+        lo, hi = np.percentile(d, [trim_pct, 100.0 - trim_pct])
+        rng = float(hi - lo)
+    return rng * 1000.0 / sample_rate
+
+
 def classify_constant(
     stats: TrajectoryStats, *, mad_max_ms: float, max_ppm: float,
     sample_rate: int, drift_min_ms: float = 0.0,
+    displacement_ms: float | None = None,
 ) -> bool:
-    """P1 恒定性二分: MAD / 极差 / 线性漂移 三门 (constant/non_constant)。
+    """恒定性判定: **实测离散** + **实测位移**。
 
-    - 极差门用 mad_max_ms 同值: 中途跳变时中位数可能恰好落在跳变前值上
-      (MAD 退化), 此时极差 (50ms 级) 仍能可靠拦下;
-    - 漂移门 = ppm 门 + **材料性门**: ppm 超门**且**全片预测漂移
-      |drift_total_ms| > drift_min_ms 才判非恒定。真实素材标定依据
-      (testsets A7M5): 整数样本量化噪声会让"已对齐"轨的偶然斜率落在
-      5–30 ppm (spread 仅 2–3 样本 = 0.05ms), 单看 ppm 会误判为非恒定;
-      而真实慢漂移轨 (C1154 CH1 ≈39ppm/0.42ms, C1159 CH2 ≈49ppm/1.9ms)
-      的预测漂移远超 0.1ms, 仍被正确拦下。
-    - step_max_ms 只作诊断警告, 不参与判定 — 跳变/漂移细分属二期。
+    取代原来的 "MAD + 原始极差 + 最小二乘斜率外推" 三门。
+
+    为什么换 (2026-10-16 实测, I:\\compact 263 个 4×mono + 两个 80 min 长文件):
+
+    * 旧第三道门是 ``|drift_ppm| > max_ppm 且 |全片预测漂移| > drift_min_ms``,
+      即把拟合斜率**线性外推到整条流**。那是**预测**位移, 不是观测位移。
+      后果: 62 s 片段 MAD 只有 0.042 ms, 却因 49 ppm 外推 1.9 ms 被判非恒定;
+      而同一批素材里"已对齐"轨的偶然斜率也能到 5~30 ppm。判据脆弱。
+    * 旧第二道门用 ``max-min`` 极差, 对单个离群帧敏感 (见
+      `measured_displacement_ms` 的实测数字)。
+
+    现在的门, 前三项都是**实测量**:
+      1. ``mad_ms <= mad_max_ms`` —— 中位绝对离差 (抗离群)
+      2. ``displacement_ms <= mad_max_ms`` —— 稳健极差 p5..p95 (抗离群)
+      3. 离群门槛 ``全范围 <= 2*mad_max_ms`` —— 稳健极差会掩盖中间的大洞/跳变,
+         所以再要求**观测到的全范围**不超过 2 倍门, 把"中间真的跳了"拦下来。
+      4. ``drift_min_ms > 0`` 时, 斜率只作**绝对位移的补充证据**:
+         需 ``|drift_ppm| > max_ppm`` **且** 实测稳健位移 ``> drift_min_ms``
+         才判非恒定 —— 斜率必须被观测位移证实, 不能靠外推。
+
+    证据不足 (无合格帧 / 轨迹太短) 一律判非恒定, 与旧行为一致。
     """
-    spread_ms = stats.spread_samples * 1000.0 / sample_rate
-    drift_bad = (
-        abs(stats.drift_ppm) > max_ppm
-        and (
-            drift_min_ms <= 0.0
-            or (
-                stats.drift_total_ms == stats.drift_total_ms
-                and abs(stats.drift_total_ms) > drift_min_ms
-            )
-        )
-    )
-    return (
-        stats.mad_ms == stats.mad_ms
-        and stats.mad_ms <= mad_max_ms
-        and stats.spread_samples == stats.spread_samples
-        and spread_ms <= mad_max_ms
-        and not drift_bad
-    )
+    if stats.mad_ms != stats.mad_ms:
+        return False                       # 没有可算的 MAD: 不可判
+    if stats.mad_ms > mad_max_ms:
+        return False
+    disp = (displacement_ms if displacement_ms is not None
+            and displacement_ms == displacement_ms else None)
+    if stats.spread_samples != stats.spread_samples:
+        return False
+    full_ms = stats.spread_samples * 1000.0 / sample_rate
+    if disp is not None:
+        if disp > mad_max_ms:
+            return False
+        # 离群门槛: 稳健极差会掩盖中间的大洞/跳变, 所以要求**观测到的**全范围
+        # 不超过 mad_max_ms (与 MAD 门同尺)。样本 <20 时不适用 —— 此时稳健
+        # 极差已退化成原始极差, 两者相等, 这一项没有额外信息 (实测
+        # 20260903_C1156 只有 2 个合格帧, 曾被更宽的系数误杀)。
+        if stats.usable_frames >= 20 and full_ms > mad_max_ms:
+            return False
+    else:
+        # 调用方没给稳健位移: 退回原始极差 (旧行为), 不静默放宽
+        if full_ms > mad_max_ms:
+            return False
+    if drift_min_ms > 0.0 and abs(stats.drift_ppm) > max_ppm:
+        # 斜率超 ppm 门时, 要求**预测位移与实测位移都**具有材料性才判非恒定。
+        #
+        # 为什么是 AND 而不是 OR:
+        #   * 预测位移 (线性拟合) 在**短轨迹**上不可靠 —— 合格帧稀少时斜率
+        #     被少数点放大 (实测 C1197 3->1: 14 个合格帧、26.58 ppm、
+        #     预测仅 0.066 ms, 而实测稳健极差 0.104 ms)。旧实现只用预测,
+        #     于是这类轨道能通过。
+        #   * 预测位移在**长轨迹**上才是那个会被线性外放到荒谬值的量 ——
+        #     这正是要修的问题 (62 s 片段 MAD 0.042 ms 却外推出 1.9 ms)。
+        # 取 AND: 只有"拟合说有大漂移"**且**"数据里确实看到大位移"才算
+        # 非恒定。任一证据缺失时保守方向由 MAD 门与全范围门兜住。
+        pred = abs(stats.drift_total_ms) if stats.drift_total_ms \
+            == stats.drift_total_ms else 0.0
+        observed = abs(disp if disp is not None else full_ms)
+        if pred > drift_min_ms and observed > drift_min_ms:
+            return False
+        # 否则: 斜率超门但实测位移没有材料性 -> 视作量化噪声, 放行
+    return True
 
 
 def boundary_pileup(frames: list[FrameDelay], search_samples: float) -> float:

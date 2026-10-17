@@ -725,13 +725,17 @@ def run_channel_sync(
             "confidence": round(e.confidence, 3),
             "polarity": e.polarity,
             "drift_ppm": round(stats.drift_ppm, 2),
-            # 与决策门一致: MAD + 极差 + 漂移(ppm×材料性) 三门
+            # 与决策门一致: MAD + 稳健实测位移 + (斜率须被实测位移证实)
+            "measured_displacement_ms": j(
+                sync_estimate.measured_displacement_ms(e.frames, sample_rate), 4),
             "constant": bool(
                 sync_estimate.classify_constant(
                     stats, mad_max_ms=eff["mad_max_ms"],
                     max_ppm=eff["constant_max_ppm"],
                     sample_rate=sample_rate,
                     drift_min_ms=eff["drift_min_ms"],
+                    displacement_ms=sync_estimate.measured_displacement_ms(
+                        e.frames, sample_rate),
                 )
             ),
             "warnings": warnings,
@@ -1054,6 +1058,8 @@ def run_channel_sync(
                     max_ppm=eff["constant_max_ppm"],
                     sample_rate=sample_rate,
                     drift_min_ms=eff["drift_min_ms"],
+                    displacement_ms=sync_estimate.measured_displacement_ms(
+                        e.frames, sample_rate),
                 ):
                     reason_ = "non_constant"
                 elif e.delay_samples != e.delay_samples:
