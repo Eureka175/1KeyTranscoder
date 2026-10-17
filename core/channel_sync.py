@@ -48,9 +48,11 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import shutil
 import struct
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable
 
@@ -765,16 +767,39 @@ def run_channel_sync(
 
     try:
         # 1. 逐流解码 raw (§6.2 存储精度表)
-        for i in range(n_tracks):
-            ok, err = _decode_stream(
-                ffmpeg, source, i, sample_rate, decoded[i], storage[i]
-            )
-            if not ok:
-                log(f"channel-sync: WARNING stream {i} decode failed")
-                return finish(
-                    "measure_failed",
-                    f"audio stream {i} decode failed: {err[-200:]}",
+        #
+        # 长片段并行 (P-1): 各轨解码互不依赖 (每条流一个独立 ffmpeg 进程、
+        # 写各自的 raw 文件), 顺序解码是纯粹的浪费。80 min / 4 轨实测:
+        # 顺序 101.6 s vs 4 路并行 32.5 s (3.13x)。
+        # 这是**音频内部**并行, 与 `--jobs` 无关 —— `--jobs` 只并行独立
+        # 文件, 不干预媒体内部的并发度。
+        # 失败语义保持不变: 仍按流序号顺序报告**第一个**失败的流。
+        dec_err: dict[int, str] = {}
+        if n_tracks <= 1:
+            for i in range(n_tracks):
+                ok, err = _decode_stream(
+                    ffmpeg, source, i, sample_rate, decoded[i], storage[i]
                 )
+                if not ok:
+                    dec_err[i] = err
+        else:
+            with ThreadPoolExecutor(max_workers=n_tracks) as ex:
+                futs = {
+                    ex.submit(_decode_stream, ffmpeg, source, i, sample_rate,
+                              decoded[i], storage[i]): i
+                    for i in range(n_tracks)
+                }
+                for fut, i in list(futs.items()):
+                    ok, err = fut.result()
+                    if not ok:
+                        dec_err[i] = err
+        if dec_err:
+            i = min(dec_err)            # 与顺序实现一致: 报最先失败的那条
+            log(f"channel-sync: WARNING stream {i} decode failed")
+            return finish(
+                "measure_failed",
+                f"audio stream {i} decode failed: {dec_err[i][-200:]}",
+            )
         arrs = [
             sync_estimate.open_source(decoded[i], storage[i])
             for i in range(n_tracks)
@@ -830,17 +855,58 @@ def run_channel_sync(
             min_usable_frames=eff["min_usable_frames"],
             frame_min_rms_dbfs=eff["frame_min_rms_dbfs"],
         )
+        # 估计阶段并行 (P-2): 每个 (候选锚点, 目标轨) 对是**完全独立**的测量,
+        # 顺序执行没有语义理由。80 min 实测每对约 35 s, 3 对顺序 ~105 s。
+        #
+        # 为什么传**路径**而不是 `arrs[i]`: RawStream 内部有可变块缓存
+        # (`_blocks`), 多个线程共读同一个对象会竞争。传路径时
+        # `estimate_pair` 自己 open/close 独立句柄 (见 sync_estimate 的
+        # `opened` 清理), 因此并发是安全的 —— 这是本处唯一需要小心的地方。
+        # 结果与顺序实现逐位一致: 每对独立, 不共享任何可变状态。
+        def _est_pair(ref_idx: int, tgt_idx: int, wide: bool = False) -> Any:
+            # 帧级并行 (P-2): 估计阶段是 Python 逐帧循环 (单帧 ~259 us, 其中
+            # 约 60% 是解释器/scipy 开销), **线程会被 GIL 卡住** —— 实测
+            # 线程版只有 1.1x。所以把帧区间切给**进程池**, 由
+            # `estimate_pair(workers=...)` 内部完成; 结果与顺序实现逐位相同
+            # (帧之间无依赖, 分块只改变算在哪)。
+            # 这里不再需要 pair 级线程: 进程池已经把 CPU 打满。
+            return sync_estimate.estimate_pair(
+                decoded[ref_idx], decoded[tgt_idx],
+                storage_dtype=storage[tgt_idx],
+                ref_index=ref_idx, tgt_index=tgt_idx,
+                workers=_est_workers,
+                **dict(
+                    est_kwargs,
+                    search_window_ms=(
+                        max(eff["wide_search_ms"],
+                            3.0 * eff["search_window_ms"])
+                        if wide else eff["search_window_ms"]
+                    ),
+                ),
+            )
+
+        def _est_many(ref_idx: int, targets: list[int], wide: bool = False
+                      ) -> dict[int, Any]:
+            return {i: _est_pair(ref_idx, i, wide) for i in targets}
+
+        # 估计阶段的帧级并行度。只在**长轨迹**上启用: 进程池在 Windows 上
+        # 有 ~1 s 的启动成本, 短片用它是净亏。2000 帧 ≈ 200 s 素材, 之下保持
+        # 单进程; 之上按 CPU 分块 (留一个核给主进程/IO)。
+        # 与 `--jobs` 无关: `--jobs` 只并行独立文件, 媒体内部并发度由这里定。
+        _n_frames_est = max(
+            0, (min(arrs[i].shape[0] for i in healthy)
+                - int(round(eff["frame_ms"] * sample_rate / 1000.0)))
+            // max(1, int(round(eff["hop_ms"] * sample_rate / 1000.0))) + 1
+        ) if healthy else 0
+        _est_workers = 1
+        if _n_frames_est >= 2000:
+            _est_workers = max(2, min(12, (os.cpu_count() or 4) - 1))
+            log(f"channel-sync: frame-parallel estimation "
+                f"({_n_frames_est} frames -> {_est_workers} processes)")
+
         for cand in order:
-            cand_ests = {}
-            for i in healthy:
-                if i == cand:
-                    continue
-                cand_ests[i] = sync_estimate.estimate_pair(
-                    arrs[cand], arrs[i],
-                    storage_dtype=storage[i],
-                    ref_index=cand, tgt_index=i,
-                    **est_kwargs,
-                )
+            targets = [i for i in healthy if i != cand]
+            cand_ests = _est_many(cand, targets) if targets else {}
             correlated = any(
                 e.usable_frames >= eff["min_usable_frames"]
                 and e.confidence >= eff["min_confidence"]
@@ -872,12 +938,7 @@ def run_channel_sync(
         )
 
         def wide_estimate(i: int) -> Any:
-            return sync_estimate.estimate_pair(
-                arrs[anchor], arrs[i],
-                storage_dtype=storage[i],
-                ref_index=anchor, tgt_index=i,
-                **dict(est_kwargs, search_window_ms=wide_window_ms),
-            )
+            return _est_pair(anchor, i, wide=True)
 
         anchor_row = plain_row(anchor, "anchor", None)
         anchor_row.update({
@@ -1247,6 +1308,7 @@ def run_channel_sync(
                           channels=rows)
 
         # 7. per-stream 输出: fixed 轨回编码 (源 codec), 其余轨 stream copy
+        #
         audio_files: list[Path] = []
         for i in range(n_tracks):
             out = work_dir / f"audio_{i}.mov"

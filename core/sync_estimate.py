@@ -557,8 +557,17 @@ def estimate_pair(
     frame_min_rms_dbfs: float = -50.0,
     ref_index: int = -1,
     tgt_index: int = -1,
+    workers: int = 1,
+    _frames_override: list["FrameDelay"] | None = None,
 ) -> PairEstimate:
     """两阶段 + 精估 (§8.3/§8.4; ref_src/tgt_src 支持 raw 路径或 1-D ndarray)。
+
+    ``workers > 1`` 时把**帧区间**切成若干段, 用**进程池**并行测量
+    (单帧约 259 us, 其中约 60% 是 Python 开销, 线程会被 GIL 卡住, 因此
+    必须是进程)。要求两个源都是**路径**: 每个子进程自己 open 自己的 raw
+    流, 不共享句柄或缓存。帧之间无依赖 (`_coarse_slice` 无状态), 所以
+    结果与 ``workers=1`` **逐位相同** —— 分块只改变"算在哪里", 不改变
+    "算什么"; 拼接按帧区间顺序进行, 保持 frames 的时间序。
 
     1) 抽取粗扫: 两流 decimate 到 coarse_rate (8kHz), 逐帧 GCC-PHAT,
        搜索窗 ±search_window_ms, 把全速率搜索收窄到 ±_FULL_SEARCH_HALF;
@@ -572,6 +581,29 @@ def estimate_pair(
     """
     opened: list[Any] = []
     try:
+        # 帧级并行 (workers>1): 只在两个源都是**路径**时可用 —— 子进程必须
+        # 能自己打开数据。这里先把 n / 几何算出来以便切分, 真正的测量在
+        # `_estimate_pair_parallel` 里由进程池完成, 父进程再负责聚合与精估。
+        if (workers and int(workers) > 1
+                and isinstance(ref_src, (str, Path))
+                and isinstance(tgt_src, (str, Path))):
+            return _estimate_pair_parallel(
+                ref_src, tgt_src,
+                workers=int(workers),
+                sample_rate=sample_rate,
+                search_window_ms=search_window_ms,
+                frame_ms=frame_ms,
+                hop_ms=hop_ms,
+                anchor_segment_seconds=anchor_segment_seconds,
+                min_confidence=min_confidence,
+                coarse_rate=coarse_rate,
+                fine_phase_band_hz=fine_phase_band_hz,
+                min_usable_frames=min_usable_frames,
+                frame_min_rms_dbfs=frame_min_rms_dbfs,
+                ref_index=ref_index,
+                tgt_index=tgt_index,
+                storage_dtype=storage_dtype,
+            )
         ref = open_source(ref_src, storage_dtype)
         if isinstance(ref_src, (str, Path)):
             opened.append(ref)
@@ -592,6 +624,7 @@ def estimate_pair(
             frame_min_rms_dbfs=frame_min_rms_dbfs,
             ref_index=ref_index,
             tgt_index=tgt_index,
+            frames_override=_frames_override,
         )
     finally:
         # 只关闭本函数自己从路径打开的流; 调用方传入的流由调用方管理。
@@ -600,6 +633,144 @@ def estimate_pair(
             close = getattr(stream, "close", None)
             if callable(close):
                 close()
+
+
+def _estimate_pair_parallel(
+    ref_path: Any,
+    tgt_path: Any,
+    *,
+    workers: int,
+    **kw: Any,
+) -> PairEstimate:
+    """把帧区间切成 `workers` 段, 用**进程池**并行测量, 再交给
+    `_estimate_pair` 做聚合与精估 (两步与顺序实现共用同一段代码)。
+
+    只有"在哪算"变了: 每帧的输入是绝对样本位置, 切分不改变任何一帧的
+    输入, 因此 `frames` 与顺序实现逐位相同 (拼接按区间顺序保持时间序)。
+    """
+    from concurrent.futures import ProcessPoolExecutor
+
+    sample_rate = kw["sample_rate"]
+    coarse_rate = kw["coarse_rate"]
+    q = sample_rate // coarse_rate
+    f_c = int(round(kw["frame_ms"] * coarse_rate / 1000.0))
+    h_c = int(round(kw["hop_ms"] * coarse_rate / 1000.0))
+    frame = f_c * q
+    hop = h_c * q
+    s_c = int(math.ceil(kw["search_window_ms"] * coarse_rate / 1000.0))
+    rms_floor = 10.0 ** (kw["frame_min_rms_dbfs"] / 20.0)
+
+    storage_dtype = kw.get("storage_dtype", "f32")
+    ref_probe = RawStream(ref_path, storage_dtype)
+    tgt_probe = RawStream(tgt_path, storage_dtype)
+    try:
+        n = min(ref_probe.shape[0], tgt_probe.shape[0])
+    finally:
+        ref_probe.close()
+        tgt_probe.close()
+    n_frames = 0 if n < frame else (n - frame) // hop + 1
+
+    params = dict(
+        frame=frame, hop=hop, h_c=h_c, f_c=f_c, s_c=s_c,
+        w_half=_FULL_SEARCH_HALF, q=q,
+        min_confidence=kw["min_confidence"], rms_floor=rms_floor,
+    )
+    k_workers = max(1, min(int(workers), n_frames))
+    bounds = np.linspace(0, n_frames, k_workers + 1).astype(int)
+    payloads = [
+        {"ref_path": ref_path, "tgt_path": tgt_path,
+         "storage_dtype": storage_dtype,
+         "params": dict(params, k_lo=int(bounds[i]), k_hi=int(bounds[i + 1]))}
+        for i in range(k_workers)
+    ]
+    chunks: list[list[FrameDelay]] = []
+    if k_workers <= 1 or n_frames == 0:
+        chunks = [_chunk_job(payloads[0])] if payloads else [[]]
+    else:
+        with ProcessPoolExecutor(max_workers=k_workers) as ex:
+            # map 保序: chunks 顺序 == 帧区间顺序
+            chunks = list(ex.map(_chunk_job, payloads))
+    merged: list[FrameDelay] = [f for part in chunks for f in part]
+
+    return estimate_pair(
+        ref_path, tgt_path,
+        storage_dtype=storage_dtype,
+        ref_index=kw["ref_index"],
+        tgt_index=kw["tgt_index"],
+        workers=1,                       # 防止递归
+        _frames_override=merged,
+        **{k: v for k, v in kw.items()
+           if k not in ("storage_dtype", "ref_index", "tgt_index")},
+    )
+
+
+def _est_frames(
+    ref: Any,
+    tgt: Any,
+    *,
+    k_lo: int,
+    k_hi: int,
+    frame: int,
+    hop: int,
+    h_c: int,
+    f_c: int,
+    s_c: int,
+    w_half: int,
+    q: int,
+    min_confidence: float,
+    rms_floor: float,
+) -> list["FrameDelay"]:
+    """逐帧测量 **[k_lo, k_hi)** 这一段. 帧之间完全独立 —— 每帧只读绝对
+    样本位置 (`_coarse_slice` 无状态、带自身抽取余量), 因此任何切分方式都
+    给出同一个结果, 这正是可以按帧并行 (进程) 的前提。"""
+    out: list[FrameDelay] = []
+    for k in range(k_lo, k_hi):
+        center_sample = k * hop + frame // 2
+        c0 = k * h_c
+        ref_c = _coarse_slice(ref, c0, c0 + f_c, q)
+        tgt_c = _coarse_slice(tgt, c0 - s_c, c0 + f_c + s_c, q)
+        g = gcc_phat_int(
+            ref_c, tgt_c, lag0=s_c, search_lo=-s_c, search_hi=s_c,
+            rms_gate=rms_floor,
+        )
+        if not g.success or g.confidence < min_confidence:
+            out.append(FrameDelay(center_sample, float("nan"), g.confidence))
+            continue
+        center = int(round(g.delay_samples)) * q
+        ref_f = read_f64(ref, k * hop, frame)
+        tgt_f = read_f64(tgt, k * hop + center - w_half, frame + 2 * w_half)
+        g2 = gcc_phat_int(
+            ref_f, tgt_f,
+            lag0=w_half - center,
+            search_lo=center - w_half, search_hi=center + w_half,
+            rms_gate=rms_floor,
+        )
+        if not g2.success or g2.confidence < min_confidence:
+            out.append(FrameDelay(center_sample, float("nan"), g2.confidence))
+            continue
+        out.append(
+            FrameDelay(center_sample, float(g2.delay_samples), g2.confidence)
+        )
+    return out
+
+
+def _chunk_job(payload: dict) -> list["FrameDelay"]:
+    """进程池任务: 对一段帧区间做测量 (顶层函数, 必须可 pickle)。
+
+    自己 open/close 各自的 raw 流 —— 不跨进程共享任何句柄或缓存。
+    """
+    import warnings as _w
+    with _w.catch_warnings():
+        _w.filterwarnings("ignore")
+        ref = open_source(payload["ref_path"], payload["storage_dtype"])
+        tgt = open_source(payload["tgt_path"], payload["storage_dtype"])
+        try:
+            return _est_frames(ref, tgt, **payload["params"])
+        finally:
+            for s in (tgt, ref):
+                c = getattr(s, "close", None)
+                if callable(c):
+                    c()
 
 
 def _estimate_pair(
@@ -618,6 +789,7 @@ def _estimate_pair(
     frame_min_rms_dbfs: float = -50.0,
     ref_index: int = -1,
     tgt_index: int = -1,
+    frames_override: list["FrameDelay"] | None = None,
 ) -> PairEstimate:
     n = min(ref.shape[0], tgt.shape[0])
     if sample_rate % coarse_rate != 0:
@@ -635,34 +807,16 @@ def _estimate_pair(
     rms_floor = 10.0 ** (frame_min_rms_dbfs / 20.0)
 
     n_frames = 0 if n < frame else (n - frame) // hop + 1
-    frames: list[FrameDelay] = []
-    for k in range(n_frames):
-        center_sample = k * hop + frame // 2
-        c0 = k * h_c
-        ref_c = _coarse_slice(ref, c0, c0 + f_c, q)
-        tgt_c = _coarse_slice(tgt, c0 - s_c, c0 + f_c + s_c, q)
-        g = gcc_phat_int(
-            ref_c, tgt_c, lag0=s_c, search_lo=-s_c, search_hi=s_c,
-            rms_gate=rms_floor,
-        )
-        if not g.success or g.confidence < min_confidence:
-            frames.append(FrameDelay(center_sample, float("nan"), g.confidence))
-            continue
-        center = int(round(g.delay_samples)) * q
-        ref_f = read_f64(ref, k * hop, frame)
-        tgt_f = read_f64(tgt, k * hop + center - w_half, frame + 2 * w_half)
-        g2 = gcc_phat_int(
-            ref_f, tgt_f,
-            lag0=w_half - center,
-            search_lo=center - w_half, search_hi=center + w_half,
-            rms_gate=rms_floor,
-        )
-        if not g2.success or g2.confidence < min_confidence:
-            frames.append(FrameDelay(center_sample, float("nan"), g2.confidence))
-            continue
-        frames.append(
-            FrameDelay(center_sample, float(g2.delay_samples), g2.confidence)
-        )
+    _frame_kw = dict(
+        frame=frame, hop=hop, h_c=h_c, f_c=f_c, s_c=s_c, w_half=w_half, q=q,
+        min_confidence=min_confidence, rms_floor=rms_floor,
+    )
+    if frames_override is not None:
+        # 已由进程池算好 (帧区间并行); 这里只做聚合与精估, 与顺序路径共用
+        # 同一段代码, 因此两条路径的结果定义完全相同。
+        frames: list[FrameDelay] = list(frames_override)
+    else:
+        frames = _est_frames(ref, tgt, k_lo=0, k_hi=n_frames, **_frame_kw)
 
     delays = np.array([f.delay_samples for f in frames], dtype=np.float64)
     confs = np.array([f.confidence for f in frames], dtype=np.float64)
