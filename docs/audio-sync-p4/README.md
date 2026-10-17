@@ -26,6 +26,10 @@ P4.9A  short-clip fixed-delay revalidation      COMPLETE — the clips suit the 
 P4.9B  residual calibration / uncertainty       COMPLETE — known-truth residual exactly 0; R3 = INSUFFICIENT_DATA (no production uncertainty field)
 P4.10  real-source qualification                COMPLETE — no independent truth exists on this machine; REAL_GROUND_TRUTH = BLOCKED
 P4.11  acquisition tooling                      COMPLETE — protocol executable, tested and tracked; ACQUISITION_READY = YES
+P4.12  grouped anchor (opt-in)                  COMPLETE — a 4ch clip can hold TWO unrelated microphone groups and the
+                                                single-anchor model could only fix one; new opt-in path, DEFAULT OFF,
+                                                field-identical with the flag off (226/226 files), 3 added fixes /
+                                                0 lost / 0 changed; both 69-81 min clips move measure_failed -> applied
 ```
 
 ```text
@@ -114,6 +118,7 @@ Algorithm changes     0
 | **whether this machine's material can supply a real wireless ground truth, and what to record if not** | [`p4.10-real-source-qualification.md`](p4.10-real-source-qualification.md) |
 | **the recording procedure that would supply one** | [`p4.10-acquisition-protocol.md`](p4.10-acquisition-protocol.md) |
 | **the executable tooling that runs once the takes exist** | [`p4.11-acquisition-tooling.md`](p4.11-acquisition-tooling.md) |
+| **what to do when one 4ch clip holds two unrelated microphone groups** | [`p4.12-grouped-anchor.md`](p4.12-grouped-anchor.md) |
 | **what P4.8 changed, and what it proved it did not** | [`p4.8-provenance.md`](p4.8-provenance.md) |
 | the P4.1 / D6 audit | [`downstream-audit.md`](downstream-audit.md) |
 | where a promoted document came from | [`documentation-provenance.md`](documentation-provenance.md) |

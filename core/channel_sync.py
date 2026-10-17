@@ -9,6 +9,10 @@
      逐轨健康检查 (NaN/Inf / 静音 RMS / 最短时长) — 轨道级状态;
   4. 锚点候选回退 [CH3, CH4, CH1, CH2] (0-based [2,3,0,1]): 首个与至少
      一条其它健康轨得到有效估计者当选; 全部失败 -> no_valid_anchor;
+  4b. (opt-in, **默认关闭**) 分组锚点: 先按"相关峰/噪声底"把健康轨分成
+     互不相关的组, 未被锚点覆盖的组各用自己的组内锚点再测一次。只做
+     **加法** —— 只有判成 untouched 的轨才可能被改判, 已经定下来的修正
+     绝不丢失、也绝不改值 (结构性保证, 不靠回归去赌);
   5. anchor <-> 其余健康轨逐一 estimate_pair (两阶段 GCC-PHAT + 相位斜率
      精估), 每轨独立质量门: usable_frames / confidence / constant
      (MAD + 漂移 ppm) / out_of_range (搜索窗边缘堆积);
@@ -46,6 +50,7 @@ latency; 不同物理位置不禁止同步, 但相关性不足时安全放弃该
 
 from __future__ import annotations
 
+import itertools
 import json
 import math
 import os
@@ -54,12 +59,14 @@ import struct
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable, Mapping
 
 __all__ = [
     "DEFAULTS",
     "effective_opts",
     "eligible_audio",
+    "group_anchor_of",
+    "group_by_snr",
     "run_channel_sync",
     "repair_remux_timescale",
 ]
@@ -125,6 +132,28 @@ DEFAULTS: dict[str, Any] = {
     # —— 锚点 (P1: 候选顺序 + 健康门; 完整打分属二期) ——
     "anchor_candidates": [2, 3, 0, 1],   # CH3 > CH4 > CH1 > CH2 (0-based); CH3 非"真值基准"
 
+    # —— 分组锚点 (opt-in, **默认关闭**) ——
+    #
+    # 单锚点模型隐含一个前提: 四条轨录的是同一个声场。真实 4 声道素材经常
+    # 不成立 —— CH1/CH2 与 CH3/CH4 是两支互不相干的麦克风。此时锚点选中的
+    # 那一组能被修, 另一组**没有任何修正机会**, 尽管它内部完全可对齐
+    # (实测 20260919_C1305/C1306: 组内相关峰/噪声中位 1.53~1.78,
+    # 跨组 0.91~1.02 —— 后者低于噪声底, 即"与随机不可分")。
+    #
+    # 默认关闭的理由: 这是**策略变更** (多了一个坐标系), 不是缺陷修复。
+    # 关闭时下方代码路径与此特性引入前逐字节相同。
+    "group_anchor_enabled": False,
+    # 建组阈值 = 相关峰/噪声底的中位数门。1.3 是实测稳定窗口的下界:
+    # 1.2 会出现 ~1.27 的跨组边导致过度合并 (C1305 四轨并成一组),
+    # 1.5 起开始过分裂 (C1214 拆掉真实同组的 CH2/CH3)。
+    "group_snr_threshold": 1.3,
+    # 每对抽多少帧来估计这个比值。长片上 200 帧与全量 41645 帧的差别只是
+    # 噪声, 而代价从 ~11 s 降到 ~20 ms。
+    "group_snr_samples": 200,
+    # 有效样本低于此值 -> 该对**不可判定**, 按不连通处理 (不猜)。3 s 素材
+    # 就有 30 帧; 更短的片段无法建组, 因此行为回落到单锚点。
+    "group_snr_min_samples": 30,
+
     # —— P4.6 时变同步 (逐窗修正): **显式 opt-in**, 默认关闭 ——
     #
     # 三项必须同时由调用方给出。policy 与 coordinate 是 D2/D5 两个**未冻结的
@@ -151,7 +180,8 @@ DEFAULTS: dict[str, Any] = {
     "algo_version": "2.3.0-p1",
 }
 
-_INT_KEYS = ("min_audio_streams", "coarse_rate", "min_usable_frames")
+_INT_KEYS = ("min_audio_streams", "coarse_rate", "min_usable_frames",
+             "group_snr_samples", "group_snr_min_samples")
 #: **可为 None** 的整数键 (P4.6): None 是"未指定, 用上游具名默认常量", 与 0
 #: 不是一回事。它们不能进 `_INT_KEYS` —— `int(None)` 会抛错, 而
 #: `effective_opts` 的 except 会把**整份配置**回退成 DEFAULTS, 于是调用方写的
@@ -165,11 +195,12 @@ _FLOAT_KEYS = ("min_audio_seconds", "silent_rms_dbfs", "search_window_ms",
                "min_confidence", "min_usable_fraction", "mad_max_ms",
                "step_min_ms", "constant_max_ppm", "drift_min_ms",
                "verify_max_ms",
-               "aligned_max_ms", "fix_chunk_seconds", "frame_min_rms_dbfs")
+               "aligned_max_ms", "fix_chunk_seconds", "frame_min_rms_dbfs",
+               "group_snr_threshold")
 _LIST_INT_KEYS = ("supported_sample_rates", "anchor_candidates")
 _LIST_FLOAT_KEYS = ("fine_phase_band_hz",)
 _LIST_STR_KEYS = ("supported_codecs",)
-_BOOL_KEYS = ("channel_sync_transparent", "time_varying")
+_BOOL_KEYS = ("channel_sync_transparent", "time_varying", "group_anchor_enabled")
 
 # 参与"全部健康 target 均失败 -> 文件级 measure_failed" 判定的轨道级原因
 _ESTIMATION_FAIL_REASONS = frozenset({
@@ -420,6 +451,77 @@ def repair_remux_timescale(
         log(mv_desc)
 
 
+# ---------------------------------------------------------------------------
+# 分组锚点 (opt-in): 建组与组内锚点 —— 纯函数, 因此可以被单测钉住
+# ---------------------------------------------------------------------------
+
+
+def group_by_snr(
+    snr: Mapping[tuple[int, int], Mapping[str, float]],
+    tracks: Iterable[int],
+    *,
+    threshold: float,
+    min_samples: int,
+) -> list[list[int]]:
+    """把轨按「相关峰 / 噪声底」中位数连成组 (并查集连通分量)。
+
+    纯函数: 不做 I/O, 不读 DEFAULTS —— 门是显式参数。这样才能被单测钉住,
+    而"门"是这个特性里唯一真正需要被钉住的东西。
+
+    两种**不可判定**的情形一律不连边:
+      * 中位数为 nan      —— 这一对根本没测出来;
+      * 有效样本 < min_samples —— 素材太短, 样本不足。
+    "不确定"绝不能当成"相关": 那会让两条死轨被并进真实麦克风组, 而正确的
+    行为是把它们隔离成孤立点 (实测 20260903_C1114: CH1 -64.3 dBFS /
+    CH2 -68.1 dBFS 在噪声底上互相"相关", 比值 5.66)。
+
+    已知局限: 单链接聚类会链式合并 (20260919_C1305 上曾出现一条 0.53% 的
+    边界边把四轨并成一组)。改用「相关峰/噪声底」而不是「合格帧覆盖率」正是
+    为了解决那个具体案例; 链式合并本身是该算法的性质, 不是实现缺陷。加法式
+    合并把它限制在"少尝试一组", 不会丢掉任何已有修正。
+    """
+    order = sorted(set(int(t) for t in tracks))
+    parent = {i: i for i in order}
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for (a, b), d in snr.items():
+        if a not in parent or b not in parent:
+            continue
+        med = d.get("median")
+        if med is None or med != med:
+            continue
+        if float(d.get("samples") or 0.0) < float(min_samples):
+            continue
+        if float(med) < float(threshold):
+            continue
+        ra, rb = find(int(a)), find(int(b))
+        if ra != rb:
+            parent[rb] = ra
+
+    comp: dict[int, list[int]] = {}
+    for i in order:
+        comp.setdefault(find(i), []).append(i)
+    return sorted((sorted(v) for v in comp.values()), key=lambda v: v[0])
+
+
+def group_anchor_of(members: Iterable[int], candidates: Iterable[int]) -> int:
+    """组内锚点 = `candidates` 顺序里最靠前的成员。
+
+    刻意复用 `anchor_candidates` 而**不另发明一套优先级**: 单组四轨时它选出
+    来的就是生产主锚点, 于是"同一组"的结论与现行逐位相同 —— 默认行为的
+    等价性是这个性质推出来的, 不是靠回归去赌。不在候选表里的成员排在最后,
+    并按轨序号稳定排序 (min 的 key 必须全序, 否则结果依赖集合遍历顺序)。
+    """
+    order = {int(c): k for k, c in enumerate(candidates)}
+    return min((int(m) for m in members),
+               key=lambda m: (order.get(m, len(order)), m))
+
+
 def _annotate_eligibility(rep: dict[str, Any]) -> None:
     """给报告的每一行加上**修正资格**判定 (原地, 失败不影响报告)。
 
@@ -619,6 +721,10 @@ def run_channel_sync(
             "file_copied": bool(file_copied),
             "log_dir": str(work_dir),
         }
+        # 分组信息只在**显式打开**时出现。默认关闭时报告与引入该特性前
+        # 逐字节相同 —— 下游按字段读取的地方不会因为多一个键而改变行为。
+        if ctx.get("grouping") is not None:
+            rep["grouping"] = ctx["grouping"]
         # P4.4: 每一行都附上**修正资格**判定 —— 与消费者用的是同一个入口
         # (`correction_eligibility`), 因此生产者写的 `decision="fixed"` 与
         # "允许进入修正路径" 是同一件事的两种说法, 而不是各说各话。
@@ -937,8 +1043,10 @@ def run_channel_sync(
             eff["wide_search_ms"], 3.0 * eff["search_window_ms"]
         )
 
-        def wide_estimate(i: int) -> Any:
-            return _est_pair(anchor, i, wide=True)
+        def wide_estimate(i: int, ref_idx: int | None = None) -> Any:
+            """宽窗复测。`ref_idx` 缺省 = 主锚点 (与开关关闭时完全一致)。"""
+            return _est_pair(anchor if ref_idx is None else ref_idx, i,
+                             wide=True)
 
         anchor_row = plain_row(anchor, "anchor", None)
         anchor_row.update({
@@ -984,6 +1092,7 @@ def run_channel_sync(
 
         def try_wide(
             i: int, ev: dict[str, Any], *, why: str,
+            ref_idx: int | None = None,
         ) -> tuple[Any, dict[str, Any], str | None]:
             """宽窗复测并**按同一道门**判定可否采纳。
 
@@ -994,7 +1103,7 @@ def run_channel_sync(
             返回 (估计, 证据, 未通过原因或 None)。未通过时估计仍返回, 供
             "有数值但证据不足" 的语义使用。
             """
-            ew = wide_estimate(i)
+            ew = wide_estimate(i, ref_idx)
             ev_w = evidence_of_est(ew)
             if abs(ew.delay_samples) > search_samples:
                 return ew, ev_w, "out_of_range"
@@ -1010,17 +1119,26 @@ def run_channel_sync(
                 return ew, ev_w, why_not
             return ew, ev_w, None
 
-        for i in healthy:
-            if i == anchor:
-                continue
-            e = ests[i]
+        def decide_and_record(
+            i: int, e: Any, ref_idx: int | None = None,
+        ) -> tuple[str, Any, dict[str, Any]]:
+            """对一条轨做**完整决策**, 把结果写进 rows[i], 返回 (决策, 采用的估计, 证据)。
+
+            为什么要抽成函数: 分组层 (4b) 需要对**同一条轨、换一个参考**再判
+            一次, 而那必须真的是同一道门 —— 复制一份门逻辑出来, 两边的阈值
+            迟早会飘。抽出来之后主路径和分组路径共用同一份代码, 因此
+            `untouched` 的原因在两条路径上可比。
+
+            `ref_idx` 只影响宽窗复测用哪个参考; 缺省 = 主锚点。
+            """
             stats = sync_estimate.summarize_trajectory(e.frames, sample_rate)
             reason_: str | None = None
             ev = evidence_of_est(e)
             coverage = ev["coverage"]
             if e.usable_frames < eff["min_usable_frames"]:
                 # 窄窗无可测帧: 宽窗复测 — 真实时差超窗 vs 确实不可测
-                ew, ev_w, why_not = try_wide(i, ev, why="usable_frames")
+                ew, ev_w, why_not = try_wide(
+                    i, ev, why="usable_frames", ref_idx=ref_idx)
                 if why_not == "out_of_range":
                     reason_ = "out_of_range"
                     log(
@@ -1067,7 +1185,8 @@ def run_channel_sync(
                 # 不可靠"把关, 而恒定性现在由 `classify_constant` 在**实测位移**
                 # 上直接判定 (core/sync_estimate.py)。`out_of_range` 检测仍然
                 # 生效 —— 由上面 `usable_frames < min_usable_frames` 分支承担。
-                ew, ev_w, why_not = try_wide(i, ev, why="evidence_insufficient")
+                ew, ev_w, why_not = try_wide(
+                    i, ev, why="evidence_insufficient", ref_idx=ref_idx)
                 if why_not == "out_of_range":
                     reason_ = "out_of_range"
                     log(
@@ -1098,7 +1217,7 @@ def run_channel_sync(
                     )
             elif sync_estimate.boundary_pileup(e.frames, search_samples) > 0.5:
                 # 边缘堆积: 宽窗确认真实时差是否在窗内
-                ew = wide_estimate(i)
+                ew = wide_estimate(i, ref_idx)
                 if (
                     ew.usable_frames >= eff["min_usable_frames"]
                     and ew.confidence >= eff["min_confidence"]
@@ -1154,7 +1273,7 @@ def run_channel_sync(
                     f"mad {stats.mad_ms:.3f}ms, "
                     f"ppm {stats.drift_ppm:.2f}) — 该轨 untouched"
                 )
-                continue
+                return "untouched", e, ev
             # 量化粒度保护 (幂等性): 修正只做**整数样本**移位, 因此
             # |delay| < 1 个样本时移位量化后为 0 —— 此时不得产生任何写入。
             # 判据用**样本数**而不是毫秒: `aligned_max_ms` (0.05 ms) 换算到
@@ -1169,13 +1288,158 @@ def run_channel_sync(
             if (abs(e.delay_ms) < eff["aligned_max_ms"]
                     or abs(e.delay_samples) < 1.0):
                 rows[i] = est_row(i, e, stats, "already_aligned", None)
+                decision = "already_aligned"
             else:
                 rows[i] = est_row(i, e, stats, "fixed", None)
-                to_fix.append(i)
+                decision = "fixed"
             rows[i]["evidence"] = ev
             rows[i]["rms_dbfs"] = (
                 round(rms_of[i], 1) if rms_of.get(i) is not None else None
             )
+            return decision, e, ev
+
+        # 主路径: 相对主锚点逐轨决策。这一段与"分组锚点"引入前逐字节相同。
+        for i in healthy:
+            if i == anchor:
+                continue
+            decision, e_used, _ev = decide_and_record(i, ests[i])
+            # `used_est` 只在**宽窗被采纳**时登记 —— 与旧实现一致, 因为尾部
+            # 汇总日志的读音就是"这条轨最终采纳了哪一条估计"。
+            if e_used is not ests[i]:
+                used_est[i] = e_used
+            if decision == "fixed":
+                to_fix.append(i)
+
+        # 4b. 分组锚点 (opt-in, 默认关闭) —— **只做加法**
+        #
+        # 单锚点模型只管锚点所在的那一组。真实 4 声道素材里 CH1/CH2 与
+        # CH3/CH4 常常是两支互不相干的麦克风, 另一组从来没有被修的机会,
+        # 尽管它内部完全可对齐。
+        #
+        # 三条自我约束, 让"打开开关"在结构上不可能造成回归:
+        #   (a) 只看**主锚点分量之外**的组 (主路径的结果原样保留);
+        #   (b) 只看**成员全部仍是 untouched** 的组 —— 任何一条轨已被主路径
+        #       处置 (fixed / already_aligned) 的组整组跳过, 绝不把两个坐标系
+        #       混在一起, 也绝不重测已经定下来的轨;
+        #   (c) 组内重判用的仍是 `decide_and_record` 同一份门逻辑与同一个
+        #       `estimate_pair`, 只有**参考**换成了组锚点。
+        # 因此开关打开只可能"多修几条轨", 不可能少修、也不可能改值。
+        groups: list[list[int]] = [sorted(healthy)]
+        group_snr: dict[str, dict[str, float]] = {}
+        ref_of: dict[int, int] = {}     # 轨 -> 复检用的参考轨
+        group_notes: dict[int, dict[str, Any]] = {}   # 分组层对该行的补充说明
+        if eff["group_anchor_enabled"] and len(healthy) >= 2:
+            snr_pairs: dict[tuple[int, int], dict[str, float]] = {}
+            for a, b in itertools.combinations(sorted(healthy), 2):
+                snr_pairs[(a, b)] = sync_estimate.sample_pair_snr(
+                    arrs[a], arrs[b],
+                    sample_rate=sample_rate,
+                    frame_ms=eff["frame_ms"],
+                    hop_ms=eff["hop_ms"],
+                    search_window_ms=eff["search_window_ms"],
+                    coarse_rate=eff["coarse_rate"],
+                    frame_min_rms_dbfs=eff["frame_min_rms_dbfs"],
+                    samples=eff["group_snr_samples"],
+                )
+            groups = group_by_snr(
+                snr_pairs, healthy,
+                threshold=eff["group_snr_threshold"],
+                min_samples=eff["group_snr_min_samples"],
+            )
+            group_snr = {f"{a + 1}-{b + 1}": d
+                         for (a, b), d in snr_pairs.items()}
+            log("channel-sync: anchor groups = " + " | ".join(
+                "[" + ",".join(f"CH{m + 1}" for m in g) + "]"
+                for g in groups)
+                + f"  (threshold {eff['group_snr_threshold']:.2f}, "
+                  f"{eff['group_snr_samples']} frames/pair, "
+                  f"primary anchor CH{anchor + 1})")
+
+            primary_comp = next((g for g in groups if anchor in g), [anchor])
+            for gi, g in enumerate(groups):
+                if g == primary_comp or len(g) < 2:
+                    continue
+                blocked = [
+                    m for m in g
+                    if rows[m].get("decision") == "fixed"
+                    or rows[m].get("decision") == "already_aligned"
+                ]
+                if blocked:
+                    log(
+                        "channel-sync: group [" + ",".join(
+                            f"CH{m + 1}" for m in g) + "] skipped — "
+                        + ",".join(f"CH{m + 1}" for m in blocked)
+                        + " 已被主锚点处置, 不与另一坐标系混用"
+                    )
+                    continue
+                grp_anchor = group_anchor_of(g, eff["anchor_candidates"])
+                for m in g:
+                    if m == grp_anchor:
+                        # 组锚点自己: 它是这一组的坐标原点, 不发生移位。
+                        # 保留它在主锚点下的原因 (信息不能丢)。
+                        prev_reason = rows[m].get("reason")
+                        row = plain_row(m, "anchor", None)
+                        row.update({
+                            "delay_ms": 0.0, "delay_samples": 0.0,
+                            "confidence": 1.0, "constant": True,
+                            "fine_delay_ms": 0.0,
+                            "rms_dbfs": (
+                                round(rms_of[m], 1)
+                                if rms_of.get(m) is not None else None
+                            ),
+                        })
+                        rows[m] = row
+                        group_notes[m] = {"anchor_role": "secondary",
+                                          "primary_reason": prev_reason}
+                        continue
+                    e2 = _est_pair(grp_anchor, m)
+                    saved = rows[m]
+                    saved_used = used_est.pop(m, None)
+                    dec2, e2_used, _ev2 = decide_and_record(m, e2, grp_anchor)
+                    if dec2 == "untouched":
+                        # 组内也没测出来 -> 保留主锚点下的原因 (更具体)
+                        rows[m] = saved
+                        if saved_used is not None:
+                            used_est[m] = saved_used
+                        continue
+                    ests[m] = e2
+                    ref_of[m] = grp_anchor
+                    group_notes[m] = {
+                        "primary_reason": saved.get("reason"),
+                        "group_anchor": grp_anchor + 1,
+                    }
+                    if e2_used is not e2:
+                        used_est[m] = e2_used
+                    else:
+                        used_est.pop(m, None)
+                    if dec2 == "fixed":
+                        to_fix.append(m)
+                    log(
+                        f"channel-sync: CH{m + 1} 主锚点下不可测, "
+                        f"组内锚点 CH{grp_anchor + 1} 下判为 {dec2} "
+                        f"({e2.delay_ms:+.3f}ms, {e2.usable_frames} 帧)"
+                    )
+
+        if eff["group_anchor_enabled"]:
+            for gi, g in enumerate(groups):
+                for m in g:
+                    rows[m]["group"] = gi
+            # 主锚点也打上 role: 否则报告里会出现两行 decision=="anchor",
+            # 单看行无法区分谁是坐标原点。开关关闭时不写, 报告保持原样。
+            rows[anchor]["anchor_role"] = "primary"
+            for m, note in group_notes.items():
+                rows[m].update(note)
+            ctx["grouping"] = {
+                "enabled": True,
+                "threshold": float(eff["group_snr_threshold"]),
+                "samples_per_pair": int(eff["group_snr_samples"]),
+                "min_samples": int(eff["group_snr_min_samples"]),
+                "anchor": anchor,
+                "groups": [[m + 1 for m in g] for g in groups],
+                "secondary_anchor_refs": {str(k + 1): v + 1
+                                          for k, v in ref_of.items()},
+                "snr": group_snr,
+            }
 
         log(
             f"channel-sync: anchor=CH{anchor + 1}, measured "
@@ -1259,7 +1523,10 @@ def run_channel_sync(
                         pass            # finally 会重试; 此处失败不致命
             try:
                 residual = sync_fix.recheck_residual(
-                    arrs[anchor],
+                    # 分组锚点打开时, 不同组的轨要用**各自**的参考复检 ——
+                    # 用主锚点去复检另一组的轨, 残差本来就应当很大, 那不是
+                    # 修正失败, 是拿错了尺子。
+                    arrs[ref_of.get(i, anchor)],
                     # 传路径而非就地 open 的流对象: recheck_residual 会自己
                     # 打开并在 finally 关闭它 (owns_tgt)。就地 open 的流没有
                     # 任何一方负责关闭, 只能靠 CPython 引用计数; 一旦引用被

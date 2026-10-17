@@ -463,3 +463,170 @@ def l1_channel_sync_p1() -> None:
         )
     )
     record("p1.估计确定性 (bit 级一致)", same)
+
+
+def l1_channel_sync_groups() -> None:
+    """分组锚点 (opt-in) 的纯逻辑: 强度采样 / 建组 / 组内锚点。
+
+    这一组**不跑媒体**: 建组是纯函数, 采样是对合成信号做的。真实施加移位
+    与复测在 L3 (端到端) 里做 —— 这里只把门与语义钉住。
+    """
+    section("L1 延时补偿 分组锚点 (opt-in)")
+    try:
+        import numpy as np
+        from scipy import signal
+    except ImportError as exc:
+        record("p1g.numpy/scipy 可用", False,
+               f"{exc} — 本组跳过 (分组锚点需 numpy/scipy)")
+        return
+    record("p1g.numpy/scipy 可用", True)
+
+    from core import sync_estimate
+    from core.channel_sync import (
+        DEFAULTS, effective_opts, group_anchor_of, group_by_snr,
+    )
+
+    # --- 默认关闭 + 键值语义 ---
+    record("p1g.分组锚点默认关闭 (策略变更非缺陷修复)",
+           DEFAULTS["group_anchor_enabled"] is False)
+    record("p1g.分组默认阈值 1.3", DEFAULTS["group_snr_threshold"] == 1.3)
+    record("p1g.分组默认 200 帧/对", DEFAULTS["group_snr_samples"] == 200)
+    record("p1g.分组最少样本 30", DEFAULTS["group_snr_min_samples"] == 30)
+    og = effective_opts({"group_anchor_enabled": 1,
+                         "group_snr_threshold": "1.45",
+                         "group_snr_samples": "120"})
+    record("p1g.opts 归一 (bool/float/int)",
+           og["group_anchor_enabled"] is True
+           and og["group_snr_threshold"] == 1.45
+           and og["group_snr_samples"] == 120,
+           f"enabled={og['group_anchor_enabled']!r} "
+           f"thr={og['group_snr_threshold']!r} "
+           f"n={og['group_snr_samples']!r}")
+
+    SR = 48_000
+
+    def speech_like(n: int, seed: int) -> np.ndarray:
+        rng = np.random.default_rng(seed)
+        sos = signal.butter(4, [100.0, 4000.0], btype="band", fs=SR,
+                            output="sos")
+        x = signal.sosfilt(sos, rng.standard_normal(n))
+        x /= np.max(np.abs(x)) + 1e-12
+        return x.astype(np.float32)
+
+    kw = dict(sample_rate=SR, frame_ms=100.0, hop_ms=100.0,
+              search_window_ms=20.0, coarse_rate=8000,
+              frame_min_rms_dbfs=-50.0, samples=40)
+    a = speech_like(6 * SR, 11)
+    same = sync_estimate.sample_pair_snr(a, np.roll(a, 673), **kw)
+    diff = sync_estimate.sample_pair_snr(a, speech_like(6 * SR, 12), **kw)
+    record("p1g.同源强度明显高于异源",
+           same["median"] >= 3.0 and diff["median"] <= 1.3
+           and same["median"] > 2.0 * diff["median"],
+           f"same={same['median']:.2f} diff={diff['median']:.2f}")
+    record("p1g.异源落在噪声底附近 (≈1, 低于阈值 1.3)",
+           diff["median"] < DEFAULTS["group_snr_threshold"],
+           f"diff={diff['median']:.2f}")
+
+    # 静音必须被 RMS 门挡掉 —— 否则两条死轨会在噪声底上互相"相关"
+    sil = np.zeros(6 * SR, dtype=np.float32)
+    s_sil = sync_estimate.sample_pair_snr(a, sil, **kw)
+    record("p1g.静音轨 -> 有效样本 0 (RMS 门), 不参与建组",
+           s_sil["samples"] == 0.0 and s_sil["median"] != s_sil["median"],
+           f"samples={s_sil['samples']} median={s_sil['median']}")
+
+    # 素材太短 -> 0 帧 -> 不可判定 (调用方必须当"不可判定", 不许当 0)
+    s_short = sync_estimate.sample_pair_snr(a[:100], a[:100], **kw)
+    record("p1g.素材过短 -> frames_total=0 且 samples=0",
+           s_short["frames_total"] == 0.0 and s_short["samples"] == 0.0,
+           f"frames_total={s_short['frames_total']}")
+
+    # 确定性: 固定种子, 同一对素材两次调用逐位相同
+    d1 = sync_estimate.sample_pair_snr(a, speech_like(6 * SR, 13), **kw)
+    d2 = sync_estimate.sample_pair_snr(a, speech_like(6 * SR, 13), **kw)
+    record("p1g.强度采样确定性 (固定种子)",
+           d1["median"] == d2["median"] and d1["samples"] == d2["samples"])
+
+    # 反相: 负峰更强时强度取负峰的绝对值, 因此极性翻转不改变"是否同源"。
+    # 目标窗必须比参考帧**长**, 否则相关面只有一个点 (m 只有 0 这一个取值),
+    # 窗口恒 <3 而退化成 nan —— 这是 `peak_noise_ratio` 的几何约束, 不是缺陷。
+    _half = 32
+    _ref = a[: SR // 10].astype(np.float64)
+    _tgt = a[: SR // 10 + 2 * _half].astype(np.float64)
+    pos = sync_estimate.peak_noise_ratio(
+        _ref, _tgt, lag0=_half, search_lo=-_half, search_hi=_half)
+    neg = sync_estimate.peak_noise_ratio(
+        _ref, -_tgt, lag0=_half, search_lo=-_half, search_hi=_half)
+    record("p1g.反相仍判同源 (极性感知)",
+           pos == pos and neg == neg and pos > 3.0
+           and abs(pos - neg) <= 0.05 * pos,
+           f"pos={pos:.2f} neg={neg:.2f}")
+
+    # --- 建组 (纯函数) ---
+    def snr_tbl(spec: dict, samples: float = 200.0) -> dict:
+        """spec: {"1-2": median, ...} -> {(0,1): {"median":.., "samples":..}}。
+
+        单对样本数可以按对覆盖 (值写成 (median, samples) 元组), 否则测不出
+        "这一对样本不足、那一对足够" 这种情形。
+        """
+        tbl = {}
+        for key, med in spec.items():
+            i, j = (int(x) - 1 for x in key.split("-"))
+            if isinstance(med, tuple):
+                med, n = med
+            else:
+                n = samples
+            tbl[(i, j)] = {"median": float(med), "samples": float(n)}
+        return tbl
+
+    two = snr_tbl({"1-2": 2.0, "3-4": 1.8,
+                   "1-3": 0.9, "1-4": 0.85, "2-3": 0.95, "2-4": 0.9})
+    g = group_by_snr(two, range(4), threshold=1.3, min_samples=30)
+    record("p1g.两组 [[C1,C2],[C3,C4]]",
+           g == [[0, 1], [2, 3]], str(g))
+
+    one = snr_tbl({f"{i}-{j}": 2.0
+                   for i in range(1, 5) for j in range(i + 1, 5)})
+    g = group_by_snr(one, range(4), threshold=1.3, min_samples=30)
+    record("p1g.四轨同源 -> 单组 (与现行单锚点等价)",
+           g == [[0, 1, 2, 3]], str(g))
+
+    none = snr_tbl({f"{i}-{j}": 0.8
+                    for i in range(1, 5) for j in range(i + 1, 5)})
+    g = group_by_snr(none, range(4), threshold=1.3, min_samples=30)
+    record("p1g.全部不相关 -> 四个孤立点 (无可修)",
+           g == [[0], [1], [2], [3]], str(g))
+
+    # 有效样本不足 -> 该对不可判定, **不连边** (不猜)。这里只有 (1,2) 样本
+    # 不足且比值很高, 若把它当真就会把两条互不相关的轨并成一组。
+    few = snr_tbl({"1-2": (5.0, 5.0), "3-4": (1.8, 200.0)})
+    g = group_by_snr(few, range(4), threshold=1.3, min_samples=30)
+    record("p1g.样本不足的对不连边 (死轨高比值也不会并组)",
+           g == [[0], [1], [2, 3]], str(g))
+
+    nan_tbl = {(0, 1): {"median": float("nan"), "samples": 200.0},
+               (2, 3): {"median": 1.8, "samples": 200.0}}
+    g = group_by_snr(nan_tbl, range(4), threshold=1.3, min_samples=30)
+    record("p1g.nan 强度不连边", g == [[0], [1], [2, 3]], str(g))
+
+    # 单链接聚类的固有性质: 链式边会合并。这是**已知局限**, 不是缺陷 ——
+    # 加法式合并使得"过度合并"的最坏后果只是少尝试一组, 不会丢掉已有修正。
+    chain = snr_tbl({"1-2": 2.0, "2-3": 1.4, "1-3": 0.5,
+                     "1-4": 0.5, "2-4": 0.5, "3-4": 0.5})
+    g = group_by_snr(chain, range(4), threshold=1.3, min_samples=30)
+    record("p1g.单链接链式合并 (已知局限, 记录行为)",
+           g == [[0, 1, 2], [3]], str(g))
+
+    # --- 组内锚点 = anchor_candidates 顺序里最靠前的成员 ---
+    cand = [2, 3, 0, 1]
+    record("p1g.组内锚点 [C1,C2] -> C1",
+           group_anchor_of([0, 1], cand) == 0)
+    record("p1g.组内锚点 [C3,C4] -> C3 (与主锚点同序)",
+           group_anchor_of([2, 3], cand) == 2)
+    record("p1g.组内锚点 [C1,C2,C4] -> C4",
+           group_anchor_of([0, 1, 3], cand) == 3)
+    record("p1g.单成员组锚点 = 自己",
+           group_anchor_of([1], cand) == 1)
+    # 结构性保证: 单组四轨时组内锚点 == 主锚点候选首位, 因此"同一组"的
+    # 结论与现行逐位相同 (A1/A3 由此推出, 不靠回归去赌)
+    record("p1g.单组四轨的组锚点 == 生产主锚点 (结构性零回归)",
+           group_anchor_of([0, 1, 2, 3], cand) == cand[0])
