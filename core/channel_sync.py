@@ -1244,6 +1244,19 @@ def run_channel_sync(
                     rows[i]["evidence"] = ev
                     log(f"channel-sync: WARNING CH{i + 1} shift failed: {exc}")
                     continue
+                # 落盘最小化 (M1b): `arrs[i]` 是 `decoded_{i}` 的唯一读者 ——
+                # 紧接着的复检读的是 `arrs[anchor]`(L1188) 而不是本轨, 所以
+                # 该轨移位一完成就可以释放它的 raw 解码副本, 不必等到整个
+                # 循环结束再统一删。anchor 不释放: 它要给后续每一轨的复检
+                # 当参考常驻。
+                # 以 80 min / 4 轨为例, decoded 每轨 799.6 MB: 逐轨释放让
+                # "decoded 4 份 + fixed 累积" 不再同时达到峰值。
+                if i != anchor:
+                    _close_map(arrs[i])
+                    try:
+                        decoded[i].unlink()
+                    except OSError:
+                        pass            # finally 会重试; 此处失败不致命
             try:
                 residual = sync_fix.recheck_residual(
                     arrs[anchor],
@@ -1309,6 +1322,21 @@ def run_channel_sync(
 
         # 7. per-stream 输出: fixed 轨回编码 (源 codec), 其余轨 stream copy
         #
+        # 落盘最小化 (M1): 到这里测量/移位/复检都已经结束, `decoded_*` 不再
+        # 需要 —— 先关句柄再删, 避免它们与 per-track 编码产物和最终输出同时
+        # 存在。以 80 min / 4 轨为例, decoded 是 4 x 799.6 MB = 3.20 GB,
+        # 与 46 GB 的透明输出叠加时是纯浪费。
+        # 句柄必须先关 (Windows): RawStream.close() 是幂等的, 尾部 finally
+        # 会再关一次, 因此这里提前关是安全的。
+        for a in arrs:
+            _close_map(a)
+        arrs = []
+        for p in decoded:
+            try:
+                p.unlink()
+            except OSError:
+                pass                    # finally 会重试; 这里失败不致命
+
         audio_files: list[Path] = []
         for i in range(n_tracks):
             out = work_dir / f"audio_{i}.mov"
@@ -1345,6 +1373,13 @@ def run_channel_sync(
                         channels=rows,
                     )
             audio_files.append(out)
+            # 落盘最小化 (M1): 该轨的 per-track 产物已经写出来了, 它的
+            # `fixed_{i}` 到此再无消费者 (复检已在上面完成)。立即释放,
+            # 这样重封装阶段只保留 audio_*.mov 而不是再叠一份 raw。
+            try:
+                fixed_raw[i].unlink()
+            except OSError:
+                pass
 
         scope = "partial" if any(
             r["decision"] == "untouched" for r in rows
