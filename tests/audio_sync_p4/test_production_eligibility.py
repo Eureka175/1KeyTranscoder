@@ -118,22 +118,35 @@ def gate() -> dict:
 
 
 def good_evidence(g: dict) -> dict:
+    """Clears every OPERATIVE gate (frame floor + confidence).
+
+    CHANGED 2026-10-16 (copy of tests/audio_sync_p4): `min_usable_fraction` is
+    calibrated to 0.0, so a coverage-derived `usable` degenerated to 2 -- BELOW
+    the 5-frame floor, i.e. not "good" at all.
+    """
     total = 4 * int(g["min_usable_frames"])
-    usable = min(total, int(np.ceil(g["min_usable_fraction"] * total)) + 2)
+    floor = int(g["min_usable_frames"])
+    usable = min(total, max(floor * 2, floor + 2))
     return {"usable_frames": usable, "total_frames": total,
             "coverage": usable / total,
             "quality": min(0.99, g["min_confidence"] + 0.4)}
 
 
 def poor_evidence(g: dict) -> dict:
-    """A NUMBER exists and is not trusted: enough to produce a value, coverage
-    below the gate."""
+    """A NUMBER exists and is not trusted.
+
+    CHANGED 2026-10-16 (copy of tests/audio_sync_p4): "coverage below the gate"
+    is unsatisfiable at 0.0 (the original expression produced a negative frame
+    count). The frame floor produces no value, so the remaining route that keeps
+    a numeric estimate is the CONFIDENCE floor -- which is exactly the
+    production `low_confidence` reason.
+    """
     total = 4 * int(g["min_usable_frames"])
-    usable = max(int(g["min_usable_frames"]),
-                 int(np.floor(g["min_usable_fraction"] * total)) - 1)
+    floor = int(g["min_usable_frames"])
+    usable = min(total, floor + 1)
     return {"usable_frames": usable, "total_frames": total,
             "coverage": usable / total,
-            "quality": min(0.99, g["min_confidence"] + 0.4)}
+            "quality": max(0.0, g["min_confidence"] - 0.1)}
 
 
 def sync(status, offset=480.0, **kw):
@@ -711,10 +724,20 @@ def main() -> int:
           f"min_usable_fraction={g['min_usable_fraction']}")
     print(f"  good evidence={good_evidence(g)}")
     print(f"  poor evidence={poor_evidence(g)}")
-    if poor_evidence(g)["coverage"] >= g["min_usable_fraction"]:
-        print("BLOCKED: the derived 'poor' fixture is not actually below the "
-              "gate — E2/E9 would not be testing what they claim",
-              file=sys.stderr)
+    # CALIBRATED 2026-10-16: "poor" must be below an OPERATIVE gate. Coverage
+    # is no longer one (calibrated to 0.0), so the guard accepts either an
+    # absolute-floor shortfall or a confidence shortfall -- otherwise it would
+    # block forever on a satisfied-but-inert coverage term.
+    _poor = poor_evidence(g)
+    _below = (
+        _poor["coverage"] < g["min_usable_fraction"]
+        or _poor["usable_frames"] < int(g["min_usable_frames"])
+        or _poor["quality"] < g["min_confidence"]
+    )
+    if not _below:
+        print("BLOCKED: the derived 'poor' fixture is not actually below any "
+              "operative gate (coverage/frames/confidence) -- E2/E9 would not "
+              "be testing what they claim", file=sys.stderr)
         return 2
 
     e1_eligible(g)

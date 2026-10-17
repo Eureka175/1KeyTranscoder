@@ -105,19 +105,40 @@ def suffices(usable: int, total: int, confidence: float, g: dict) -> bool:
 
 
 def abundant(g: dict) -> tuple[int, int, float]:
-    """(usable, total, confidence) comfortably above every gate."""
+    """(usable, total, confidence) comfortably above every gate.
+
+    CHANGED 2026-10-16 (copy of tests/audio_sync_p4). The original built
+    `usable` from `min_usable_fraction`, so when that gate was calibrated from
+    0.6 to 0.0 the "abundant" fixture degenerated to `min(total, 0+2) = 2`,
+    which is BELOW `min_usable_frames` (5) and therefore not abundant at all.
+    Coverage is no longer a gate, so the fixture is now built from the frame
+    floor, with a healthy margin, and the coverage clause is kept only because
+    `suffices()` still evaluates it (harmless at a 0.0 threshold).
+    """
     total = 4 * g["min_usable_frames"]
-    usable = min(total, int(np.ceil(g["min_usable_fraction"] * total)) + 2)
+    floor = int(g["min_usable_frames"])
+    usable = min(total, max(floor * 2, floor + 2))
     return usable, total, min(0.99, g["min_confidence"] + 0.4)
 
 
 def scarce(g: dict) -> tuple[int, int, float]:
-    """A NUMBER exists and is NOT trusted: enough frames/confidence to produce
-    a value, but coverage below the gate."""
+    """A NUMBER exists and is NOT trusted.
+
+    CHANGED 2026-10-16 (copy of tests/audio_sync_p4). The original built
+    "untrusted" from COVERAGE, but `min_usable_fraction` has been calibrated to
+    0.0, so "coverage below the gate" is unsatisfiable (the original expression
+    degenerated to a negative frame count). Of the two remaining insufficient-
+    evidence routes, the ABSOLUTE FRAME FLOOR produces no value at all, so it
+    cannot carry the original intent ("the NUMBER still exists", S2.2).
+
+    `scarce` therefore keeps enough frames to produce a value
+    (>= min_usable_frames) and puts CONFIDENCE below `min_confidence` instead,
+    which is exactly the production reason `low_confidence` exists.
+    """
     total = 4 * g["min_usable_frames"]
-    usable = max(g["min_usable_frames"],
-                 int(np.floor(g["min_usable_fraction"] * total)) - 1)
-    return usable, total, min(0.99, g["min_confidence"] + 0.4)
+    floor = int(g["min_usable_frames"])
+    usable = min(total, floor + 1)
+    return usable, total, max(0.0, g["min_confidence"] - 0.1)
 
 
 def small_geometry() -> dict:
@@ -265,10 +286,12 @@ def s2_low_confidence_with_number(g: dict) -> None:
           res.offset_samples is not None and res.quality == conf,
           f"offset_samples={res.offset_samples} quality={res.quality}. "
           f"The value is reported; what is withheld is TRUST.")
+    # CHANGED 2026-10-16: the gate that withholds trust is now confidence
+    # (coverage calibrated to 0.0), so the assertion follows the operative gate.
     value("S2.3 ...and the evidence that explains it travels with it",
-          res.coverage is not None and (usable / total) < g["min_usable_fraction"],
-          f"coverage={res.measurement_coverage:.3f} < "
-          f"{g['min_usable_fraction']} — 'a number exists and is not trusted'")
+          res.quality is not None and res.quality < g["min_confidence"],
+          f"quality={res.quality:.3f} < min_confidence={g['min_confidence']} "
+          f"— 'a number exists and is not trusted'")
     value("S2.4 ...and LOW_CONFIDENCE is not a FAILED state",
           res.processed and res.status is not SyncStatus.FAILED,
           "uncertainty is not error: an under-evidenced measurement is a "

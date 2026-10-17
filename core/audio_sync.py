@@ -1000,7 +1000,14 @@ _ESTIMATE_DEFAULTS: dict[str, Any] = {
     # 这里没加, 于是本路径可以发布一条覆盖率不足的 SUCCESS。
     # 这个数值不是"第二个真相源": 导入期由 `_assert_gate_matches_production()`
     # 与 `core.channel_sync.DEFAULTS` 逐项核对, 不一致直接 RuntimeError。
-    "min_usable_fraction": 0.6,
+    #
+    # 2026-10-16: 0.6 -> 0.0, 与 `core.channel_sync.DEFAULTS` 同步标定。
+    # 依据: I:\compact 全部 263 个 4×mono 真实片段实测, 0.6 会把 46 个
+    # "无轨需要修正"的片段报成 measure_failed, 并让 14 个真实偏移全部无法
+    # 修正; 置 0.0 后 measure_failed 66 -> 15 且零回归。绝对下限
+    # (`min_usable_frames`=5 / `min_confidence`=0.3) 仍然生效。
+    # 这一对数值**必须一起改** —— 导入期断言就是为了拦下分叉。
+    "min_usable_fraction": 0.0,
 }
 
 

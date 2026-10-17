@@ -88,7 +88,19 @@ DEFAULTS: dict[str, Any] = {
     "anchor_segment_seconds": 30.0,      # 初值, 待真实素材标定 (相位斜率锚段, 不足取全长)
     "min_confidence": 0.3,               # 初值, 待真实素材标定
     "min_usable_frames": 5,              # 初值, 待真实素材标定
-    "min_usable_fraction": 0.6,          # 初值, 待真实素材标定 (轨迹证据覆盖率: 大洞时恒定性不可靠 -> 宽窗复测)
+    "min_usable_fraction": 0.0,          # 已标定 (真实语料实测, 非初值)
+    # ^ 原为 0.6，注释写作"初值, 待真实素材标定"。实测 (2026-10-16,
+    #   I:\compact 全部 263 个 4×mono 片段, 仅音频路径) 结果:
+    #     0.6  -> measure_failed 66/263 (25.1%), applied 0
+    #     0.0  -> measure_failed 15/263 ( 5.7%), applied 14
+    #   其中 46 个是**假失败** (无轨需要修正, 却因覆盖率不足被报成
+    #   measure_failed); 14 个真实修正经端到端验证 13/14 通过, 零回归。
+    #   比例门删除后**绝对下限仍然生效**: `min_usable_frames` (5) 与
+    #   `min_confidence` (0.3) 继续拒绝由单帧噪声相关得出的移位;
+    #   证据不足的轨道依旧 untouched, 只是不再让**整文件**报成失败。
+    #   设置 0.0 而不是删除该键: `evidence_ok` / `evidence_of_est` /
+    #   `audio_sync_tv_exec` 都通过 `effective_opts()` 读这一项,
+    #   删键会让它们回退到 DEFAULTS 从而复活 0.6。
     "fine_phase_band_hz": [200.0, 8000.0],  # 初值, 待真实素材标定 (96k 上沿仍 8k)
     # 帧级 RMS 门 (dBFS): 任一窗低于此值该帧不可测 — 抽取滤波振铃会把
     # 真静音抬到 ~1e-3 (-60dB), 缺省 -50dB 高于振铃、低于真实内容
@@ -981,6 +993,15 @@ def run_channel_sync(
             elif coverage < eff["min_usable_fraction"]:
                 # 轨迹证据覆盖率不足 (存在大洞): 恒定性判断不可靠 -> 宽窗复测。
                 # P4.2: 宽窗结果**必须重过同一道证据门**才可采纳。
+                #
+                # 2026-10-16: `min_usable_fraction` 已标定为 0.0, 所以本分支在
+                # 当前生产配置下**不可达** (coverage 恒 >= 0.0)。保留它的理由:
+                # (a) 门若被调回正值立即恢复作用; (b) 语义与上面的
+                # `usable_frames` 分支不同。
+                # 为什么覆盖率不再是必需的代理: 覆盖率原本替"轨迹有洞 -> 恒定性
+                # 不可靠"把关, 而恒定性现在由 `classify_constant` 在**实测位移**
+                # 上直接判定 (core/sync_estimate.py)。`out_of_range` 检测仍然
+                # 生效 —— 由上面 `usable_frames < min_usable_frames` 分支承担。
                 ew, ev_w, why_not = try_wide(i, ev, why="evidence_insufficient")
                 if why_not == "out_of_range":
                     reason_ = "out_of_range"
@@ -1067,7 +1088,19 @@ def run_channel_sync(
                     f"ppm {stats.drift_ppm:.2f}) — 该轨 untouched"
                 )
                 continue
-            if abs(e.delay_ms) < eff["aligned_max_ms"]:
+            # 量化粒度保护 (幂等性): 修正只做**整数样本**移位, 因此
+            # |delay| < 1 个样本时移位量化后为 0 —— 此时不得产生任何写入。
+            # 判据用**样本数**而不是毫秒: `aligned_max_ms` (0.05 ms) 换算到
+            # 48 kHz 只覆盖 ±2.4 个样本, 是一个与采样率无关的毫米级带,
+            # 不是"量化粒度"。
+            #
+            # 实测边界 (testsets A7M5): 20260901_C0977 CH4 报告 +0.062 ms
+            # = 3 个样本, 落在 `aligned_max_ms` 之外 -> 被判 fixed 并写入
+            # 3 个样本的移位。**本保护不覆盖它** —— 3 个样本 > 1 个样本,
+            # 那是"真实但极小"的修正 (幅度为主题修正量的 1/400), 属于
+            # 测量不确定度问题, 不是幂等性问题。真正的幂等边界是 1 个样本。
+            if (abs(e.delay_ms) < eff["aligned_max_ms"]
+                    or abs(e.delay_samples) < 1.0):
                 rows[i] = est_row(i, e, stats, "already_aligned", None)
             else:
                 rows[i] = est_row(i, e, stats, "fixed", None)

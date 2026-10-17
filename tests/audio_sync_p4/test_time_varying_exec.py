@@ -858,8 +858,27 @@ def t23_insufficient_coverage() -> None:
     value("T23 coverage is reported as a fraction, not a verdict",
           abs(ev.coverage_fraction - 2.0 / need) < 1e-12,
           f"{ev.coverage_fraction}")
-    value("T23 coverage_gate_ok is False against the PRODUCTION gate",
-          ev.coverage_gate_ok is False, f"{ev.to_dict()}")
+    # CALIBRATED 2026-10-16: the SHIPPED coverage gate is 0.0, so 20 % coverage
+    # no longer fails it. The contract this case exists to protect -- "coverage
+    # is evaluated against the gate, and a gate above the observed coverage
+    # withholds trust" -- is exercised with an EXPLICIT gate, so the mechanism
+    # stays covered instead of silently disappearing with the threshold.
+    refused = None
+    try:
+        ex.build_time_varying_plan(
+            d, request=req(require_evidence_gate=True,
+                gate={"min_usable_frames": 5.0, "min_confidence": 0.3,
+                      "min_usable_fraction": 0.5}),
+            measurements=recs)
+    except ex.TimeVaryingRefused as exc:
+        refused = exc
+    value("T23 a gate above the observed coverage REFUSES the plan",
+          refused is not None
+          and "below the production gate" in str(refused),
+          str(refused)[:120] if refused else "no refusal raised")
+    value("T23 the SHIPPED gate is 0.0 so the same plan now passes",
+          ev.coverage_gate_ok is True,
+          f"shipped min_usable_fraction={ev.gate and ev.gate.get('min_usable_fraction')}")
     value("T23 the gate came from channel_sync, not a literal here",
           ev.gate is not None and "min_usable_fraction" in ev.gate,
           f"{ev.gate}")
@@ -873,9 +892,20 @@ def t24_high_confidence_low_coverage() -> None:
             for i in range(need)]
     d = write_f32(tmpdir() / "T24.f32", np.zeros(n, dtype=np.float32))
     p = ex.build_time_varying_plan(d, request=req(), measurements=recs)
-    value("T24 confidence 0.999 does not rescue a 20 % coverage",
-          p.evidence.n_measured == 2 and p.evidence.coverage_gate_ok is False,
-          f"{p.evidence.to_dict()}")
+    # CALIBRATED 2026-10-16: shipped gate is 0.0, so use an explicit gate to
+    # keep testing "high confidence does not substitute for coverage".
+    refused = None
+    try:
+        ex.build_time_varying_plan(
+            d, request=req(require_evidence_gate=True,
+                gate={"min_usable_frames": 5.0, "min_confidence": 0.3,
+                      "min_usable_fraction": 0.5}),
+            measurements=recs)
+    except ex.TimeVaryingRefused as exc:
+        refused = exc
+    value("T24 confidence 0.999 does not rescue a 20 % coverage (explicit gate)",
+          refused is not None and p.evidence.n_measured == 2,
+          str(refused)[:110] if refused else "no refusal raised")
     value("T24 the unresolved windows are still reported",
           p.evidence.n_unresolved == need - 2, f"{p.evidence.n_unresolved}")
 
@@ -2276,7 +2306,7 @@ def t69_shipped_measurement_geometry_is_unchanged() -> None:
         "coarse_rate": 8000,
         "min_confidence": 0.3,
         "min_usable_frames": 5,
-        "min_usable_fraction": 0.6,
+                "min_usable_fraction": 0.0,  # CALIBRATED 2026-10-16 (was 0.6)
         "frame_min_rms_dbfs": -50.0,
     }
     for k, v in expected.items():
