@@ -616,6 +616,21 @@ def l1_channel_sync_groups() -> None:
     record("p1g.单链接链式合并 (已知局限, 记录行为)",
            g == [[0, 1, 2], [3]], str(g))
 
+    # 三轨输入 (`min_audio_streams` 允许 3): 覆盖面必须包含 3 轨, 语料里没有
+    # 3 声道的真实素材, 这一档只能靠合成输入守住。
+    three = snr_tbl({"1-2": 2.0, "1-3": 0.9, "2-3": 0.9})
+    g = group_by_snr(three, range(3), threshold=1.3, min_samples=30)
+    record("p1g.三轨 [C1,C2] + 孤立 C3",
+           g == [[0, 1], [2]], str(g))
+    g = group_by_snr(snr_tbl({"1-2": 2.0, "1-3": 1.9, "2-3": 1.9}),
+                     range(3), threshold=1.3, min_samples=30)
+    record("p1g.三轨同源 -> 单组", g == [[0, 1, 2]], str(g))
+    # 传入的边跨越不存在的轨 (防御性): 必须被忽略而不是抛错
+    g = group_by_snr({(0, 1): {"median": 3.0, "samples": 200.0},
+                      (1, 9): {"median": 3.0, "samples": 200.0}},
+                     range(3), threshold=1.3, min_samples=30)
+    record("p1g.跨越界轨的边被忽略", g == [[0, 1], [2]], str(g))
+
     # --- 组内锚点 = anchor_candidates 顺序里最靠前的成员 ---
     cand = [2, 3, 0, 1]
     record("p1g.组内锚点 [C1,C2] -> C1",
