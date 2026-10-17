@@ -10,6 +10,9 @@
     P1 只做二分 — step/ramp 细分属二期, 相邻步长仅作诊断警告;
   * boundary_pileup(): 合格帧落在搜索窗边缘的比例, 供 out_of_range 判定
     (真实时差超出搜索窗时帧测量堆积在窗边缘);
+  * sample_pair_snr() / peak_noise_ratio(): **建组**用的相关强度采样。它们
+    不产生延迟值, 只回答"两条轨是不是在录同一个声场" —— 单锚点模型无法
+    表达"4 声道其实是两支互不相干的麦克风", 建组层需要这个量;
   * 底层件 open_source / read_f64 / gcc_phat_int / phase_slope_fine 公开,
     供 sync_fix 修后复检复用.
 
@@ -26,7 +29,10 @@ fine_delay_samples = round(全局延迟) + 相位斜率残余, 报告为诊断�
 
 数据约定: delay > 0 = 目标轨比参考**晚到** (修正 = 整体前移 delay);
 一切估计数学在 float64 下进行; raw 文件按存储精度 (f32/f64) memmap
-流式读取; 全程确定性 (固定 FFT 尺寸 + 整数帧位, 无任何 RNG)。
+流式读取; 延迟估计全程确定性 (固定 FFT 尺寸 + 整数帧位, 无任何 RNG)。
+`sample_pair_snr()` 是唯一的抽样环节: 种子固定 (`_SNR_SEED`), 因此同一对
+素材在任何一次运行里抽到同一批帧 —— 建组结论可复现, 但它**不参与**任何
+延迟数值。
 """
 
 from __future__ import annotations
@@ -54,6 +60,8 @@ __all__ = [
     "open_source",
     "read_f64",
     "gcc_phat_int",
+    "peak_noise_ratio",
+    "sample_pair_snr",
     "phase_slope_fine",
 ]
 
@@ -70,6 +78,9 @@ _FULL_SEARCH_HALF = 8
 # 均方根门: 低于视为静音帧 (vendored 原值, 仅挡精确零; 抽取/滤波振铃
 # 会把"静音"抬到 ~1e-3, 帧级静音由 frame_min_rms_dbfs 门拦截)
 _RMS_GATE = 1e-12
+# 建组抽样种子。全模块唯一的随机源, 且种子固定 —— 同一对素材在任何一次
+# 运行里抽到同一批帧, 因此分组结论可复现 (报告里出现的组结构不是掷骰子)。
+_SNR_SEED = 1234
 
 
 # ---------------------------------------------------------------- 数据类
@@ -472,6 +483,139 @@ def gcc_phat_int(
         delay_samples=delay_samples, confidence=confidence,
         polarity=polarity, success=bool(v >= 2.0 * nf),
     )
+
+
+# ------------------------------------------------------- 建组用的相关强度采样
+#
+# 这一组函数**不产生任何延迟值**, 只回答"这两条轨是不是在录同一个声场"。
+# 现行策略假定 4 条轨同源 (全部对齐到同一个锚点), 但真实 4 声道素材里
+# CH1/CH2 与 CH3/CH4 常常是两支互不相干的麦克风。区分"同组/异组"需要的
+# 是一个**逐帧归一化**的强度量, 而不是延迟估计。
+
+
+def peak_noise_ratio(
+    ref: np.ndarray,
+    tgt: np.ndarray,
+    *,
+    lag0: int,
+    search_lo: int,
+    search_hi: int,
+    rms_gate: float = _RMS_GATE,
+) -> float:
+    """单帧「相关峰 / 噪声底」比值; nan = 该帧不可判定。
+
+    与 `gcc_phat_int` 的 `success` 判据同源 (`peak >= 2 * noise_floor`), 但
+    返回比值本身 —— 建组要的是连续强度, 不是布尔。
+
+    为什么不把 `gcc_phat_int` 重构成共用实现: 那条路径正在生产上跑, 任何改动
+    都要重新证明逐位一致。这里只需**同一条公式** (同一窗口取材、同一噪声底
+    表达式 `sqrt(2 ln N)/sqrt(N)`), 口径一致就够。
+
+    RMS 门属于判据的一部分, 不是可选项: 缺了它两条静音轨会在噪声底上"相关"
+    (实测 20260903_C1114: CH1 -64.3 dBFS / CH2 -68.1 dBFS 得比值 5.66),
+    于是静音被聚成一个"麦克风组"。
+    """
+    if ref.size == 0 or tgt.size < ref.size:
+        return float("nan")
+    ref = ref - ref.mean()
+    tgt = tgt - tgt.mean()
+    r_ref = float(np.sqrt(np.mean(ref * ref)))
+    r_tgt = float(np.sqrt(np.mean(tgt * tgt)))
+    if r_ref < rms_gate or r_tgt < rms_gate:
+        return float("nan")
+    ref /= r_ref
+    tgt /= r_tgt
+
+    nfft = fft.next_fast_len(ref.size + tgt.size - 1, real=True)
+    g = np.conj(fft.rfft(ref, nfft)) * fft.rfft(tgt, nfft)
+    g /= np.abs(g) + _EPS_REL * float(np.max(np.abs(g))) + _EPS_ABS
+    surface = fft.irfft(g, nfft)
+
+    m_lo = max(0, lag0 + search_lo)
+    m_hi = min(tgt.size - ref.size, lag0 + search_hi)
+    if m_lo > m_hi:
+        return float("nan")
+    window = surface[m_lo: m_hi + 1]
+    if window.size < 3:
+        return float("nan")
+
+    # 反相感知规则与 gcc_phat_int 一致: 负峰明显更强时以负峰为准
+    v = max(float(np.max(window)), 0.0)
+    neg = -float(np.min(window))
+    if neg > v * 1.2:
+        v = neg
+    nf = math.sqrt(2.0 * math.log(nfft)) / math.sqrt(nfft)
+    if nf <= 0.0:
+        return float("nan")
+    return v / nf
+
+
+def sample_pair_snr(
+    ref: Any,
+    tgt: Any,
+    *,
+    sample_rate: int,
+    frame_ms: float,
+    hop_ms: float,
+    search_window_ms: float,
+    coarse_rate: int = 8000,
+    frame_min_rms_dbfs: float = -50.0,
+    samples: int = 200,
+    seed: int = _SNR_SEED,
+) -> dict[str, float]:
+    """抽帧估计两流相关强度 —— 只服务建组, 输出不是延迟值。
+
+    几何与 `estimate_pair` 的**粗扫阶段**完全一致 (`_coarse_slice` + 同一个
+    `s_c` 搜索半窗), 因此这里的强度和生产判据是同一个量纲。
+
+    采样是**确定性**的: `default_rng(seed)` 在固定版本 numpy 上可复现, 且
+    抽样覆盖整条时间轴 (不是开头一段)。长素材上 200 帧 vs 全部 41645 帧的
+    差别只是噪声, 建组不需要每帧都看。
+
+    返回 {"samples": 可用帧数, "frames_total": 总帧数, "median"/"p25"/"p75"}。
+    有效帧不足时各统计量为 nan —— 调用方必须把 nan 当"不可判定", 不许当 0。
+    """
+    if sample_rate % coarse_rate != 0:
+        raise ValueError(
+            f"sample_rate {sample_rate} 不能被 coarse_rate {coarse_rate} 整除"
+        )
+    q = sample_rate // coarse_rate
+    f_c = int(round(frame_ms * coarse_rate / 1000.0))
+    h_c = int(round(hop_ms * coarse_rate / 1000.0))
+    s_c = int(math.ceil(search_window_ms * coarse_rate / 1000.0))
+    rms_floor = 10.0 ** (frame_min_rms_dbfs / 20.0)
+
+    n = min(ref.shape[0], tgt.shape[0])
+    n_frames = 0 if n < f_c * q else (n - f_c * q) // (h_c * q) + 1
+    out = {"samples": 0.0, "frames_total": float(n_frames),
+           "median": float("nan"), "p25": float("nan"),
+           "p75": float("nan")}
+    if n_frames <= 0:
+        return out
+
+    k = min(int(samples), n_frames)
+    if k >= n_frames:
+        idx = range(n_frames)
+    else:
+        idx = np.random.default_rng(seed).choice(n_frames, size=k,
+                                                 replace=False)
+    vals: list[float] = []
+    for kk in idx:
+        c0 = int(kk) * h_c
+        r = _coarse_slice(ref, c0, c0 + f_c, q)
+        t = _coarse_slice(tgt, c0 - s_c, c0 + f_c + s_c, q)
+        v = peak_noise_ratio(r, t, lag0=s_c, search_lo=-s_c, search_hi=s_c,
+                             rms_gate=rms_floor)
+        if v == v:
+            vals.append(v)
+    if not vals:
+        return out
+    arr = np.asarray(vals, dtype=np.float64)
+    out["samples"] = float(arr.size)
+    out["median"] = float(np.median(arr))
+    out["p25"] = float(np.percentile(arr, 25))
+    out["p75"] = float(np.percentile(arr, 75))
+    return out
 
 
 # ---------------------------------------------------------------- 相位斜率精估
