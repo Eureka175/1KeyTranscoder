@@ -39,6 +39,7 @@ def run_checks(
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
+    video_reencoded: bool = True,
     log: Callable[[str], None],
 ) -> dict[str, Any]:
     """Run the level-gated post-encode checks; returns the report.
@@ -46,7 +47,17 @@ def run_checks(
     codec: expected re-encoded video codec ("hevc" | "av1"); drives the
     sample-entry/codec expectations and the XAVC-brand policy.
     At level='full' additionally runs the PSNR/SSIM quality sample
-    (1-in-N short clips; FAIL escalates to structural failure)."""
+    (1-in-N short clips; FAIL escalates to structural failure).
+
+    video_reencoded: False when the caller's output carries a **stream
+    copy** of the source video (即 `--channel-sync-transparent` 的透明
+    预处理). PSNR/SSIM 在那种情况下没有定义物: 两侧的编码帧逐位相同,
+    度量只会给出一个无信息量的极大值, 所以它被**显式列为不适用**而不是
+    跑一遍、也不是静默跳过 —— 静默跳过会让报告看起来"全绿"却少做了一项,
+    而跑一遍会把一个恒真的数字当成质量证据。其余各级检查与正式编码
+    **完全同一套**, 因为 `compare` / `selfcheck` / Gyroflow 都是
+    "源 vs 成品" 的对比, 本来就不关心成品怎么来的。
+    """
     compare_level = "basic" if level == "basic" else "advanced"
     report = compare(
         original=original,
@@ -151,7 +162,21 @@ def run_checks(
             )
             log(f"selfcheck: FAIL ({exc})")
 
-        if ffmpeg is not None:
+        if not video_reencoded:
+            # 透明预处理: 视频是 stream copy, 编码帧逐位相同 -> PSNR/SSIM
+            # 没有定义物。**单列**成一条不适用项, 并打 INFO, 让报告能一眼
+            # 看出"少做的是哪一项、为什么"。
+            report["quality"] = {
+                "status": "SKIPPED_NOT_APPLICABLE",
+                "detail": "video stream-copied (no re-encode) — "
+                          "PSNR/SSIM is not defined for identical frames",
+            }
+            log(
+                "INFO: full 检查的 PSNR/SSIM 抽样在本模式下不适用 "
+                "(视频为 stream copy, 编码帧逐位相同), 已单列为 "
+                "SKIPPED_NOT_APPLICABLE"
+            )
+        elif ffmpeg is not None:
             from .quality import run_quality_sample
 
             log("PSNR/SSIM quality sample (full)...")

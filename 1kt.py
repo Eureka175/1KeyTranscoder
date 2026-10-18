@@ -1550,6 +1550,83 @@ def resolve_default_backend(
 # transparent 模式 (--channel-sync-transparent, 剪辑前预处理)
 # ---------------------------------------------------------------------------
 
+def transparent_verify(
+    *,
+    src: Path,
+    dst: Path,
+    streams: list[dict],
+    ffmpeg: Path,
+    ffprobe: Path,
+    gpac: GpacContainerBackend,
+    gyroflow: Path | None,
+    level: str,
+    work_dir: Path,
+    log: Any,
+) -> dict[str, Any]:
+    """透明模式的编码后验证 —— **与正式编码同一套 level 语义**。
+
+    `--check` 的三级在正式编码路径上由 `preservation/checker.run_checks`
+    (Sony) 与 `preservation/dji.run_dji_check` (DJI) 实现, 两者都是
+    "源 vs 成品" 的对比, 本来就不关心成品怎么产生的。所以透明模式直接复用
+    同一个入口, 只有一处差别: 视频是 **stream copy**, 因此 `full` 档里的
+    PSNR/SSIM 没有定义物 —— 那个子项被**单列为 SKIPPED_NOT_APPLICABLE**
+    并打 INFO, 既不静默跳过(报告会显得全绿却少做一项), 也不跑一个恒真的
+    数字(那是把无信息量当质量证据)。其余各级与正式编码完全一致。
+
+    失败**不影响已产出的文件** —— 这是透明模式的原则: 它只写报告与日志。
+    """
+    is_sony = any(
+        st.get("codec_type") == "data"
+        and st.get("codec_tag_string") == "rtmd"
+        for st in streams
+    )
+    dji = False
+    if not is_sony:
+        try:
+            from preservation import is_dji_source
+
+            dji = bool(is_dji_source(streams))
+        except Exception:                             # noqa: BLE001
+            dji = False
+
+    video = next((s for s in streams if s.get("codec_type") == "video"), None)
+    codec_name = str((video or {}).get("codec_name") or "hevc")
+    # 输出视频是**源视频的拷贝**, 所以"期望的输出 codec"就是源的 codec。
+    codec = codec_name if codec_name in ("hevc", "av1") else "hevc"
+
+    try:
+        if is_sony:
+            from preservation.checker import run_checks
+
+            return run_checks(
+                original=src, final=dst, gpac=gpac, ffprobe=ffprobe,
+                level=level, gyroflow=gyroflow, work_dir=work_dir,
+                known_facts={}, codec=codec, ffmpeg=ffmpeg,
+                quality_opts=None, quality_csv=None,
+                video_reencoded=False, log=log,
+            )
+        if dji:
+            from preservation.dji import run_dji_check
+
+            return run_dji_check(
+                original=src, final=dst, gpac=gpac, ffprobe=ffprobe,
+                gyroflow=gyroflow, scratch=work_dir / "validate",
+                level=level,
+                video_entry=str((video or {}).get("codec_tag_string") or
+                                "hvc1"),
+                ffmpeg=ffmpeg, quality_opts=None, quality_csv=None,
+                video_reencoded=False, log=log,
+            )
+        log(
+            f"INFO: check={level} — 该源不属于 Sony/DJI 家族, 没有对应的"
+            f"元数据验证器; 本文件跳过 check (透明模式原则: 输出不受影响)"
+        )
+        return {"status": "SKIPPED_NO_CHECKER", "summary": {}}
+    except Exception as exc:                          # noqa: BLE001
+        log(f"WARNING: check={level} 执行失败: {exc} — 输出文件不受影响")
+        return {"status": "ERROR", "detail": str(exc), "summary": {}}
+
+
 def transparent_main(
     *,
     args: argparse.Namespace,
@@ -1559,6 +1636,7 @@ def transparent_main(
     ffmpeg: Path,
     ffprobe: Path,
     gpac: GpacContainerBackend,
+    gyroflow: Path | None = None,
 ) -> int:
     """视频/非音频流 stream copy + 轨道级音频同步, 不依赖编码器配置。
 
@@ -1634,17 +1712,27 @@ def transparent_main(
     status = DashboardStatus(dashboard_json)
     if not args.headless:
         spawn_dashboard(dashboard_json, script_dir)
+    # `check` 必须记录**实际请求的等级**。这里原本写死 "basic", 于是
+    # `--check advanced` 的看板与日志都显示 basic —— 报告在说谎。同时把
+    # 等级和它在透明模式下的差别打出来, 免得"以为跑了 full"。
     status.set_meta(
         {
             "encoders": "channel-sync-transparent",
             "preset": "SYNC",
-            "check": "basic",
+            "check": args.check,
             "total": len(sources),
             "gpu": "",
             "jobs": "1",
             "headless": args.headless,
         }
     )
+    logger.info("Check level: %s (transparent)", args.check)
+    if args.check == "full":
+        logger.info(
+            "INFO: check=full — PSNR/SSIM 抽样在本模式下**不适用** "
+            "(视频为 stream copy, 编码帧逐位相同), 将单列为 "
+            "SKIPPED_NOT_APPLICABLE; 其余 full 项 (详细自检/深度项) 照常执行"
+        )
 
     logger.info("============================================================")
     logger.info("1KeyTranscoder transparent channel-sync batch start")
@@ -1654,7 +1742,8 @@ def transparent_main(
     logger.info("Files: %d", len(sources))
     logger.info("============================================================")
 
-    counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0}
+    counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0,
+                "check_failed": 0}
     for src in sources:
         dst = output_path_for(src, input_root, output_root, "SYNC", False)
         file_log = per_file_log_path(src, input_root, logs_root, "SYNC")
@@ -1721,11 +1810,54 @@ def transparent_main(
                         "byte copy" if res.get("file_copied") else "remux",
                         dst,
                     )
+                    # 编码后验证: 与正式编码同一套 level 语义。只有真的
+                    # 重封装过才值得验 (下面 already_aligned 那条是字节级
+                    # 拷贝, 验它等于拿源和源比)。
+                    crep = transparent_verify(
+                        src=src, dst=dst, streams=streams,
+                        ffmpeg=ffmpeg, ffprobe=ffprobe, gpac=gpac,
+                        gyroflow=gyroflow, level=args.check,
+                        work_dir=work_root / job_id_for(src) / "check",
+                        log=lambda msg: logger.info(
+                            "[CHECK] %s | %s", src.name, msg),
+                    )
+                    summary = crep.get("summary") or {}
+                    if summary:
+                        logger.info(
+                            "[CHECK] %s | level=%s PRESERVED=%s MODIFIED=%s "
+                            "MISSING=%s structural_success=%s quality=%s",
+                            src.name, args.check,
+                            summary.get("PRESERVED"), summary.get("MODIFIED"),
+                            summary.get("MISSING"),
+                            crep.get("structural_success"),
+                            (crep.get("quality") or {}).get("status", "-"),
+                        )
+                        file_logger.info(
+                            "CHECK | level=%s | %s",
+                            args.check,
+                            json.dumps(crep, ensure_ascii=False,
+                                       default=str)[:4000],
+                        )
+                        if not crep.get("structural_success", True):
+                            # 只影响计数与日志: 透明模式的原则是**不改已产出
+                            # 的文件**。把它记成 failed 会让人以为文件坏了,
+                            # 因此单独计一个"验证未通过"。
+                            counters["check_failed"] += 1
+                    else:
+                        logger.info(
+                            "[CHECK] %s | level=%s | %s", src.name,
+                            args.check, crep.get("status", "-"),
+                        )
                 else:
                     logger.info(
                         "[SYNC-OK] %s | already aligned — byte-identical "
                         "copy | %s",
                         src.name, dst,
+                    )
+                    logger.info(
+                        "[CHECK] %s | level=%s | 输出与源文件字节级相同, "
+                        "元数据对比恒等, check 跳过 (与源和源比较同义)",
+                        src.name, args.check,
                     )
                 counters["done"] += 1
             elif res["status"] in ("not_eligible", "tool_missing"):
@@ -1750,10 +1882,18 @@ def transparent_main(
     status.mark_finished()
     logger.info("============================================================")
     logger.info(
-        "Transparent finished | done=%d skipped=%d failed=%d dry-run=%d",
+        "Transparent finished | done=%d skipped=%d failed=%d dry-run=%d "
+        "check_failed=%d",
         counters["done"], counters["skipped"], counters["failed"],
-        counters["dry-run"],
+        counters["dry-run"], counters["check_failed"],
     )
+    if counters["check_failed"]:
+        # 验证未通过**不是**文件失败: 透明模式不改已产出的文件, 这里只把
+        # 数量与位置报出来, 由人决定要不要回退。
+        logger.warning(
+            "CHECK FAILED %d 个文件: 输出文件保持原样, 详见上文 [CHECK] 行",
+            counters["check_failed"],
+        )
     logger.info("Total log: %s", total_log)
     logger.info("Dashboard data: %s", dashboard_json)
     logger.info("============================================================")
@@ -1809,6 +1949,7 @@ def main() -> int:
             ffmpeg=ffmpeg,
             ffprobe=ffprobe,
             gpac=gpac,
+            gyroflow=gyroflow,
         )
 
     try:

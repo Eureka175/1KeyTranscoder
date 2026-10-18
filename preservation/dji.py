@@ -369,6 +369,7 @@ def run_dji_check(
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
+    video_reencoded: bool = True,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """ORIGINAL vs FINAL structural + payload + consumer check for DJI.
@@ -381,6 +382,10 @@ def run_dji_check(
       full     : advanced + deep items (per-track timescale/media
                  duration, payload head/tail bytes, ffprobe stream
                  facts incl. data-track tags) + PSNR/SSIM quality sample
+
+    video_reencoded: False 表示成品携带的是**源视频的 stream copy**
+    (`--channel-sync-transparent`)。此时 full 的 PSNR/SSIM 单列为
+    SKIPPED_NOT_APPLICABLE, 其余各级与正式编码完全同一套。
 
     video_entry: expected sample entry of the re-encoded video track
     ("hvc1" HEVC / "av01" AV1).
@@ -629,7 +634,21 @@ def run_dji_check(
 
     # --- PSNR/SSIM quality sample (full only) ---
     quality: dict[str, Any] | None = None
-    if level == "full" and ffmpeg is not None:
+    if level == "full" and not video_reencoded:
+        # 与 Sony 侧同一处理: 视频是 stream copy 时 PSNR/SSIM 没有定义物,
+        # 单列为不适用并打 INFO —— 不静默跳过(报告会显得少做了一项却全绿),
+        # 也不跑一个恒真的数字(那是把无信息量当质量证据)。
+        quality = {
+            "status": "SKIPPED_NOT_APPLICABLE",
+            "detail": "video stream-copied (no re-encode) — "
+                      "PSNR/SSIM is not defined for identical frames",
+        }
+        log(
+            "INFO: full 检查的 PSNR/SSIM 抽样在本模式下不适用 "
+            "(视频为 stream copy, 编码帧逐位相同), 已单列为 "
+            "SKIPPED_NOT_APPLICABLE"
+        )
+    elif level == "full" and ffmpeg is not None:
         from .quality import run_quality_sample
 
         log("PSNR/SSIM quality sample (full)...")
