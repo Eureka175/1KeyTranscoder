@@ -1678,13 +1678,55 @@ def run_channel_sync(
                             f"no video track in {source} for transparent remux"
                         )
                     gpac.movie_timescale = movie_ts
-                    adds = [f"{source}#video"]
-                    for t in tracks:
-                        if t["handler"] in ("vide", "soun"):
-                            continue
-                        adds.append(f"{source}#{t['id']}")
-                    for af in audio_files:
-                        adds.append(f"{af}#audio")
+                    # 按**源容器里的轨道顺序**重建 `-add` 列表, 而不是把
+                    # "视频 -> 非音频 -> 全部音频" 这个固定搭配写死。
+                    #
+                    # 为什么顺序重要: 它属于容器语义。实测 20260904_C1214 的
+                    # 源是 [video, a0..a3, rtmd], 而旧实现产出
+                    # [video, rtmd, a0..a3] —— 六条流的 packet md5 全部相同
+                    # (内容无损), 但**按流序号定位**的下游 (脚本 / NLE /
+                    # 部分校验工具) 会因此读错轨。`mux_new` 严格按 `-add` 的
+                    # 先后建轨, 所以顺序只能在这里定。
+                    soun_ids = [t["id"] for t in tracks
+                                if t["handler"] == "soun"]
+                    if len(soun_ids) != len(audio_files):
+                        # 轨道清单与音频文件数对不上: **不猜**。静默按新顺序
+                        # 拼会张冠李戴, 那比"顺序变了"严重得多, 因此退回旧
+                        # 顺序并把原因写进日志。
+                        log(
+                            f"channel-sync: transparent remux — 源 soun 轨 "
+                            f"{len(soun_ids)} 条, 音频文件 "
+                            f"{len(audio_files)} 条, 无法保序 — 退回 "
+                            f"\"视频+数据+音频\" 顺序"
+                        )
+                        adds = [f"{source}#video"]
+                        for t in tracks:
+                            if t["handler"] in ("vide", "soun"):
+                                continue
+                            adds.append(f"{source}#{t['id']}")
+                        for af in audio_files:
+                            adds.append(f"{af}#audio")
+                    else:
+                        adds = []
+                        k = 0
+                        for t in sorted(tracks,
+                                        key=lambda x: x.get("number", 0)):
+                            h = t["handler"]
+                            if h == "vide":
+                                adds.append(f"{source}#video")
+                            elif h == "soun":
+                                # 音频轨用重生成/拷贝后的独立文件替换, 但
+                                # **占回它原来的位置**。
+                                adds.append(f"{audio_files[k]}#audio")
+                                k += 1
+                            else:
+                                adds.append(f"{source}#{t['id']}")
+                        log("channel-sync: transparent remux — 按源轨顺序 ["
+                            + ", ".join(
+                                "vide" if a.endswith("#video")
+                                else "soun" if a.endswith("#audio")
+                                else "data"
+                                for a in adds) + "]")
                     dst.parent.mkdir(parents=True, exist_ok=True)
                     if dst.exists():
                         dst.unlink()
