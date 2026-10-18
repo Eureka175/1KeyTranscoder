@@ -647,6 +647,101 @@ def _apply_time_varying_track(
     return res, detail
 
 
+def _restore_sony_metadata(
+    source: Path,
+    adds: list[str],
+    dst: Path,
+    work_dir: Path,
+    gpac: Any,
+    log: Callable[[str], None],
+) -> Path | None:
+    """Sony 元数据保全: 把保留管线的恢复步骤复用到透明重封装上。
+
+    为什么必须做: GPAC 的 `-new` 只重写它认识的轨道结构, 容器层的
+    brand / tref / nrtm meta item / 厂商 uuid 全都会丢。实测
+    `20260904_C1214` 上丢掉这四类之后, Gyroflow 从成品读到
+    **0/146146** 个 IMU 样本, 相机型号也认不出来 —— 而 rtmd **轨的
+    payload 逐字节相同**。也就是说丢的完全是容器层。
+
+    步骤与 `preservation/pipeline.py` 的第 4~5c 步一致, 顺序也一样:
+        mux_new(stage) -> reconstruct(tref/cdsc + nrtm) -> flatten
+        -> set_brand -> insert_uuid_boxes(stage -> dst) -> item_type patch
+
+    `flatten` 不能省: 字节级 uuid 插入要求 moov 在 mdat 之后, 而且
+    它将 movie timescale 归位, 后面的 set_brand 再按源 timescale 恢复。
+
+    返回 stage 路径 (调用方不再需要); 失败则抛异常, 由调用方回退到
+    原样拷贝 —— 元数据保全失败时**不能**交出一个"看着像成品"的文件。
+    """
+    from preservation import isobmf
+    from preservation.pipeline import _item_type_bytes
+    from preservation.sony import SonyPreservationBackend
+
+    stage = work_dir / "transparent_stage.mov"
+    try:
+        if stage.exists():
+            stage.unlink()
+    except OSError:
+        pass
+
+    sony = SonyPreservationBackend(gpac, None)
+    bundle_dir = work_dir / "metadata"
+    bundle = sony.extract(source, bundle_dir)
+    log(f"channel-sync: Sony metadata — {len(bundle.tracks)} 元数据轨, "
+        f"{len(bundle.boxes)} uuid box, nrtm="
+        f"{'yes' if bundle.nrtm else 'no'}, "
+        f"brand={bundle.major_brand!r}")
+
+    gpac.mux_new(stage, adds)
+    sony.reconstruct(bundle, bundle_dir, stage)
+    gpac.flatten(stage)
+
+    if bundle.major_brand:
+        compat = [b for b in bundle.compatible_brands
+                  if b and b != bundle.major_brand]
+        major = bundle.major_brand
+        if bundle.brand_minor_version:
+            major += f":{bundle.brand_minor_version}"
+        gpac.set_brand(
+            stage, major, compat,
+            remove=[b for b in ("qt  ", "isom", "iso2")
+                    if b not in compat and b != bundle.major_brand],
+        )
+
+    if dst.exists():
+        dst.unlink()
+    existing = {
+        (ctx, isobmf.sha256_bytes(raw))
+        for ctx, _, raw in isobmf.extract_uuid_boxes(stage)
+    }
+    inserts = [
+        (ctx, data)
+        for ctx, data in sony.uuid_inserts(bundle, bundle_dir)
+        if (ctx, isobmf.sha256_bytes(data)) not in existing
+    ]
+    if len(inserts) < len(bundle.boxes):
+        log(f"channel-sync: uuid — GPAC 已自带 "
+            f"{len(bundle.boxes) - len(inserts)} 个, 补插 {len(inserts)} 个")
+    isobmf.insert_uuid_boxes(stage, dst, inserts)
+
+    if bundle.nrtm and bundle.nrtm.item_id > 0:
+        target = _item_type_bytes(bundle.nrtm.item_type)
+        if target is not None:
+            try:
+                desc = isobmf.patch_meta_item_type(
+                    dst, bundle.nrtm.item_id, target)
+                if desc:
+                    log(f"channel-sync: {desc}")
+            except RuntimeError as exc:
+                log(f"channel-sync: WARNING nrtm item_type patch 跳过: {exc}")
+
+    try:
+        stage.unlink()
+    except OSError:
+        pass
+    return stage
+
+
 def run_channel_sync(
     *,
     source: Path,
@@ -1732,7 +1827,27 @@ def run_channel_sync(
                         dst.unlink()
                     log("channel-sync: transparent remux (video/non-audio "
                         "stream copy + fixed audio) with MP4Box...")
-                    gpac.mux_new(dst, adds)
+                    # Sony 源必须走**与保留管线相同的恢复步骤**, 否则重封装
+                    # 会把容器层元数据全部丢掉。实测 20260904_C1214:
+                    #   ftyp      XAVC -> isom
+                    #   rtmd      tref/cdsc 关联丢失 (track payload 本身逐字节相同)
+                    #   nrtm      镜头档案 meta item 整项缺失
+                    #   uuid      PROF/UNKNOWN/USMT = 1/1/7 -> 0/0/2
+                    #   后果: Gyroflow 从成品读到 0/146146 IMU 帧、认不出相机
+                    # 也就是说"6 条流 packet md5 全同"只在**流**层面成立,
+                    # 容器层该保的一样都没保住。
+                    sony_meta = (
+                        any(st.get("codec_type") == "data"
+                            and st.get("codec_tag_string") == "rtmd"
+                            for st in streams)
+                    )
+                    stage: Path | None = None
+                    if sony_meta:
+                        stage = _restore_sony_metadata(
+                            source, adds, dst, work_dir, gpac, log
+                        )
+                    if stage is None:
+                        gpac.mux_new(dst, adds)
                     # GPAC 输出 mvhd timescale 与源不一致: 按实际 timescale
                     # 修复 tkhd/elst 时长 (同 classic 路径修正辅助)
                     repair_remux_timescale(dst, log=log)
