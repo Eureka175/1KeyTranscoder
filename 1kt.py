@@ -1276,6 +1276,32 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--channel-sync-groups",
+        action="store_true",
+        default=None,
+        help=(
+            "分组锚点 (P4.12, 显式 opt-in, **默认关闭**). 单锚点模型隐含"
+            "\"四条轨录同一个声场\"这个前提; 真实 4 声道素材里 CH1/CH2 与 "
+            "CH3/CH4 常常是两支互不相干的麦克风, 此时锚点选中的那一组能被修, "
+            "另一组没有任何修正机会。启用后先按\"相关峰/噪声底\"把健康轨分成"
+            "互不相关的组, 未被锚点覆盖的组各用自己的组内锚点再测一次。"
+            "**只做加法**: 只有判成 untouched 的轨才可能被改判, 已定的修正"
+            "不会丢失、也不会改值 (实测全语料 226 文件: 新增 3 / 丢失 0 / 改值 0)。"
+            "代价: 每个动作组多一次完整测量, 80 min 长片实测 +30%%~+84%%。"
+        ),
+    )
+    parser.add_argument(
+        "--channel-sync-group-threshold",
+        default=None,
+        type=float,
+        help=(
+            "分组锚点的相关强度门 (默认 1.3, 相关峰/噪声底中位数). 1.0 附近是"
+            "\"与随机不可分\"的分界 (估计器自身的 success 判据是 2.0x)。实测"
+            "组内中位 2.96 / 跨组 0.90; 阈值 1.2~1.5 之间没有片段丢失动作, "
+            "1.2 起有过度合并的迹象。仅在 --channel-sync-groups 生效时有意义。"
+        ),
+    )
+    parser.add_argument(
         "--audio-plan",
         default=None,
         help=(
@@ -1567,6 +1593,26 @@ def transparent_main(
         logger.warning(
             "TRANSPARENT CONFIG LOAD FAILED | %s (channel_sync DEFAULTS 生效)",
             exc,
+        )
+
+    # P4.12 — 分组锚点在**透明批量路径**上同样要能吃命令行开关。
+    #
+    # 这条路与下面是两条独立的入口 (本函数只做透明预处理, 不编码视频), 因此
+    # 它自己加载 channel_sync 配置, 也必须自己做同一份 CLI 覆盖。漏掉这一处的
+    # 后果很具体: `--channel-sync-groups` 在透明模式下静默失效, 而透明模式正是
+    # 长程音频对齐测试会用的那条路。只覆写调用方真的给了值的键。
+    _t_grp = getattr(args, "channel_sync_groups", None)
+    _t_thr = getattr(args, "channel_sync_group_threshold", None)
+    if _t_grp is not None or _t_thr is not None:
+        channel_sync_opts = dict(channel_sync_opts or {})
+        if _t_grp is not None:
+            channel_sync_opts["group_anchor_enabled"] = bool(_t_grp)
+        if _t_thr is not None:
+            channel_sync_opts["group_snr_threshold"] = float(_t_thr)
+        logger.info(
+            "CHANNEL-SYNC GROUPING | enabled=%s threshold=%s",
+            channel_sync_opts.get("group_anchor_enabled"),
+            channel_sync_opts.get("group_snr_threshold"),
         )
 
     if args.retry_list:
@@ -1918,6 +1964,20 @@ def main() -> int:
             channel_sync_opts["tv_coordinate"] = str(_tv_coord)
     # --channel-sync-tv 隐含 --channel-sync (与 transparent 同一处理)
     if _tv_flag:
+        channel_sync_enabled = True
+
+    # P4.12 — 分组锚点: 与上面的 P4.6 同一手法 (只覆写调用方真的给了值的键,
+    # 因此 config 块里的其它 channel_sync 键保持不动)。`--channel-sync-groups`
+    # 隐含 --channel-sync: 用户说"要分组"就等于说"要做延时补偿"。
+    _grp_flag = getattr(args, "channel_sync_groups", None)
+    _grp_thr = getattr(args, "channel_sync_group_threshold", None)
+    if _grp_flag is not None or _grp_thr is not None:
+        channel_sync_opts = dict(channel_sync_opts or {})
+        if _grp_flag is not None:
+            channel_sync_opts["group_anchor_enabled"] = bool(_grp_flag)
+        if _grp_thr is not None:
+            channel_sync_opts["group_snr_threshold"] = float(_grp_thr)
+    if _grp_flag:
         channel_sync_enabled = True
 
     # 显式音频计划 (v0.8.0+): 经典软件路径 (x265 / svtav1) 与硬件后端
