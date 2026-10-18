@@ -314,6 +314,9 @@ def l1_hardware_audio() -> None:
     args_now = set(re.findall(r'add_argument\(\s*["\'](--[a-z0-9-]+)', entry))
     P46_ADDED = {"--channel-sync-tv", "--channel-sync-tv-policy",
                  "--channel-sync-tv-coordinate"}
+    # P4.12 — 分组锚点的两个开关。与本集合里其它条目同一处理: 手写登记,
+    # 因此将来任何一次新增都必须改到这里, 不能静默长出新参数。
+    P412_ADDED = {"--channel-sync-groups", "--channel-sync-group-threshold"}
     # REVISED BY THE HARDWARE-FIRST DECODE PHASE. This set is deliberately
     # hand-maintained: it is the thing that makes an argument add/remove
     # impossible to slip in silently. Two edits landed together here, which is
@@ -349,10 +352,11 @@ def l1_hardware_audio() -> None:
            "--audio-plan" in args_now
            and (V080_BASELINE - THIS_PHASE_ADDED) <= args_now,
            f"missing: {sorted((V080_BASELINE - THIS_PHASE_ADDED) - args_now)}")
-    record("v08hw.cli 除 P4.6 时变 opt-in 与本阶段新增外, 没有其它参数",
-           args_now - P46_ADDED - THIS_PHASE_ADDED <= V080_BASELINE,
+    record("v08hw.cli 除 P4.6/P4.12 的 opt-in 与本阶段新增外, 没有其它参数",
+           args_now - P46_ADDED - P412_ADDED - THIS_PHASE_ADDED
+           <= V080_BASELINE,
            f"unexpected: "
-           f"{sorted(args_now - P46_ADDED - THIS_PHASE_ADDED - V080_BASELINE)}")
+           f"{sorted(args_now - P46_ADDED - P412_ADDED - THIS_PHASE_ADDED - V080_BASELINE)}")
     # The removals are asserted as *gone*, not merely absent from the list --
     # otherwise a future re-add would pass unnoticed.
     record("v08hw.cli 旧硬解开关已移除 (不是保留为别名)",
@@ -366,6 +370,12 @@ def l1_hardware_audio() -> None:
            and _tv_at >= 0
            and "default=None" in entry[_tv_at: _tv_at + 400],
            f"present: {sorted(P46_ADDED & args_now)}")
+    _grp_at = entry.find("--channel-sync-groups")
+    record("v08hw.cli P4.12 的分组锚点参数存在, 且默认关闭 (default=None)",
+           P412_ADDED <= args_now
+           and _grp_at >= 0
+           and "default=None" in entry[_grp_at: _grp_at + 400],
+           f"present: {sorted(P412_ADDED & args_now)}")
 
 
 def _video_deps(path: Path) -> list[str]:
