@@ -120,6 +120,7 @@ Algorithm changes     0
 | **the executable tooling that runs once the takes exist** | [`p4.11-acquisition-tooling.md`](p4.11-acquisition-tooling.md) |
 | **what to do when one 4ch clip holds two unrelated microphone groups** | [`p4.12-grouped-anchor.md`](p4.12-grouped-anchor.md) |
 | **current status of the whole alignment line, incl. the time-varying reassessment** | [P4.12-STATUS.md](P4.12-STATUS.md) |
+| **the full regression matrix for the 0.8.7 release, with the data behind every verdict** | [`v0.8.7-regression-matrix.md`](v0.8.7-regression-matrix.md) |
 | **what P4.8 changed, and what it proved it did not** | [`p4.8-provenance.md`](p4.8-provenance.md) |
 | the P4.1 / D6 audit | [`downstream-audit.md`](downstream-audit.md) |
 | where a promoted document came from | [`documentation-provenance.md`](documentation-provenance.md) |
