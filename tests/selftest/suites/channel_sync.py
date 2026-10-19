@@ -645,3 +645,201 @@ def l1_channel_sync_groups() -> None:
     # 结论与现行逐位相同 (A1/A3 由此推出, 不靠回归去赌)
     record("p1g.单组四轨的组锚点 == 生产主锚点 (结构性零回归)",
            group_anchor_of([0, 1, 2, 3], cand) == cand[0])
+
+# ==========================================================================
+# 透明模式契约: check 路由 + 容器层依赖倒置
+# ==========================================================================
+def l1_transparent_contract() -> None:
+    """`1kt.transparent_verify` 的路由, 与 `run_channel_sync` 的注入契约。
+
+    这两条都是**纯逻辑**, 不需要编码也不需要真实素材:
+      * 路由只依赖 stream 描述 (`rtmd` -> Sony, `djmd` -> DJI, 其余跳过);
+      * 注入契约只依赖参数组合。
+
+    为什么值得单独立 suite: 这一层曾经有两个静默缺陷 —— `--check` 在透明
+    模式被完全忽略, 以及 DJI 判定 import 了一个不存在的名字被宽 except 吞掉
+    (于是 DJI 分支永远进不去, 日志却理直气壮地说"不是 Sony/DJI")。两条都
+    是"跑起来不报错、结果不对"的类型, 只能靠断言路由本身来守。
+    """
+    import importlib.util
+    import inspect
+    import sys
+
+    section("L1 透明模式契约 (check 路由 / 容器层依赖倒置)")
+    root = Path(__file__).resolve().parents[3]
+    spec = importlib.util.spec_from_file_location("_1kt_contract", root / "1kt.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    # --- 1. 注入契约: signature -------------------------------------------
+    sig = inspect.signature(mod.run_channel_sync) if hasattr(
+        mod, "run_channel_sync") else None
+    if sig is None:
+        from core.channel_sync import run_channel_sync
+        sig = inspect.signature(run_channel_sync)
+    record("p12c.run_channel_sync 暴露 restore_metadata 钩子",
+           "restore_metadata" in sig.parameters,
+           str(list(sig.parameters)))
+    record("p12c.钩子默认 None (不改变既有调用点)",
+           sig.parameters["restore_metadata"].default is None)
+
+    # --- 2. 图省事漏注入 -> 必须在动手前失败 ------------------------------
+    from core.channel_sync import run_channel_sync
+
+    raised = None
+    try:
+        run_channel_sync(
+            source=Path("no-such-input.mp4"), ffmpeg=Path("ffmpeg.exe"),
+            work_dir=Path(tempfile.mkdtemp(prefix="p12c_")),
+            streams=[], opts=None, transparent=True,
+            dst=Path("out.mp4"), gpac=None, restore_metadata=None,
+        )
+    except ValueError as exc:
+        raised = exc
+    except Exception as exc:                            # noqa: BLE001
+        raised = exc
+    record("p12c.透明模式缺钩子 -> ValueError (而不是静默剥元数据)",
+           isinstance(raised, ValueError),
+           f"{type(raised).__name__}: {str(raised)[:110]}")
+    record("p12c.该失败发生在任何工作之前 (先于读文件/探测)",
+           isinstance(raised, ValueError),
+           "源路径不存在却先报契约错误 —— 说明检查在入口")
+
+    # --- 3. 非透明模式不受影响 -------------------------------------------
+    ok_non_transparent = True
+    try:
+        run_channel_sync(
+            source=Path("no-such-input.mp4"), ffmpeg=Path("ffmpeg.exe"),
+            work_dir=Path(tempfile.mkdtemp(prefix="p12c_")),
+            streams=[], opts=None, transparent=False, dst=None,
+        )
+    except ValueError:
+        ok_non_transparent = False
+    except Exception:                                   # noqa: BLE001
+        pass                                            # 别的失败与本契约无关
+    record("p12c.非透明路径不需要钩子", ok_non_transparent)
+
+    # --- 4. 分层: 音频同步层不得 import 容器/元数据层 ---------------------
+    import re
+    forbidden = ("VideoEncoder", "Metadata", "Sony", "x265", "NVENC", "QSV",
+                 "audio_mix", "output_compose", "audio_encode")
+    leaks = []
+    for name in ("channel_sync.py", "audio_sync.py", "sync_estimate.py",
+                 "sync_fix.py", "audio_sync_tv.py"):
+        p = root / "core" / name
+        if not p.is_file():
+            continue
+        for i, line in enumerate(
+                p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            if not re.match(r"^\s*(from|import)\s", line):
+                continue
+            if any(f in line for f in forbidden):
+                leaks.append(f"{name}:{i}: {line.strip()}")
+    record("p12c.音频同步层不 import 容器/元数据层 (依赖倒置成立)",
+           not leaks, f"leaks={leaks}")
+
+    from preservation.transparent_restore import (
+        restore_after_transparent_remux,
+    )
+    rsig = inspect.signature(restore_after_transparent_remux)
+    record("p12c.容器层恢复函数签名与钩子一致",
+           list(rsig.parameters) == ["source", "adds", "dst", "work_dir",
+                                     "gpac", "log"],
+           str(list(rsig.parameters)))
+
+    # --- 5. check 路由三分支 ---------------------------------------------
+    from preservation import checker as _checker
+    from preservation import dji as _dji
+
+    calls: dict[str, Any] = {}
+
+    def fake_run_checks(**kw):
+        calls["sony"] = kw
+        return {"summary": {"PRESERVED": 1}, "structural_success": True,
+                "quality": {"status": "SKIPPED_NOT_APPLICABLE"}}
+
+    def fake_run_dji(**kw):
+        calls["dji"] = kw
+        return {"summary": {"PRESERVED": 2}, "structural_success": True,
+                "quality": {"status": "SKIPPED_NOT_APPLICABLE"}}
+
+    orig_sony, orig_dji = _checker.run_checks, _dji.run_dji_check
+    _checker.run_checks = fake_run_checks
+    _dji.run_dji_check = fake_run_dji
+    try:
+        work = Path(tempfile.mkdtemp(prefix="p12c_route_"))
+        common = dict(src=Path("s.mp4"), dst=Path("d.mp4"),
+                      ffmpeg=Path("ffmpeg.exe"), ffprobe=Path("ffprobe.exe"),
+                      gpac=None, gyroflow=None, work_dir=work,
+                      log=lambda _m: None)
+
+        sony_streams = [
+            {"codec_type": "video", "codec_name": "hevc",
+             "codec_tag_string": "hvc1"},
+            {"codec_type": "audio", "codec_name": "pcm_s24le"},
+            {"codec_type": "data", "codec_tag_string": "rtmd"},
+        ]
+        r = mod.transparent_verify(streams=sony_streams, level="full",
+                                   **common)
+        record("p12c.Sony (rtmd) -> run_checks", "sony" in calls)
+        record("p12c.Sony 路由传 video_reencoded=False",
+               calls.get("sony", {}).get("video_reencoded") is False)
+        record("p12c.Sony 路由保留请求的 level",
+               calls.get("sony", {}).get("level") == "full")
+        record("p12c.Sony 路由返回真实 summary",
+               r.get("summary", {}).get("PRESERVED") == 1)
+
+        calls.clear()
+        dji_streams = [
+            {"codec_type": "video", "codec_name": "hevc",
+             "codec_tag_string": "hvc1"},
+            {"codec_type": "audio", "codec_name": "pcm_s16le"},
+            {"codec_type": "data", "codec_tag_string": "djmd"},
+        ]
+        mod.transparent_verify(streams=dji_streams, level="basic", **common)
+        record("p12c.DJI (djmd) -> run_dji_check", "dji" in calls,
+               f"calls={sorted(calls)}")
+        record("p12c.DJI 路由传 video_reencoded=False",
+               calls.get("dji", {}).get("video_reencoded") is False)
+
+        calls.clear()
+        plain = [{"codec_type": "video", "codec_name": "hevc",
+                  "codec_tag_string": "hvc1"},
+                 {"codec_type": "audio", "codec_name": "aac"}]
+        r = mod.transparent_verify(streams=plain, level="full", **common)
+        record("p12c.非 Sony/DJI -> SKIPPED_NO_CHECKER",
+               r.get("status") == "SKIPPED_NO_CHECKER", str(r)[:90])
+        record("p12c.跳过时不会误调任何扫描器",
+               not calls, f"calls={sorted(calls)}")
+
+        # 验证器自身抛异常不能影响已产出的文件
+        def boom(**kw):
+            raise RuntimeError("synthetic checker failure")
+
+        _checker.run_checks = boom
+        r = mod.transparent_verify(streams=sony_streams, level="full",
+                                   **common)
+        record("p12c.验证器异常 -> 返回 ERROR 而不是抛出",
+               r.get("status") == "ERROR", str(r.get("status")))
+    finally:
+        _checker.run_checks = orig_sony
+        _dji.run_dji_check = orig_dji
+
+    # --- 6. video_reencoded 护栏 (PSNR 只在视频被重编码时才有定义) ---------
+    for fname, matcher in (
+        ("checker.py", "run_checks"),
+        ("dji.py", "run_dji_check"),
+    ):
+        p = root / "preservation" / fname
+        src = p.read_text(encoding="utf-8", errors="replace")
+        record(f"p12c.{fname} 的 {matcher} 接受 video_reencoded",
+               "video_reencoded" in src)
+        record(f"p12c.{fname} video_reencoded 默认 True (编码路径语义不变)",
+               "video_reencoded: bool = True" in src)
+        # 跳过 PSNR 的分支必须被 `not video_reencoded` 守着 —— 否则
+        # "透明模式跳过" 会变成 "所有模式跳过", 那一步是静默的。
+        guarded = "not video_reencoded" in src
+        record(f"p12c.{fname} 跳过 PSNR 的分支由 not video_reencoded 守着",
+               guarded)
+        record(f"p12c.{fname} 跳过时给出 SKIPPED_NOT_APPLICABLE (不伪装成 PASS)",
+               "SKIPPED_NOT_APPLICABLE" in src)

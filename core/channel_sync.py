@@ -647,99 +647,9 @@ def _apply_time_varying_track(
     return res, detail
 
 
-def _restore_sony_metadata(
-    source: Path,
-    adds: list[str],
-    dst: Path,
-    work_dir: Path,
-    gpac: Any,
-    log: Callable[[str], None],
-) -> Path | None:
-    """Sony 元数据保全: 把保留管线的恢复步骤复用到透明重封装上。
-
-    为什么必须做: GPAC 的 `-new` 只重写它认识的轨道结构, 容器层的
-    brand / tref / nrtm meta item / 厂商 uuid 全都会丢。实测
-    `20260904_C1214` 上丢掉这四类之后, Gyroflow 从成品读到
-    **0/146146** 个 IMU 样本, 相机型号也认不出来 —— 而 rtmd **轨的
-    payload 逐字节相同**。也就是说丢的完全是容器层。
-
-    步骤与 `preservation/pipeline.py` 的第 4~5c 步一致, 顺序也一样:
-        mux_new(stage) -> reconstruct(tref/cdsc + nrtm) -> flatten
-        -> set_brand -> insert_uuid_boxes(stage -> dst) -> item_type patch
-
-    `flatten` 不能省: 字节级 uuid 插入要求 moov 在 mdat 之后, 而且
-    它将 movie timescale 归位, 后面的 set_brand 再按源 timescale 恢复。
-
-    返回 stage 路径 (调用方不再需要); 失败则抛异常, 由调用方回退到
-    原样拷贝 —— 元数据保全失败时**不能**交出一个"看着像成品"的文件。
-    """
-    from preservation import isobmf
-    from preservation.pipeline import _item_type_bytes
-    from preservation.sony import SonyPreservationBackend
-
-    stage = work_dir / "transparent_stage.mov"
-    try:
-        if stage.exists():
-            stage.unlink()
-    except OSError:
-        pass
-
-    sony = SonyPreservationBackend(gpac, None)
-    bundle_dir = work_dir / "metadata"
-    bundle = sony.extract(source, bundle_dir)
-    log(f"channel-sync: Sony metadata — {len(bundle.tracks)} 元数据轨, "
-        f"{len(bundle.boxes)} uuid box, nrtm="
-        f"{'yes' if bundle.nrtm else 'no'}, "
-        f"brand={bundle.major_brand!r}")
-
-    gpac.mux_new(stage, adds)
-    sony.reconstruct(bundle, bundle_dir, stage)
-    gpac.flatten(stage)
-
-    if bundle.major_brand:
-        compat = [b for b in bundle.compatible_brands
-                  if b and b != bundle.major_brand]
-        major = bundle.major_brand
-        if bundle.brand_minor_version:
-            major += f":{bundle.brand_minor_version}"
-        gpac.set_brand(
-            stage, major, compat,
-            remove=[b for b in ("qt  ", "isom", "iso2")
-                    if b not in compat and b != bundle.major_brand],
-        )
-
-    if dst.exists():
-        dst.unlink()
-    existing = {
-        (ctx, isobmf.sha256_bytes(raw))
-        for ctx, _, raw in isobmf.extract_uuid_boxes(stage)
-    }
-    inserts = [
-        (ctx, data)
-        for ctx, data in sony.uuid_inserts(bundle, bundle_dir)
-        if (ctx, isobmf.sha256_bytes(data)) not in existing
-    ]
-    if len(inserts) < len(bundle.boxes):
-        log(f"channel-sync: uuid — GPAC 已自带 "
-            f"{len(bundle.boxes) - len(inserts)} 个, 补插 {len(inserts)} 个")
-    isobmf.insert_uuid_boxes(stage, dst, inserts)
-
-    if bundle.nrtm and bundle.nrtm.item_id > 0:
-        target = _item_type_bytes(bundle.nrtm.item_type)
-        if target is not None:
-            try:
-                desc = isobmf.patch_meta_item_type(
-                    dst, bundle.nrtm.item_id, target)
-                if desc:
-                    log(f"channel-sync: {desc}")
-            except RuntimeError as exc:
-                log(f"channel-sync: WARNING nrtm item_type patch 跳过: {exc}")
-
-    try:
-        stage.unlink()
-    except OSError:
-        pass
-    return stage
+MetadataRestoreHook = Callable[
+    [Path, list[str], Path, Path, Any, Callable[[str], None]], "Path | None"
+]
 
 
 def run_channel_sync(
@@ -753,11 +663,19 @@ def run_channel_sync(
     transparent: bool | None = None,
     dst: Path | None = None,
     gpac: Any | None = None,
+    restore_metadata: MetadataRestoreHook | None = None,
 ) -> dict[str, Any]:
     """测量 -> 锚点回退 -> 轨道级质量门 -> 整数修正 -> 复检 -> 输出。
 
     transparent: 显式覆盖 opts["channel_sync_transparent"]; 为 True 时
     dst 必填 (透明模式最终输出路径)。
+
+    restore_metadata: 透明模式的**容器层恢复钩子**, 依赖倒置用。签名
+    `(source, adds, dst, work_dir, gpac, log) -> stage | None`。本模块是
+    音频同步层, 不导入任何 Sony / 编码器 / 封装库 (P4 审计 A.1 强制),
+    因此容器层恢复由调用方注入 —— 见 `preservation/transparent_restore.py`
+    的模块 docstring。`transparent=True` 且给了 dst 却不注入钩子时**立即
+    抛 ValueError**: 静默交出一个元数据被剥光的"成品"正是要根除的缺陷。
 
     status:
       applied         至少一轨 fixed; audio_files 含全轨音频文件
@@ -775,6 +693,16 @@ def run_channel_sync(
     eff = effective_opts(opts)
     t_mode = bool(transparent if transparent is not None
                   else eff["channel_sync_transparent"])
+    # 契约检查放在**任何工作开始之前**: 透明模式要写成品, 而写成品就必须
+    # 有能力恢复容器层。等到 mux 之后才发现没钩子, 只能二选一 —— 交出元数据
+    # 被剥光的文件 (不可接受), 或回退成源文件拷贝 (看起来成功, 实际没做对齐
+    # 之外还丢了一次真实重封装)。前移成启动期错误, 二者都不会发生。
+    if t_mode and dst is not None and restore_metadata is None:
+        raise ValueError(
+            "transparent channel-sync requires the restore_metadata hook: "
+            "the audio-sync layer must not import the container layer, so the "
+            "caller has to inject it (see preservation/transparent_restore.py)"
+        )
     work_dir.mkdir(parents=True, exist_ok=True)
     stem = source.stem
     ctx: dict[str, Any] = {"anchor": None}
@@ -1843,7 +1771,9 @@ def run_channel_sync(
                     )
                     stage: Path | None = None
                     if sony_meta:
-                        stage = _restore_sony_metadata(
+                        # `restore_metadata` 在函数入口已保证非 None (见上面的
+                        # 契约检查), 这里只负责调用; 具体步骤全在容器层。
+                        stage = restore_metadata(
                             source, adds, dst, work_dir, gpac, log
                         )
                     if stage is None:

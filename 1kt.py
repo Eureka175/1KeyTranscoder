@@ -1580,14 +1580,13 @@ def transparent_verify(
         and st.get("codec_tag_string") == "rtmd"
         for st in streams
     )
-    dji = False
-    if not is_sony:
-        try:
-            from preservation import is_dji_source
-
-            dji = bool(is_dji_source(streams))
-        except Exception:                             # noqa: BLE001
-            dji = False
+    # DJI 判定用的是**同一个**谓词 (`core.batch_hw.is_dji_source`, `djmd` 轨道),
+    # 而且它在模块顶层已经 import 过了。这里原本写 `from preservation import
+    # is_dji_source` —— 那个名字根本不存在, ImportError 被下面的 `except
+    # Exception: dji = False` 吞掉, 于是 DJI 分支**永远进不去**, 每一支 DJI
+    # 素材都会被打上"不属于 Sony/DJI 家族"的日志。静默的宽 except 把一个
+    # 直接的 NameError 变成了一个看起来正常的业务判断。
+    dji = bool(is_dji_source(streams)) if not is_sony else False
 
     video = next((s for s in streams if s.get("codec_type") == "video"), None)
     codec_name = str((video or {}).get("codec_name") or "hevc")
@@ -1644,6 +1643,9 @@ def transparent_main(
     输出与源文件字节级一致; 文件级失败时输出为源文件原样拷贝。
     """
     from core.channel_sync import run_channel_sync
+    from preservation.transparent_restore import (
+        restore_after_transparent_remux,
+    )
 
     output_root.mkdir(parents=True, exist_ok=True)
     logs_root = input_root.parent / "logs"
@@ -1682,15 +1684,24 @@ def transparent_main(
     _t_grp = getattr(args, "channel_sync_groups", None)
     _t_thr = getattr(args, "channel_sync_group_threshold", None)
     if _t_grp is not None or _t_thr is not None:
+        from core.channel_sync import effective_opts
+
         channel_sync_opts = dict(channel_sync_opts or {})
         if _t_grp is not None:
             channel_sync_opts["group_anchor_enabled"] = bool(_t_grp)
         if _t_thr is not None:
             channel_sync_opts["group_snr_threshold"] = float(_t_thr)
+        # 打**生效值**, 不是"调用方覆写了什么"。只打覆写值会让日志出现
+        # `threshold=None` —— 而实际生效的是 DEFAULTS 的 1.30, 运维照着
+        # "None" 去排查会走错方向。
+        _eff = effective_opts(channel_sync_opts)
         logger.info(
-            "CHANNEL-SYNC GROUPING | enabled=%s threshold=%s",
-            channel_sync_opts.get("group_anchor_enabled"),
-            channel_sync_opts.get("group_snr_threshold"),
+            "CHANNEL-SYNC GROUPING | enabled=%s threshold=%.2f "
+            "samples=%d min_samples=%d (CLI override: enabled=%s thr=%s)",
+            _eff["group_anchor_enabled"], _eff["group_snr_threshold"],
+            _eff["group_snr_samples"], _eff["group_snr_min_samples"],
+            "yes" if _t_grp is not None else "no",
+            "yes" if _t_thr is not None else "no",
         )
 
     if args.retry_list:
@@ -1793,6 +1804,9 @@ def transparent_main(
                 transparent=True,
                 dst=dst,
                 gpac=gpac,
+                # 容器层恢复由本层注入 (依赖倒置): 音频同步层不得 import
+                # preservation.sony —— 那是 P4 审计 A.1 强制的分层边界。
+                restore_metadata=restore_after_transparent_remux,
                 log=lambda msg: logger.info("[SYNC] %s | %s", src.name, msg),
             )
             file_logger.info(

@@ -23,13 +23,15 @@ rem  且与源素材逐采样相同。下面两个变量现在默认开启, 把�
 rem    SYNC=1    -> --channel-sync (4 声道恒定延时对齐, 纯整数样本移位)
 rem    GROUPS=1  -> --channel-sync-groups (分组锚点; 只在"一支片子里有两支
 rem                 互不相干的麦克风"时才多修几条轨, 其它情况行为不变)
-rem  想关掉(例如先跑一遍对照组): 把 SYNC 改成 0。
+rem  想关掉(例如先跑一遍对照组): 把 SYNC 改成 0。SYNC=0 是**总开关**: 即使
+rem  GROUPS 还是 1 也不会传任何对齐参数 (否则"关掉"只关掉一半, 而日志里
+rem  看不出区别)。分组锚点只在 SYNC=1 时才跟随 GROUPS。
 set "SYNC=1"
 set "GROUPS=1"
 
 set "SYNCARGS="
 if "%SYNC%"=="1" set "SYNCARGS=%SYNCARGS% --channel-sync"
-if "%GROUPS%"=="1" set "SYNCARGS=%SYNCARGS% --channel-sync-groups"
+if "%SYNC%"=="1" if "%GROUPS%"=="1" set "SYNCARGS=%SYNCARGS% --channel-sync-groups"
 
 if not exist "%INPUT%" mkdir "%INPUT%"
 if not exist "%OUTPUT%" mkdir "%OUTPUT%"
