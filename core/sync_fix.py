@@ -32,7 +32,7 @@ from .sync_estimate import (
     read_f64,
 )
 
-__all__ = ["shift_stream", "recheck_residual"]
+__all__ = ["shift_stream", "recheck_residual", "recheck_residual_windows"]
 
 
 def shift_stream(
@@ -132,14 +132,30 @@ def _recheck(
     search_ms: float,
     anchor_segment_seconds: float,
     fine_phase_band_hz: tuple[float, float],
+    center_frac: float = 0.5,
 ) -> float:
     n = min(ref.shape[0], tgt.shape[0])
     if n < 4096:
         return float("nan")
     anchor_len = min(int(round(anchor_segment_seconds * sample_rate)), n)
-    a0 = (n - anchor_len) // 2
+    span = n - anchor_len
+    # `center_frac` 决定锚段落在片长上的位置 (0=片头, 0.5=中部, 1=片尾)。
+    # 0.5 必须**逐位复现**旧公式 `(n - anchor_len) // 2`, 否则 windows=1 的
+    # 默认路径就与历史结果不一致了 (跨度是奇数时 round 会多 1 个样本)。
+    if center_frac == 0.5:
+        a0 = (n - anchor_len) // 2
+    else:
+        c = min(1.0, max(0.0, float(center_frac)))
+        a0 = min(max(int(round(span * c)), 0), span)
     s = int(math.ceil(search_ms * sample_rate / 1000.0))
+    # 读窗需要 a0-s >= 0 且 a0+anchor_len+s <= n。贴边时**收缩搜索半径**,
+    # 而不是越界读 —— 线性 PCM 是内存映射, 越界读在 Windows 上是访问违例,
+    # 不是可以捕获的异常。锚段占满全片时无法留搜索余量, 如实返回 nan
+    # (旧实现会传入负偏移, 静默读到错位数据)。
+    s = max(0, min(s, a0, n - anchor_len - a0))
 
+    if s < 1:
+        return float("nan")
     ref_seg = read_f64(ref, a0, anchor_len)
     tgt_win = read_f64(tgt, a0 - s, anchor_len + 2 * s)
     g = gcc_phat_int(ref_seg, tgt_win, lag0=s, search_lo=-s, search_hi=s)
@@ -152,3 +168,62 @@ def _recheck(
     )
     total = d_int + delta if delta == delta else float(d_int)
     return total * 1000.0 / sample_rate
+
+
+def recheck_residual_windows(
+    ref_src: Any,
+    fixed_src: Any,
+    *,
+    sample_rate: int,
+    storage_dtype: str,
+    windows: int = 3,
+    search_ms: float = 5.0,
+    anchor_segment_seconds: float,
+    fine_phase_band_hz: tuple[float, float] = (200.0, 8000.0),
+) -> dict:
+    """全片多窗复检: 沿片长均匀取 `windows` 个锚段, 返回**最差**残差。
+
+    为什么需要它: 单窗复检只看中部锚段。若某轨的偏移不是全片常数,
+    中部恰好局部对齐, 单窗就会判"通过", 而全片其实还有几十采样的残差
+    （实测 `20260904_C1179 CH1`: 中部通过, 全片 31.5 采样）。
+    反过来, 对**恒定**偏移只需要一个窗就够, 所以默认 `windows=1` 保持旧行为,
+    多窗是显式开启的。
+
+    返回 `{"worst_ms", "worst_abs_ms", "values", "n_windows", "centers"}`;
+    `worst_ms` 为 nan 表示全部窗都不可测。
+    """
+    k = max(1, int(windows))
+    # 0.5 仍是第一个窗: 单窗时与 recheck_residual 完全等价。
+    if k == 1:
+        centers = [0.5]
+    else:
+        # 避开最边上的 5%, 那里常含淡入/静音, 相关性差。
+        centers = [0.05 + 0.9 * i / (k - 1) for i in range(k)]
+    opened: list[Any] = []
+    try:
+        ref = open_source(ref_src, storage_dtype)
+        if isinstance(ref_src, (str, Path)):
+            opened.append(ref)
+        tgt = open_source(fixed_src, storage_dtype)
+        if isinstance(fixed_src, (str, Path)):
+            opened.append(tgt)
+        values: list[float] = []
+        for c in centers:
+            try:
+                values.append(_recheck(
+                    ref, tgt, sample_rate=sample_rate, search_ms=search_ms,
+                    anchor_segment_seconds=anchor_segment_seconds,
+                    fine_phase_band_hz=fine_phase_band_hz, center_frac=c,
+                ))
+            except Exception:                 # noqa: BLE001 — 单窗失败不致命
+                values.append(float("nan"))
+        good = [v for v in values if v == v]
+        worst = max(good, key=abs) if good else float("nan")
+        return {"worst_ms": worst,
+                "worst_abs_ms": abs(worst) if worst == worst else float("nan"),
+                "values": values, "n_windows": k, "centers": centers}
+    finally:
+        for stream in opened:
+            close = getattr(stream, "close", None)
+            if callable(close):
+                close()

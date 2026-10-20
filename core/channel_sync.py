@@ -127,6 +127,17 @@ DEFAULTS: dict[str, Any] = {
 
     # —— 修正 / 复检 ——
     "verify_max_ms": 0.05,               # 复检残差阈值 (整数修正量化残差理论上 <= 0.5 sample)
+    # 复检的**相对**容差 (2026-10-20): 绝对门 0.05 ms 有个方向性错误 ——
+    # 它把"留 20.79 ms 偏差"判成比"留 0.08 ms"更安全。实测 `C1213 CH1`
+    # 测出 +20.79 ms、修正后残差 0.08 ms, 却因为 0.08 > 0.05 被整条退回。
+    # 打开后有效门为 max(verify_max_ms, |delay_ms| * verify_max_rel):
+    # 小于 5 采样的偏移由 `min_shift_samples` 管, 这里不会放宽它们。
+    # 默认 0.0 = 关闭 (与旧行为逐位一致)。
+    "verify_max_rel": 0.0,
+    # 复检窗口数 (2026-10-20): 1 = 只看中部锚段 (旧行为)。>1 = 沿片长均匀取
+    # 多个锚段, 取**最差**残差。为"偏移不是全片常数"的轨准备:
+    # 实测 `C1179 CH1` 中部局部对齐、全片仍有 31.5 采样残差, 单窗会放过它。
+    "recheck_windows": 1,
     "aligned_max_ms": 0.05,              # 全部通道 |delay| 低于此值 -> already_aligned
     # 修正的**最小幅度** (整数样本)。|shift| <= 此值的轨一律判 already_aligned,
     # 不做写入。"5 sample 以内都不修"是明确的产品决定, 不是阈值微调:
@@ -197,7 +208,7 @@ DEFAULTS: dict[str, Any] = {
 
 _INT_KEYS = ("min_audio_streams", "coarse_rate", "min_usable_frames",
              "group_snr_samples", "group_snr_min_samples",
-             "min_shift_samples")
+             "min_shift_samples", "recheck_windows")
 #: **可为 None** 的整数键 (P4.6): None 是"未指定, 用上游具名默认常量", 与 0
 #: 不是一回事。它们不能进 `_INT_KEYS` —— `int(None)` 会抛错, 而
 #: `effective_opts` 的 except 会把**整份配置**回退成 DEFAULTS, 于是调用方写的
@@ -210,7 +221,7 @@ _FLOAT_KEYS = ("min_audio_seconds", "silent_rms_dbfs", "search_window_ms",
                "anchor_segment_seconds",
                "min_confidence", "min_usable_fraction", "mad_max_ms",
                "step_min_ms", "constant_max_ppm", "drift_min_ms",
-               "verify_max_ms",
+               "verify_max_ms", "verify_max_rel",
                "aligned_max_ms", "fix_chunk_seconds", "frame_min_rms_dbfs",
                "group_snr_threshold")
 _LIST_INT_KEYS = ("supported_sample_rates", "anchor_candidates")
@@ -1662,32 +1673,57 @@ def run_channel_sync(
                     except OSError:
                         pass            # finally 会重试; 此处失败不致命
             try:
-                residual = sync_fix.recheck_residual(
-                    # 分组锚点打开时, 不同组的轨要用**各自**的参考复检 ——
-                    # 用主锚点去复检另一组的轨, 残差本来就应当很大, 那不是
-                    # 修正失败, 是拿错了尺子。
-                    arrs[ref_of.get(i, anchor)],
-                    # 传路径而非就地 open 的流对象: recheck_residual 会自己
-                    # 打开并在 finally 关闭它 (owns_tgt)。就地 open 的流没有
-                    # 任何一方负责关闭, 只能靠 CPython 引用计数; 一旦引用被
-                    # 保留 (异常回溯/调试器) 句柄即悬空, 下面的 unlink 会失败
-                    # 并被静默吞掉, 留下整条 raw 临时文件。
-                    fixed_raw[i],
-                    sample_rate=sample_rate,
-                    storage_dtype=storage[i],
-                    anchor_segment_seconds=eff["anchor_segment_seconds"],
-                    fine_phase_band_hz=tuple(eff["fine_phase_band_hz"]),
-                )
+                # 复检门: 绝对门 + 可选相对门。相对门只在**这条轨的偏移本身**
+                # 远大于残余时放行 —— 即"修正带来了数量级改善"。小于
+                # `min_shift_samples` 的偏移本来就不写, 所以不会因此放宽小位移。
+                delay_ms_here = abs(float(e.delay_ms))
+                limit = eff["verify_max_ms"]
+                if eff["verify_max_rel"] > 0.0:
+                    limit = max(limit, delay_ms_here * eff["verify_max_rel"])
+                windows = max(1, int(eff["recheck_windows"]))
+                if windows > 1:
+                    wr = sync_fix.recheck_residual_windows(
+                        arrs[ref_of.get(i, anchor)],
+                        fixed_raw[i],
+                        sample_rate=sample_rate,
+                        storage_dtype=storage[i],
+                        windows=windows,
+                        anchor_segment_seconds=eff["anchor_segment_seconds"],
+                        fine_phase_band_hz=tuple(eff["fine_phase_band_hz"]),
+                    )
+                    residual = wr["worst_ms"]
+                    win_note = (f" ({windows} 窗取最差: "
+                                f"{['%.3f' % v if v == v else 'nan' for v in wr['values']]})")
+                else:
+                    residual = sync_fix.recheck_residual(
+                        # 分组锚点打开时, 不同组的轨要用**各自**的参考复检 ——
+                        # 用主锚点去复检另一组的轨, 残差本来就应当很大, 那不是
+                        # 修正失败, 是拿错了尺子。
+                        arrs[ref_of.get(i, anchor)],
+                        # 传路径而非就地 open 的流对象: recheck_residual 会自己
+                        # 打开并在 finally 关闭它 (owns_tgt)。就地 open 的流没有
+                        # 任何一方负责关闭, 只能靠 CPython 引用计数; 一旦引用被
+                        # 保留 (异常回溯/调试器) 句柄即悬空, 下面的 unlink 会失败
+                        # 并被静默吞掉, 留下整条 raw 临时文件。
+                        fixed_raw[i],
+                        sample_rate=sample_rate,
+                        storage_dtype=storage[i],
+                        anchor_segment_seconds=eff["anchor_segment_seconds"],
+                        fine_phase_band_hz=tuple(eff["fine_phase_band_hz"]),
+                    )
+                    win_note = ""
             except Exception as exc:      # noqa: BLE001
                 residual = float("nan")
+                limit = eff["verify_max_ms"]
+                win_note = ""
                 log(f"channel-sync: WARNING CH{i + 1} recheck error: {exc}")
-            if residual != residual or abs(residual) >= eff["verify_max_ms"]:
+            if residual != residual or abs(residual) >= limit:
                 rows[i]["decision"] = "untouched"
                 rows[i]["reason"] = "recheck_residual"
                 rows[i]["shift_samples"] = None
                 log(
                     f"channel-sync: WARNING CH{i + 1} 复检残差 "
-                    f"{residual:+.4f}ms 超门 {eff['verify_max_ms']}ms — "
+                    f"{residual:+.4f}ms 超门 {limit:.4f}ms{win_note} — "
                     "仅该轨回退为 untouched"
                 )
                 continue

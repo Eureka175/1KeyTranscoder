@@ -69,6 +69,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
              channel_sync.l1_channel_sync_groups),
             ("transparent 契约 (check 路由/依赖倒置)",
              channel_sync.l1_transparent_contract),
+            ("复检双维 (相对容差 / 全片多窗)",
+             channel_sync.l1_recheck_knobs),
             ("audio model v0.7.1", audio_model.l1_audio_model),
             ("audio select/map v0.7.1", audio_selection.l1_audio_selection),
             ("audio timeline v0.7.1", audio_timeline.l1_audio_timeline),
