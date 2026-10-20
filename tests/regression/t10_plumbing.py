@@ -90,22 +90,27 @@ def check_start_bat() -> dict:
     frag_lines = []
     for ln in text.splitlines():
         s = ln.strip()
-        if s.startswith('set "SYNC=') or s.startswith('set "GROUPS='):
+        if (s.startswith('set "SYNC=') or s.startswith('set "GROUPS=')
+                or s.startswith('set "ACCURATE=')):
             frag_lines.append(s)
         if s.startswith('if "%SYNC%"=="1"'):
             frag_lines.append(s)
         if s.startswith('if "%GROUPS%"=="1"'):
             frag_lines.append(s)
-    # extract the fragment verbatim and run it under cmd.exe for each combo
-    body = "\n".join(frag_lines)
+        if s.startswith('if "%ACCURATE%"=="1"'):
+            frag_lines.append(s)
     results = {}
-    for sync, groups in (("1", "1"), ("1", "0"), ("0", "1"), ("0", "0")):
+    for sync, groups, acc in (("1", "1", "0"), ("1", "0", "0"),
+                              ("1", "0", "1"), ("1", "1", "1"),
+                              ("0", "1", "1"), ("0", "0", "0")):
         script = (f'@echo off\nset "SYNC={sync}"\nset "GROUPS={groups}"\n'
+                  f'set "ACCURATE={acc}"\n'
                   + "\n".join(l for l in frag_lines
                               if not l.startswith('set "SYNC=')
-                              and not l.startswith('set "GROUPS='))
+                              and not l.startswith('set "GROUPS=')
+                              and not l.startswith('set "ACCURATE='))
                   + '\n<nul set /p "=%SYNCARGS%"\n')
-        bat = WORK / f"_frag_{sync}{groups}.bat"
+        bat = WORK / f"_frag_{sync}{groups}{acc}.bat"
         bat.parent.mkdir(parents=True, exist_ok=True)
         bat.write_text(script, encoding="ascii", errors="replace")
         r = subprocess.run(["cmd", "/c", str(bat)], stdin=subprocess.DEVNULL,
@@ -113,15 +118,20 @@ def check_start_bat() -> dict:
                            text=True, encoding="utf-8", errors="replace")
         args = [t for t in (r.stdout or "").split()
                 if t.startswith("--")]
-        results[f"SYNC={sync} GROUPS={groups}"] = args
+        results[f"SYNC={sync} GROUPS={groups} ACC={acc}"] = args
     defaults = {ln.strip() for ln in text.splitlines()
-                if ln.strip().startswith('set "SYNC=')
-                or ln.strip().startswith('set "GROUPS=')}
-    ok = (results["SYNC=1 GROUPS=1"]
+                if ln.strip().startswith(('set "SYNC=', 'set "GROUPS=',
+                                          'set "ACCURATE='))}
+    ok = (results["SYNC=1 GROUPS=1 ACC=0"]
           == ["--channel-sync", "--channel-sync-groups"]
-          and results["SYNC=1 GROUPS=0"] == ["--channel-sync"]
-          and results["SYNC=0 GROUPS=1"] == []
-          and results["SYNC=0 GROUPS=0"] == [])
+          and results["SYNC=1 GROUPS=0 ACC=0"] == ["--channel-sync"]
+          and results["SYNC=1 GROUPS=0 ACC=1"]
+          == ["--channel-sync", "--channel-sync-accurate"]
+          and results["SYNC=1 GROUPS=1 ACC=1"]
+          == ["--channel-sync", "--channel-sync-groups",
+              "--channel-sync-accurate"]
+          and results["SYNC=0 GROUPS=1 ACC=1"] == []
+          and results["SYNC=0 GROUPS=0 ACC=0"] == [])
     return {"fragment_lines": frag_lines, "combos": results,
             "defaults_declared": sorted(defaults),
             "default_is_sync_on": ('set "SYNC=1"' in defaults
@@ -136,6 +146,8 @@ def check_cli_defaults() -> dict:
         "--channel-sync-groups present": '"--channel-sync-groups"' in src,
         "--channel-sync-group-threshold present":
             '"--channel-sync-group-threshold"' in src,
+        "--channel-sync-accurate present":
+            '"--channel-sync-accurate"' in src,
         "both default None (so config file wins when absent)":
             src.count("default=None") >= 2,
     }

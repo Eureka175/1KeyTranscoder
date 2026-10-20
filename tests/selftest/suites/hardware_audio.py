@@ -316,7 +316,9 @@ def l1_hardware_audio() -> None:
                  "--channel-sync-tv-coordinate"}
     # P4.12 — 分组锚点的两个开关。与本集合里其它条目同一处理: 手写登记,
     # 因此将来任何一次新增都必须改到这里, 不能静默长出新参数。
-    P412_ADDED = {"--channel-sync-groups", "--channel-sync-group-threshold"}
+    # v0.8.7 — 精确模式开关同样登记在这里 (同一个理由)。
+    P412_ADDED = {"--channel-sync-groups", "--channel-sync-group-threshold",
+                  "--channel-sync-accurate"}
     # REVISED BY THE HARDWARE-FIRST DECODE PHASE. This set is deliberately
     # hand-maintained: it is the thing that makes an argument add/remove
     # impossible to slip in silently. Two edits landed together here, which is
@@ -376,6 +378,12 @@ def l1_hardware_audio() -> None:
            and _grp_at >= 0
            and "default=None" in entry[_grp_at: _grp_at + 400],
            f"present: {sorted(P412_ADDED & args_now)}")
+    _acc_at = entry.find("--channel-sync-accurate")
+    record("v08hw.cli v0.8.7 的精确模式参数存在, 且默认关闭 (default=None)",
+           "--channel-sync-accurate" in args_now
+           and _acc_at >= 0
+           and "default=None" in entry[_acc_at: _acc_at + 400],
+           f"at={_acc_at}")
 
 
 def _video_deps(path: Path) -> list[str]:

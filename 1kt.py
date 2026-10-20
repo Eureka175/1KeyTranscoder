@@ -1276,6 +1276,20 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--channel-sync-accurate",
+        action="store_true",
+        default=None,
+        help=(
+            "精确模式 (v0.8.7, 显式 opt-in, **默认关闭**). 把\"最小修正幅度\""
+            "从 5 样本降到 1 样本并放弃毫米带, 于是 2~5 样本的小偏移也会被修。"
+            "每一级都必须由**施加后的独立复检残差**验收: 残差 ≤1 样本才按 1 "
+            "样本粒度采纳; 做不到就退到 2 样本 (放弃 |shift|==2 的轨); 再做不到"
+            "就退回常规 5 样本门并打 WARNING。判据是量出来的, 不是猜的。"
+            "报告里会多一个 `accurate` 块, 逐轨写明候选/采纳/放弃与原因。"
+            "代价: 小偏移轨要多一次移位+复检; 长片上可忽略。"
+        ),
+    )
+    parser.add_argument(
         "--channel-sync-groups",
         action="store_true",
         default=None,
@@ -1702,6 +1716,22 @@ def transparent_main(
             _eff["group_snr_samples"], _eff["group_snr_min_samples"],
             "yes" if _t_grp is not None else "no",
             "yes" if _t_thr is not None else "no",
+        )
+
+    # v0.8.7 — 精确模式在透明批量路径上同样要能吃开关 (P4.12 那个教训:
+    # 这里漏一行, 开关就在透明模式下静默失效, 而透明模式正是长测走的路)。
+    _t_acc = getattr(args, "channel_sync_accurate", None)
+    if _t_acc is not None:
+        from core.channel_sync import effective_opts as _eff_opts
+
+        channel_sync_opts = dict(channel_sync_opts or {})
+        channel_sync_opts["channel_sync_accurate"] = bool(_t_acc)
+        _ae = _eff_opts(channel_sync_opts)
+        logger.info(
+            "CHANNEL-SYNC ACCURATE | enabled=%s min_shift_samples=%d "
+            "(CLI override: %s)",
+            _ae["channel_sync_accurate"], _ae["min_shift_samples"],
+            "yes" if _t_acc is not None else "no",
         )
 
     if args.retry_list:
@@ -2133,6 +2163,15 @@ def main() -> int:
         if _grp_thr is not None:
             channel_sync_opts["group_snr_threshold"] = float(_grp_thr)
     if _grp_flag:
+        channel_sync_enabled = True
+
+    # v0.8.7 — 精确模式。同一手法: 只覆写真的给了值的键, 并且隐含
+    # --channel-sync (说"要更精确"当然等于说"要做对齐")。
+    _acc_flag = getattr(args, "channel_sync_accurate", None)
+    if _acc_flag is not None:
+        channel_sync_opts = dict(channel_sync_opts or {})
+        channel_sync_opts["channel_sync_accurate"] = bool(_acc_flag)
+    if _acc_flag:
         channel_sync_enabled = True
 
     # 显式音频计划 (v0.8.0+): 经典软件路径 (x265 / svtav1) 与硬件后端

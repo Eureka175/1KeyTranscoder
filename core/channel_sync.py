@@ -137,6 +137,11 @@ DEFAULTS: dict[str, Any] = {
     #     或 −37~−39 样本, 与 5 样本差着两个数量级。
     # 用**样本数**而不是毫秒, 因为要表达的是量化粒度, 与采样率无关。
     "min_shift_samples": 5,
+    # 精确模式 (opt-in, **默认关闭**): 把最小幅度门降到 1 样本, 但**必须由
+    # 施加后的独立复检残差来验收** —— 1 样本做不到就退 2 样本, 再做不到就
+    # 退回常规 5 样本并打 WARNING。见 `resolve_accurate_tier()`。
+    # 关掉时这一整段不执行, 决策路径与 v0.8.7 逐字节相同。
+    "channel_sync_accurate": False,
     "fix_chunk_seconds": 60.0,           # 初值, 待真实素材标定 (移位分块大小)
 
     # —— 锚点 (P1: 候选顺序 + 健康门; 完整打分属二期) ——
@@ -211,7 +216,8 @@ _FLOAT_KEYS = ("min_audio_seconds", "silent_rms_dbfs", "search_window_ms",
 _LIST_INT_KEYS = ("supported_sample_rates", "anchor_candidates")
 _LIST_FLOAT_KEYS = ("fine_phase_band_hz",)
 _LIST_STR_KEYS = ("supported_codecs",)
-_BOOL_KEYS = ("channel_sync_transparent", "time_varying", "group_anchor_enabled")
+_BOOL_KEYS = ("channel_sync_transparent", "time_varying", "group_anchor_enabled",
+              "channel_sync_accurate")
 
 # 参与"全部健康 target 均失败 -> 文件级 measure_failed" 判定的轨道级原因
 _ESTIMATION_FAIL_REASONS = frozenset({
@@ -698,6 +704,51 @@ def is_aligned_decision(
     )
 
 
+#: 精确模式的分级候选, 由细到粗; 最后一个必须等于默认 `min_shift_samples`。
+ACCURATE_TIERS: tuple[int, ...] = (1, 2)
+
+
+def resolve_accurate_tier(
+    extras: Mapping[int, tuple[int, float]],
+    *,
+    min_shift_samples: int,
+) -> tuple[int, set[int], dict[int, str]]:
+    """`--channel-sync-accurate`: 决定这一批小修正能不能按多细的粒度写下去。
+
+    `extras` 是"只因为精确模式降低了门才被判 fixed"的轨:
+    `{轨道下标: (shift_samples, 复检残差样本数)}`。
+
+    **"可不可行"用的是施加之后的独立复检残差, 不是阈值猜测。** 这就是整个
+    代码库对"这个数值到底对不对"的一贯判据 (`recheck_residual`); 换一套
+    别的度量只会多出一个没人能复核的说法。
+
+    分级:
+      * tier 1 — 每条 extra 的复检残差都 ≤ 1 样本 → 按 1 样本粒度采纳;
+      * tier 2 — 1 样本做不到时, 丢掉 `|shift| == 1` 的轨, 只看剩下的,
+        残差 ≤ 2 样本即可;
+      * 否则 —— 全部退回常规 `min_shift_samples` 门, 并如实报告。
+
+    返回 `(tier, keep, dropped)`: `keep` 是保留下来的轨下标集合,
+    `dropped` 是 `{下标: 原因}`。
+    """
+    if not extras:
+        return min_shift_samples, set(), {}
+
+    for tier in ACCURATE_TIERS:
+        keep = {i for i, (sh, _r) in extras.items() if abs(sh) > tier}
+        bad = {i: f"residual {extras[i][1]:.2f} samples > {tier}"
+               for i in keep if not extras[i][1] <= tier}
+        if not bad:
+            # 该层通过: 比它更小的轨按本层粒度判为已对齐
+            dropped = {i: f"|shift| <= {tier} at tier {tier}"
+                       for i in extras if abs(extras[i][0]) <= tier}
+            return tier, keep, dropped
+
+    dropped = {i: f"residual {extras[i][1]:.2f} samples exceeds tier 2"
+               for i in extras}
+    return min_shift_samples, set(), dropped
+
+
 def run_channel_sync(
     *,
     source: Path,
@@ -794,6 +845,11 @@ def run_channel_sync(
         # 逐字节相同 —— 下游按字段读取的地方不会因为多一个键而改变行为。
         if ctx.get("grouping") is not None:
             rep["grouping"] = ctx["grouping"]
+        # 精确模式同理: 只有真的打开才出现, 而且必须有内容可报 ——
+        # 一个"enabled: true 但没有任何候选"的块本身也是信息 (开关没起
+        # 作用), 所以开着的就写。
+        if ctx.get("accurate") is not None:
+            rep["accurate"] = ctx["accurate"]
         # P4.4: 每一行都附上**修正资格**判定 —— 与消费者用的是同一个入口
         # (`correction_eligibility`), 因此生产者写的 `decision="fixed"` 与
         # "允许进入修正路径" 是同一件事的两种说法, 而不是各说各话。
@@ -1354,10 +1410,20 @@ def run_channel_sync(
             #   * 把 3 样本的修正写进成品, 得到的是"看起来做过处理"的文件,
             #     而没有可复现的对齐收益。
             # 用 rint 后的**整数样本**判定, 与下游真正写入的 shift 同一个量。
+            #
+            # 精确模式: 把门降到 1 样本, 并且**放弃**毫米带。毫米带在 48 kHz
+            # 覆盖 ±2.4 样本, 留着它会让 tier 1 与 tier 2 在实际素材上无法
+            # 区分 —— 那等于开了开关却没有更细。可行性由施加后的复检残差
+            # 决定 (`resolve_accurate_tier`), 决策阶段只负责提出候选。
+            if eff["channel_sync_accurate"]:
+                gate_ms, gate_samples = 0.0, min(ACCURATE_TIERS)
+            else:
+                gate_ms, gate_samples = (eff["aligned_max_ms"],
+                                         eff["min_shift_samples"])
             if is_aligned_decision(
                 e.delay_ms, e.delay_samples,
-                aligned_max_ms=eff["aligned_max_ms"],
-                min_shift_samples=eff["min_shift_samples"],
+                aligned_max_ms=gate_ms,
+                min_shift_samples=gate_samples,
             ):
                 rows[i] = est_row(i, e, stats, "already_aligned", None)
                 decision = "already_aligned"
@@ -1541,6 +1607,8 @@ def run_channel_sync(
                 log(f"channel-sync: TIME-VARYING REFUSED — {tv_error}")
                 return finish("tv_not_configured", tv_error, channels=rows)
         fixed_ok: list[int] = []
+        #: 精确模式验收用: {轨下标: (shift_samples, 复检残差样本数)}
+        accurate_extras: dict[int, tuple[int, float]] = {}
         for i in to_fix:
             e = used_est.get(i, ests[i])   # 宽窗采纳轨用采纳估计 (窄窗 delay 可能为 NaN)
             shift = int(np.rint(e.delay_samples))
@@ -1630,6 +1698,49 @@ def run_channel_sync(
             log(f"channel-sync: fixed CH{i + 1} "
                 f"(shift {shift} samples, 复检残差 {residual:+.4f}ms)")
             fixed_ok.append(i)
+            if (eff["channel_sync_accurate"]
+                    and abs(shift) <= eff["min_shift_samples"]):
+                # 只因精确模式降低了门才被修的轨 —— 需要额外验收。
+                accurate_extras[i] = (
+                    shift, abs(residual) * sample_rate / 1000.0)
+
+        # 5b. 精确模式验收: 复检残差决定能按多细的粒度写下去。
+        #
+        # 必须在**音频文件生成之前**落定 (下面的第 8 步按 `fixed_ok` 决定
+        # 该轨写移位后的数据还是源轨 stream copy)。事后再改判定会交出一个
+        # "报告说没动、实际动了"的文件。
+        accurate_report: dict[str, Any] | None = None
+        if eff["channel_sync_accurate"]:
+            tier, keep, dropped = resolve_accurate_tier(
+                accurate_extras, min_shift_samples=eff["min_shift_samples"])
+            for i, why in sorted(dropped.items()):
+                rows[i]["decision"] = "already_aligned"
+                rows[i]["reason"] = None
+                rows[i]["shift_samples"] = None
+                if i in fixed_ok:
+                    fixed_ok.remove(i)
+                log(f"channel-sync: WARNING CH{i + 1} 精确模式未通过验收 "
+                    f"({why}) — 该轨不修")
+            accurate_report = {
+                "enabled": True,
+                "tier_samples": tier,
+                "candidates": {f"CH{i + 1}": {"shift": sh,
+                                              "residual_samples": round(r, 3)}
+                               for i, (sh, r) in sorted(
+                                   accurate_extras.items())},
+                "kept": [f"CH{i + 1}" for i in sorted(keep)],
+                "dropped": {f"CH{i + 1}": why
+                            for i, why in sorted(dropped.items())},
+            }
+            if dropped and tier == eff["min_shift_samples"]:
+                log("channel-sync: WARNING 精确模式退化 — 1 样本与 2 样本粒度"
+                    "都无法由复检残差确认, 本轮按常规 "
+                    f"{eff['min_shift_samples']} 样本门执行")
+            else:
+                log(f"channel-sync: accurate — tier={tier} 样本 "
+                    f"(候选 {len(accurate_extras)}, 采纳 {len(keep)}, "
+                    f"放弃 {len(dropped)})")
+            ctx["accurate"] = accurate_report
 
         # 6. 结果范围判定
         failed_est = [

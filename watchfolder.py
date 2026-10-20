@@ -56,6 +56,10 @@ def main() -> int:
                     help="透传 --channel-sync-groups: 分组锚点 (隐含 "
                          "--channel-sync; 只在\"一支片子里有两支互不相干的"
                          "麦克风\"时才有动作)")
+    ap.add_argument("--channel-sync-accurate", action="store_true",
+                    help="透传 --channel-sync-accurate: 精确模式 (隐含 "
+                         "--channel-sync; 小偏移逐级验收 1→2→5 样本, "
+                         "不可行时退化并告警)")
     ap.add_argument("--no-channel-sync", action="store_true",
                     help="显式关闭声道对齐 (与 --channel-sync 互斥; 用于"
                          "把手写参数里的开关一次性否掉)")
@@ -72,12 +76,15 @@ def main() -> int:
     #       给了 --channel-sync / --channel-sync-groups -> 传下去;
     #       给了 --no-channel-sync -> 两个都不传 (显式否掉)。
     if args.no_channel_sync and (args.channel_sync
-                                 or args.channel_sync_groups):
+                                 or args.channel_sync_groups
+                                 or args.channel_sync_accurate):
         print("[watchfolder] --no-channel-sync 与 --channel-sync* 互斥",
               file=sys.stderr)
         return 2
-    want_sync = bool(args.channel_sync or args.channel_sync_groups)
+    want_sync = bool(args.channel_sync or args.channel_sync_groups
+                     or args.channel_sync_accurate)
     want_groups = bool(args.channel_sync_groups)
+    want_accurate = bool(args.channel_sync_accurate)
 
     cmd = [
         sys.executable, str(ROOT / "1kt.py"),
@@ -94,6 +101,8 @@ def main() -> int:
         # --channel-sync-groups 在 1kt.py 里隐含 --channel-sync; 两个都传是
         # 幂等的, 但显式写全便于在日志里一眼看出这次到底开了什么。
         cmd.append("--channel-sync-groups")
+    if want_accurate:
+        cmd.append("--channel-sync-accurate")
     if args.headless:
         cmd.append("--headless")
     if args.experimental_multihw:
@@ -107,6 +116,7 @@ def main() -> int:
         f"jobs={args.jobs} interval={args.interval}s "
         f"channel_sync={'on' if want_sync else 'off'}"
         f"{' (groups)' if want_groups else ''}"
+        f"{' (accurate)' if want_accurate else ''}"
     )
     if not want_sync:
         print("[watchfolder] 注意: 未开启 --channel-sync, 本轮不做声道对齐")

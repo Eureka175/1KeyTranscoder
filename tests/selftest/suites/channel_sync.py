@@ -876,3 +876,57 @@ def l1_transparent_contract() -> None:
     record("p12c.两条门是或关系: 0 样本恒不动", aligned(0, thr=0))
     record("p12c.真实归档的最大位移 +1222 不受影响",
            not aligned(1222))
+
+    # --- 8. 精确模式分级验收 (--channel-sync-accurate) --------------------
+    from core.channel_sync import (
+        ACCURATE_TIERS,
+        _BOOL_KEYS,
+        resolve_accurate_tier,
+    )
+
+    record("p12c.精确模式默认关闭",
+           DEFAULTS["channel_sync_accurate"] is False)
+    record("p12c.精确模式进 _BOOL_KEYS (字符串可被强制成 bool)",
+           "channel_sync_accurate" in _BOOL_KEYS)
+    record("p12c.分级候选是 (1,2), 都不粗于常规门",
+           ACCURATE_TIERS == (1, 2), str(ACCURATE_TIERS))
+    record("p12c.常规门 5 样本必须比最粗的候选更粗",
+           max(ACCURATE_TIERS) < DEFAULTS["min_shift_samples"])
+
+    def tier_of(extras: dict, minshift: int = 5):
+        return resolve_accurate_tier(extras, min_shift_samples=minshift)
+
+    t, keep, drop = tier_of({})
+    record("p12c.无候选 -> 不动 (tier 回到常规门)", (t, keep, drop) == (5, set(), {}))
+
+    t, keep, drop = tier_of({0: (2, 0.4), 1: (3, 0.9), 2: (5, 0.2)})
+    record("p12c.全部残差 <=1 样本 -> tier 1 全采纳",
+           t == 1 and keep == {0, 1, 2} and not drop, f"{t} {keep} {drop}")
+
+    t, keep, drop = tier_of({0: (2, 0.4), 1: (4, 1.6)})
+    record("p12c.有一轨 1 样本不达标 -> 退 tier 2 并放弃 |shift|==2",
+           t == 2 and keep == {1} and set(drop) == {0}, f"{t} {keep} {drop}")
+
+    t, keep, drop = tier_of({0: (3, 2.7), 1: (5, 4.0)})
+    record("p12c.1 与 2 样本都不可行 -> 退回常规门并全部放弃",
+           t == 5 and not keep and set(drop) == {0, 1}, f"{t} {keep} {drop}")
+
+    t, keep, drop = tier_of({0: (3, 1.0)})
+    record("p12c.边界: 残差恰为 1.000 样本 -> tier 1 采纳",
+           t == 1 and keep == {0})
+    t, keep, drop = tier_of({0: (3, 1.0001)})
+    record("p12c.边界: 残差 1.0001 样本 -> 不进 tier 1",
+           t == 2 and keep == {0}, f"{t} {keep}")
+
+    t, keep, drop = tier_of({0: (2, 0.1)})
+    record("p12c.只有 |shift|==2 且 1 样本可验 -> tier 1 采纳它",
+           t == 1 and keep == {0})
+
+    t, keep, drop = tier_of({0: (2, 1.5)})
+    record("p12c.只有 |shift|==2 且 1 样本不可验 -> tier 2 放弃它",
+           t == 2 and not keep and set(drop) == {0}, f"{t} {keep} {drop}")
+
+    # 分级必须单调: 采纳集合随 tier 增大只会缩小, 不会突然变大
+    t, keep, drop = tier_of({0: (1, 0.0), 1: (2, 0.5)})
+    record("p12c.|shift|<=1 的候选在 tier 1 就被放弃 (门本来就不修它)",
+           set(drop) == {0} and keep == {1}, f"{keep} {drop}")
