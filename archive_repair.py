@@ -681,9 +681,19 @@ def repair_one(src: Path, dst: Path, *, opts: dict | None,
         from preservation.gyroflow import check as gyro_check, find_gyroflow
 
         gf = find_gyroflow(None)
-        rec["gyroflow"] = (gyro_check(src, dst, gf,
-                                      SCRATCH / ("gyro_" + src.stem + ".json"))
-                           .get("status") if gf else "UNAVAILABLE")
+        if not gf:
+            rec["gyroflow"] = "UNAVAILABLE"
+        else:
+            # `gyro_check` 的最后一个参数是**临时目录**, 它会在里面写两份
+            # 导出 JSON (单个片段可达 400 MiB)。用完必须删 —— 早先漏了这一步,
+            # 跑 13 个文件就在 scratch 里留下 2.7 GiB 垃圾。
+            gscratch = SCRATCH / ("gyro_" + src.stem)
+            shutil.rmtree(gscratch, ignore_errors=True)
+            try:
+                rec["gyroflow"] = gyro_check(
+                    src, dst, gf, gscratch).get("status")
+            finally:
+                shutil.rmtree(gscratch, ignore_errors=True)
     except Exception as exc:                            # noqa: BLE001
         rec["gyroflow"] = f"ERROR: {type(exc).__name__}"
     return rec
