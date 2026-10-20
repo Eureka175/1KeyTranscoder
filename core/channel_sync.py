@@ -18,7 +18,8 @@
      (MAD + 漂移 ppm) / out_of_range (搜索窗边缘堆积);
   6. 每轨独立决策: silent_track / non_finite / insufficient_frames /
      low_confidence / non_constant / out_of_range -> untouched (不阻止
-     其它健康轨同步); |delay| < aligned_max_ms -> already_aligned;
+     其它健康轨同步); |delay| < aligned_max_ms 或 |shift| <=
+     min_shift_samples (默认 5 样本) -> already_aligned;
      其余 -> fixed (纯整数样本移位, rint(delay_samples));
   7. 对 fixed 轨执行 recheck_residual() (局部 GCC + 相位斜率, 门
      verify_max_ms): 失败仅回退**该轨**为 untouched, 不回滚其它轨;
@@ -127,6 +128,15 @@ DEFAULTS: dict[str, Any] = {
     # —— 修正 / 复检 ——
     "verify_max_ms": 0.05,               # 复检残差阈值 (整数修正量化残差理论上 <= 0.5 sample)
     "aligned_max_ms": 0.05,              # 全部通道 |delay| 低于此值 -> already_aligned
+    # 修正的**最小幅度** (整数样本)。|shift| <= 此值的轨一律判 already_aligned,
+    # 不做写入。"5 sample 以内都不修"是明确的产品决定, 不是阈值微调:
+    #   * 48 kHz 下 1 样本 = 0.0208 ms, 5 样本 = 0.104 ms;
+    #   * 这个量级已经在测量不确定度里 —— 同一套估计器在重复测量上的散布
+    #     就有 1~2 个样本, 再往下修等于把噪声写成文件内容;
+    #   * 并且它对真实缺陷没有收益: 归档里 14 条待修轨的位移是 +905~+1222
+    #     或 −37~−39 样本, 与 5 样本差着两个数量级。
+    # 用**样本数**而不是毫秒, 因为要表达的是量化粒度, 与采样率无关。
+    "min_shift_samples": 5,
     "fix_chunk_seconds": 60.0,           # 初值, 待真实素材标定 (移位分块大小)
 
     # —— 锚点 (P1: 候选顺序 + 健康门; 完整打分属二期) ——
@@ -181,7 +191,8 @@ DEFAULTS: dict[str, Any] = {
 }
 
 _INT_KEYS = ("min_audio_streams", "coarse_rate", "min_usable_frames",
-             "group_snr_samples", "group_snr_min_samples")
+             "group_snr_samples", "group_snr_min_samples",
+             "min_shift_samples")
 #: **可为 None** 的整数键 (P4.6): None 是"未指定, 用上游具名默认常量", 与 0
 #: 不是一回事。它们不能进 `_INT_KEYS` —— `int(None)` 会抛错, 而
 #: `effective_opts` 的 except 会把**整份配置**回退成 DEFAULTS, 于是调用方写的
@@ -650,6 +661,41 @@ def _apply_time_varying_track(
 MetadataRestoreHook = Callable[
     [Path, list[str], Path, Path, Any, Callable[[str], None]], "Path | None"
 ]
+
+
+def is_aligned_decision(
+    delay_ms: float,
+    delay_samples: float,
+    *,
+    aligned_max_ms: float,
+    min_shift_samples: int,
+) -> bool:
+    """这条轨是否应当判 `already_aligned` (即不做任何写入)。
+
+    **这是"要不要动这个文件"的唯一判据**, 因此抽成纯函数以便逐边界测试 ——
+    它藏在 `decide_and_record` 内联时, 只有跑真实素材才能触到, 而真实素材
+    恰好最缺边界样本。
+
+    三个条件任一成立即不动:
+
+    ``|delay_ms| < aligned_max_ms``
+        毫米级带。与采样率无关, 表达"这根本不是个时差"。
+
+    ``|delay_samples| < 1.0``
+        量化粒度: 修正只做整数样本移位, 不足 1 样本时移位恒为 0。
+
+    ``|rint(delay_samples)| <= min_shift_samples``
+        **最小幅度** (v0.8.7 产品决定: 5 样本以内都不修)。用 rint 之后的
+        整数量判定, 与下游真正写入的 `shift_samples` 是同一个数。
+        48 kHz 下 5 样本 = 0.104 ms; 真实缺陷的位移是 37~1222 样本,
+        与它差两个数量级, 所以这条线不会挡掉任何真实问题。
+    """
+    shift = int(round(delay_samples))
+    return (
+        abs(delay_ms) < aligned_max_ms
+        or abs(delay_samples) < 1.0
+        or abs(shift) <= int(min_shift_samples)
+    )
 
 
 def run_channel_sync(
@@ -1299,17 +1345,20 @@ def run_channel_sync(
                 return "untouched", e, ev
             # 量化粒度保护 (幂等性): 修正只做**整数样本**移位, 因此
             # |delay| < 1 个样本时移位量化后为 0 —— 此时不得产生任何写入。
-            # 判据用**样本数**而不是毫秒: `aligned_max_ms` (0.05 ms) 换算到
-            # 48 kHz 只覆盖 ±2.4 个样本, 是一个与采样率无关的毫米级带,
-            # 不是"量化粒度"。
             #
-            # 实测边界 (testsets A7M5): 20260901_C0977 CH4 报告 +0.062 ms
-            # = 3 个样本, 落在 `aligned_max_ms` 之外 -> 被判 fixed 并写入
-            # 3 个样本的移位。**本保护不覆盖它** —— 3 个样本 > 1 个样本,
-            # 那是"真实但极小"的修正 (幅度为主题修正量的 1/400), 属于
-            # 测量不确定度问题, 不是幂等性问题。真正的幂等边界是 1 个样本。
-            if (abs(e.delay_ms) < eff["aligned_max_ms"]
-                    or abs(e.delay_samples) < 1.0):
+            # 最小幅度 (v0.8.7, 产品决定): |shift| <= `min_shift_samples`
+            # (默认 5 = 0.104 ms @48 kHz) 的轨**不做写入**, 判 already_aligned。
+            # 理由不是"阈值调紧", 而是这个量级已经在测量不确定度里:
+            #   * 同一套估计器重复测量就有 1~2 样本的散布;
+            #   * 真实缺陷的位移是 +905~+1222 / −37~−39 样本, 差两个数量级;
+            #   * 把 3 样本的修正写进成品, 得到的是"看起来做过处理"的文件,
+            #     而没有可复现的对齐收益。
+            # 用 rint 后的**整数样本**判定, 与下游真正写入的 shift 同一个量。
+            if is_aligned_decision(
+                e.delay_ms, e.delay_samples,
+                aligned_max_ms=eff["aligned_max_ms"],
+                min_shift_samples=eff["min_shift_samples"],
+            ):
                 rows[i] = est_row(i, e, stats, "already_aligned", None)
                 decision = "already_aligned"
             else:

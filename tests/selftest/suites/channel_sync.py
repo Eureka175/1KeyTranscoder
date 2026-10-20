@@ -843,3 +843,36 @@ def l1_transparent_contract() -> None:
                guarded)
         record(f"p12c.{fname} 跳过时给出 SKIPPED_NOT_APPLICABLE (不伪装成 PASS)",
                "SKIPPED_NOT_APPLICABLE" in src)
+
+    # --- 7. 最小幅度门 (v0.8.7): 5 样本以内都不修 ------------------------
+    from core.channel_sync import _INT_KEYS, DEFAULTS, is_aligned_decision
+
+    def aligned(samples: float, ms: float | None = None,
+                *, thr: int = 5) -> bool:
+        ms = samples / 48.0 if ms is None else ms
+        return is_aligned_decision(ms, samples, aligned_max_ms=0.05,
+                                   min_shift_samples=thr)
+
+    record("p12c.最小幅度默认 5 样本",
+           DEFAULTS["min_shift_samples"] == 5,
+           str(DEFAULTS.get("min_shift_samples")))
+    record("p12c.最小幅度进 _INT_KEYS (字符串可被强制成 int)",
+           "min_shift_samples" in _INT_KEYS)
+    for n in (0, 1, 3, 4, 5):
+        record(f"p12c.{n} 样本 -> 不动", aligned(n))
+    for n in (6, 7, 37, 39, 944):
+        record(f"p12c.{n} 样本 -> 修", not aligned(n))
+    record("p12c.负位移对称 (-5 不动)", aligned(-5))
+    record("p12c.负位移对称 (-6 修)", not aligned(-6))
+    record("p12c.亚样本位移不动", aligned(0.4))
+    record("p12c.毫米带优先 (3 样本也属 0.0625ms, 仍不动)",
+           aligned(3))
+    record("p12c.thr=0 时 3 样本变为可修 (门是可配置的)",
+           not aligned(3, thr=0))
+    # 但 `aligned_max_ms` (0.05 ms) 是**独立**的下限: 48 kHz 下它覆盖 ±2.4
+    # 样本, 所以 thr=0 也修不了 1~2 样本的轨。两条门是"或"关系, 不是替代。
+    record("p12c.thr=0 也修不了 2 样本 (0.0417ms 仍在 aligned_max_ms 内)",
+           aligned(2, thr=0))
+    record("p12c.两条门是或关系: 0 样本恒不动", aligned(0, thr=0))
+    record("p12c.真实归档的最大位移 +1222 不受影响",
+           not aligned(1222))
