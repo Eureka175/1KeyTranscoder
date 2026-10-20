@@ -62,8 +62,8 @@ def main() -> int:
         extra = sorted(set(on_disk) - expected)
         print(f"期望文件集 {len(expected)} 个; 缺={missing} 多={extra}")
 
-    hdr = (f"{'file':<24}{'moov1st':<9}{'meta':<6}{'dur':>10}"
-           f"{'MOD':>4}{'MIS':>4}{'AUD03':<9}{'gyro':<6}  uuid")
+    hdr = (f"{'file':<24}{'moov1st':<9}{'meta':<6}{'sdp':<6}{'bits':<7}"
+           f"{'dur':>10}{'MOD':>4}{'MIS':>4}{'AUD03':<9}{'gyro':<6}  uuid")
     print()
     print(hdr)
     print("-" * len(hdr))
@@ -75,6 +75,10 @@ def main() -> int:
             print(f"{name:<24} (no report row)")
             continue
         md = r.get("metadata") or {}
+        se = r.get("sample_entry") or {}
+        bits = sorted({v.get("samplesize_bits") for k, v in se.items()
+                       if k.startswith("CH") and isinstance(v, dict)
+                       and v.get("samplesize_bits") is not None})
         top_after = r.get("top_level_after") or []
         moov_before_mdat = (
             top_after.index("moov") < top_after.index("mdat")
@@ -87,6 +91,7 @@ def main() -> int:
         uu = md.get("uuid") or {}
         print(f"{name:<24}{str(moov_before_mdat):<9}"
               f"{str(md.get('identical')):<6}"
+              f"{str(se.get('ok')):<6}{str(bits):<7}"
               f"{(f'{dur:+.6f}' if isinstance(dur, (int, float)) else '-'):>10}"
               f"{str(summ.get('MODIFIED')):>4}{str(summ.get('MISSING')):>4}"
               f"{str(aud.get('verdict')):<9}"
@@ -96,6 +101,13 @@ def main() -> int:
             bad.append(f"{name}: status={r.get('status')}")
         if not md.get("identical"):
             bad.append(f"{name}: 元数据与输入不一致")
+        # 音频 sample entry 必须与源逐字节一致(除 btrt), 且位深声明正确。
+        # 这一条是为"四轨白噪音"事故加的: 只看 ffmpeg 能解码会漏掉。
+        if se.get("ok") is not True:
+            bad.append(f"{name}: 音频 sample entry 与源不一致 "
+                       f"{se.get('problems')}")
+        if bits != [24]:
+            bad.append(f"{name}: 音频位深声明={bits} (期望 [24])")
         if moov_before_mdat is not True:
             bad.append(f"{name}: moov 不在 mdat 之前")
         if dur not in (None, 0.0) and abs(dur) > 1e-6:

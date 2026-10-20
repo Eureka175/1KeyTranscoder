@@ -1941,6 +1941,35 @@ def run_channel_sync(
                     # GPAC 输出 mvhd timescale 与源不一致: 按实际 timescale
                     # 修复 tkhd/elst 时长 (同 classic 路径修正辅助)
                     repair_remux_timescale(dst, log=log)
+                    # 音频 sample entry 被 GPAC 从 ffmpeg 的 QuickTime `in24`
+                    # 翻译成 MP4 `ipcm` 时把位深写错 (24 bit -> 16 bit), 条目
+                    # 自相矛盾: `pcmC` 说 24, `samplesize` 说 16。ffmpeg 采信
+                    # `pcmC` 所以解码正确, 但 Premiere/VLC 采信 `samplesize`,
+                    # 四轨全成白噪音。这里用源的条目覆盖 (去掉 btrt 保持等长,
+                    # 因此不需要动任何偏移)。失败只记 WARNING, 不影响已产出文件。
+                    try:
+                        from preservation.sample_entry import (
+                            patch_audio_sample_entries,
+                        )
+
+                        sdp = patch_audio_sample_entries(
+                            source, dst, log=log)
+                        if sdp.get("consistent_after") is False:
+                            # 条目自相矛盾 (pcmC 说 24 / samplesize 说 16) 是
+                            # 无条件错误: ffmpeg 解码正确, 但 Premiere/VLC
+                            # 会按 samplesize 读成白噪音。宁可退回源文件拷贝,
+                            # 也不交一个"能解码但播不对"的成品。
+                            raise RuntimeError(
+                                "音频 sample entry 补丁后仍自相矛盾: "
+                                + str(sdp.get("reason")))
+                        if not sdp.get("ok"):
+                            log("channel-sync: WARNING 音频 sample entry 未能"
+                                f"与源一致 — {sdp.get('reason')}")
+                    except RuntimeError:
+                        raise
+                    except Exception as exc:      # noqa: BLE001
+                        log(f"channel-sync: WARNING sample entry 补丁异常: "
+                            f"{exc}")
                     output_file = dst
                 except Exception as exc:      # noqa: BLE001
                     log(f"channel-sync: transparent remux failed: {exc} — "

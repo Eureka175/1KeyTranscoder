@@ -293,7 +293,7 @@ def _item(cid: str, verdict: str, detail: str = "",
     return {"id": cid, "verdict": verdict, "detail": detail, "data": data}
 
 
-def check_container(facts: dict, doc: dict) -> list[dict]:
+def check_container(path: Path, facts: dict, doc: dict) -> list[dict]:
     """元数据写入位置 / 结构规范。**只看文件自身**, 不需要源。"""
     out: list[dict] = []
 
@@ -361,6 +361,39 @@ def check_container(facts: dict, doc: dict) -> list[dict]:
                          entries))
     else:
         out.append(_item("CTR-07", SKIP, "无音频轨"))
+
+    # CTR-08: 音频 sample entry 内部一致性。**不需要源文件**。
+    # 这条是为一个真实事故加的: 透明重封装把 ffmpeg 的 QuickTime `in24` 条目
+    # 翻译成 MP4 `ipcm` 时只换了标签没换位深 —— `pcmC` 说 24 bit,
+    # `samplesize` 说 16 bit。ffmpeg 采信前者(解码正确, 因此残差复测一直是 0),
+    # Premiere/VLC 采信后者(四轨白噪音)。逐字段看永远发现不了, 必须把两个
+    # 字段放在一起比。
+    try:
+        from preservation.sample_entry import (
+            audio_entry_consistency,
+            read_audio_entries,
+        )
+
+        wentries = read_audio_entries(path)
+        if not wentries:
+            out.append(_item("CTR-08", SKIP, "无音频 sample entry"))
+        else:
+            bad = []
+            for i, e in enumerate(wentries):
+                c = audio_entry_consistency(e["bytes"])
+                if not c["consistent"]:
+                    bad.append({"track": i + 1, "detail": c})
+            out.append(_item(
+                "CTR-08", WARN if bad else PASS,
+                f"{len(wentries)} 条音频条目, "
+                + ("全部自洽" if not bad else
+                   f"{len(bad)} 条自相矛盾: " + "; ".join(
+                       f"CH{b['track']} {b['detail']['problems']}"
+                       for b in bad)),
+                bad or None))
+    except Exception as exc:                            # noqa: BLE001
+        out.append(_item("CTR-08", SKIP,
+                         f"无法检查: {type(exc).__name__}: {exc}"))
     return out
 
 
@@ -660,7 +693,53 @@ def repair_one(src: Path, dst: Path, *, opts: dict | None,
         round(float(fmt_ctr) - float(src_ctr), 6)
         if (src_ctr and fmt_ctr) else None)
     rec["format_checks"] = check_format(dst, after, after_doc, 0.0)
-    rec["container_checks"] = check_container(after, after_doc)
+    rec["container_checks"] = check_container(dst, after, after_doc)
+
+    # 硬闸门: 音频 sample entry 必须与源的**格式语义**一致。
+    # 只看 ffmpeg 能不能解码是不够的 —— ffmpeg 采信 `pcmC`, 而 Premiere/VLC
+    # 采信 `samplesize`, 条目自相矛盾时前者解码正确、后者四轨白噪音。
+    # 这里用源条目逐字段比对, 不一致就把整次修复判为失败(输出退回源拷贝)。
+    try:
+        from preservation.sample_entry import (
+            audio_entry_consistency,
+            read_audio_entries,
+            strip_optional_boxes,
+        )
+
+        src_e = read_audio_entries(src)
+        out_e = read_audio_entries(dst)
+        sdp: dict[str, Any] = {"source_tracks": len(src_e),
+                               "final_tracks": len(out_e)}
+        problems = []
+        if len(src_e) != len(out_e):
+            problems.append(f"音频轨数 源{len(src_e)}/成品{len(out_e)}")
+        for i, (s, o) in enumerate(zip(src_e, out_e)):
+            c = audio_entry_consistency(o["bytes"])
+            if not c["consistent"]:
+                problems.append(f"CH{i + 1} 条目自相矛盾 {c['problems']}")
+            want = strip_optional_boxes(s["bytes"])
+            if o["bytes"] != want:
+                problems.append(f"CH{i + 1} 条目与源不一致")
+            sdp[f"CH{i + 1}"] = {
+                "source_bits": s and audio_entry_consistency(
+                    s["bytes"])["pcmc_bits"],
+                "final_bits": c["pcmc_bits"],
+                "samplesize_bits": c["samplesize_bits"],
+                "matches_source": o["bytes"] == want,
+            }
+        sdp["ok"] = not problems
+        sdp["problems"] = problems
+        rec["sample_entry"] = sdp
+        if problems:
+            shutil.copy2(src, dst)
+            rec["status"] = "sample_entry_mismatch"
+            rec["file_copied"] = True
+            rec["error"] = ("音频 sample entry 与源不一致, 已退回源文件原样"
+                            f"拷贝: {problems[:4]}")
+            return rec
+    except Exception as exc:                            # noqa: BLE001
+        rec["sample_entry"] = {"ok": False,
+                               "error": f"{type(exc).__name__}: {exc}"}
 
     # 音频必须真的对齐了: 用**成品**重新测一遍 (不是看日志)。
     aud_items, aud_data = check_audio(dst, after_doc, opts)
@@ -705,7 +784,7 @@ def repair_one(src: Path, dst: Path, *, opts: dict | None,
 def summarise_check(path: Path, doc: dict,
                     opts: dict | None = None) -> dict[str, Any]:
     facts = container_facts(path)
-    items = (check_container(facts, doc) + check_format(path, facts, doc, 1.0))
+    items = (check_container(path, facts, doc) + check_format(path, facts, doc, 1.0))
     a_items, a_data = check_audio(path, doc, opts)
     items += a_items
     verdicts = [i["verdict"] for i in items]

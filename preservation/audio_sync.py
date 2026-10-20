@@ -51,3 +51,31 @@ def remux_replace_audio(
     mv_desc = isobmf.patch_movie_duration(dst)
     if mv_desc:
         log(mv_desc)
+    # 音频 sample entry 的自洽性护栏。
+    #
+    # 这里**不做**"换回源条目"的补丁: 此时音频轨用的是 ffmpeg 的 `.mov`
+    # 中间文件, 条目是 QuickTime `in24` (合法写法, `samplesize=16` 是约定值,
+    # 位深由 fourcc 决定), 与源的 `ipcm` 长度不同, 换不了。实测
+    # `place_final` 的 MOV→MP4 容器重封装会**原样保留** `in24`, 不会把它翻成
+    # 自相矛盾的 `ipcm`, 所以这条路径是安全的。
+    #
+    # 真正出问题的是**透明模式**的 `restore_metadata` 链路 (flatten + set_brand
+    # XAVC 之后 GPAC 把 in24 翻成 ipcm 却照搬 samplesize=16) —— 那里已经用
+    # `patch_audio_sample_entries` 换回了源条目。这里只做最后一道自洽检查:
+    # 条目自相矛盾是无条件错误, 宁可让这次转码失败也不交付白噪音。
+    from .sample_entry import (
+        audio_entry_consistency,
+        normalise_audio_entry_bit_depth,
+        read_audio_entries,
+    )
+
+    bad = [i + 1 for i, e in enumerate(read_audio_entries(dst))
+           if not audio_entry_consistency(e["bytes"])["consistent"]]
+    if bad:
+        fixed = normalise_audio_entry_bit_depth(dst, log=log)
+        still = [i + 1 for i, e in enumerate(read_audio_entries(dst))
+                 if not audio_entry_consistency(e["bytes"])["consistent"]]
+        if still:
+            raise RuntimeError(
+                f"音频 sample entry 自相矛盾且无法校正: 轨 {still}")
+        log(f"WARNING 音频 sample entry 曾自相矛盾 (轨 {bad}), 已按 pcmC 校正")
