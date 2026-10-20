@@ -861,8 +861,15 @@ def cmd_repair(args: argparse.Namespace) -> int:
     for i, src in enumerate(files, 1):
         doc = probe(src)
         if not doc.get("streams"):
-            rows.append({"src": str(src), "status": "probe_failed",
-                         "error": "ffprobe 读不到流"})
+            # 单个坏文件**不许中断整批**。这条记录必须带上 `overall`,
+            # 否则下面统计时 KeyError 会把 200 多个文件的批次整体打掉
+            # (真发生过: I:\20260901 有一个 ffprobe 读不了的文件)。
+            rec = {"src": str(src), "status": "probe_failed",
+                   "overall": "FAILED",
+                   "error": "ffprobe 读不到流, 无法判定, 未做任何修改"}
+            rows.append(rec)
+            print(f"[{i}/{len(files)}] FAILED    {src.name} "
+                  f"(ffprobe 读不到流)", flush=True)
             continue
         dst = outp / _rel(src, root if root.is_dir() else root.parent)
         facts = container_facts(src)
@@ -890,7 +897,8 @@ def cmd_repair(args: argparse.Namespace) -> int:
     md = write_report(rows, Path(args.json or outp), "归档修复")
     tally: dict[str, int] = {}
     for r in rows:
-        tally[r["overall"]] = tally.get(r["overall"], 0) + 1
+        k = r.get("overall") or "FAILED"
+        tally[k] = tally.get(k, 0) + 1
     print(f"\n{tally}\n-> {md}")
 
     if args.in_place:
