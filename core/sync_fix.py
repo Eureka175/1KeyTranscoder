@@ -137,22 +137,31 @@ def _recheck(
     n = min(ref.shape[0], tgt.shape[0])
     if n < 4096:
         return float("nan")
+    s = int(math.ceil(search_ms * sample_rate / 1000.0))
+    if n < 2 * s + 4096:
+        return float("nan")
     anchor_len = min(int(round(anchor_segment_seconds * sample_rate)), n)
+    # 锚段必须留出**搜索余量**: 读窗是 [a0-s, a0+anchor_len+s), 需要两头都在
+    # 数组内。旧实现直接把 a0 = (n - anchor_len)//2 = 0、s = 240 传下去,
+    # 读窗起点变成 -240 —— `read_f64` 把它钳到 0, 于是短片段实际退化成
+    # "整片窗", 一直能测; 我上一版把这一步改成返回 nan, 结果所有短于 20 s 的
+    # 片段复检全变 nan, 被当成"复检失败"退回, 一次性误杀 7 条已修好的轨。
+    # 正确做法是在**收缩锚段长度**的基础上保留搜索余量, 而不是放弃测量。
+    if anchor_len > n - 2 * s:
+        anchor_len = n - 2 * s
     span = n - anchor_len
     # `center_frac` 决定锚段落在片长上的位置 (0=片头, 0.5=中部, 1=片尾)。
-    # 0.5 必须**逐位复现**旧公式 `(n - anchor_len) // 2`, 否则 windows=1 的
-    # 默认路径就与历史结果不一致了 (跨度是奇数时 round 会多 1 个样本)。
+    # 0.5 必须**逐位复现**旧公式 `(n - anchor_len) // 2`。
     if center_frac == 0.5:
-        a0 = (n - anchor_len) // 2
+        a0 = span // 2
     else:
         c = min(1.0, max(0.0, float(center_frac)))
         a0 = min(max(int(round(span * c)), 0), span)
-    s = int(math.ceil(search_ms * sample_rate / 1000.0))
-    # 读窗需要 a0-s >= 0 且 a0+anchor_len+s <= n。贴边时**收缩搜索半径**,
-    # 而不是越界读 —— 线性 PCM 是内存映射, 越界读在 Windows 上是访问违例,
-    # 不是可以捕获的异常。锚段占满全片时无法留搜索余量, 如实返回 nan
-    # (旧实现会传入负偏移, 静默读到错位数据)。
+    # 收缩 anchor_len 之后这两条恒成立; 留作断言式的防御, 不猜。
     s = max(0, min(s, a0, n - anchor_len - a0))
+    if s < 1:
+        return float("nan")
+
 
     if s < 1:
         return float("nan")

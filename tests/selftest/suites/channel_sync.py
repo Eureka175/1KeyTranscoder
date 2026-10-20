@@ -1032,3 +1032,24 @@ def l1_recheck_knobs() -> None:
     record("p13p.多窗结果与单窗同量级 (恒定偏移, 合成)",
            abs(wr["worst_ms"] * sr / 1000.0 - 12.0) <= 1.5,
            f"worst={wr['worst_ms'] * sr / 1000:.2f} samples")
+
+    # --- 回归: 片段短于锚段时长时必须仍可测 ---
+    # 这个 bug 真实发生过: 为了消除越界读, 曾把"锚段占满全片"的情形直接判
+    # nan, 结果所有短于 20 s 的片段复检全部 nan, 被当成复检失败退回,
+    # 一次性误杀 7 条已经修好的轨 (C1182/C1197/C1212/C1214 等)。
+    # 正确行为是**收缩锚段长度**、保留搜索余量, 而不是放弃测量。
+    short = rng.standard_normal(30000)          # 0.625 s @48k
+    short_t = np.concatenate([np.zeros(9), short])[:len(short)]
+    v_short = sync_fix._recheck(
+        short, short_t, sample_rate=sr, search_ms=5.0,
+        anchor_segment_seconds=20.0, fine_phase_band_hz=(200.0, 8000.0))
+    record("p13q.短于锚段的片段仍可复检 (锚段收缩, 不得返回 nan)",
+           v_short == v_short
+           and abs(v_short * sr / 1000.0 - 9.0) <= 1.5,
+           f"{v_short} ms")
+    wr_short = sync_fix.recheck_residual_windows(
+        short, short_t, sample_rate=sr, storage_dtype="f32", windows=3,
+        anchor_segment_seconds=20.0)
+    record("p13r.短片段多窗同样可测 (窗口收缩, 非 nan)",
+           all(v == v for v in wr_short["values"]),
+           f"values={wr_short['values']}")
