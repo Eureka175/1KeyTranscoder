@@ -79,6 +79,7 @@ import core.channel_sync as cs                          # noqa: E402
 from core import audio_sync_tv as tv                    # noqa: E402
 from core import sync_estimate as se                    # noqa: E402
 from core import sync_fix as sf                         # noqa: E402
+from preservation import sample_entry as sample_entry      # noqa: E402
 
 FFMPEG = REPO / "tools" / "ffmpeg.exe"
 FFPROBE = REPO / "tools" / "ffprobe.exe"
@@ -943,7 +944,12 @@ def write_report(out: Path, inv: list[dict], traj_meta: list[dict],
                  budget: Budget, pending: list[str],
                  enhanced: dict | None = None,
                  refsweep: dict | None = None,
-                 knobs: dict | None = None) -> None:
+                 knobs: dict | None = None,
+                 profile: dict | None = None,
+                 correlation: dict | None = None,
+                 entries: dict | None = None,
+                 oracle: dict | None = None,
+                 gaps: dict | None = None) -> None:
     lines: list[str] = []
     a = lines.append
     a("# 长镜头逐窗对齐可行性探针 —— 报告\n")
@@ -960,6 +966,52 @@ def write_report(out: Path, inv: list[dict], traj_meta: list[dict],
         a(f"| {it['name']} | {it['duration_s']:.1f}s | {it['n_audio']} | "
           f"{it['sample_rate']} |")
     a("")
+    if entries or profile or correlation:
+        a("## 1b 素材体检\n")
+        if entries:
+            a("### sample entry 自洽性（容器声明 vs 实际）\n")
+            a("| 文件 | 流 | fourcc | samplesize | pcmC 位深 | 自洽 |")
+            a("|---|---|---|---|---|---|")
+            for clip, rows in entries.items():
+                for r in rows:
+                    if r.get("error"):
+                        a(f"| {clip} | — | — | — | — | 读不出: "
+                          f"{r['error'][:40]} |")
+                        continue
+                    a(f"| {clip} | {r.get('stream')} | {r.get('fourcc')} | "
+                      f"{r.get('samplesize_bits')} | {r.get('pcmc_bits')} | "
+                      f"{'是' if r.get('consistent', True) else '**否**'} |")
+            a("")
+        if profile:
+            a("### 逐通道电平与静音（60 s 块）\n")
+            a("| 文件 | CH | RMS p10/p50/p90 dBFS | 峰值 | 静音块 | 静音占比 | "
+              "最长静音 |")
+            a("|---|---|---|---|---|---|---|")
+            for clip, d in profile.items():
+                for ch in d["channels"]:
+                    a(f"| {clip} | CH{ch['ch']} | "
+                      f"{ch['rms_db_p10']:.1f}/{ch['rms_db_p50']:.1f}/"
+                      f"{ch['rms_db_p90']:.1f} | {ch['peak_db_max']:.1f} | "
+                      f"{ch['silent_blocks']}/{ch['blocks']} | "
+                      f"{100 * ch['silent_fraction']:.0f}% | "
+                      f"{ch['longest_silent_run_s']:.0f}s |")
+            a("")
+        if correlation:
+            a("### 分块相关性（8 kHz NCC 峰值，逐块）\n")
+            a("| 文件 | 通道对 | NCC 中位 | p10 | 相关块 | 弱 | 不相关 | "
+              "lag 中位 | lag 离散 |")
+            a("|---|---|---|---|---|---|---|---|---|")
+            for clip, d in correlation.items():
+                for pr in d["pairs"]:
+                    a(f"| {clip} | CH{pr['a']}-CH{pr['b']} | "
+                      f"{pr['ncc_median']:.3f} | {pr['ncc_p10']:.3f} | "
+                      f"{pr['blocks_correlated']} | {pr['blocks_weak']} | "
+                      f"{pr['blocks_uncorrelated']} | {pr['lag_median']} | "
+                      f"{pr['lag_spread']} |")
+            a("")
+            a("判读：`相关块` 少而 `不相关块` 多 = 相关性只在局部时段成立，"
+              "那些时段的窗不可能有证据。\n")
+
     a("## 2 逐帧测量（生产几何）\n")
     a("| 文件 | 参考→目标 | 可用帧 | 总帧 | 延迟 | MAD | 极差 | 漂移 |")
     a("|---|---|---|---|---|---|---|---|")
@@ -1067,6 +1119,49 @@ def write_report(out: Path, inv: list[dict], traj_meta: list[dict],
                   f"{r['resolved_30_10']} |")
             a("")
 
+    if oracle:
+        a("## 3e 上限分析（逐窗换几何 / 换参考能到多少）\n")
+        a("`best_single` = 固定一个几何/参考；`union_geometry` = 逐窗换几何；"
+          "`union_all` = 连参考与旋钮变体一起换。判据是 `union_all` 是否达到 "
+          f"{FEASIBILITY_MIN_RESOLVED:.0%} 门。\n")
+        for clip, d in oracle.items():
+            a(f"### {clip}\n")
+            a("| 窗/跳 | 目标 | 来源数 | 最好单一 | 逐窗换几何 | "
+              "逐窗全换 | 60% 门 |")
+            a("|---|---|---|---|---|---|---|")
+            for scale, per_t in d["targets"].items():
+                for tgt, v in sorted(per_t.items()):
+                    a(f"| {scale} | CH{tgt} | {v['n_sources']} | "
+                      f"{v['best_single_resolved']} "
+                      f"({100 * v['best_single_fraction']:.1f}%) | "
+                      f"{v['union_geometry_resolved']} "
+                      f"({100 * v['union_geometry_fraction']:.1f}%) | "
+                      f"{v['union_all_resolved']} "
+                      f"({100 * v['union_all_fraction']:.1f}%) | "
+                      f"{'PASS' if v['union_all_passes_60pct'] else 'FAIL'} |")
+            a("")
+
+    if gaps:
+        a("## 3f 缺口代价 / 量化敏感度 / 窗内 MAD\n")
+        a("`hold` 缺口代价 = 每段无证据窗两端测量的差 —— 这是 hold 策略本身"
+          "引入的误差；`量化差` = 整数移位相对分数移位的残余增量。\n")
+        a("| 文件 | 几何 | 目标 | 已解析/未解析 | 窗内 MAD p50/p90 ms | "
+          "缺口数 | 缺口误差 p50/p90/max | 缺口>1ms | 量化差 p90 |")
+        a("|---|---|---|---|---|---|---|---|---|")
+        for clip, rows in gaps.items():
+            for r in rows:
+                hg = r["hold_gap_cost"]
+                md = r["window_mad_ms"]
+                q = r["quantization_sensitivity"]
+                a(f"| {clip} | {r['geometry']} | CH{r['target']} | "
+                  f"{r['resolved']}/{r['unresolved']} | "
+                  f"{_fmt(md.get('p50'), 2)}/{_fmt(md.get('p90'), 2)} | "
+                  f"{hg['n_gaps']} | {_fmt(hg['err_p50'], 1)}/"
+                  f"{_fmt(hg['err_p90'], 1)}/{_fmt(hg['err_max'], 1)} | "
+                  f"{hg['gaps_gt_48_samples']} | "
+                  f"{_fmt(q.get('delta_p90'), 3)} |")
+        a("")
+
     if synthetic:
         a("## 4 合成校验（估计器可信度）\n")
         a(f"- 素材: {synthetic['source']}, 片段 {synthetic['excerpt_s']:.0f}s")
@@ -1126,6 +1221,325 @@ def _fmt(v, nd: int = 3) -> str:
     if not math.isfinite(f):
         return "—"
     return f"{f:.{nd}f}"
+
+
+# ---------------------------------------------------------------------------
+# S0b/S0c: 素材自身的体检 —— 电平/静音分布、分块相关性
+# ---------------------------------------------------------------------------
+def audio_entry_report(clip: Path) -> list[dict]:
+    """音频 sample entry 自洽性（读容器, 不解码）。
+
+    这条检查针对一个真实缺陷类: `pcmC` 说 24 bit 而 `samplesize` 说 16 bit 时,
+    ffmpeg 采信前者解码正确, 而 Premiere/VLC 采信后者 -> 四轨白噪音。长镜头若
+    中招, 后续所有测量都建立在"能解码但播放异常"的音频上, 必须先确认。
+    """
+    try:
+        entries = sample_entry.read_audio_entries(clip)
+    except Exception as exc:                    # noqa: BLE001
+        return [{"error": f"{type(exc).__name__}: {exc}"}]
+    out: list[dict] = []
+    with clip.open("rb") as fh:
+        for i, e in enumerate(entries):
+            rec = {"stream": i, "offset": e.get("offset"),
+                   "size": e.get("size")}
+            raw = b""
+            try:
+                fh.seek(int(e["offset"]))
+                raw = fh.read(int(e["size"]))
+            except Exception as exc:            # noqa: BLE001
+                rec["error"] = f"读条目失败: {type(exc).__name__}: {exc}"
+            if raw:
+                try:
+                    rec.update(sample_entry.audio_entry_consistency(raw))
+                except Exception as exc:        # noqa: BLE001
+                    rec["error"] = f"{type(exc).__name__}: {exc}"
+            out.append(rec)
+    return out
+
+
+def _runs(flags: list[bool]) -> list[tuple[int, int]]:
+    """连续 False 段的 (起始块, 长度)。"""
+    out: list[tuple[int, int]] = []
+    start = None
+    for i, f in enumerate(flags + [True]):
+        if not f:
+            if start is None:
+                start = i
+        elif start is not None:
+            out.append((start, i - start))
+            start = None
+    return out
+
+
+def channel_profile(raw: list[Path], n_samples: int,
+                    block_s: float = 60.0) -> dict:
+    """逐通道、逐 block 的电平与静音分布。
+
+    这是"零证据窗"最可能的物理原因: 舞台收音在节目间隙会长时间静音。若某些
+    block 全静音, 那么无论几何怎么调, 那些窗都不可能有证据 —— 不是测量缺陷,
+    而是素材没有内容。阈值 -50 dBFS 与生产 `frame_min_rms_dbfs` 同口径。
+    """
+    bs = int(round(block_s * SR))
+    blocks = max(1, n_samples // bs)
+    per_ch: list[dict] = []
+    for ch, path in enumerate(raw):
+        arr = np.memmap(path, dtype=np.float32, mode="r")
+        rms_db = np.zeros(blocks)
+        peak = np.zeros(blocks)
+        for b in range(blocks):
+            seg = np.asarray(arr[b * bs:(b + 1) * bs], dtype=np.float64)
+            if seg.size == 0:
+                rms_db[b] = -120.0
+                continue
+            r = float(np.sqrt(np.mean(seg * seg)))
+            rms_db[b] = 20.0 * math.log10(max(r, 1e-12))
+            peak[b] = 20.0 * math.log10(max(float(np.max(np.abs(seg))), 1e-12))
+        silent = (rms_db < -50.0).tolist()
+        runs = _runs(silent)
+        per_ch.append({
+            "ch": ch + 1,
+            "rms_db_p10": float(np.percentile(rms_db, 10)),
+            "rms_db_p50": float(np.percentile(rms_db, 50)),
+            "rms_db_p90": float(np.percentile(rms_db, 90)),
+            "peak_db_max": float(peak.max()),
+            "silent_blocks": int(sum(silent)),
+            "blocks": int(blocks),
+            "silent_fraction": float(sum(silent) / max(1, blocks)),
+            "longest_silent_run_s": (float(max((n for _, n in runs),
+                                               default=0)) * block_s),
+            "silent_runs": [[int(i), int(n)] for i, n in runs if n >= 2],
+        })
+        del arr
+    return {"block_s": block_s, "n_samples": n_samples, "channels": per_ch}
+
+
+def _decimate(arr, factor: int) -> np.ndarray:
+    """抗混叠抽取: 先按 factor 做滑动平均, 再取样。"""
+    a = np.asarray(arr, dtype=np.float32)
+    if factor <= 1:
+        return a - float(a.mean())
+    k = np.ones(factor, dtype=np.float32) / factor
+    a = np.convolve(a, k, mode="same")[::factor]
+    return a - float(a.mean())
+
+
+def _ncc_peak(a: np.ndarray, b: np.ndarray, max_lag: int) -> tuple[float, int]:
+    a = a - float(a.mean())
+    b = b - float(b.mean())
+    na = float(np.linalg.norm(a))
+    nb = float(np.linalg.norm(b))
+    if na == 0.0 or nb == 0.0:
+        return 0.0, 0
+    n = 1 << int(np.ceil(np.log2(a.size + b.size)))
+    cc = np.fft.irfft(np.fft.rfft(a, n) * np.conj(np.fft.rfft(b, n)), n)
+    cc = np.concatenate([cc[-max_lag:], cc[:max_lag + 1]]) / (na * nb)
+    i = int(np.argmax(np.abs(cc)))
+    return float(abs(cc[i])), int(i - max_lag)
+
+
+def block_correlation(raw: list[Path], n_samples: int,
+                      block_s: float = 120.0,
+                      max_blocks: int = 60) -> dict:
+    """分块相关性: 通道对在**每个时间块**上的 NCC 峰值。
+
+    回答一个关键问题: 互相关是**全局**的, 还是只在该片段的某些时段成立。
+    若是后者, "某段有证据、某段没有"就不是几何问题, 而是内容问题。
+    8 kHz 抽取 + ±80 ms 搜索: 与生产粗扫同量级, 只判"有没有相关", 不用于定位。
+    """
+    bs = int(round(block_s * SR))
+    n_blocks = max(1, n_samples // bs)
+    step = max(1, n_blocks // max_blocks)
+    idxs = list(range(0, n_blocks, step))[:max_blocks]
+    dec = 6                                  # 48k -> 8k
+    max_lag = int(0.080 * SR / dec)
+    pairs = [(i, j) for i in range(len(raw)) for j in range(i + 1, len(raw))]
+    res: dict = {"block_s": block_s, "decimated_rate": SR // dec,
+                 "blocks_used": len(idxs), "pairs": []}
+    arrs = [np.memmap(p, dtype=np.float32, mode="r") for p in raw]
+    try:
+        for i, j in pairs:
+            peaks: list[float] = []
+            lags: list[int] = []
+            for b in idxs:
+                seg_a = _decimate(arrs[i][b * bs:(b + 1) * bs], dec)
+                seg_b = _decimate(arrs[j][b * bs:(b + 1) * bs], dec)
+                p, lag = _ncc_peak(seg_a, seg_b, max_lag)
+                peaks.append(p)
+                lags.append(lag)
+            pa = np.asarray(peaks)
+            la = np.asarray(lags, dtype=np.int64)
+            res["pairs"].append({
+                "a": i + 1, "b": j + 1,
+                "ncc_median": float(np.median(pa)),
+                "ncc_p10": float(np.percentile(pa, 10)),
+                "ncc_p90": float(np.percentile(pa, 90)),
+                "blocks_correlated": int((pa >= 0.3).sum()),
+                "blocks_weak": int(((pa >= 0.1) & (pa < 0.3)).sum()),
+                "blocks_uncorrelated": int((pa < 0.1).sum()),
+                "lag_median": int(np.median(la)),
+                "lag_spread": int(la.max() - la.min()),
+                "per_block_peaks": [round(float(x), 3) for x in pa],
+            })
+    finally:
+        del arrs
+    return res
+
+
+# ---------------------------------------------------------------------------
+# S2e: 上限分析 —— 所有 (几何 × 参考) 合在一起能到多少
+# ---------------------------------------------------------------------------
+def oracle_upper_bound(tdir: Path, stem: str, n_samples: int,
+                       targets: list[int]) -> dict:
+    """逐窗证据的**上限**: 把所有已测轨迹按 (几何, 参考, 变体) 当独立来源。
+
+    每个窗算三种口径:
+
+      * ``best_single``   —— 最好的单一来源（一个几何/参考固定用到底）
+      * ``union_geometry``—— 同一目标下逐窗换几何
+      * ``union_all``     —— 连参考与旋钮变体都逐窗换
+
+    如果 ``union_all`` 都到不了 60% 证据门, 那么"逐窗修正"在这两条素材上就不
+    成立 —— 与窗长、接缝、policy 都无关, 只是没有证据。
+    """
+    files = sorted(tdir.glob(f"{stem}__r*_t*__*.npz"))
+    n_by_target: dict[int, dict[str, np.ndarray]] = {}
+    for f in files:
+        rec = load_traj(f)
+        if rec is None:
+            continue
+        tgt = int(rec.get("tgt", -1))
+        if tgt not in targets:
+            continue
+        label = (f"{rec.get('geometry', '?')}|r{rec.get('ref', -1) + 1}"
+                 + (f"|{rec.get('variant')}" if rec.get("variant") else ""))
+        good = _good(rec)
+        n_by_target.setdefault(tgt, {})[label] = rec["centers"][good]
+    out: dict = {"targets": {},
+                 "n_sources": {str(t): len(v) for t, v in n_by_target.items()}}
+    for window_s, hop_s in [(30.0, 10.0), (60.0, 20.0), (15.0, 5.0)]:
+        ws, hs = int(round(window_s * SR)), int(round(hop_s * SR))
+        n_need = tv.required_window_count(n_samples, hop_samples=hs)
+        n_meas = tv.measured_window_count(n_samples, window_samples=ws,
+                                          hop_samples=hs)
+        if n_meas <= 0:          # 片段比窗短: 这一档窗尺度不适用
+            out['targets'][f'{window_s:.0f}/{hop_s:.0f}s'] = {}
+            continue
+        per_t: dict = {}
+        for tgt, sources in n_by_target.items():
+            counts = {}
+            for label, centers in sources.items():
+                if centers.size == 0:
+                    counts[label] = np.zeros(n_meas, dtype=np.int64)
+                    continue
+                idx = tv.window_index("nearest-centre", centers,
+                                      window_samples=ws, hop_samples=hs,
+                                      n_windows=n_need)
+                counts[label] = np.bincount(idx, minlength=n_meas)[:n_meas]
+            if not counts:
+                continue
+            mat = np.vstack([
+                np.pad(v, (0, max(0, n_meas - v.size)), constant_values=0)
+                for v in counts.values()])
+            best_single = int((mat >= 3).sum(axis=1).max())
+            fam: dict[str, np.ndarray] = {}
+            for label, cnt in counts.items():
+                g = label.split("|")[0]
+                fam[g] = np.maximum(fam[g], cnt) if g in fam else cnt
+            fam_mat = np.vstack(list(fam.values()))
+            family_union = int((fam_mat >= 3).any(axis=0).sum())
+            all_union = int((mat >= 3).any(axis=0).sum())
+            per_t[str(tgt + 1)] = {
+                "n_windows_needed": int(n_need),
+                "n_windows_measured": int(n_meas),
+                "n_sources": len(counts),
+                "best_single_resolved": best_single,
+                "best_single_fraction": best_single / max(1, n_need),
+                "union_geometry_resolved": family_union,
+                "union_geometry_fraction": family_union / max(1, n_need),
+                "union_all_resolved": all_union,
+                "union_all_fraction": all_union / max(1, n_need),
+                "union_all_passes_60pct": ((all_union / max(1, n_need))
+                                           >= FEASIBILITY_MIN_RESOLVED),
+            }
+        out["targets"][f"{window_s:.0f}/{hop_s:.0f}s"] = per_t
+    return out
+
+
+# ---------------------------------------------------------------------------
+# S2f: 缺口代价 / 量化敏感度 / 窗内 MAD
+# ---------------------------------------------------------------------------
+def gap_and_quantization(rec: dict, n_samples: int, window_s: float,
+                         hop_s: float, min_frames: int = 3) -> dict:
+    """1) 缺口代价: 无证据段用 hold 时, 段两端测量差多大。
+    2) 量化敏感度: 逐窗整数移位 vs 分数移位, 残余差多少。
+    3) 窗内 MAD: 每个已解析窗的延迟离散度（该窗值可信度的直接度量）。
+    """
+    ws, hs = int(round(window_s * SR)), int(round(hop_s * SR))
+    n_need = tv.required_window_count(n_samples, hop_samples=hs)
+    n_meas = tv.measured_window_count(n_samples, window_samples=ws,
+                                      hop_samples=hs)
+    good = _good(rec)
+    centers = rec["centers"][good]
+    delays = rec["delays"][good]
+    if centers.size == 0 or n_meas <= 0:
+        return {}
+    idx = tv.window_index("nearest-centre", centers, window_samples=ws,
+                          hop_samples=hs, n_windows=n_need)
+    med = np.full(n_meas, np.nan)
+    mad = np.full(n_meas, np.nan)
+    frac: list[np.ndarray] = []
+    ints: list[np.ndarray] = []
+    for w in range(n_meas):
+        d = delays[idx == w]
+        if d.size < min_frames:
+            continue
+        m = float(np.median(d))
+        med[w] = m
+        mad[w] = float(np.median(np.abs(d - m)) * 1.4826)
+        frac.append(np.abs(d - m))
+        ints.append(np.abs(d - float(round(m))))
+    resolved = ~np.isnan(med)
+    hold_err: list[float] = []
+    hold_span: list[int] = []
+    for start, length in _runs(resolved.tolist()):
+        prev, nxt = start - 1, start + length
+        if prev >= 0 and nxt < resolved.size and resolved[prev] and resolved[nxt]:
+            hold_err.append(abs(float(med[nxt] - med[prev])))
+            hold_span.append(length)
+    mad_ok = mad[resolved]
+    qf = np.concatenate(frac) if frac else np.zeros(0)
+    qi = np.concatenate(ints) if ints else np.zeros(0)
+    return {
+        "window_s": window_s, "hop_s": hop_s,
+        "resolved": int(resolved.sum()),
+        "unresolved": int((~resolved).sum()),
+        "window_mad_ms": {
+            "p50": (float(np.percentile(mad_ok, 50)) / SR * 1000.0
+                    if mad_ok.size else None),
+            "p90": (float(np.percentile(mad_ok, 90)) / SR * 1000.0
+                    if mad_ok.size else None),
+        },
+        "hold_gap_cost": {
+            "n_gaps": len(hold_err),
+            "err_p50": (float(np.percentile(hold_err, 50))
+                        if hold_err else None),
+            "err_p90": (float(np.percentile(hold_err, 90))
+                        if hold_err else None),
+            "err_max": (float(max(hold_err)) if hold_err else None),
+            "gaps_gt_48_samples": int(sum(1 for e in hold_err if e > 48)),
+            "gap_len_p50": (float(np.percentile(hold_span, 50))
+                            if hold_span else None),
+            "gap_len_max": (int(max(hold_span)) if hold_span else None),
+        },
+        "quantization_sensitivity": {
+            "fractional_p90": (float(np.percentile(qf, 90))
+                               if qf.size else None),
+            "integer_p90": (float(np.percentile(qi, 90))
+                            if qi.size else None),
+            "delta_p90": (float(np.percentile(qi, 90) - np.percentile(qf, 90))
+                          if qf.size and qi.size else None),
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1193,6 +1607,45 @@ def _stage_extras(out: Path, clip: Path, tdir: Path, raw: list[Path],
             log(f"  S2d 旋钮扫描: {len(rows)} 条 (变体×目标)")
 
 
+def _stage_oracle_final(out: Path, clip: Path, tdir: Path, anchor: int,
+                        targets: list[int], n_samples: int,
+                        stages: set[str], budget: Budget,
+                        pending: list[str], oracle: dict, gaps: dict) -> None:
+    """S2e 上限分析 + S2f 缺口代价（都在已有轨迹上算, 不新增测量）。"""
+    if "oracle" not in stages:
+        return
+    if budget.exhausted():
+        pending.append(f"oracle__{clip.stem}")
+        return
+    try:
+        oracle[clip.stem] = oracle_upper_bound(tdir, clip.stem, n_samples,
+                                               targets)
+        atomic_json(out / "s2e_oracle.json", oracle)
+        best = max((v["union_all_fraction"]
+                    for st in oracle[clip.stem]["targets"].values()
+                    for v in st.values()), default=0.0)
+        log(f"  S2e 上限分析: 逐窗换几何+参考的最好目标 "
+            f"{100 * best:.0f}% (60% 门)")
+    except Exception as exc:                # noqa: BLE001
+        log(f"  S2e 失败: {type(exc).__name__}: {exc}")
+        pending.append(f"oracle__{clip.stem}")
+        return
+    rows = []
+    for gname in (REF_GEOM, "overlap500", PROD_GEOM):
+        for tgt in targets:
+            rec = load_traj(_traj_path(tdir, clip.stem, anchor, tgt, gname))
+            if rec is None:
+                continue
+            row = gap_and_quantization(rec, n_samples, 30.0, 10.0)
+            if row:
+                row.update({"geometry": gname, "target": tgt + 1})
+                rows.append(row)
+    if rows:
+        gaps[clip.stem] = rows
+        atomic_json(out / "s2f_gaps.json", gaps)
+        log(f"  S2f 缺口代价: {len(rows)} 条")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="长镜头逐窗对齐可行性探针 (CPU only, 可续跑)")
@@ -1219,8 +1672,8 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     budget = Budget(args.budget_minutes)
     stages = (set(args.only) if args.only
-              else {"traj", "windows", "enhance", "refsweep", "knobs",
-                    "synth"})
+              else {"profile", "traj", "windows", "enhance",
+                    "refsweep", "knobs", "oracle", "synth"})
     global WORKERS
     WORKERS = max(1, args.workers)
 
@@ -1247,6 +1700,11 @@ def main() -> int:
     traj_meta: list[dict] = []
     windows: dict[str, list] = {}
     enhanced: dict[str, list] = {}
+    profile: dict[str, dict] = {}
+    correlation: dict[str, dict] = {}
+    entries: dict[str, list] = {}
+    oracle: dict[str, dict] = {}
+    gaps: dict[str, list] = {}
     refsweep: dict[str, list] = {}
     knobs: dict[str, list] = {}
 
@@ -1263,6 +1721,38 @@ def main() -> int:
         n_samples = min(p.stat().st_size // 4 for p in raw)
         log(f"S1 {clip.stem}: {n_samples} 采样/轨 "
             f"({n_samples / SR:.1f}s), raw 就绪")
+
+        # ---- S0 体检: sample entry / 电平与静音 / 分块相关性 ----
+        if "profile" in stages:
+            entries[clip.stem] = audio_entry_report(clip)
+            atomic_json(out / "s0_entries.json", entries)
+            bad = [e for e in entries[clip.stem]
+                   if e.get("consistent") is False or e.get("error")]
+            log(f"  S0a sample entry: {len(entries[clip.stem])} 条, "
+                f"不自洽 {len(bad)} 条")
+            try:
+                profile[clip.stem] = channel_profile(raw, n_samples)
+                atomic_json(out / "s0b_profile.json", profile)
+                for ch in profile[clip.stem]["channels"]:
+                    log(f"  S0b CH{ch['ch']}: RMS中位 "
+                        f"{ch['rms_db_p50']:.1f} dBFS, 静音 "
+                        f"{100 * ch['silent_fraction']:.0f}%, "
+                        f"最长静音 {ch['longest_silent_run_s']:.0f}s")
+            except Exception as exc:            # noqa: BLE001
+                log(f"  S0b 失败: {type(exc).__name__}: {exc}")
+                pending.append(f"profile__{clip.stem}")
+            if not budget.exhausted():
+                try:
+                    correlation[clip.stem] = block_correlation(raw, n_samples)
+                    atomic_json(out / "s0c_correlation.json", correlation)
+                    log(f"  S0c 分块相关性: "
+                        f"{len(correlation[clip.stem]['pairs'])} 对, "
+                        f"{correlation[clip.stem]['blocks_used']} 块")
+                except Exception as exc:        # noqa: BLE001
+                    log(f"  S0c 失败: {type(exc).__name__}: {exc}")
+                    pending.append(f"corr__{clip.stem}")
+            else:
+                pending.append(f"corr__{clip.stem}")
 
         tdir = out / "traj"
         tdir.mkdir(exist_ok=True)
@@ -1288,6 +1778,9 @@ def main() -> int:
                     atomic_json(out / "s2_windows.json", windows)
             _stage_extras(out, clip, tdir, raw, anchor, targets, n_samples,
                           stages, budget, pending, enhanced, refsweep, knobs)
+            _stage_oracle_final(out, clip, tdir, anchor, targets,
+                                n_samples, stages, budget, pending,
+                                oracle, gaps)
             continue
         jobs: list[tuple[int, int, tuple]] = []
         for tgt in targets:
@@ -1334,6 +1827,9 @@ def main() -> int:
         # ---- S2b/S2c/S2d: 增强分析 / 参考扫描 / 旋钮扫描 ----
         _stage_extras(out, clip, tdir, raw, anchor, targets, n_samples,
                       stages, budget, pending, enhanced, refsweep, knobs)
+        _stage_oracle_final(out, clip, tdir, anchor, targets,
+                            n_samples, stages, budget, pending,
+                            oracle, gaps)
 
     # ---- S3 合成校验 ----
     synthetic = None
@@ -1365,7 +1861,8 @@ def main() -> int:
         "numpy": np.__version__,
     })
     write_report(out, inv, traj_meta, windows, synthetic, budget, pending,
-                 enhanced, refsweep, knobs)
+                 enhanced, refsweep, knobs, profile, correlation, entries,
+                 oracle, gaps)
     log(f"完成: {out / 'report.md'}")
     if pending:
         log(f"有 {len(pending)} 个任务未完成 (预算/中断); 重跑可续")
