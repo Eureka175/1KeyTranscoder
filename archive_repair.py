@@ -523,6 +523,37 @@ def check_audio(path: Path, doc: dict,
         # 对齐, 也不能说没对齐。如实记 UNMEASURABLE。
         items.append(_item("AUD-03", UNMEASURABLE,
                            f"status={status}: {str(rep.get('detail'))[:160]}"))
+    # AUD-04: **被拒但确实还偏**的轨。
+    #
+    # 为什么必须单独报这一项: `AUD-03 PASS` 的条件是生产判 `already_aligned`,
+    # 而那个状态的语义是"**没有可采纳的修正**" —— 被质量门拒掉的轨
+    # (`non_constant` / `low_confidence`) 不算在里面。于是报告可以一边写
+    # "AUD-03 PASS"、一边留着 23–27 ms 的未修偏移。实测 13 件交付里
+    # **11 件属于这种情形**, 共 12 条轨 (偏差 23.68–27.31 ms)。
+    # 把漏检写成 PASS 比没有检查更糟, 所以这里如实记为 WARN 并列出幅度。
+    min_shift = 5
+    still_off = []
+    for r in rows:
+        d = r.get("delay_ms")
+        if r.get("decision") != "untouched":
+            continue
+        if not isinstance(d, (int, float)):
+            continue
+        if abs(d) < 1000.0 * min_shift / 48000.0:
+            continue
+        still_off.append({"stream": r.get("stream"),
+                          "reason": r.get("reason"),
+                          "delay_ms": d})
+    if still_off:
+        desc = "; ".join(
+            f"CH{(x['stream'] or 0) + 1}{x['delay_ms']:+.2f}ms({x['reason']})"
+            for x in still_off)
+        items.append(_item(
+            "AUD-04", WARN,
+            f"{len(still_off)} 条轨仍被拒且偏差 >= {min_shift} 采样: {desc}",
+            still_off))
+    else:
+        items.append(_item("AUD-04", PASS, "没有被拒且仍明显偏移的轨"))
     return items, {"status": status, "rows": rows,
                    "detail": rep.get("detail")}
 
