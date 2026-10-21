@@ -1090,21 +1090,25 @@ def l1_recheck_knobs() -> None:
             tgt = _np.concatenate([_np.zeros(actual), _ref])[:len(_ref)]
             tp = td / f"t_{actual}_{claimed}.f32"
             tgt.astype("float32").tofile(tp)
-            est = _types.SimpleNamespace(delay_ms=claimed * 1000.0 / sr)
+            est = _types.SimpleNamespace(delay_ms=claimed * 1000.0 / sr,
+                                        delay_samples=float(claimed))
             return cs._agree_with_independent_estimate(
                 1, est, claimed, {0: _td_ref, 1: tp}, 0, 0, sr, "f32",
                 eff_agree)
 
         _same = _case(900, 900)
         record("p13w.独立估计与 shift 一致 -> 放行",
-               _same is None, str(_same))
+               _same["accepted"] is True, str(_same.get("diff_samples")))
         _off = _case(900, 840)
         record("p13x.独立估计差 60 采样 -> 拒绝并给出差值",
-               _off is not None and abs(_off["diff_samples"] - 60.0) <= 2.0,
-               str(_off and _off["diff_samples"]))
+               _off["accepted"] is False
+               and abs(_off["diff_samples"] - 60.0) <= 2.0,
+               str(_off.get("diff_samples")))
         _near = _case(900, 901)
         record("p13y.差 1 采样在容差内 -> 放行 (粗护栏, 不替代精测)",
-               _near is None, str(_near))
+               _near["accepted"] is True, str(_near.get("diff_samples")))
+        record("p13z.测量记录总是带 accepted 字段 (放行也要可审计)",
+               all("accepted" in _case(*a) for a in ((900, 900), (900, 840))))
 
     # --- 材料性判据 (2026-10-21): 修正值不值得做 ---
     record("p14a.materiality_k 默认 0.0 (关闭)",
@@ -1133,3 +1137,24 @@ def l1_recheck_knobs() -> None:
            cs.materiality_accepts(1150, 1.553, sr, k="3") is not None)
     record("p14j.effective_opts 归一 materiality_k=3",
            cs.effective_opts({"materiality_k": "3"})["materiality_k"] == 3.0)
+
+    # --- 一致性门默认只诊断 (2026-10-22) ---
+    # 实测: 任何量纲的否决都误拒 5–23 条良好修正, 只多挡 ≤1 条不良。
+    record("p14k.verify_agree_veto 默认 False (只诊断不否决)",
+           cs.DEFAULTS["verify_agree_veto"] is False)
+    record("p14l.verify_agree_veto 在 _BOOL_KEYS 里",
+           "verify_agree_veto" in cs._BOOL_KEYS)
+    record("p14m.verify_agree_rel 默认 0 (关闭)",
+           cs.DEFAULTS["verify_agree_rel"] == 0.0)
+    record("p14n.verify_agree_sigma 默认 0 (关闭)",
+           cs.DEFAULTS["verify_agree_sigma"] == 0.0)
+    _tol = cs.effective_agree_tolerance(
+        cs.effective_opts({"verify_agree_samples": 5,
+                           "verify_agree_rel": 0.02,
+                           "verify_agree_sigma": 3.0}),
+        delay_samples=1200.0, ind_samples=1210.0,
+        window_values=[24.5, 24.6, 24.4], sample_rate=sr)
+    record("p14o.容差 = max(绝对, 相对, sigma) 取最宽",
+           _tol["tolerance_samples"] >= 24.0, str(_tol))
+    record("p14p.相对项 = rel×|delay| = 0.02×1200 = 24 采样",
+           abs(_tol["tolerance_samples"] - 24.0) < 1e-6, str(_tol))

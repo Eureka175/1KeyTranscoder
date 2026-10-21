@@ -147,6 +147,28 @@ DEFAULTS: dict[str, Any] = {
     # `C1167 CH2` 与 `C1267 CH1` 的移位值与独立测量差 5–6 采样 ——
     # 数据写对了、数值是错的。残差门看不出来, 两条独立估计的一致性才看得出来。
     "verify_agree_samples": 0,
+    # 一致性容差的**相对**与**置信**量纲 (2026-10-22):
+    # 固定采样数在不同偏移量级上要求不同 —— 20 采样对 24 ms 是 1.7%,
+    # 对 5 ms 是 8%。所以容差随尺度走, 取三者最宽:
+    #   verify_agree_samples  绝对下限 (采样)
+    #   verify_agree_rel      相对偏差: rel × |delay|
+    #   verify_agree_sigma    sigma × 独立估计的多窗标准差
+    # 默认 0 = 不启用, 与旧行为一致。
+    "verify_agree_rel": 0.0,
+    "verify_agree_sigma": 0.0,
+    # 一致性判据是否**否决**该轨 (默认 False = 只诊断)。
+    #
+    # 依据 (2026-10-22, 归档+访谈集去重后 73 条被修轨; 独立标签 =
+    # 数据精确 且 改善倍数 >= 10x, 良好 70 / 不良 3, 3 条不良全是 after 不可测):
+    #   全放行              保留 73, 良好 70, 误收 3, 误拒 0
+    #   绝对 5 采样否决      保留 47, 良好 47, 误收 0, **误拒 23**
+    #   绝对 20 采样否决     保留 58, 良好 56, 误收 2, **误拒 14**
+    #   相对 5%*|delay| 否决 保留 68, 良好 65, 误收 3, **误拒 5**
+    #   5 sigma 否决         保留 62, 良好 59, 误收 3, **误拒 11**
+    # 任何量纲的否决都是"误拒 5-23 条良好修正, 换多挡 <=1 条不良" —— 因为两条
+    # 估计的分歧主要来自**独立估计自身的方法偏差**, 而不是移位值错了。
+    # 所以默认只记录 + 超阈警告, 否决权留给"修后残差"。
+    "verify_agree_veto": False,
     # 材料性判据 (2026-10-21): 0 = 关闭 (旧行为)。
     #
     # 恒定性不通过的轨, 只要 `|delay| >= materiality_k × 实测稳健位移`,
@@ -244,13 +266,14 @@ _FLOAT_KEYS = ("min_audio_seconds", "silent_rms_dbfs", "search_window_ms",
                "min_confidence", "min_usable_fraction", "mad_max_ms",
                "step_min_ms", "constant_max_ppm", "drift_min_ms",
                "verify_max_ms", "verify_max_rel", "materiality_k",
+               "verify_agree_rel", "verify_agree_sigma",
                "aligned_max_ms", "fix_chunk_seconds", "frame_min_rms_dbfs",
                "group_snr_threshold")
 _LIST_INT_KEYS = ("supported_sample_rates", "anchor_candidates")
 _LIST_FLOAT_KEYS = ("fine_phase_band_hz",)
 _LIST_STR_KEYS = ("supported_codecs",)
 _BOOL_KEYS = ("channel_sync_transparent", "time_varying", "group_anchor_enabled",
-              "channel_sync_accurate")
+              "channel_sync_accurate", "verify_agree_veto")
 
 # 参与"全部健康 target 均失败 -> 文件级 measure_failed" 判定的轨道级原因
 _ESTIMATION_FAIL_REASONS = frozenset({
@@ -879,25 +902,85 @@ def _agree_with_independent_estimate(
     except Exception:                     # noqa: BLE001 — 测不出就当一致
         # 独立路径本身失败时**不能**据此拒绝: 那属于"证据不足", 由别的门负责。
         # 这里只做加成性的复核, 不做否决权的扩张。
-        return None
+        return {"measured": False, "accepted": True, "reason": "measure_failed"}
     vals = [v for v in pre["values"] if v == v]
     if not vals:
-        # 独立路径测不出来: 不能因此拒绝 —— 那是"证据不足", 由别的门负责。
-        return None
+        return {"measured": False, "accepted": True, "reason": "no_window"}
     ind_ms = float(sorted(vals)[len(vals) // 2])
     ind_samples = ind_ms * sample_rate / 1000.0
     diff = abs(ind_samples - float(shift))
-    if diff <= float(eff["verify_agree_samples"]):
-        return None
+    delay_samples = abs(float(est.delay_samples))
+    tol = effective_agree_tolerance(
+        eff, delay_samples=delay_samples, ind_samples=ind_samples,
+        window_values=list(pre["values"]), sample_rate=sample_rate)
     return {
+        "measured": True,
         "independent_ms": ind_ms,
         "independent_samples": ind_samples,
         "shift_samples": int(shift),
         "diff_samples": diff,
+        # 判据的三种表达都记下来, 便于离线复核"该用哪种量纲":
+        #   绝对样本 / 相对偏差 / 以估计器自身散布为单位
+        "diff_ratio": (diff / delay_samples) if delay_samples > 0 else None,
+        "tolerance_samples": tol["tolerance_samples"],
+        "tolerance_basis": tol["basis"],
+        "window_spread_ms": tol["window_spread_ms"],
+        "accepted": diff <= tol["tolerance_samples"],
         "windows_ms": list(pre["values"]),
         "search_ms": wide_ms,
-        "tolerance_samples": int(eff["verify_agree_samples"]),
     }
+
+
+def effective_agree_tolerance(
+    eff: dict[str, Any],
+    *,
+    delay_samples: float,
+    ind_samples: float,
+    window_values: list[float],
+    sample_rate: int,
+) -> dict[str, Any]:
+    """一致性门容差该用什么量纲: 绝对样本 / 相对偏移 / 估计器自身散布。
+
+    固定采样数的问题: 20 采样是 0.42 ms —— 对 24 ms 的偏移是 1.7%, 对 5 ms
+    的偏移却是 8%。同一个数字在不同量级上要求完全不同, 所以容差应当随被测量
+    的尺度走。
+
+    三种候选 (取**最宽**的那个, 因为一道门不应因量纲假设而更严):
+
+      * 绝对下限 `verify_agree_samples` (采样): 永远保底, 避免小偏移被过度卡;
+      * 相对偏差 `verify_agree_rel × |delay|`: "两条估计相差不超过偏移的 x%",
+        与偏移量级同尺度;
+      * 估计器散度 `verify_agree_sigma × 窗间离散`: 用独立路径自己的多窗
+        标准差当不确定度, "两个估计的差在 3σ 内即视为一致"。这是统计上
+        最正确的量纲 —— 它把"测量本身有多不确定"直接写进判据。
+
+    返回选取的容差与依据, 供报告引用。
+    """
+    tol_abs = float(eff["verify_agree_samples"])
+    basis = "absolute"
+    delay = abs(float(delay_samples))
+    rel = float(eff["verify_agree_rel"])
+    if rel > 0.0 and delay > 0.0:
+        cand = rel * delay
+        if cand > tol_abs:
+            tol_abs, basis = cand, "relative"
+    sigma = float(eff["verify_agree_sigma"])
+    good = [v for v in window_values if v == v]
+    # 窗间离散**总是**算: 它是"独立估计本身有多不稳定"的直接度量, 即使当前
+    # 没启用 sigma 判据也要记进报告 —— 否则事后无法回答"容差该用哪种量纲"
+    # 这个问题（55 条样本里 Δ 大小与修正质量并不相关, 相关的是相对不确定度）。
+    if len(good) >= 2:
+        mean = sum(good) / len(good)
+        var = sum((v - mean) ** 2 for v in good) / (len(good) - 1)
+        sd_ms = var ** 0.5
+    else:
+        sd_ms = float("nan")
+    if sigma > 0.0 and sd_ms == sd_ms:
+        cand = sigma * sd_ms * float(sample_rate) / 1000.0
+        if cand > tol_abs:
+            tol_abs, basis = cand, "sigma"
+    return {"tolerance_samples": tol_abs, "basis": basis,
+            "window_spread_ms": sd_ms}
 
 
 def run_channel_sync(
@@ -1810,12 +1893,21 @@ def run_channel_sync(
                 # 与 `shift` 比对。生产估计器是逐帧 GCC + 轨迹统计; 这里用
                 # 宽搜索窗的整段 GCC + 相位斜率 (多窗取中位), 属于不同的
                 # 估计路径, 因此"两边一致"是有信息量的。
-                if eff["verify_agree_samples"] > 0:
+                if (eff["verify_agree_samples"] > 0
+                        or eff["verify_agree_rel"] > 0.0
+                        or eff["verify_agree_sigma"] > 0.0):
                     agree = _agree_with_independent_estimate(
                         i, e, shift, decoded, ref_of.get(i, anchor), anchor,
                         sample_rate, storage[i], eff,
                     )
-                    if agree is not None:
+                    # **总是**把测量记到行上, 不只是拒绝时。否则"容差该用
+                    # 哪种量纲"这类问题永远只能靠日志猜: 被放行的轨没有记录,
+                    # 就无法把"差值"与"修得对不对"放在一起比。
+                    rows[i]["agreement"] = agree
+                    # 默认**只诊断不否决**: 否决权交给修后残差。依据见 DEFAULTS
+                    # 里 verify_agree_veto 的实测 (误拒 5–23 条良好修正)。
+                    if eff["verify_agree_veto"] and not agree.get(
+                            "accepted", True):
                         rows[i]["decision"] = "untouched"
                         rows[i]["reason"] = "estimate_disagreement"
                         rows[i]["shift_samples"] = None
@@ -1826,7 +1918,8 @@ def run_channel_sync(
                             f"({agree['independent_samples']:+.1f} 采样) 与 "
                             f"shift {shift:+d} 相差 "
                             f"{agree['diff_samples']:.1f} 采样 > "
-                            f"{eff['verify_agree_samples']} — 该轨不可信, "
+                            f"{agree['tolerance_samples']:.1f} "
+                            f"({agree['tolerance_basis']}) — 该轨不可信, "
                             "untouched"
                         )
                         continue
@@ -1871,13 +1964,26 @@ def run_channel_sync(
                 if eff["verify_max_rel"] > 0.0:
                     limit = max(limit, delay_ms_here * eff["verify_max_rel"])
                 # 材料性放行的轨: 一个整数移位**不可能**把非恒定偏移抹平,
-                # 它的物理极限就是该轨的实测位移。用 0.05 ms 或 20% 去卡它,
-                # 等于要求做不到的事, 于是又回到"测量成功却主动丢弃"。
-                # 因此这类轨的验收上界取 max(现有门, 实测位移)。
+                # 它的物理极限就是该轨的实测位移。所以这类轨的验收上界取
+                # **实测位移**本身 (不低于绝对下限), 而不是 max(相对门, 位移):
+                # 相对门 (20%×24ms ≈ 4.8ms) 比位移宽得多, 用它会让"残余超过
+                # 自身变化量"的修正混过去 —— 实测 `C1212 CH1` 残余 94 采样而
+                # 位移只有 55 采样, 按相对门就漏了。
+                #
+                # 这也正是"不固定采样、按置信偏移"的落点: 容差不是常数, 而是
+                # 这条轨自己做一次整数移位后**必然残留**的那个量。
                 mat_note = materiality_note.get(i)
                 if mat_note:
-                    limit = max(limit, float(mat_note["displacement_ms"]))
+                    limit = max(eff["verify_max_ms"],
+                                float(mat_note["displacement_ms"]))
                 windows = max(1, int(eff["recheck_windows"]))
+                # 多窗只在"被修掉的偏移远大于量化粒度"时才有意义: 多窗是
+                # 用来抓**非恒定**偏移的, 而小位移轨的验收本来就由绝对门管。
+                # 对它们启用多窗只会引入窗间方差 —— 实测 `C1174 CH2`
+                # (shift −38 = 0.79 ms) 因此被误拒, 丢掉一条已验证的修正。
+                # 阈值取 1 ms (≈48 采样), 与小位移的测量不确定度同量级。
+                if abs(float(e.delay_ms)) < 1.0:
+                    windows = 1
                 if windows > 1:
                     wr = sync_fix.recheck_residual_windows(
                         arrs[ref_of.get(i, anchor)],
