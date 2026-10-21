@@ -22,12 +22,25 @@
 产出目录默认 `F:\\_long_take_probe`，全部可续跑：中断后重跑会跳过已完成的任务
 （每个任务一个 checkpoint，原子写入）。输出 < 100 MB。
 
-三阶段任务（按优先级，预算用尽即优雅停止）::
+六个阶段（按优先级，预算用尽即优雅停止）::
 
-    S1 解码 + 逐帧轨迹（生产几何 × 每对 (参考,目标) × 多种几何）
-    S2 逐窗可行性（多种 (窗长, 跳长)：覆盖率、缺口、接缝、逐窗修正后的残余模拟）
-    S3 合成校验（注入已知常数延迟 / 已知线性漂移，给出估计器偏差与方差，
-       以及逐窗管线能否复原已知漂移）—— 这一步用来证明 S2 的数字可信
+    S1 traj       逐帧轨迹: 9 种几何 × 每对 (锚,目标)。含 2 s / 5 s 帧的
+                  "密度上限"探针 —— 若这么长的帧仍救不回零证据窗，则"换几何"
+                  这条路线被证伪。                          (~30 min / 2 文件)
+    S2 windows    逐窗可行性: 5 种 (窗长,跳长) 下的解析率、缺口、接缝步长、
+                  逐窗修正后的残余模拟。                    (~1 min)
+    S2b enhance   零测量成本的四项分析: 滑窗位置能否救回零证据窗 / 自适应窗长
+                  需要多长 / 有证据窗覆盖多少音频时长 / 60 s 最小段的分段常数
+                  拟合残余与接缝。                          (~1 min)
+    S2c refsweep  参考扫描: 12 个有序通道对（逐窗允许每窗换参考），找出让
+                  证据密度最高的参考。                      (~12 min)
+    S2d knobs     估计器旋钮扫描: 只用 estimate_pair 已有参数（置信门 / 粗扫率 /
+                  搜索窗 / 相位带），看可用帧能否增加。      (~16 min)
+    S3 synth      合成校验: 注入已知常数延迟与已知线性漂移，给出偏差/方差，并做
+                  "对照 + 漂移"双窗口管线校验 —— 证明 S2 的数字可信。
+                                                           (~6 min)
+
+总计约 60-70 分钟（两条长镜头）；`--budget-minutes 150` 只是安全上限。
 
 关键设计口径（都写进报告）:
 
@@ -77,6 +90,8 @@ DEFAULT_OUT = Path(r"F:\_long_take_probe")
 PREFER_STEMS: tuple[str, ...] = ("20260919_C1305", "20260919_C1306")
 
 #: 几何扫描: (frame_ms, hop_ms, anchor_segment_seconds)。生产默认是 (200,100,20)。
+#: 后两项是"密度上限"探针: 若 2 s / 5 s 帧仍救不回零证据窗, 说明素材在时间上
+#: 稀疏, 换几何这条路线就被证伪 (帧越长, 每帧越容易过置信门)。
 GEOMETRIES = [
     (100.0, 50.0, 20.0, "dense100"),
     (200.0, 100.0, 20.0, "prod200"),
@@ -85,15 +100,36 @@ GEOMETRIES = [
     (1000.0, 500.0, 20.0, "very-coarse1000"),
     (500.0, 100.0, 20.0, "overlap500"),
     (200.0, 100.0, 5.0, "prod200-short-anchor"),
+    (2000.0, 1000.0, 20.0, "coarse2000"),
+    (5000.0, 2500.0, 20.0, "coarse5000"),
 ]
 PROD_GEOM = "prod200"
+#: 参考扫描与估计器旋钮扫描用这个几何: 覆盖最好、代价最低 (帧数 = 时长/1 s)。
+REF_GEOM = "very-coarse1000"
+
+#: 参考扫描: 6 个有序通道对 (每条轨既当参考也当目标), 用来看"换参考能否提高
+#: 逐窗证据密度" —— 生产中锚点选择是全局的, 逐窗允许每窗选不同参考。
+REF_PAIRS = [(0, 1), (0, 2), (0, 3), (1, 0), (1, 2), (1, 3),
+             (2, 0), (2, 1), (2, 3), (3, 0), (3, 1), (3, 2)]
+
+#: 估计器旋钮扫描（全部是生产参数, 不新造语义）: 稀疏/弱相关素材上, 降低置信门、
+#: 降低粗扫采样率、放宽搜索窗、收窄相位带, 都可能提高可用帧数。
+KNOB_VARIANTS = [
+    ("minconf0.2", {"min_confidence": 0.2}),
+    ("coarse4000", {"coarse_rate": 4000}),
+    ("search250", {"search_window_ms": 250.0}),
+    ("band100-4000", {"fine_phase_band_hz": (100.0, 4000.0)}),
+]
 
 #: 逐窗尺度: (window_s, hop_s)。生产 tv 默认是 (30,10)。
 WINDOW_SCALES = [(30.0, 10.0), (15.0, 5.0), (10.0, 5.0), (5.0, 2.0),
                  (60.0, 20.0)]
+#: 自适应窗长阶梯: 零证据窗向上加长, 看多长才能凑够帧。
+ADAPTIVE_WINDOW_LADDER = [30.0, 60.0, 120.0, 240.0, 480.0]
 FEASIBILITY_MIN_RESOLVED = 0.60      # 计划书里的证据门
 
 T0 = time.time()
+WORKERS = 4          # main() 按 --workers 覆盖; 供各个任务循环共享
 
 
 # ---------------------------------------------------------------------------
@@ -215,22 +251,30 @@ def task_id_traj(clip: str, ref: int, tgt: int, geom: str) -> str:
 
 def run_trajectory(raw: list[Path], ref: int, tgt: int,
                    frame_ms: float, hop_ms: float, anchor_s: float,
-                   workers: int) -> dict:
-    """调用生产 estimate_pair, 把**全帧轨迹**（含被否帧）转成可落盘的数组。"""
+                   workers: int, overrides: dict | None = None) -> dict:
+    """调用生产 estimate_pair, 把**全帧轨迹**（含被否帧）转成可落盘的数组。
+
+    ``overrides`` 只允许覆盖 estimate_pair 已有的生产参数 (置信门/粗扫率/搜索窗/
+    相位带), 用它们做"估计器旋钮"扫描; 不引入新语义。
+    """
     eff = cs.effective_opts(None)
+    kw: dict = {
+        "search_window_ms": eff["search_window_ms"],
+        "frame_ms": frame_ms, "hop_ms": hop_ms,
+        "anchor_segment_seconds": anchor_s,
+        "min_confidence": eff["min_confidence"],
+        "coarse_rate": eff["coarse_rate"],
+        "fine_phase_band_hz": tuple(eff["fine_phase_band_hz"]),
+        "min_usable_frames": eff["min_usable_frames"],
+        "frame_min_rms_dbfs": eff["frame_min_rms_dbfs"],
+    }
+    for k, v in (overrides or {}).items():
+        if k not in kw:
+            raise KeyError(f"不支持的 estimate_pair 覆盖项: {k}")
+        kw[k] = v
     est = se.estimate_pair(
         str(raw[ref]), str(raw[tgt]),
-        sample_rate=SR,
-        search_window_ms=eff["search_window_ms"],
-        frame_ms=frame_ms, hop_ms=hop_ms,
-        anchor_segment_seconds=anchor_s,
-        min_confidence=eff["min_confidence"],
-        coarse_rate=eff["coarse_rate"],
-        fine_phase_band_hz=tuple(eff["fine_phase_band_hz"]),
-        min_usable_frames=eff["min_usable_frames"],
-        frame_min_rms_dbfs=eff["frame_min_rms_dbfs"],
-        ref_index=ref, tgt_index=tgt,
-        workers=workers,
+        sample_rate=SR, ref_index=ref, tgt_index=tgt, workers=workers, **kw,
     )
     frames = est.frames or []
     centers = np.fromiter((f.center_sample for f in frames), dtype=np.int64,
@@ -239,7 +283,8 @@ def run_trajectory(raw: list[Path], ref: int, tgt: int,
                          count=len(frames))
     confs = np.fromiter((f.confidence for f in frames), dtype=np.float64,
                         count=len(frames))
-    good = ~np.isnan(delays) & (confs >= eff["min_confidence"])
+    gate = float(kw["min_confidence"])
+    good = ~np.isnan(delays) & (confs >= gate)
     # 与生产决策链完全一致的三个调用（signature 逐个对齐 channel_sync L1496+）
     stats = (se.summarize_trajectory(frames, SR) if frames else None)
     disp_ms = (se.measured_displacement_ms(frames, SR) if frames else None)
@@ -265,6 +310,8 @@ def run_trajectory(raw: list[Path], ref: int, tgt: int,
         "summarize": None if stats is None else asdict(stats),
         "displacement_ms": None if disp_ms is None else float(disp_ms),
         "constant": const,
+        "conf_gate": gate,
+        "overrides": dict(overrides or {}),
     }
 
 
@@ -304,7 +351,8 @@ def window_measurements(rec: dict, n_samples: int, window_samples: int,
                 for _ in range(max(0, tv.measured_window_count(
                     n_samples, window_samples=window_samples,
                     hop_samples=hop_samples)))]
-    good = ~np.isnan(delays) & (confs >= 0.3)
+    gate = float(rec.get("conf_gate", 0.3))
+    good = ~np.isnan(delays) & (confs >= gate)
     idx = tv.window_index("nearest-centre", centers,
                           window_samples=window_samples,
                           hop_samples=hop_samples, n_windows=n_win)
@@ -655,11 +703,247 @@ def synthetic_validation(work: Path, budget: Budget, excerpt_s: float = 240.0,
 
 
 # ---------------------------------------------------------------------------
+# S2b: 逐窗增强分析（滑窗位置 / 自适应窗长 / 音频时间覆盖 / 分段拟合）
+# ---------------------------------------------------------------------------
+def _good(rec: dict) -> np.ndarray:
+    d = rec["delays"]
+    c = rec["confidences"]
+    return ~np.isnan(d) & (c >= float(rec.get("conf_gate", 0.3)))
+
+
+def _counts_per_window(rec: dict, n_samples: int, ws: int, hs: int,
+                       offset: int = 0) -> np.ndarray:
+    """每个窗内的合格帧数。``offset`` 让窗网格整体右移（滑窗位置实验）。"""
+    n_meas = tv.measured_window_count(n_samples - offset,
+                                      window_samples=ws, hop_samples=hs)
+    if n_meas <= 0:
+        return np.zeros(0, dtype=np.int64)
+    idx = tv.window_index("nearest-centre", rec["centers"] - offset,
+                          window_samples=ws, hop_samples=hs,
+                          n_windows=tv.required_window_count(
+                              n_samples - offset, hop_samples=hs))
+    good = _good(rec)
+    return np.bincount(idx[good], minlength=n_meas)[:n_meas]
+
+
+def _piecewise_segments(centers: np.ndarray, delays: np.ndarray,
+                        min_seg_samples: int,
+                        step_threshold_samples: float) -> dict:
+    """把 lag 轨迹切成"段内常数"的段（二分递归），用于估计逐窗修正的残余与接缝。
+
+    只用已测帧（nan 已剔除）。切分依据是左右两半中位差 > 阈值，且每段不少于
+    ``min_seg_samples``（默认 60 s）—— 这正是"接缝可以多久出现一次"的约束。
+    """
+    n = centers.size
+    if n < 8:
+        return {"segments": 0, "residual_p50": None, "residual_p90": None,
+                "seam_steps": [], "min_seg_ok": False}
+    segs: list[tuple[int, int]] = [(0, n)]
+    out: list[tuple[int, int]] = []
+    while segs:
+        a, b = segs.pop()
+        if b - a < 8:
+            out.append((a, b))
+            continue
+        mid = (a + b) // 2
+        left = delays[a:mid]
+        right = delays[mid:b]
+        if (centers[mid] - centers[a]) < min_seg_samples or \
+                (centers[b - 1] - centers[mid]) < min_seg_samples:
+            out.append((a, b))
+            continue
+        if abs(float(np.median(left) - np.median(right))) <= step_threshold_samples:
+            out.append((a, b))
+            continue
+        segs.append((a, mid))
+        segs.append((mid, b))
+    out.sort()
+    residual: list[np.ndarray] = []
+    seam: list[float] = []
+    medians: list[float] = []
+    for a, b in out:
+        d = delays[a:b]
+        if d.size == 0:
+            continue
+        m = float(np.median(d))
+        medians.append(m)
+        residual.append(np.abs(d - m))
+    for i in range(1, len(medians)):
+        seam.append(abs(medians[i] - medians[i - 1]))
+    res = (np.concatenate(residual) if residual
+           else np.zeros(0, dtype=np.float64))
+    return {
+        "segments": len(out),
+        "residual_p50": float(np.percentile(res, 50)) if res.size else None,
+        "residual_p90": float(np.percentile(res, 90)) if res.size else None,
+        "seam_steps": seam,
+        "seam_gt_1": int(sum(1 for s in seam if s > 1)),
+        "seam_gt_48": int(sum(1 for s in seam if s > 48)),
+        "min_seg_ok": True,
+    }
+
+
+def enhanced_window_analysis(rec: dict, n_samples: int) -> dict:
+    """在已有轨迹上做四件"零测量成本"的可行性分析。
+
+    1. **滑窗位置**: 窗网格整体偏移 1/4、1/2、3/4 跳，看零证据窗能否被救回。
+       （生产 applier 的窗网格是固定的，所以这一步回答"换个切法是否可行"。）
+    2. **自适应窗长**: 零证据窗向上加长到 60/120/240/480 s，看多长能凑够 3 帧。
+    3. **音频时间覆盖**: 有证据的窗覆盖了多长的音频（不是窗数，是时长）。
+    4. **分段常数拟合**: 用 60 s 最小段做二分切分，给出段内残余与接缝步长。
+    """
+    out: dict = {"scales": [], "piecewise": None, "conf_gate":
+                 float(rec.get("conf_gate", 0.3))}
+    good = _good(rec)
+    centers = rec["centers"][good]
+    delays = rec["delays"][good]
+    for window_s, hop_s in [(30.0, 10.0), (60.0, 20.0)]:
+        ws = int(round(window_s * SR))
+        hs = int(round(hop_s * SR))
+        base = _counts_per_window(rec, n_samples, ws, hs, offset=0)
+        if base.size == 0:
+            continue
+        n_need = tv.required_window_count(n_samples, hop_samples=hs)
+        # 1) 滑窗位置
+        offsets = [0, hs // 4, hs // 2, (3 * hs) // 4]
+        per_off = []
+        best = np.zeros_like(base)
+        for off in offsets:
+            c = _counts_per_window(rec, n_samples, ws, hs, offset=off)
+            m = min(base.size, c.size)
+            if m == 0:
+                continue
+            cnt = np.zeros(base.size, dtype=np.int64)
+            cnt[:m] = c[:m]
+            per_off.append({"offset_samples": off,
+                            "resolved": int((cnt >= 3).sum())})
+            best[:m] = np.maximum(best[:m], cnt[:m])
+        # 2) 自适应窗长（仅 30 s 网格）
+        ladder_need = []
+        if (window_s, hop_s) == (30.0, 10.0):
+            for w in range(base.size):
+                if base[w] >= 3:
+                    ladder_need.append(window_s)
+                    continue
+                need = None
+                for L in ADAPTIVE_WINDOW_LADDER:
+                    Ls = int(round(L * SR))
+                    start = w * hs
+                    cnt = int(np.count_nonzero(
+                        (centers >= start) & (centers < start + Ls)))
+                    if cnt >= 3:
+                        need = L
+                        break
+                ladder_need.append(need if need is not None else -1.0)
+            arr = np.asarray([v for v in ladder_need if v > 0],
+                             dtype=np.float64)
+        else:
+            arr = np.zeros(0)
+        # 3) 音频时间覆盖: 有证据窗的样本并集（用窗长近似, 按 resolved 计数）
+        resolved_mask = base >= 3
+        covered_samples = int(resolved_mask.sum()) * ws
+        # 4) 无证据窗的连续长度（秒）
+        quiet_runs: list[int] = []
+        cur = 0
+        for flag in resolved_mask.tolist():
+            if flag:
+                if cur:
+                    quiet_runs.append(cur)
+                cur = 0
+            else:
+                cur += 1
+        if cur:
+            quiet_runs.append(cur)
+        out["scales"].append({
+            "window_s": window_s, "hop_s": hop_s,
+            "n_windows_needed": int(n_need),
+            "resolved_base": int(resolved_mask.sum()),
+            "resolved_fraction_base":
+                float(resolved_mask.sum() / max(1, n_need)),
+            "sliding_offsets": per_off,
+            "sliding_best_resolved": int((best >= 3).sum()),
+            "sliding_best_fraction": float((best >= 3).sum()
+                                           / max(1, n_need)),
+            "adaptive_needed_window_s": {
+                "p50": float(np.percentile(arr, 50)) if arr.size else None,
+                "p90": float(np.percentile(arr, 90)) if arr.size else None,
+                "max": float(arr.max()) if arr.size else None,
+                "n_covered": int(arr.size),
+            },
+            "audio_time_coverage": float(covered_samples / n_samples),
+            "quiet_run_windows": {
+                "n": len(quiet_runs),
+                "p50_s": (float(np.median(quiet_runs) * hop_s)
+                          if quiet_runs else 0.0),
+                "p90_s": (float(np.percentile(quiet_runs, 90) * hop_s)
+                          if quiet_runs else 0.0),
+                "max_s": (float(max(quiet_runs) * hop_s)
+                          if quiet_runs else 0.0),
+            },
+        })
+    pw = _piecewise_segments(centers, delays,
+                             min_seg_samples=int(60.0 * SR),
+                             step_threshold_samples=48.0)
+    out["piecewise"] = pw
+    return out
+
+
+# ---------------------------------------------------------------------------
+# S2c/S2d: 参考扫描 / 估计器旋钮扫描
+# ---------------------------------------------------------------------------
+def _traj_path(tdir: Path, clip_stem: str, ref: int, tgt: int,
+               gname: str, variant: str | None = None) -> Path:
+    suffix = f"__{variant}" if variant else ""
+    return tdir / f"{clip_stem}__r{ref}_t{tgt}__{gname}{suffix}.npz"
+
+
+def _run_pair_stage(tdir: Path, clip_stem: str, raw: list[Path],
+                    pairs: list[tuple[int, int]], geom: str,
+                    budget: Budget, pending: list[str],
+                    variant: str | None = None,
+                    overrides: dict | None = None) -> list[dict]:
+    """通用"给定几何/通道对/参数变体，跑轨迹测量"的任务循环（可续跑）。"""
+    g = next(g for g in GEOMETRIES if g[3] == geom)
+    frame_ms, hop_ms, anchor_s = g[0], g[1], g[2]
+    recs: list[dict] = []
+    for ref, tgt in pairs:
+        path = _traj_path(tdir, clip_stem, ref, tgt, geom, variant)
+        rec = load_traj(path)
+        if rec is None:
+            if budget.exhausted():
+                pending.append(f"pair__{clip_stem}__r{ref}_t{tgt}__{geom}"
+                               + (f"__{variant}" if variant else ""))
+                continue
+            try:
+                rec = run_trajectory(raw, ref, tgt, frame_ms, hop_ms, anchor_s,
+                                     WORKERS, overrides)
+            except Exception as exc:            # noqa: BLE001
+                log(f"  r{ref}t{tgt} {geom}{variant or ''} 失败: "
+                    f"{type(exc).__name__}: {exc}")
+                pending.append(f"pair__{clip_stem}__r{ref}_t{tgt}__{geom}")
+                continue
+            rec["clip"] = clip_stem
+            rec["geometry"] = geom
+            rec["variant"] = variant
+            save_traj(path, rec)
+            log(f"  r{ref}t{tgt} {geom}{'/' + variant if variant else ''}: "
+                f"可用 {rec['usable_frames']}/{rec['n_frames']}")
+        rec["clip"] = clip_stem
+        rec["geometry"] = geom
+        rec.setdefault("variant", variant)
+        recs.append(rec)
+    return recs
+
+
+# ---------------------------------------------------------------------------
 # 报告
 # ---------------------------------------------------------------------------
 def write_report(out: Path, inv: list[dict], traj_meta: list[dict],
                  windows: dict, synthetic: dict | None,
-                 budget: Budget, pending: list[str]) -> None:
+                 budget: Budget, pending: list[str],
+                 enhanced: dict | None = None,
+                 refsweep: dict | None = None,
+                 knobs: dict | None = None) -> None:
     lines: list[str] = []
     a = lines.append
     a("# 长镜头逐窗对齐可行性探针 —— 报告\n")
@@ -719,6 +1003,70 @@ def write_report(out: Path, inv: list[dict], traj_meta: list[dict],
         if errs:
             a(f"- plan 构建失败: `{errs[0]}`")
         a("")
+    if enhanced:
+        a("## 3b 逐窗增强分析\n")
+        a("回答四个问题：滑窗位置能否救回零证据窗 / 自适应窗长需要多长 / "
+          "有证据的窗覆盖了多少音频时长 / 分段常数拟合的残余与接缝。\n")
+        for clip, rows in enhanced.items():
+            a(f"### {clip}\n")
+            a("| 几何 | 窗/跳 | 已解析 | 滑窗最优 | 自适应窗长 p50/p90 s | "
+              "音频时长覆盖 | 无证据连续段 p50/p90/max s | 分段数 | "
+              "段内残余 p90 | 接缝 >1/>48 |")
+            a("|---|---|---|---|---|---|---|---|---|---|")
+            for r in rows:
+                pw = r.get("piecewise") or {}
+                for sc in r.get("scales") or []:
+                    ad = sc.get("adaptive_needed_window_s") or {}
+                    qr = sc.get("quiet_run_windows") or {}
+                    a(f"| {r['geometry']} | {sc['window_s']:.0f}/"
+                      f"{sc['hop_s']:.0f}s | {sc['resolved_base']}/"
+                      f"{sc['n_windows_needed']} | "
+                      f"{sc['sliding_best_resolved']} "
+                      f"({100 * sc['sliding_best_fraction']:.0f}%) | "
+                      f"{_fmt(ad.get('p50'), 0)}/{_fmt(ad.get('p90'), 0)} | "
+                      f"{100 * sc['audio_time_coverage']:.0f}% | "
+                      f"{_fmt(qr.get('p50_s'), 0)}/{_fmt(qr.get('p90_s'), 0)}/"
+                      f"{_fmt(qr.get('max_s'), 0)} | "
+                      f"{_fmt(pw.get('segments'), 0)} | "
+                      f"{_fmt(pw.get('residual_p90'), 1)} | "
+                      f"{pw.get('seam_gt_1', 0)}/{pw.get('seam_gt_48', 0)} |")
+            a("")
+
+    if refsweep:
+        a("## 3c 参考扫描（逐窗可选不同参考）\n")
+        for clip, rows in refsweep.items():
+            a(f"### {clip}\n")
+            a("| 参考→目标 | 可用帧 | 延迟 | 30/10s 已解析 | 解析率 |")
+            a("|---|---|---|---|---|")
+            for r in sorted(rows, key=lambda x: (x["tgt"], -x["resolved_30_10"])):
+                a(f"| CH{r['ref']}→CH{r['tgt']} | {r['usable_frames']} | "
+                  f"{_fmt(r['delay_ms'], 2)}ms | {r['resolved_30_10']} | "
+                  f"{100 * r['resolved_fraction_30_10']:.1f}% |")
+            a("")
+            best: dict[int, dict] = {}
+            for r in rows:
+                cur = best.get(r["tgt"])
+                if cur is None or r["resolved_30_10"] > cur["resolved_30_10"]:
+                    best[r["tgt"]] = r
+            if best:
+                a("每个目标的最佳参考: "
+                  + "; ".join(f"CH{t}←CH{r['ref']} "
+                              f"({r['resolved_30_10']} 窗)"
+                              for t, r in sorted(best.items())))
+                a("")
+
+    if knobs:
+        a("## 3d 估计器旋钮扫描（都用 estimate_pair 已有参数）\n")
+        for clip, rows in knobs.items():
+            a(f"### {clip}\n")
+            a("| 变体 | 覆盖参数 | 目标 | 可用帧 | 30/10s 已解析 |")
+            a("|---|---|---|---|---|")
+            for r in rows:
+                a(f"| {r['variant']} | `{r['overrides']}` | "
+                  f"CH{r['target']} | {r['usable_frames']} | "
+                  f"{r['resolved_30_10']} |")
+            a("")
+
     if synthetic:
         a("## 4 合成校验（估计器可信度）\n")
         a(f"- 素材: {synthetic['source']}, 片段 {synthetic['excerpt_s']:.0f}s")
@@ -783,6 +1131,68 @@ def _fmt(v, nd: int = 3) -> str:
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
+def _stage_extras(out: Path, clip: Path, tdir: Path, raw: list[Path],
+                  anchor: int, targets: list[int], n_samples: int,
+                  stages: set[str], budget: Budget, pending: list[str],
+                  enhanced: dict, refsweep: dict, knobs: dict) -> None:
+    """S2b/S2c/S2d: 增强分析（零测量）、参考扫描、估计器旋钮扫描。"""
+    stem = clip.stem
+    if "enhance" in stages:
+        rows: list[dict] = []
+        for geom in GEOMETRIES:
+            for tgt in targets:
+                rec = load_traj(_traj_path(tdir, stem, anchor, tgt, geom[3]))
+                if rec is None:
+                    continue
+                rec.setdefault("conf_gate", 0.3)
+                a = enhanced_window_analysis(rec, n_samples)
+                a.update({"geometry": geom[3], "target": tgt + 1})
+                rows.append(a)
+        if rows:
+            enhanced[stem] = rows
+            atomic_json(out / "s2b_enhanced.json", enhanced)
+            log(f"  S2b 增强分析: {len(rows)} 条 (几何×目标)")
+
+    if "refsweep" in stages:
+        recs = _run_pair_stage(tdir, stem, raw, REF_PAIRS, REF_GEOM,
+                               budget, pending)
+        rows = []
+        for rec in recs:
+            wr = window_report(rec, n_samples, 30.0, 10.0, min_frames=3)
+            rows.append({
+                "ref": rec["ref"] + 1, "tgt": rec["tgt"] + 1,
+                "usable_frames": rec["usable_frames"],
+                "delay_ms": rec["delay_ms"],
+                "resolved_30_10": wr["n_windows_resolved"],
+                "resolved_fraction_30_10": wr["resolved_fraction"],
+            })
+        if rows:
+            refsweep[stem] = rows
+            atomic_json(out / "s2c_refsweep.json", refsweep)
+            log(f"  S2c 参考扫描: {len(rows)} 个通道对")
+
+    if "knobs" in stages:
+        rows = []
+        for vname, ov in KNOB_VARIANTS:
+            recs = _run_pair_stage(tdir, stem, raw,
+                                   [(anchor, t) for t in targets], REF_GEOM,
+                                   budget, pending, variant=vname,
+                                   overrides=ov)
+            for rec in recs:
+                wr = window_report(rec, n_samples, 30.0, 10.0, min_frames=3)
+                rows.append({
+                    "variant": vname, "overrides": ov,
+                    "target": rec["tgt"] + 1,
+                    "usable_frames": rec["usable_frames"],
+                    "resolved_30_10": wr["n_windows_resolved"],
+                    "resolved_fraction_30_10": wr["resolved_fraction"],
+                })
+        if rows:
+            knobs[stem] = rows
+            atomic_json(out / "s2d_knobs.json", knobs)
+            log(f"  S2d 旋钮扫描: {len(rows)} 条 (变体×目标)")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="长镜头逐窗对齐可行性探针 (CPU only, 可续跑)")
@@ -808,7 +1218,11 @@ def main() -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     budget = Budget(args.budget_minutes)
-    stages = set(args.only) if args.only else {"traj", "windows", "synth"}
+    stages = (set(args.only) if args.only
+              else {"traj", "windows", "enhance", "refsweep", "knobs",
+                    "synth"})
+    global WORKERS
+    WORKERS = max(1, args.workers)
 
     log(f"输出目录 {out}; 预算 {args.budget_minutes} 分钟; "
         f"workers={args.workers} threads={args.threads}")
@@ -832,6 +1246,9 @@ def main() -> int:
     pending: list[str] = []
     traj_meta: list[dict] = []
     windows: dict[str, list] = {}
+    enhanced: dict[str, list] = {}
+    refsweep: dict[str, list] = {}
+    knobs: dict[str, list] = {}
 
     # ---- S1 解码 + 轨迹 ----
     per_clip_raw: dict[str, tuple[list[Path], dict]] = {}
@@ -869,6 +1286,8 @@ def main() -> int:
                 if rows:
                     windows[clip.stem] = rows
                     atomic_json(out / "s2_windows.json", windows)
+            _stage_extras(out, clip, tdir, raw, anchor, targets, n_samples,
+                          stages, budget, pending, enhanced, refsweep, knobs)
             continue
         jobs: list[tuple[int, int, tuple]] = []
         for tgt in targets:
@@ -905,14 +1324,16 @@ def main() -> int:
                     f"延迟 {rec['delay_ms']:+.3f}ms ({time.time() - t0:.1f}s)")
             traj_meta.append(rec)
 
-        # ---- S2 逐窗（用生产几何 + 最密几何各做一遍）----
-        if "windows" not in stages:
-            continue
-        rows = _run_window_stage(out, clip, tdir, anchor, targets,
-                                 n_samples, budget, pending)
-        if rows:
-            windows[clip.stem] = rows
-            atomic_json(out / "s2_windows.json", windows)
+        # ---- S2 逐窗（所有已测几何）----
+        if "windows" in stages:
+            rows = _run_window_stage(out, clip, tdir, anchor, targets,
+                                     n_samples, budget, pending)
+            if rows:
+                windows[clip.stem] = rows
+                atomic_json(out / "s2_windows.json", windows)
+        # ---- S2b/S2c/S2d: 增强分析 / 参考扫描 / 旋钮扫描 ----
+        _stage_extras(out, clip, tdir, raw, anchor, targets, n_samples,
+                      stages, budget, pending, enhanced, refsweep, knobs)
 
     # ---- S3 合成校验 ----
     synthetic = None
@@ -939,10 +1360,12 @@ def main() -> int:
         "window_scales": WINDOW_SCALES,
         "feasibility_min_resolved": FEASIBILITY_MIN_RESOLVED,
         "pending": pending,
+        "stages": sorted(stages),
         "python": sys.version.split()[0],
         "numpy": np.__version__,
     })
-    write_report(out, inv, traj_meta, windows, synthetic, budget, pending)
+    write_report(out, inv, traj_meta, windows, synthetic, budget, pending,
+                 enhanced, refsweep, knobs)
     log(f"完成: {out / 'report.md'}")
     if pending:
         log(f"有 {len(pending)} 个任务未完成 (预算/中断); 重跑可续")
