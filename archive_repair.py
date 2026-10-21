@@ -871,6 +871,25 @@ def iter_media(root: Path, pattern: str) -> list[Path]:
                   {e.lower() for e in pattern.split(",")})
 
 
+def parse_opt_overrides(items: list[str]) -> dict[str, Any]:
+    """把 `--opt k=v` 解析成 dict; 值的类型交给 `effective_opts` 归一。
+
+    为什么不在 CLI 里做类型判断: `core.channel_sync.effective_opts` 已经按
+    `_INT_KEYS`/`_FLOAT_KEYS`/`_BOOL_KEYS` 逐键强制类型, 在这里再判一次就是
+    两处规则、迟早不一致。CLI 只负责把字符串搬过去。
+    """
+    out: dict[str, Any] = {}
+    for item in items or []:
+        if "=" not in item:
+            raise SystemExit(f"--opt 需要 key=value: {item!r}")
+        k, v = item.split("=", 1)
+        k = k.strip()
+        if not k:
+            raise SystemExit(f"--opt 的键为空: {item!r}")
+        out[k] = v.strip()
+    return out
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     root = Path(args.input)
     files = iter_media(root, args.ext)
@@ -881,6 +900,7 @@ def cmd_check(args: argparse.Namespace) -> int:
         opts["group_anchor_enabled"] = True
     if args.accurate:
         opts["channel_sync_accurate"] = True
+    opts.update(parse_opt_overrides(getattr(args, "opt", [])))
     print(f"check: {len(files)} 个文件 (root={root}) "
           f"opts={opts or 'DEFAULTS'}", flush=True)
     rows = []
@@ -933,6 +953,7 @@ def cmd_repair(args: argparse.Namespace) -> int:
         opts["group_anchor_enabled"] = True
     if args.accurate:
         opts["channel_sync_accurate"] = True
+    opts.update(parse_opt_overrides(getattr(args, "opt", [])))
     opts_or_none = opts or None
 
     rows: list[dict] = []
@@ -1028,6 +1049,9 @@ def main(argv: list[str] | None = None) -> int:
                    help="按分组锚点语义测量 (与 repair 一致)")
     c.add_argument("--accurate", action="store_true",
                    help="按精确模式语义测量 (能看见 2~5 样本的小偏移)")
+    c.add_argument("--opt", action="append", default=[], metavar="K=V",
+                   help="透传给 channel-sync 的选项覆盖, 可重复; "
+                        "例如 --opt verify_max_rel=0.2 --opt verify_agree_samples=5")
     c.set_defaults(func=cmd_check)
 
     r = sub.add_parser("repair", help="修复到暂存目录 (默认不改原件)")
@@ -1037,6 +1061,9 @@ def main(argv: list[str] | None = None) -> int:
                    help="打开分组锚点 (与 1kt.py 同名开关语义一致)")
     r.add_argument("--accurate", action="store_true",
                    help="打开精确模式 (1→2→5 样本分级)")
+    r.add_argument("--opt", action="append", default=[], metavar="K=V",
+                   help="透传给 channel-sync 的选项覆盖, 可重复; "
+                        "例如 --opt verify_max_rel=0.2 --opt verify_agree_samples=5")
     r.add_argument("--in-place", action="store_true",
                    help="修完后写回原件 (必须同时给 --backup 与 --yes)")
     r.add_argument("--backup", default="", help="写回前的备份目录")
