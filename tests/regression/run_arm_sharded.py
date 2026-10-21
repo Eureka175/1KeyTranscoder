@@ -38,7 +38,7 @@ def gather(scope: str) -> list[Path]:
         roots = [Path("I:/") / d.name for d in sorted(Path("I:/").iterdir())
                  if d.is_dir() and len(d.name) == 8 and d.name.isdigit()]
     elif scope == "proof":
-        roots = [Path(r"F:\align_4ch_proof")]
+        roots = [Path(r"F:\1KeyTranscoder\data\align_4ch_proof")]
     else:
         raise SystemExit(f"未知 scope: {scope}")
     files: list[Path] = []

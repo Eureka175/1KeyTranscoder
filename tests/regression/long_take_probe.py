@@ -71,8 +71,8 @@ FFMPEG = REPO / "tools" / "ffmpeg.exe"
 FFPROBE = REPO / "tools" / "ffprobe.exe"
 SR = 48000
 PCM_CACHE = Path(r"E:\1kt_scratch\pcm")   # 只读复用已有解码缓存
-DEFAULT_CLIPS = [r"F:\align_4ch_proof\20260919_C1305.MP4",
-                 r"F:\align_4ch_proof\20260919_C1306.MP4"]
+DEFAULT_CLIPS = [r"F:\1KeyTranscoder\data\align_4ch_proof\20260919_C1305.MP4",
+                 r"F:\1KeyTranscoder\data\align_4ch_proof\20260919_C1306.MP4"]
 DEFAULT_OUT = Path(r"F:\_long_take_probe")
 PREFER_STEMS: tuple[str, ...] = ("20260919_C1305", "20260919_C1306")
 

@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 
 CACHE = Path(r"E:\1kt_scratch\pcm")
-PROOF = Path(r"F:\align_4ch_proof")
+PROOF = Path(r"F:\1KeyTranscoder\data\align_4ch_proof")
 SR = 48000
 FRAME = int(SR * 0.2)
 FLOOR = -50.0

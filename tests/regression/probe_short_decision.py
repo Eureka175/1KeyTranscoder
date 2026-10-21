@@ -22,7 +22,7 @@ sys.path.insert(0, str(REPO))
 
 FFPROBE = REPO / "tools" / "ffprobe.exe"
 FFMPEG = REPO / "tools" / "ffmpeg.exe"
-PROOF = Path(r"F:\align_4ch_proof")
+PROOF = Path(r"F:\1KeyTranscoder\data\align_4ch_proof")
 WORK = Path(r"E:\1kt_scratch\short_geom")
 CLIPS = ["20260904_C1180", "20260904_C1202", "20260903_C1162",
          "20260904_C1197", "20260904_C1211"]

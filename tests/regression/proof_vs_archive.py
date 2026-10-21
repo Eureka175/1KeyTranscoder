@@ -53,7 +53,7 @@ def show(tag: str, p: Path) -> dict:
 def main() -> int:
     names = sys.argv[1:] or ["20260904_C1213"]
     for nm in names:
-        a = Path(r"F:\align_4ch_proof") / f"{nm}.MP4"
+        a = Path(r"F:\1KeyTranscoder\data\align_4ch_proof") / f"{nm}.MP4"
         cands = list(Path("I:/").glob(f"*/{nm}.MP4"))
         cands = [c for c in cands if "compact" not in str(c)]
         if not a.is_file():

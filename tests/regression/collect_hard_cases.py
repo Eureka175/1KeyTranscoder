@@ -23,7 +23,7 @@ from pathlib import Path
 OUT = Path(r"F:\1KeyTranscoder\work\regression_r087\out")
 ARM = OUT / "ARCH_on5.json"
 DELIVERED = OUT  # 已交付的 13 件(名字)从 I:\\repaired 目录取
-DEST = Path(r"F:\难对齐素材")
+DEST = Path(r"F:\1KeyTranscoder\data\hard_cases")
 EXCLUDE_NAMES = {"20260919_C1305.MP4", "20260919_C1306.MP4"}
 SR = 48000
 MIN_SAMPLES = 5

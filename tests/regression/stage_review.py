@@ -16,7 +16,7 @@ import shutil
 from pathlib import Path
 
 SRC = Path(r"I:\repaired")
-DST = Path(r"F:\对齐复核")
+DST = Path(r"F:\1KeyTranscoder\data\review")
 REP = SRC / "_rep"
 MIN_SAMPLES = 5
 SR = 48000

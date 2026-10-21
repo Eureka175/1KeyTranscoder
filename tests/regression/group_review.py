@@ -15,7 +15,7 @@ import json
 import os
 from pathlib import Path
 
-DST = Path(r"F:\对齐复核")
+DST = Path(r"F:\1KeyTranscoder\data\review")
 REPORT = Path(r"E:\1kt_scratch\aud04\archive-repair-report.json")
 GROUP = "全轨已对齐"
 

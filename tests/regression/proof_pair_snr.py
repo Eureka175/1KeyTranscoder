@@ -27,7 +27,7 @@ from core.channel_sync import effective_opts  # noqa: E402
 from core.sync_estimate import open_source, sample_pair_snr  # noqa: E402
 
 CACHE = Path(r"E:\1kt_scratch\pcm")
-PROOF = Path(r"F:\align_4ch_proof")
+PROOF = Path(r"F:\1KeyTranscoder\data\align_4ch_proof")
 SR = 48000
 THRESHOLD = 1.3
 
