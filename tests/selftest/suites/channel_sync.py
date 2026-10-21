@@ -1105,3 +1105,31 @@ def l1_recheck_knobs() -> None:
         _near = _case(900, 901)
         record("p13y.差 1 采样在容差内 -> 放行 (粗护栏, 不替代精测)",
                _near is None, str(_near))
+
+    # --- 材料性判据 (2026-10-21): 修正值不值得做 ---
+    record("p14a.materiality_k 默认 0.0 (关闭)",
+           cs.DEFAULTS["materiality_k"] == 0.0)
+    record("p14b.materiality_k 在 _FLOAT_KEYS 里",
+           "materiality_k" in cs._FLOAT_KEYS)
+    record("p14c.k<=0 -> 不接受 (关闭时与旧实现一致)",
+           cs.materiality_accepts(1150, 1.553, sr, k=0.0) is None)
+    _m = cs.materiality_accepts(1150, 1.553, sr, k=3.0)
+    record("p14d.15.4 倍比值 -> 接受并给出证据",
+           _m is not None and abs(_m["ratio"] - 15.427) < 0.01,
+           str(_m and round(_m["ratio"], 3)))
+    record("p14e.2 倍比值 -> 不接受 (不足 k 倍)",
+           cs.materiality_accepts(1150, 11.0, sr, k=3.0) is None)
+    record("p14f.位移为 nan -> 不接受 (不可判定不当 0)",
+           cs.materiality_accepts(1150, float("nan"), sr, k=3.0) is None)
+    record("p14g.位移为 0 -> 比值 inf, 接受",
+           (lambda r: r is not None and r["ratio"] == float("inf"))(
+               cs.materiality_accepts(1150, 0.0, sr, k=3.0)))
+    # 30 ms 偏差 vs 10 ms 位移 = 恰好 3 倍: 1440 采样 @48 kHz
+    _b = cs.materiality_accepts(1440.0, 10.0, sr, k=3.0)
+    record("p14h.恰好等于 k 倍 -> 接受 (边界含等号)",
+           _b is not None and abs(_b["ratio"] - 3.0) < 1e-9,
+           str(_b and _b["ratio"]))
+    record("p14i.字符串 k 可被归一 (CLI 传参路径)",
+           cs.materiality_accepts(1150, 1.553, sr, k="3") is not None)
+    record("p14j.effective_opts 归一 materiality_k=3",
+           cs.effective_opts({"materiality_k": "3"})["materiality_k"] == 3.0)

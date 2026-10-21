@@ -147,6 +147,19 @@ DEFAULTS: dict[str, Any] = {
     # `C1167 CH2` 与 `C1267 CH1` 的移位值与独立测量差 5–6 采样 ——
     # 数据写对了、数值是错的。残差门看不出来, 两条独立估计的一致性才看得出来。
     "verify_agree_samples": 0,
+    # 材料性判据 (2026-10-21): 0 = 关闭 (旧行为)。
+    #
+    # 恒定性不通过的轨, 只要 `|delay| >= materiality_k × 实测稳健位移`,
+    # 就按可修处理。依据是"修正前后的误差比较": 整数移位后的残余上界是实测
+    # 位移, 而拒绝留下的误差是 |delay|; 两者相差 k 倍以上时修正显然更优。
+    #
+    # 实测依据 (2026-10-21, `F:\align_4ch_proof` 的 4ch 有效原始文件):
+    # 47 条被拒且偏差 >= 5 采样的轨里, **39 条 (83%)** 有 SNR>=1.3 的可对齐
+    # 伙伴、可用帧中位 58 —— 它们不缺数据、不缺相关性, 只是被恒定性门拦下。
+    # 归档全量口径下, 这类轨的稳健位移中位 1.553 ms 而偏差中位 23.95 ms
+    # (比值 15×), 取 k=3 可放行而残余上界仅 0.78 ms。
+    # 全范围(离群)门不需要单独调系数 —— 它拦下的那 20 条同样满足本判据。
+    "materiality_k": 0.0,
     "aligned_max_ms": 0.05,              # 全部通道 |delay| 低于此值 -> already_aligned
     # 修正的**最小幅度** (整数样本)。|shift| <= 此值的轨一律判 already_aligned,
     # 不做写入。"5 sample 以内都不修"是明确的产品决定, 不是阈值微调:
@@ -230,7 +243,7 @@ _FLOAT_KEYS = ("min_audio_seconds", "silent_rms_dbfs", "search_window_ms",
                "anchor_segment_seconds",
                "min_confidence", "min_usable_fraction", "mad_max_ms",
                "step_min_ms", "constant_max_ppm", "drift_min_ms",
-               "verify_max_ms", "verify_max_rel",
+               "verify_max_ms", "verify_max_rel", "materiality_k",
                "aligned_max_ms", "fix_chunk_seconds", "frame_min_rms_dbfs",
                "group_snr_threshold")
 _LIST_INT_KEYS = ("supported_sample_rates", "anchor_candidates")
@@ -771,6 +784,53 @@ def resolve_accurate_tier(
     return min_shift_samples, set(), dropped
 
 
+def materiality_accepts(
+    delay_samples: float,
+    displacement_ms: float,
+    sample_rate: int,
+    *,
+    k: float,
+) -> dict[str, Any] | None:
+    """材料性判据: 修正值不值得做?
+
+    `k <= 0` 时关闭 (返回 None, 行为与旧实现逐位一致)。
+
+    开启后, 恒定性不通过的轨只要满足
+
+        |delay| >= k × 实测稳健位移
+
+    就按"可修"处理。理由是**比较修正前后哪个误差更小**:
+    施加一个整数移位后, 残余的上界就是实测位移 (轨迹在该轨上的真实变化量);
+    而拒绝它留下的误差是 |delay| 本身。两者相差 k 倍以上时, 修显然更优 ——
+    拒绝等于"为了不引入 0.78 ms 而留下 24 ms"。
+
+    为什么用它替代"放宽离群门": 实测 80 条被拒轨里, 全范围门(离群)拦下 20 条、
+    稳健位移门拦下 36 条; 材料性判据对这两类给出**同一个**判断依据 (比值),
+    不需要再单独调全范围门的系数。`F:\\align_4ch_proof` 复核显示, 在 4ch 均有效
+    的素材上 83% 的未修轨属于"有共同内容、只是被判据拦下", 这条判据正对它们。
+
+    返回 None = 不接受; 否则返回证据 dict (供报告与复核引用)。
+    """
+    try:
+        kk = float(k)
+    except (TypeError, ValueError):
+        return None
+    if not (kk > 0.0):
+        return None
+    if delay_samples != delay_samples or displacement_ms != displacement_ms:
+        return None
+    delay_ms = abs(float(delay_samples)) * 1000.0 / float(sample_rate)
+    disp = abs(float(displacement_ms))
+    if delay_ms < kk * disp:
+        return None
+    return {
+        "k": kk,
+        "delay_ms": delay_ms,
+        "displacement_ms": disp,
+        "ratio": (delay_ms / disp) if disp > 0.0 else float("inf"),
+    }
+
+
 def _agree_with_independent_estimate(
     idx: int,
     est: Any,
@@ -1132,6 +1192,9 @@ def run_channel_sync(
         rms_of: dict[int, float | None] = {}
         rows: list[dict] = [plain_row(i, "untouched", None)
                             for i in range(n_tracks)]
+        #: 材料性判据放行的轨: {轨下标: 说明}。恒定性失败的轨如果满足
+        #: "偏差 >= k × 实测位移", 就按可修处理, 这里记下证据以便报告与复核。
+        materiality_note: dict[int, dict[str, Any]] = {}
         for i, a in enumerate(arrs):
             if a.shape[0] < min_samples:
                 health.append((False, "insufficient_frames", float("nan")))
@@ -1449,20 +1512,39 @@ def run_channel_sync(
             if reason_ is None:
                 if e.confidence < eff["min_confidence"]:
                     reason_ = "low_confidence"
-                elif not sync_estimate.classify_constant(
-                    stats, mad_max_ms=eff["mad_max_ms"],
-                    max_ppm=eff["constant_max_ppm"],
-                    sample_rate=sample_rate,
-                    drift_min_ms=eff["drift_min_ms"],
-                    displacement_ms=sync_estimate.measured_displacement_ms(
-                        e.frames, sample_rate),
-                ):
-                    reason_ = "non_constant"
-                elif e.delay_samples != e.delay_samples:
-                    reason_ = "low_confidence"
-                elif abs(e.delay_samples) > search_samples:
-                    reason_ = "out_of_range"
                 else:
+                    disp_ms = sync_estimate.measured_displacement_ms(
+                        e.frames, sample_rate)
+                    if not sync_estimate.classify_constant(
+                        stats, mad_max_ms=eff["mad_max_ms"],
+                        max_ppm=eff["constant_max_ppm"],
+                        sample_rate=sample_rate,
+                        drift_min_ms=eff["drift_min_ms"],
+                        displacement_ms=disp_ms,
+                    ):
+                        # 恒定性不通过。**材料性判据**可以替它放行:
+                        # 如果修正能去掉的偏差 >= k × 修正后仍然存在的变化,
+                        # 那么"不恒定"就不是拒绝的理由 —— 拒绝等于为了
+                        # 不引入 0.78 ms 而留下 24 ms。
+                        mat = materiality_accepts(
+                            e.delay_samples, disp_ms, sample_rate,
+                            k=eff["materiality_k"])
+                        if mat is None:
+                            reason_ = "non_constant"
+                        else:
+                            materiality_note[i] = mat
+                            log(
+                                f"channel-sync: CH{i + 1} 非恒定但满足材料性: "
+                                f"偏差 {mat['delay_ms']:.2f}ms >= "
+                                f"{mat['k']:g} × 实测位移 "
+                                f"{mat['displacement_ms']:.3f}ms "
+                                f"(比值 {mat['ratio']:.1f}) — 按可修处理"
+                            )
+                if reason_ is None and e.delay_samples != e.delay_samples:
+                    reason_ = "low_confidence"
+                elif reason_ is None and abs(e.delay_samples) > search_samples:
+                    reason_ = "out_of_range"
+                elif reason_ is None:
                     # P4.2 最终采纳门: 被采纳的估计必须过证据门。旧实现在这里
                     # 只看置信度/恒定性/范围, 覆盖率**不再检查**, 因此一条
                     # coverage 不足的宽窗可以被写成 fixed/SUCCESS。
@@ -1525,6 +1607,10 @@ def run_channel_sync(
             rows[i]["rms_dbfs"] = (
                 round(rms_of[i], 1) if rms_of.get(i) is not None else None
             )
+            # 材料性判据放行的轨: 把证据挂到行上。报告与复核必须能看出
+            # "这条轨其实不恒定, 是按材料性放行的", 不能只留一个 fixed。
+            if i in materiality_note:
+                rows[i]["materiality"] = materiality_note[i]
             return decision, e, ev
 
         # 主路径: 相对主锚点逐轨决策。这一段与"分组锚点"引入前逐字节相同。
@@ -1784,6 +1870,13 @@ def run_channel_sync(
                 limit = eff["verify_max_ms"]
                 if eff["verify_max_rel"] > 0.0:
                     limit = max(limit, delay_ms_here * eff["verify_max_rel"])
+                # 材料性放行的轨: 一个整数移位**不可能**把非恒定偏移抹平,
+                # 它的物理极限就是该轨的实测位移。用 0.05 ms 或 20% 去卡它,
+                # 等于要求做不到的事, 于是又回到"测量成功却主动丢弃"。
+                # 因此这类轨的验收上界取 max(现有门, 实测位移)。
+                mat_note = materiality_note.get(i)
+                if mat_note:
+                    limit = max(limit, float(mat_note["displacement_ms"]))
                 windows = max(1, int(eff["recheck_windows"]))
                 if windows > 1:
                     wr = sync_fix.recheck_residual_windows(
@@ -1836,7 +1929,9 @@ def run_channel_sync(
                 e.delay_samples - float(shift), 3
             )
             log(f"channel-sync: fixed CH{i + 1} "
-                f"(shift {shift} samples, 复检残差 {residual:+.4f}ms)")
+                f"(shift {shift} samples, 复检残差 {residual:+.4f}ms"
+                + (f", 材料性放行 上限 {limit:.4f}ms" if materiality_note.get(i)
+                   else "") + ")")
             fixed_ok.append(i)
             if (eff["channel_sync_accurate"]
                     and abs(shift) <= eff["min_shift_samples"]):

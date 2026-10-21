@@ -43,20 +43,34 @@ VARIANTS = [
     ("agree5", [("verify_agree_samples", "5")]),
     ("rel20agree5", [("verify_max_rel", "0.2"),
                      ("verify_agree_samples", "5")]),
+    # 阶段 1: 材料性判据 (2026-10-21)
+    ("mat3", [("materiality_k", "3")]),
+    ("mat3full", [("materiality_k", "3"), ("verify_max_rel", "0.2"),
+                  ("recheck_windows", "3"),
+                  ("verify_agree_samples", "5")]),
 ]
+
+
+def archive_roots() -> list[str]:
+    return [str(d) for d in sorted(Path("I:/").iterdir())
+            if d.is_dir() and len(d.name) == 8 and d.name.isdigit()]
 
 
 def main() -> int:
     only = sys.argv[1] if len(sys.argv) > 1 else ""
+    scope = sys.argv[2] if len(sys.argv) > 2 else "corpus"
+    roots = archive_roots() if scope == "archive" else []
     for tag, sets in VARIANTS:
         if only and tag != only:
             continue
-        out = OUT / f"G3_{tag}_corpus.json"
-        log = LOGS / f"G3_{tag}_corpus.log"
+        out = OUT / f"G3_{tag}_{scope}.json"
+        log = LOGS / f"G3_{tag}_{scope}.log"
         cmd = [sys.executable, str(CSRUN), "run", "--arm", f"g3{tag}",
                "--out", str(out), "--set", "group_anchor_enabled=1"]
         for k, v in sets:
             cmd += ["--set", f"{k}={v}"]
+        for r in roots:
+            cmd += ["--root", r]
         t0 = time.time()
         with log.open("w", encoding="utf-8", errors="replace") as fh:
             rc = subprocess.call(cmd, cwd=str(REPO), stdout=fh,
