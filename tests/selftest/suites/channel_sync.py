@@ -1053,3 +1053,55 @@ def l1_recheck_knobs() -> None:
     record("p13r.短片段多窗同样可测 (窗口收缩, 非 nan)",
            all(v == v for v in wr_short["values"]),
            f"values={wr_short['values']}")
+
+    # --- 第三道门: 独立预检估计必须与 shift 一致 (2026-10-20) ---
+    # 背景: 只放宽"残差"门会放行"数据写对、数值写错"的轨 —— 实测 `rel=0.2`
+    # 在语料上新增 4 条, 其中 `C1167 CH2`(shift −42/实测 −37) 与
+    # `C1267 CH1`(shift 1056/实测 1050) 属于这一类。残差门天生看不出来,
+    # 只有两条独立估计的一致性才看得出。
+    record("p13s.verify_agree_samples 默认 0 (关闭)",
+           cs.DEFAULTS["verify_agree_samples"] == 0)
+    record("p13t.verify_agree_samples 在 _INT_KEYS 里",
+           "verify_agree_samples" in cs._INT_KEYS)
+    record("p13u.estimate_disagreement 计入估计层失败原因",
+           "estimate_disagreement" in cs._ESTIMATION_FAIL_REASONS)
+    eff_a = cs.effective_opts({"verify_agree_samples": 2})
+    record("p13v.effective_opts 归一 verify_agree_samples 为 int",
+           eff_a["verify_agree_samples"] == 2
+           and isinstance(eff_a["verify_agree_samples"], int))
+
+    import tempfile
+
+    import numpy as _np
+
+    from core import sync_fix as _sf
+
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        _rng = _np.random.default_rng(11)
+        _ref = _rng.standard_normal(sr * 4).astype("float32")
+        (_td_ref := td / "ref.f32")
+        _ref.tofile(_td_ref)
+        eff_agree = cs.effective_opts({"verify_agree_samples": 2,
+                                      "recheck_windows": 1})
+
+        def _case(actual: int, claimed: int):
+            import types as _types
+            tgt = _np.concatenate([_np.zeros(actual), _ref])[:len(_ref)]
+            tp = td / f"t_{actual}_{claimed}.f32"
+            tgt.astype("float32").tofile(tp)
+            est = _types.SimpleNamespace(delay_ms=claimed * 1000.0 / sr)
+            return cs._agree_with_independent_estimate(
+                1, est, claimed, {0: _td_ref, 1: tp}, 0, 0, sr, "f32",
+                eff_agree)
+
+        _same = _case(900, 900)
+        record("p13w.独立估计与 shift 一致 -> 放行",
+               _same is None, str(_same))
+        _off = _case(900, 840)
+        record("p13x.独立估计差 60 采样 -> 拒绝并给出差值",
+               _off is not None and abs(_off["diff_samples"] - 60.0) <= 2.0,
+               str(_off and _off["diff_samples"]))
+        _near = _case(900, 901)
+        record("p13y.差 1 采样在容差内 -> 放行 (粗护栏, 不替代精测)",
+               _near is None, str(_near))

@@ -138,6 +138,15 @@ DEFAULTS: dict[str, Any] = {
     # 多个锚段, 取**最差**残差。为"偏移不是全片常数"的轨准备:
     # 实测 `C1179 CH1` 中部局部对齐、全片仍有 31.5 采样残差, 单窗会放过它。
     "recheck_windows": 1,
+    # 第三道门 (2026-10-20): **独立预检估计必须与施加的移位一致**。
+    # 0 = 关闭 (旧行为)。>0 时, 在施加移位**之前**用与生产估计器不同的一条
+    # 路径 (宽搜索窗 GCC + 相位斜率, 多窗取中位) 重新测一次这条轨的延迟,
+    # 若与 `shift` 相差超过该样本数, 判该轨不可信 -> untouched(
+    # reason=`estimate_disagreement`)。
+    # 为什么不能只靠"残差够小": 实测 `rel=0.2` 放行 4 条候选, 其中
+    # `C1167 CH2` 与 `C1267 CH1` 的移位值与独立测量差 5–6 采样 ——
+    # 数据写对了、数值是错的。残差门看不出来, 两条独立估计的一致性才看得出来。
+    "verify_agree_samples": 0,
     "aligned_max_ms": 0.05,              # 全部通道 |delay| 低于此值 -> already_aligned
     # 修正的**最小幅度** (整数样本)。|shift| <= 此值的轨一律判 already_aligned,
     # 不做写入。"5 sample 以内都不修"是明确的产品决定, 不是阈值微调:
@@ -208,7 +217,7 @@ DEFAULTS: dict[str, Any] = {
 
 _INT_KEYS = ("min_audio_streams", "coarse_rate", "min_usable_frames",
              "group_snr_samples", "group_snr_min_samples",
-             "min_shift_samples", "recheck_windows")
+             "min_shift_samples", "recheck_windows", "verify_agree_samples")
 #: **可为 None** 的整数键 (P4.6): None 是"未指定, 用上游具名默认常量", 与 0
 #: 不是一回事。它们不能进 `_INT_KEYS` —— `int(None)` 会抛错, 而
 #: `effective_opts` 的 except 会把**整份配置**回退成 DEFAULTS, 于是调用方写的
@@ -234,6 +243,8 @@ _BOOL_KEYS = ("channel_sync_transparent", "time_varying", "group_anchor_enabled"
 _ESTIMATION_FAIL_REASONS = frozenset({
     "insufficient_frames", "low_confidence", "non_constant",
     "out_of_range", "recheck_residual",
+    # 2026-10-20: 两条独立估计不一致 —— 值本身就是可疑的, 与"没测出来"同类。
+    "estimate_disagreement",
     # P4.2: 证据覆盖率不足 = 估计层未通过证据门 (与 low_confidence 同类,
     # 文件级判定同样算作"该 target 未测出").
     "evidence_insufficient",
@@ -758,6 +769,75 @@ def resolve_accurate_tier(
     dropped = {i: f"residual {extras[i][1]:.2f} samples exceeds tier 2"
                for i in extras}
     return min_shift_samples, set(), dropped
+
+
+def _agree_with_independent_estimate(
+    idx: int,
+    est: Any,
+    shift: int,
+    decoded: dict[int, Path],
+    ref_idx: int,
+    anchor: int,
+    sample_rate: int,
+    storage_dtype: str,
+    eff: dict[str, Any],
+) -> dict[str, Any] | None:
+    """第三道门: 用**另一条估计路径**复核 `shift`, 不一致则返回详情。
+
+    返回值 None = 一致 (放行); dict = 不一致 (调用方把该轨退回 untouched)。
+
+    为什么需要它 (实测 2026-10-20): 只放宽"残差"门会放行四类轨里的两类坏样本 ——
+    `rel=0.2` 在语料上新增 4 条, 其中 `C1167 CH2` (shift −42, 实测 −37) 与
+    `C1267 CH1` (shift 1056, 实测 1050) **数据写对了、数值是错的**。
+    残差门天生看不出这种错: 移位是按错误值施加的, 复检量到的"残余"当然小。
+    只有"两条独立估计彼此一致"能识别它。
+
+    这里的独立路径是: 宽搜索窗 (±|delay|+10 ms) 整段 GCC-PHAT + 相位斜率精估,
+    沿片长取 `recheck_windows` 个窗, 取**中位**作为独立估计。它与生产估计器
+    (逐帧窄窗 GCC + 轨迹统计) 的窗口、统计量和搜索范围都不同。
+    """
+    wide_ms = min(float(eff["wide_search_ms"]),
+                  abs(float(est.delay_ms)) + 10.0)
+    if wide_ms <= 0.0:
+        return None
+    # `sync_fix` 在生产代码里是**函数内惰性导入** (`run_channel_sync` 里
+    # `from . import sync_estimate, sync_fix`), 模块层没有这个名字。
+    # 这里必须自己导入: 否则 NameError 会被下面的宽 except 吞掉, 门永远返回
+    # "一致" —— 一个"跑起来不报错、结果永远放行"的静默缺陷。
+    from . import sync_fix as _sf
+
+    try:
+        pre = _sf.recheck_residual_windows(
+            decoded[ref_idx], decoded[idx],
+            sample_rate=sample_rate,
+            storage_dtype=storage_dtype,
+            windows=max(1, int(eff["recheck_windows"])),
+            search_ms=wide_ms,
+            anchor_segment_seconds=eff["anchor_segment_seconds"],
+            fine_phase_band_hz=tuple(eff["fine_phase_band_hz"]),
+        )
+    except Exception:                     # noqa: BLE001 — 测不出就当一致
+        # 独立路径本身失败时**不能**据此拒绝: 那属于"证据不足", 由别的门负责。
+        # 这里只做加成性的复核, 不做否决权的扩张。
+        return None
+    vals = [v for v in pre["values"] if v == v]
+    if not vals:
+        # 独立路径测不出来: 不能因此拒绝 —— 那是"证据不足", 由别的门负责。
+        return None
+    ind_ms = float(sorted(vals)[len(vals) // 2])
+    ind_samples = ind_ms * sample_rate / 1000.0
+    diff = abs(ind_samples - float(shift))
+    if diff <= float(eff["verify_agree_samples"]):
+        return None
+    return {
+        "independent_ms": ind_ms,
+        "independent_samples": ind_samples,
+        "shift_samples": int(shift),
+        "diff_samples": diff,
+        "windows_ms": list(pre["values"]),
+        "search_ms": wide_ms,
+        "tolerance_samples": int(eff["verify_agree_samples"]),
+    }
 
 
 def run_channel_sync(
@@ -1640,6 +1720,30 @@ def run_channel_sync(
                         f"({tv_detail.get('reason')}) — 该轨 untouched")
                     continue
             else:
+                # 第三道门 (opt-in): 施加之前先用**另一条路径**独立测一次延迟,
+                # 与 `shift` 比对。生产估计器是逐帧 GCC + 轨迹统计; 这里用
+                # 宽搜索窗的整段 GCC + 相位斜率 (多窗取中位), 属于不同的
+                # 估计路径, 因此"两边一致"是有信息量的。
+                if eff["verify_agree_samples"] > 0:
+                    agree = _agree_with_independent_estimate(
+                        i, e, shift, decoded, ref_of.get(i, anchor), anchor,
+                        sample_rate, storage[i], eff,
+                    )
+                    if agree is not None:
+                        rows[i]["decision"] = "untouched"
+                        rows[i]["reason"] = "estimate_disagreement"
+                        rows[i]["shift_samples"] = None
+                        rows[i]["estimate_disagreement"] = agree
+                        log(
+                            f"channel-sync: WARNING CH{i + 1} 独立预检估计 "
+                            f"{agree['independent_ms']:+.3f}ms "
+                            f"({agree['independent_samples']:+.1f} 采样) 与 "
+                            f"shift {shift:+d} 相差 "
+                            f"{agree['diff_samples']:.1f} 采样 > "
+                            f"{eff['verify_agree_samples']} — 该轨不可信, "
+                            "untouched"
+                        )
+                        continue
                 try:
                     sync_fix.shift_stream(
                         arrs[i], fixed_raw[i],

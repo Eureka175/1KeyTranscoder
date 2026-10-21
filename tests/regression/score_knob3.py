@@ -18,7 +18,9 @@ from pathlib import Path
 OUT = Path(r"F:\1KeyTranscoder\work\regression_r087\out")
 BASE = "ARM5_on.json"
 ORDER = ["G3_ctl_corpus.json", "G3_rel20_corpus.json",
-         "G3_rel20win3_corpus.json", "G3_rel50win3_corpus.json"]
+         "G3_rel20win3_corpus.json", "G3_agree2_corpus.json",
+         "G3_full_corpus.json", "G3_agree5_corpus.json",
+         "G3_rel20agree5_corpus.json"]
 
 
 def allfix(name: str) -> dict[tuple[str, int], dict] | None:

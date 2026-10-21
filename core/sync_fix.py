@@ -146,18 +146,24 @@ def _recheck(
     # 读窗起点变成 -240 —— `read_f64` 把它钳到 0, 于是短片段实际退化成
     # "整片窗", 一直能测; 我上一版把这一步改成返回 nan, 结果所有短于 20 s 的
     # 片段复检全变 nan, 被当成"复检失败"退回, 一次性误杀 7 条已修好的轨。
-    # 正确做法是在**收缩锚段长度**的基础上保留搜索余量, 而不是放弃测量。
+    # 正确做法: 先收缩锚段长度让 2s 放得下, 再把窗口中心夹进 [s, span-s]。
+    # **不能只收缩搜索半径** —— 边窗的中心本来就贴边, 半径会被压到接近 0,
+    # 于是边窗永远测不出来 (实测: 3 窗里只有中间那窗有效)。
+    if n < 2 * s + 4096:
+        return float("nan")
     if anchor_len > n - 2 * s:
         anchor_len = n - 2 * s
     span = n - anchor_len
-    # `center_frac` 决定锚段落在片长上的位置 (0=片头, 0.5=中部, 1=片尾)。
-    # 0.5 必须**逐位复现**旧公式 `(n - anchor_len) // 2`。
+    lo, hi = s, span - s
+    if hi < lo:
+        return float("nan")
     if center_frac == 0.5:
         a0 = span // 2
     else:
         c = min(1.0, max(0.0, float(center_frac)))
-        a0 = min(max(int(round(span * c)), 0), span)
-    # 收缩 anchor_len 之后这两条恒成立; 留作断言式的防御, 不猜。
+        a0 = int(round(span * c))
+    a0 = min(max(a0, lo), hi)
+    # 夹过之后这两条恒成立; 留作防御, 越过界就不是"静默错数据"而是 nan。
     s = max(0, min(s, a0, n - anchor_len - a0))
     if s < 1:
         return float("nan")

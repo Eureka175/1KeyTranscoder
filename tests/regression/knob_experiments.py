@@ -35,7 +35,14 @@ VARIANTS = [
     ("ctl", []),                                    # 对照: 新代码 + 默认选项
     ("rel20", [("verify_max_rel", "0.2")]),
     ("rel20win3", [("verify_max_rel", "0.2"), ("recheck_windows", "3")]),
-    ("rel50win3", [("verify_max_rel", "0.5"), ("recheck_windows", "3")]),
+    ("agree2", [("verify_agree_samples", "2")]),
+    ("full", [("verify_max_rel", "0.2"), ("recheck_windows", "3"),
+              ("verify_agree_samples", "2")]),
+    # 实测独立估计的噪声底 ~4 采样, 容差 2 会误杀正确修正 (C1174 差 2.3)。
+    # 容差 5 是实测出来的可用工作点。
+    ("agree5", [("verify_agree_samples", "5")]),
+    ("rel20agree5", [("verify_max_rel", "0.2"),
+                     ("verify_agree_samples", "5")]),
 ]
 
 
