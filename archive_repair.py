@@ -926,7 +926,9 @@ def cmd_check(args: argparse.Namespace) -> int:
     files = iter_media(root, args.ext)
     if args.limit:
         files = files[: args.limit]
-    opts: dict[str, Any] = {}
+    from core.channel_sync import production_opts as _prod
+
+    opts: dict[str, Any] = _prod()
     if args.groups:
         opts["group_anchor_enabled"] = True
     if args.accurate:
@@ -979,7 +981,9 @@ def cmd_repair(args: argparse.Namespace) -> int:
         files = files[: args.limit]
     print(f"repair: {len(files)} 个候选文件 → {outp}", flush=True)
 
-    opts: dict[str, Any] = {}
+    from core.channel_sync import production_opts as _prod2
+
+    opts: dict[str, Any] = _prod2()
     if args.groups:
         opts["group_anchor_enabled"] = True
     if args.accurate:

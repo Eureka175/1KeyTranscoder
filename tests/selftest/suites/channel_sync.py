@@ -1176,3 +1176,27 @@ def l1_recheck_knobs() -> None:
            cs.compose_reference_shift(float("nan"), 10.0, sr) is None)
     record("p15f.非整数参考移位 -> None",
            cs.compose_reference_shift(10.0, 3.5, sr) is None)
+
+    # --- 生产工作点 (2026-10-22 合入) ---
+    record("p16a.PRODUCTION_OPTS 的键都在 DEFAULTS 里",
+           all(k in cs.DEFAULTS for k in cs.PRODUCTION_OPTS))
+    record("p16b.PRODUCTION_OPTS 含 track_reference=True",
+           cs.PRODUCTION_OPTS.get("track_reference") is True)
+    record("p16c.PRODUCTION_OPTS 含 materiality_k=3",
+           cs.PRODUCTION_OPTS.get("materiality_k") == 3.0)
+    _po = cs.production_opts()
+    record("p16d.production_opts() 而不改库默认",
+           _po["track_reference"] is True
+           and cs.DEFAULTS["track_reference"] is False)
+    record("p16e.调用方覆盖优先于 profile",
+           cs.production_opts({"track_reference": False})["track_reference"]
+           is False)
+    record("p16f.值为 None 的键不擦掉 profile",
+           cs.production_opts({"track_reference": None})["track_reference"]
+           is True)
+    _pe = cs.effective_opts(cs.production_opts())
+    record("p16g.effective_opts 归一后 profile 生效值正确",
+           _pe["materiality_k"] == 3.0 and _pe["verify_max_rel"] == 0.2
+           and _pe["recheck_windows"] == 3
+           and _pe["verify_agree_samples"] == 20
+           and _pe["track_reference"] is True)

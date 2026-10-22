@@ -1673,14 +1673,16 @@ def transparent_main(
         fresh=bool(args.fresh_log),
     )
 
-    # channel_sync 阈值: 优先 --config 里的 channel_sync 块, 加载失败用 DEFAULTS
-    channel_sync_opts = None
+    # channel_sync 阈值: 生产工作点作为基线, --config 的 channel_sync 块覆盖
+    from core.channel_sync import production_opts as _prod_opts
+
+    channel_sync_opts: dict[str, Any] | None = _prod_opts()
     try:
         config_path = resolve_config_file(
             script_dir, args.config, "x265.json"
         )
         cfg = load_json_file(config_path)
-        channel_sync_opts = (
+        channel_sync_opts = _prod_opts(
             cfg.get("channel_sync") if isinstance(cfg, dict) else None
         )
     except Exception as exc:
@@ -2123,7 +2125,10 @@ def main() -> int:
     quality_opts = (
         config.get("quality_check") if isinstance(config, dict) else None
     )
-    channel_sync_opts = (
+    # 生产工作点作为基线, config 文件的 channel_sync 块覆盖其上
+    from core.channel_sync import production_opts as _prod_opts2
+
+    channel_sync_opts = _prod_opts2(
         config.get("channel_sync") if isinstance(config, dict) else None
     )
     channel_sync_enabled = bool(

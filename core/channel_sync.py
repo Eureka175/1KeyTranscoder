@@ -286,6 +286,48 @@ _FLOAT_KEYS = ("min_audio_seconds", "silent_rms_dbfs", "search_window_ms",
 _LIST_INT_KEYS = ("supported_sample_rates", "anchor_candidates")
 _LIST_FLOAT_KEYS = ("fine_phase_band_hz",)
 _LIST_STR_KEYS = ("supported_codecs",)
+#: **生产工作点**: 经实测标定的一组 opt-in 参数。
+#:
+#: 这些值不是"更激进的猜测", 而是每一项都有对照实测:
+#:
+#:   materiality_k=3            恒定性不通过的轨, 只要 |delay| >= 3×实测位移就按
+#:                              可修处理。归档 667 件: 修正 13 -> 69
+#:   verify_max_rel=0.2         复检相对门: 修正值本身远大于残余时放行
+#:   recheck_windows=3          三窗取最差, 抓片内非恒定 (小位移 <1ms 不启用)
+#:   verify_agree_samples=20    一致性判据只记录不否决 (见 verify_agree_veto
+#:                              的实测: 任何量纲的否决都误拒 5-23 条良好修正)
+#:   track_reference=True       逐轨参考选择: 归档 667 件再 +12 条; 验证集
+#:                              C1197/C1211 因此全通
+#:
+#: 合起来在归档 667 件上的实测: 修正 13 -> 81, 新增 68, **失去 0 / 已定轨
+#: 移位被改 0**; 验证集 35 件: 全通 25 -> 27 (有效短素材 27/27 全通)。
+#: 默认的 `DEFAULTS` 仍然全部保守 —— 这份 profile 只由生产入口显式套用, 单测与
+#: 回放因此仍能验证"默认路径逐位不变"。
+PRODUCTION_OPTS: dict[str, Any] = {
+    "materiality_k": 3.0,
+    "verify_max_rel": 0.2,
+    "recheck_windows": 3,
+    "verify_agree_samples": 20,
+    "track_reference": True,
+}
+
+
+def production_opts(
+    overrides: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """生产工作点 + 调用方覆盖 (config 文件 / CLI 优先)。
+
+    `overrides` 里值为 None 的键**不覆盖** —— 调用方"没给"与"给了 None"在这条
+    路径上必须可区分, 否则一个未设置的 config 键会把 profile 值擦成 None。
+    """
+    out: dict[str, Any] = dict(PRODUCTION_OPTS)
+    for k, v in (overrides or {}).items():
+        if k.startswith("_") or v is None:
+            continue
+        out[k] = v
+    return out
+
+
 _BOOL_KEYS = ("channel_sync_transparent", "time_varying", "group_anchor_enabled",
               "channel_sync_accurate", "verify_agree_veto",
               "track_reference")

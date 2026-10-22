@@ -456,3 +456,54 @@ limit = max(verify_max_ms, 位移 + max(1 采样, 5% × 位移))
 排除 6 件（3 件废素材 + 2 条静音 CH2 + 1 件 0.50 s）后，**27 件有效短素材现在
 全部全通**；长镜头 2 件待逐窗修正（§12.3 已证可行）。
 
+---
+
+## 14 合入生产（2026-10-22）
+
+### 14.1 形态
+
+生产入口现在从 `core.channel_sync.PRODUCTION_OPTS` 起步，config 文件与 CLI
+覆盖其上；**库的 `DEFAULTS` 保持保守**，因此单测与回放仍能验证"默认路径逐位
+不变"。
+
+| 入口 | 位置 | 行为 |
+|---|---|---|
+| `1kt.py` 透明批量路径 | `transparent_main` | `production_opts(config['channel_sync'])` |
+| `1kt.py` 编码主路径 | `main` | 同上 |
+| `archive_repair.py check` | `cmd_check` | `production_opts()` + `--opt` 覆盖 |
+| `archive_repair.py repair` | `cmd_repair` | 同上 |
+
+配置里加载失败时**仍用 profile**（不是 DEFAULTS）—— 否则一次配置读取失败就会
+把生产悄悄退回旧行为。
+
+### 14.2 工作点内容与依据
+
+| 键 | 值 | 依据 |
+|---|---|---|
+| `materiality_k` | 3.0 | 归档 667 件: 修正 13 → 69 |
+| `verify_max_rel` | 0.2 | 修正值远大于残余时放行 |
+| `recheck_windows` | 3 | 三窗取最差抓片内非恒定（小位移 <1 ms 不启用） |
+| `verify_agree_samples` | 20 | 一致性判据只记录不否决（否决会误拒 5–23 条良好修正） |
+| `track_reference` | True | 逐轨参考选择: 归档再 +12；验证集 `C1197`/`C1211` 全通 |
+
+合起来在归档 667 件上的实测：**修正 13 → 81，新增 68，失去 0，已定轨移位被改 0**；
+新增里 63 良好 / 3 不良 / 2 不可核验。验证集 35 件：全通 25 → 27，有效短素材
+**27/27 全通**。
+
+### 14.3 如何回退/覆盖
+
+* 单个文件/批次：config 文件的 `channel_sync` 块写同名键（优先于 profile）。
+* 临时实验：`archive_repair.py check/repair --opt track_reference=0` 等。
+* 想完全回到旧行为：`--opt materiality_k=0 --opt verify_max_rel=0
+  --opt recheck_windows=1 --opt verify_agree_samples=0 --opt track_reference=0`
+  —— 与历史 `DEFAULTS` 逐位一致。
+
+### 14.4 验收
+
+| 项 | 结果 |
+|---|---|
+| L1 | **921 PASS / 0 FAIL**（+7 条：profile 键合法性、覆盖优先、None 不擦值、归一后生效值） |
+| 默认路径中性 | 验证集 140 轨记录改前/改后**差异 0 条** |
+| 生产入口实测 | `archive_repair.py check` 打印 `opts={'materiality_k': 3.0, ...}` 并套用 |
+| 单文件检查 | `C1159` 报 `AUD-03 FAIL`（该源确实需要修, `AUD-01 status=applied`、`AUD-02` 显示 CH1/CH2 待修）—— 口径正确，不是回归 |
+
