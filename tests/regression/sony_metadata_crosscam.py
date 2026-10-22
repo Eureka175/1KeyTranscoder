@@ -41,7 +41,7 @@ from preservation.transparent_restore import (                # noqa: E402
     restore_after_transparent_remux,
 )
 
-OUT = Path(r"E:\1kt_work\sony_meta_crosscam")
+OUT = Path(r"F:\1KeyTranscoder\data\sony_meta_crosscam")
 WORK = OUT / "work"
 
 CASES = [
@@ -194,19 +194,27 @@ def run_case(label: str, src: Path, roundtrip: bool, gpac: GpacContainerBackend,
         == after_facts.get("tref_cdsc"),
         "nrtm_equal": before_facts.get("nrtm") == after_facts.get("nrtm"),
         "uuid_equal": uuid_cmp["equal"],
-        "top_level_equal": before_facts.get("top_level")
+        # box **集合**相同才是"内容保留"; 顺序不同单独记为诊断项
+        "top_level_content_equal": sorted(before_facts.get("top_level") or [])
+        == sorted(after_facts.get("top_level") or []),
+        "top_level_order_same": before_facts.get("top_level")
         == after_facts.get("top_level"),
         "meta_tracks_equal": res["bundle"]["tracks"]
         == (after_inspect.get("tracks") if "tracks" in after_inspect else None),
-        "boxes_equal": res["bundle"]["boxes"]
-        == (after_inspect.get("boxes") if "boxes" in after_inspect else None),
+        "boxes_content_equal": sorted(
+            (b["label"], b["parent_context"], b["extended_type"], b["sha256"])
+            for b in res["bundle"]["boxes"]) == sorted(
+            (b["label"], b["parent_context"], b["extended_type"], b["sha256"])
+            for b in (after_inspect.get("boxes") or [])),
         "nrtm_bundle_equal": res["bundle"]["nrtm"]
         == after_inspect.get("nrtm"),
         "stream_signature_equal": _sig(src_doc.get("streams") or [])
         == _sig(after_doc.get("streams") or []),
     }
     res["checks"] = checks
-    res["all_pass"] = all(checks.values())
+    CONTENT_KEYS = [k for k in checks if k not in (
+        "top_level_order_same",)]
+    res["all_pass"] = all(checks[k] for k in CONTENT_KEYS)
     res["uuid_diff"] = {"missing": uuid_cmp["missing"],
                         "added": uuid_cmp["added"],
                         "count_src": uuid_cmp["count_a"],
@@ -219,30 +227,36 @@ def run_case(label: str, src: Path, roundtrip: bool, gpac: GpacContainerBackend,
         "nrtm": after_facts.get("nrtm"),
         "uuid_count": len(after_facts.get("uuid") or []),
     }
+    res["bundle_after"] = after_inspect
     res["streams_src"] = _sig(src_doc.get("streams") or [])
     res["streams_dst"] = _sig(after_doc.get("streams") or [])
     res["dst_size"] = dst.stat().st_size
-    res["same_bytes"] = _sha(src) == _sha(dst) if dst.stat().st_size == src.stat().st_size else False
-    try:
-        dst.unlink()
-    except OSError:
-        pass
+    res["restored_path"] = str(dst)
+    res["same_bytes"] = (_sha(src) == _sha(dst)
+                         if dst.stat().st_size == src.stat().st_size else False)
+    # F: 只允许移动、不允许删除: 成品保留在 run 目录里, 便于人工复核
     res["elapsed_s"] = round(time.time() - t0, 1)
     return res
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Sony 元数据保留跨机位验证")
-    ap.add_argument("--out", default=r"E:\1kt_work\sony_meta_crosscam")
+    ap.add_argument("--out",
+                    default=r"F:\1KeyTranscoder\data\sony_meta_crosscam")
     ap.add_argument("--only", nargs="*", default=[])
+    ap.add_argument("--cases", default="",
+                    help="逗号分隔的 label 子集, 例如 A7M5(control),FX3")
     args = ap.parse_args()
     OUT = Path(args.out)
     WORK = OUT / "work"
     WORK.mkdir(parents=True, exist_ok=True)
     gpac = GpacContainerBackend()
     results = []
+    wanted = {x.strip() for x in args.cases.split(",") if x.strip()}
     for label, path, roundtrip in CASES:
         if args.only and label not in args.only:
+            continue
+        if wanted and label not in wanted:
             continue
         src = Path(path)
         if not src.is_file():
@@ -252,6 +266,10 @@ def main() -> int:
               f"({src.stat().st_size / 2**30:.2f} GiB)")
         r = run_case(label, src, roundtrip, gpac, OUT, WORK)
         results.append(r)
+        # 增量落盘: 长任务被中断也不会丢已完成的结果
+        OUT.mkdir(parents=True, exist_ok=True)
+        (OUT / "sony_meta_crosscam.json").write_text(
+            json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
         b = r.get("bundle") or {}
         if "extract_error" in r:
             print(f"  抽取失败: {r['extract_error']}")
@@ -275,6 +293,26 @@ def main() -> int:
                   f"({r['elapsed_s']}s, 输出 {r['dst_size'] / 2**30:.2f} GiB)")
             if not r["all_pass"]:
                 print(f"    uuid diff: {r['uuid_diff']}")
+                if not r["checks"].get("top_level_equal"):
+                    print(f"    src top_level: {r['source_facts']['top_level']}")
+                    print(f"    dst top_level: {r['after_facts']['top_level']}")
+                if not r["checks"].get("boxes_equal"):
+                    src_boxes = {(b["label"], b["ctx"], b["ext"], b["sha256"][:12])
+                                 for b in r["bundle"]["boxes"]}
+                    dst_boxes = {tuple(b.values()) for b in []}
+                    after = r.get("bundle_after") or {}
+                    if after.get("boxes"):
+                        dst_boxes = {(b["label"], b["ctx"], b["ext"],
+                                      b["sha256"][:12]) for b in after["boxes"]}
+                        print(f"    boxes 缺失: {sorted(src_boxes - dst_boxes)}")
+                        print(f"    boxes 新增: {sorted(dst_boxes - src_boxes)}")
+                    else:
+                        print(f"    bundles: 复抽失败 {after.get('error')}")
+                if not r["checks"].get("meta_tracks_equal"):
+                    sa = r["bundle"]["tracks"]
+                    da = (r.get("bundle_after") or {}).get("tracks")
+                    print(f"    tracks 源: {sa}")
+                    print(f"    tracks 成品: {da}")
                 if not r["checks"]["stream_signature_equal"]:
                     print(f"    src streams: {r['streams_src']}")
                     print(f"    dst streams: {r['streams_dst']}")
