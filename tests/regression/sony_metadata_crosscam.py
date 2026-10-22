@@ -50,7 +50,7 @@ CASES = [
     ("A7M4", r"F:\1KeyTranscoder\data\_from_I\2026.09.24\A7M4\C0147.MP4", True),
     ("FX3", r"F:\1KeyTranscoder\data\_from_I\2026.09.24\FX3\C0513.MP4", True),
     ("FX30", r"F:\1KeyTranscoder\data\_from_I\2026.09.24\FX30\20260922_fx30_2_9757.MP4", True),
-    ("HXR-NX800", r"F:\1KeyTranscoder\data\_from_I\2026.09.24\HXR-NX800\CA0230.MP4", False),
+    ("HXR-NX800", r"F:\1KeyTranscoder\data\_from_I\2026.09.24\HXR-NX800\CA0230.MP4", True),
     ("Mavic4P(DJI)", r"F:\1KeyTranscoder\data\_from_I\2026.09.24\Mavic4P\DJI_20260921164928_0296_D.MP4", False),
 ]
 
@@ -241,6 +241,8 @@ def run_case(label: str, src: Path, roundtrip: bool, gpac: GpacContainerBackend,
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Sony 元数据保留跨机位验证")
+    ap.add_argument("--scratch-root", default="",
+                    help="work 目录根 (默认 <out>/work); 大文件往返建议放 E:")
     ap.add_argument("--out",
                     default=r"F:\1KeyTranscoder\data\sony_meta_crosscam")
     ap.add_argument("--only", nargs="*", default=[])
@@ -248,7 +250,7 @@ def main() -> int:
                     help="逗号分隔的 label 子集, 例如 A7M5(control),FX3")
     args = ap.parse_args()
     OUT = Path(args.out)
-    WORK = OUT / "work"
+    WORK = Path(args.scratch_root) if args.scratch_root else OUT / "work"
     WORK.mkdir(parents=True, exist_ok=True)
     gpac = GpacContainerBackend()
     results = []
