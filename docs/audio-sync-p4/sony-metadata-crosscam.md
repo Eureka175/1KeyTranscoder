@@ -96,3 +96,9 @@ preservation.gyroflow.check 分别从**源**与**恢复后的成品**导出，�
   把 TEMP/TMP 指到 E: 后重跑，	ransparent_stage.mov 已生成 41.14 GiB，正在做元数据轨重建。
 * 结论不受影响：其余四台机位在 bundle 与消费方两层都已闭环。
 
+
+### 中止原因与恢复方式
+
+* 2026-10-23 约 01:10，因机器必须在 01:30 前进入休眠，主动终止该往返（已跑约 70 分钟，停在 GPAC 对 41 GiB stage 的元数据轨重建阶段）。
+* 已保留证据：抽取结果完整（rtmd 84480 样本 × 11264 B、uuid 8 个、nrtm、brand XAVC、movie_ts 50000）；同系列 A7M4/FX3/FX30 已通过 bundle 与 Gyroflow 两层验证。
+* 恢复时注意：GPAC import 走系统临时目录，C: 只有约 31 GB，必须把 TEMP/TMP 指到 E:；命令见 tests/regression/sony_metadata_crosscam.py 的 --scratch-root 用法。
