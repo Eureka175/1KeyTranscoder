@@ -1016,7 +1016,7 @@ def main() -> int:
     ap.add_argument("--budget-minutes", type=float, default=180.0)
     ap.add_argument("--ext", default=".MP4")
     ap.add_argument("--only", nargs="*", default=[],
-                    help="只跑这些阶段: checks profile stereo pairs")
+                    help="只跑这些阶段: checks video profile stereo container pairs")
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--fresh", action="store_true")
     ap.add_argument("--video-window", type=float, default=120.0,
