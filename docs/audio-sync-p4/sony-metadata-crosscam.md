@@ -72,3 +72,27 @@ python tests\regression\finalise_sony_meta_crosscam.py               # 汇总表
 2. NX800 往返（41 GiB，需要 41 GiB 以上 scratch；可在 E: 恢复后做）。
 3. 把"内容一致 / 顺序不同"作为正式验收口径写进 `preservation` 的检查报告
    （`uuid_inventory_equal` 已按多重集判定，顶层 box 顺序应单列为 warning）。
+
+## 消费方验证（Gyroflow）—— 决定性证据
+
+preservation.gyroflow.check 分别从**源**与**恢复后的成品**导出，比较 Gyroflow 实际解析到的东西：
+
+| 机位 | IMU 样本（源 → 成品） | 机型识别 | 镜头型号 | 帧率/readout | 镜头 profile | 结论 |
+|---|---|---|---|---|---|---|
+| A7M5（对照） | 124124 → 124124 | ILCE-7M5 → ILCE-7M5 | 一致 | 一致 | True → True | **PASS**（mismatches 空） |
+| A7M4 | 771840 → 771840 | ILCE-7M4 → ILCE-7M4 | 一致 | 一致 | True → True | **PASS** |
+| FX3 | 28800 → 28800 | ILME-FX3 → ILME-FX3 | 一致 | 一致 | True → True | **PASS** |
+| FX30 | 73920 → 73920 | ILME-FX30 → ILME-FX30 | 一致 | 一致 | True → True | **PASS** |
+
+这正是当初的失败模式（元数据丢失时 Gyroflow 从 146146 IMU 样本掉到 0）：现在**四台机位全部 0 差异**。
+顶层 box 顺序的差异（GPAC 把 uuid 追加到末尾）**不影响消费方**。
+
+工具：D:\\Gyroflow-windows64\\Gyroflow.exe（preservation.gyroflow.find_gyroflow 找到）。
+
+## NX800 往返（41 GiB）状态
+
+* 抽取已验证：rtmd 84480 样本 × 11264 B、uuid 8 个、nrtm、brand XAVC、movie_ts 50000。
+* 往返在跑：GPAC 的 import 走系统临时目录，第一轮因 **C: 只剩 31 GB** 在 80%% 处 ENOSPC 失败；
+  把 TEMP/TMP 指到 E: 后重跑，	ransparent_stage.mov 已生成 41.14 GiB，正在做元数据轨重建。
+* 结论不受影响：其余四台机位在 bundle 与消费方两层都已闭环。
+
