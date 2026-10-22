@@ -47,11 +47,11 @@ WORK = OUT / "work"
 CASES = [
     # label, path, roundtrip?
     ("A7M5(control)", r"F:\1KeyTranscoder\data\align_4ch_proof\20260903_C1159.MP4", True),
-    ("A7M4", r"I:\2026.09.24\A7M4\C0147.MP4", True),
-    ("FX3", r"I:\2026.09.24\FX3\C0513.MP4", True),
-    ("FX30", r"I:\2026.09.24\FX30\20260922_fx30_2_9757.MP4", True),
-    ("HXR-NX800", r"I:\2026.09.24\HXR-NX800\CA0230.MP4", False),
-    ("Mavic4P(DJI)", r"I:\2026.09.24\Mavic4P\DJI_20260921164928_0296_D.MP4", False),
+    ("A7M4", r"F:\1KeyTranscoder\data\_from_I\2026.09.24\A7M4\C0147.MP4", True),
+    ("FX3", r"F:\1KeyTranscoder\data\_from_I\2026.09.24\FX3\C0513.MP4", True),
+    ("FX30", r"F:\1KeyTranscoder\data\_from_I\2026.09.24\FX30\20260922_fx30_2_9757.MP4", True),
+    ("HXR-NX800", r"F:\1KeyTranscoder\data\_from_I\2026.09.24\HXR-NX800\CA0230.MP4", False),
+    ("Mavic4P(DJI)", r"F:\1KeyTranscoder\data\_from_I\2026.09.24\Mavic4P\DJI_20260921164928_0296_D.MP4", False),
 ]
 
 STREAM_FIELDS = [
