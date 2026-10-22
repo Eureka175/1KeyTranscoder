@@ -1158,3 +1158,21 @@ def l1_recheck_knobs() -> None:
            _tol["tolerance_samples"] >= 24.0, str(_tol))
     record("p14p.相对项 = rel×|delay| = 0.02×1200 = 24 采样",
            abs(_tol["tolerance_samples"] - 24.0) < 1e-6, str(_tol))
+
+    # --- 逐轨参考选择 (2026-10-22) ---
+    record("p15a.track_reference 默认 False (关闭)",
+           cs.DEFAULTS["track_reference"] is False)
+    record("p15b.track_reference 在 _BOOL_KEYS 里",
+           "track_reference" in cs._BOOL_KEYS)
+    _cmp = cs.compose_reference_shift(324.5, 913.0, sr)
+    record("p15c.链式合成: 6.76ms + 913 采样 = 25.78ms",
+           _cmp is not None
+           and abs(_cmp["composed_ms"] - 25.78125) < 1e-6
+           and _cmp["reference_shift_samples"] == 913,
+           str(_cmp and round(_cmp["composed_ms"], 3)))
+    record("p15d.合成是加法 (符号约定与 shift_stream 一致)",
+           cs.compose_reference_shift(100.0, -100.0, sr)["composed_samples"] == 0)
+    record("p15e.非有限延迟 -> None (不可用不当 0)",
+           cs.compose_reference_shift(float("nan"), 10.0, sr) is None)
+    record("p15f.非整数参考移位 -> None",
+           cs.compose_reference_shift(10.0, 3.5, sr) is None)

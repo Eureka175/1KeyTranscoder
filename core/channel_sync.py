@@ -51,6 +51,7 @@ latency; 不同物理位置不禁止同步, 但相关性不足时安全放弃该
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 import json
 import math
@@ -169,6 +170,19 @@ DEFAULTS: dict[str, Any] = {
     # 估计的分歧主要来自**独立估计自身的方法偏差**, 而不是移位值错了。
     # 所以默认只记录 + 超阈警告, 否决权留给"修后残差"。
     "verify_agree_veto": False,
+    # 逐轨参考选择 (默认 False = 关闭, 行为与旧实现逐位一致)。
+    #
+    # 主锚点下测不出的轨, 换用其它已定位的轨当参考重测, 再把"相对参考的延迟"
+    # 合成为"相对主锚点的移位" (见 compose_reference_shift)。只在**主锚点下
+    # 已判 untouched 的轨**上动手, 且成功写回仍要过 decide_and_record 同一道
+    # 门 + 修后残差核验 (复检以主锚点为参照), 因此开关打开只可能多修, 不会
+    # 改掉任何已定的值。
+    #
+    # 依据: `F:\align_4ch_proof` 的有效素材里, CH1↔CH2 的 NCC 为 0.975–0.977
+    # (lag 离散 1 采样), 而生产固定用 CH3 当锚点时 C1211 的 CH1、C1197 的 CH2
+    # 覆盖率只有个位数。C1211 的链路 19.02+6.76 = 25.78 ms 与直接测量
+    # 25.4 ms 吻合, 说明合成方向与量值都对。
+    "track_reference": False,
     # 材料性判据 (2026-10-21): 0 = 关闭 (旧行为)。
     #
     # 恒定性不通过的轨, 只要 `|delay| >= materiality_k × 实测稳健位移`,
@@ -273,7 +287,8 @@ _LIST_INT_KEYS = ("supported_sample_rates", "anchor_candidates")
 _LIST_FLOAT_KEYS = ("fine_phase_band_hz",)
 _LIST_STR_KEYS = ("supported_codecs",)
 _BOOL_KEYS = ("channel_sync_transparent", "time_varying", "group_anchor_enabled",
-              "channel_sync_accurate", "verify_agree_veto")
+              "channel_sync_accurate", "verify_agree_veto",
+              "track_reference")
 
 # 参与"全部健康 target 均失败 -> 文件级 measure_failed" 判定的轨道级原因
 _ESTIMATION_FAIL_REASONS = frozenset({
@@ -805,6 +820,43 @@ def resolve_accurate_tier(
     dropped = {i: f"residual {extras[i][1]:.2f} samples exceeds tier 2"
                for i in extras}
     return min_shift_samples, set(), dropped
+
+
+def compose_reference_shift(
+    delay_vs_reference_samples: float,
+    reference_shift_samples: float,
+    sample_rate: int,
+) -> dict[str, Any] | None:
+    """把"相对某条参考轨的延迟"合成为"相对主锚点的绝对移位"。
+
+    符号约定与生产一致: `delay > 0` = 目标晚到, 施加的整数移位就是 delay 本身
+    (`sync_fix.shift_stream(out[n] = in[n + shift])`)。因此链式合成是**加法**:
+
+        shift(t) = shift(ref) + delay(t 相对 ref)
+
+    例: CH2 相对主锚点晚 +19.02 ms, CH1 相对 CH2 晚 +6.76 ms
+        -> CH1 相对主锚点晚 25.78 ms (与直接测 CH1↔锚点的 25.4 ms 一致)。
+
+    返回 None = 不可用 (非有限值/参考移位非整数)。返回 dict 供报告与复核引用;
+    组合值本身的正确性仍由修后残差核验 (拿主锚点做独立比对), 不靠这道算术自证。
+    """
+    try:
+        d = float(delay_vs_reference_samples)
+        r = float(reference_shift_samples)
+    except (TypeError, ValueError):
+        return None
+    if d != d or r != r:
+        return None
+    if int(r) != r:
+        return None
+    composed = d + r
+    return {
+        "delay_vs_reference_samples": d,
+        "delay_vs_reference_ms": d * 1000.0 / float(sample_rate),
+        "reference_shift_samples": int(r),
+        "composed_samples": composed,
+        "composed_ms": composed * 1000.0 / float(sample_rate),
+    }
 
 
 def materiality_accepts(
@@ -1708,6 +1760,177 @@ def run_channel_sync(
             if decision == "fixed":
                 to_fix.append(i)
 
+        # 4a. 逐轨参考选择 (opt-in, 默认关闭) —— **只对主锚点下没修成的轨**
+        #
+        # 4 声道素材常是两支互不相干的麦克风: CH1/CH2 近场一对, CH3/CH4 另一对。
+        # 主锚点固定为其中一条时, 另一组的轨可能"有共同内容却测不出"。这里让
+        # 这些轨换用**已定位**的轨当参考重测, 把相对延迟合成为绝对移位。
+        #
+        # 三条自我约束, 使打开开关在结构上不可能造成回归:
+        #   (a) 只碰主锚点下 decision == "untouched" 的轨 —— 已 fixed /
+        #       already_aligned 的轨原样保留, 绝不重测;
+        #   (b) 参考轨必须已经"定位"(锚点 / 已 fixed / 已 aligned), 否则合成
+        #       缺一项, 直接跳过;
+        #   (c) 写回仍走 `decide_and_record` 的同一份门逻辑, 且 step 6 的复检
+        #       以**主锚点**为参照 (ref_of[i] = anchor) —— 合成算术的正确性由
+        #       修后残差独立核验, 不靠这道算术自证。
+        reference_notes: dict[int, dict[str, Any]] = {}
+        #: 轨 -> 复检用的参考轨。**在 4a 之前初始化**: 换参考阶段就要写它
+        #: (复检以主锚点为参照), 而 4b 的分组层也共用这一份。
+        ref_of: dict[int, int] = {}
+
+        def _absolute_shift_of(r: int) -> int | None:
+            """已定位轨相对主锚点的整数移位 (与 step 5 的 rint 同口径)。"""
+            if r == anchor:
+                return 0
+            dec_r = rows[r].get("decision")
+            if dec_r == "already_aligned":
+                return 0
+            if dec_r != "fixed":
+                return None
+            e_r = used_est.get(r, ests.get(r))
+            if e_r is None:
+                return None
+            v = float(e_r.delay_samples)
+            return None if v != v else int(np.rint(v))
+
+        #: 换参考时的几何阶梯: 生产几何优先, 再退到更长的帧。
+        #:
+        #: 为什么需要它: 弱相关轨在 200 ms 帧下可能只有 1 个可用帧, 而 1 s 帧
+        #: 能凑到 6 个 (C1197 CH2 实测)。帧长只影响"证据够不够", 不影响移位
+        #: 语义; 采纳后仍由修后残差独立核验。阶梯有限, 不引入无界搜索。
+        _alt_geoms: list[tuple[float, float]] = [
+            (float(eff["frame_ms"]), float(eff["hop_ms"]))]
+        for _cand in ((500.0, 250.0), (1000.0, 500.0)):
+            if _cand != _alt_geoms[0]:
+                _alt_geoms.append(_cand)
+
+        def _est_pair_geom(ref_idx: int, tgt_idx: int,
+                           frame_ms: float, hop_ms: float) -> Any:
+            """与 `_est_pair` 相同, 但可指定帧几何 (换参考的几何阶梯用)。"""
+            return sync_estimate.estimate_pair(
+                decoded[ref_idx], decoded[tgt_idx],
+                storage_dtype=storage[tgt_idx],
+                ref_index=ref_idx, tgt_index=tgt_idx,
+                workers=_est_workers,
+                **dict(est_kwargs, frame_ms=frame_ms, hop_ms=hop_ms),
+            )
+
+        def try_alternate_reference(i: int, round_no: int) -> bool:
+            saved_row = dict(rows[i])
+            best: tuple | None = None
+            tried = 0
+            for r in healthy:
+                if r == i or r == anchor:
+                    continue
+                ref_shift = _absolute_shift_of(r)
+                if ref_shift is None:
+                    continue
+                for frame_ms, hop_ms in _alt_geoms:
+                    try:
+                        e = _est_pair_geom(r, i, frame_ms, hop_ms)
+                    except Exception as exc:    # noqa: BLE001
+                        log(f"channel-sync: CH{i + 1} 参考 CH{r + 1} "
+                            f"({frame_ms:.0f}ms) 复测失败: "
+                            f"{type(exc).__name__}")
+                        continue
+                    tried += 1
+                    ev = evidence_of_est(e)
+                    ok, _why = evidence_ok(ev)
+                    if not ok:
+                        continue
+                stats = sync_estimate.summarize_trajectory(e.frames, sample_rate)
+                disp = sync_estimate.measured_displacement_ms(
+                    e.frames, sample_rate)
+                const = bool(sync_estimate.classify_constant(
+                    stats, mad_max_ms=eff["mad_max_ms"],
+                    max_ppm=eff["constant_max_ppm"],
+                    sample_rate=sample_rate,
+                    drift_min_ms=eff["drift_min_ms"],
+                    displacement_ms=disp))
+                composed = float(e.delay_samples) + float(ref_shift)
+                if not const:
+                    # 非恒定: 用材料性判据比较"合成后能去掉的偏差"与"残余上界"
+                    if materiality_accepts(
+                        composed, disp, sample_rate,
+                        k=eff["materiality_k"],
+                    ) is None:
+                        continue
+                if abs(composed) > search_samples:
+                    continue
+                score = (1 if const else 0, int(e.usable_frames),
+                         float(e.confidence))
+                if best is None or score > best[0]:
+                    best = (score, r, e, composed, ev, const, float(disp),
+                            int(ref_shift), frame_ms, hop_ms)
+            if best is None:
+                if tried:
+                    log(f"channel-sync: CH{i + 1} 换参考无改进 "
+                        f"({tried} 个参考×几何组合均未过证据门)")
+                return False
+            (_score, r, e, composed, _ev, const, disp, ref_shift,
+             frame_ms, hop_ms) = best
+            e_comp = dataclasses.replace(
+                e,
+                delay_samples=composed,
+                delay_ms=composed * 1000.0 / float(sample_rate),
+            )
+            dec, e_used, _ev2 = decide_and_record(i, e_comp, anchor)
+            if dec not in ("fixed", "already_aligned"):
+                rows[i] = saved_row        # 保留主锚点下更具体的原因
+                return False
+            ests[i] = e_comp
+            if e_used is not e_comp:
+                used_est[i] = e_used
+            ref_of[i] = anchor             # 复检以主锚点为参照
+            note = compose_reference_shift(e.delay_samples, ref_shift,
+                                           sample_rate) or {}
+            note.update({
+                "reference": r + 1,
+                "usable_frames": int(e.usable_frames),
+                "constant": const,
+                "displacement_ms": round(disp, 3),
+                "frame_ms": float(frame_ms),
+                "hop_ms": float(hop_ms),
+                "round": round_no + 1,
+            })
+            reference_notes[i] = note
+            rows[i]["reference_choice"] = note
+            if dec == "fixed":
+                to_fix.append(i)
+            log(
+                f"channel-sync: CH{i + 1} 换参考 CH{r + 1} 重测 -> {dec} "
+                f"(相对 {note.get('delay_vs_reference_ms', float('nan')):+.3f}ms"
+                f", 参考移位 {ref_shift:+d}, 合成 "
+                f"{note.get('composed_ms', float('nan')):+.3f}ms, "
+                f"{e.usable_frames} 帧, 恒定={const})"
+            )
+            return True
+
+        if eff["track_reference"]:
+            if eff["group_anchor_enabled"]:
+                log("channel-sync: track_reference 与 group_anchor_enabled "
+                    "同时打开; 逐轨参考先做, 分组层随后只处理仍然 untouched "
+                    "的轨")
+            for round_no in range(2):
+                progressed = False
+                for i in healthy:
+                    if i == anchor:
+                        continue
+                    if rows[i].get("decision") != "untouched":
+                        continue
+                    if try_alternate_reference(i, round_no):
+                        progressed = True
+                if not progressed:
+                    break
+            if reference_notes:
+                ctx["track_reference"] = {
+                    "enabled": True,
+                    "anchor": anchor,
+                    "channels": {str(k + 1): v for k, v in
+                                 reference_notes.items()},
+                }
+
         # 4b. 分组锚点 (opt-in, 默认关闭) —— **只做加法**
         #
         # 单锚点模型只管锚点所在的那一组。真实 4 声道素材里 CH1/CH2 与
@@ -1724,7 +1947,7 @@ def run_channel_sync(
         # 因此开关打开只可能"多修几条轨", 不可能少修、也不可能改值。
         groups: list[list[int]] = [sorted(healthy)]
         group_snr: dict[str, dict[str, float]] = {}
-        ref_of: dict[int, int] = {}     # 轨 -> 复检用的参考轨
+        # ref_of 已在 4a 之前初始化 (换参考阶段需要), 这里不重置
         group_notes: dict[int, dict[str, Any]] = {}   # 分组层对该行的补充说明
         if eff["group_anchor_enabled"] and len(healthy) >= 2:
             snr_pairs: dict[tuple[int, int], dict[str, float]] = {}
@@ -1974,8 +2197,16 @@ def run_channel_sync(
                 # 这条轨自己做一次整数移位后**必然残留**的那个量。
                 mat_note = materiality_note.get(i)
                 if mat_note:
-                    limit = max(eff["verify_max_ms"],
-                                float(mat_note["displacement_ms"]))
+                    disp_here = float(mat_note["displacement_ms"])
+                    # 位移与复检残差都是**估计量**。要求 residual <= 位移 严格
+                    # 成立时, 不到一个采样的估计差就会翻转决定 —— 实测
+                    # C1197 CH2: 残差 2.0393ms vs 位移 2.0208ms, 差 0.9 采样,
+                    # 于是 25ms 的修正被判掉。留一个**小于测量粒度**的余量:
+                    # max(1 采样, 5% x 位移)。门的语义仍是"残余不超过该轨
+                    # 自身变化量", 只是不再把估计噪声当成判据。
+                    margin = max(1000.0 / float(sample_rate),
+                                 0.05 * disp_here)
+                    limit = max(eff["verify_max_ms"], disp_here + margin)
                 windows = max(1, int(eff["recheck_windows"]))
                 # 多窗只在"被修掉的偏移远大于量化粒度"时才有意义: 多窗是
                 # 用来抓**非恒定**偏移的, 而小位移轨的验收本来就由绝对门管。
