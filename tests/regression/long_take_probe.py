@@ -871,7 +871,7 @@ def enhanced_window_analysis(rec: dict, n_samples: int) -> dict:
                 "max": float(arr.max()) if arr.size else None,
                 "n_covered": int(arr.size),
             },
-            "audio_time_coverage": float(covered_samples / n_samples),
+            "audio_time_coverage": float(min(1.0, covered_samples / n_samples)),
             "quiet_run_windows": {
                 "n": len(quiet_runs),
                 "p50_s": (float(np.median(quiet_runs) * hop_s)
@@ -1295,7 +1295,7 @@ def channel_profile(raw: list[Path], n_samples: int,
             rms_db[b] = 20.0 * math.log10(max(r, 1e-12))
             peak[b] = 20.0 * math.log10(max(float(np.max(np.abs(seg))), 1e-12))
         silent = (rms_db < -50.0).tolist()
-        runs = _runs(silent)
+        runs = _runs([not f for f in silent])   # _runs 返回 False 段 = 静音段
         per_ch.append({
             "ch": ch + 1,
             "rms_db_p10": float(np.percentile(rms_db, 10)),
