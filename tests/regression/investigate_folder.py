@@ -648,10 +648,26 @@ def stage_container(path: Path, video: dict, duration: float,
         return sig
 
     src_sig = stream_signature(src_streams)
+    # 按类型分组: video 对 video, audio[i] 对 audio[i], data/subtitle 单独统计.
+    # 位置配对在"某些流被丢弃"时会把 data 轨和视频轨比到一起, 产生假差异。
+    def _group(sig):
+        out = {"video": [], "audio": [], "other": []}
+        for s in sig:
+            key = ("video" if s.get("type") == "video" else
+                   "audio" if s.get("type") == "audio" else "other")
+            out[key].append(s)
+        return out
+
+    src_groups = _group(src_sig)
     # 映射策略: 先按"全部流"忠实重封; 失败则退到视频+音频, 并记录被放弃的流。
     # mp4 muxer 不接受相机私有 data 轨 (实测 Sony meta: "Could not find tag for
     # codec none"), 这正是"容器格式能否完整复现"要回答的问题。
-    maps = [("all", ["-map", "0"]), ("av", ["-map", "0:v", "-map", "0:a"])]
+    # 映射策略: mp4 muxer 不接受相机私有 data 轨, 所以先试全部流, 再退到
+    # 视频+音频。**音频映射必须是可选的 `0:a?`** —— 无人机素材常常完全没有
+    # 音频, 此时 `-map 0:a` 会让 ffmpeg 直接报 "matches no streams", 把本可
+    # 成功的复现验证变成失败。
+    maps = [("all", ["-map", "0"]),
+            ("av", ["-map", "0:v?", "-map", "0:a?"])]
     for label, flags in (("plain", []),
                          ("faststart", ["-movflags", "+faststart"])):
         dest = d / f"remux_{label}.mp4"
@@ -678,19 +694,27 @@ def stage_container(path: Path, video: dict, duration: float,
         rep_streams = rep_doc.get("streams") or []
         rep_sig = stream_signature(rep_streams)
         diffs = []
-        for i in range(max(len(src_sig), len(rep_sig))):
-            a = src_sig[i] if i < len(src_sig) else None
-            b = rep_sig[i] if i < len(rep_sig) else None
-            if a is None or b is None:
-                diffs.append({"stream": i, "missing": "src" if a is None
-                              else "out"})
-                continue
-            for k in a:
-                if k == "bit_rate":
-                    continue          # 段长/封装差异会让平均码率变化, 单列
-                if a[k] != b[k]:
-                    diffs.append({"stream": i, "field": k,
-                                  "source": a[k], "output": b[k]})
+        rep_groups = _group(rep_sig)
+        for kind in ("video", "audio"):
+            aa, bb = src_groups[kind], rep_groups[kind]
+            for i in range(max(len(aa), len(bb))):
+                a = aa[i] if i < len(aa) else None
+                b = bb[i] if i < len(bb) else None
+                if a is None or b is None:
+                    diffs.append({"kind": kind, "n": i,
+                                  "missing": "src" if a is None else "out"})
+                    continue
+                for k in a:
+                    if k in ("bit_rate", "index"):
+                        # bit_rate: 段长/封装差异会变; index: 重封后必然重编号,
+                        # 两者都不是"格式是否被复现"的属性
+                        continue
+                    if a[k] != b[k]:
+                        diffs.append({"kind": kind, "n": i, "field": k,
+                                      "source": a[k], "output": b[k]})
+        # 源里的 data/subtitle 轨: 是否被保留
+        src_other = src_groups["other"]
+        rep_other = rep_groups["other"]
         dropped = []
         if used_map == "av":
             dropped = [{"index": s.get("index"),
@@ -698,6 +722,8 @@ def stage_container(path: Path, video: dict, duration: float,
                         "codec": s.get("codec_name")}
                        for s in src_streams
                        if s.get("codec_type") not in ("video", "audio")]
+        out.setdefault("data_streams_source", len(src_other))
+        out.setdefault("data_streams_kept", len(rep_other))
         out["variants"][label] = {
             "ok": True,
             "map": used_map,
@@ -826,7 +852,7 @@ def write_report(out: Path, files: list[dict], budget: Budget,
     eligible = [f for f in files
                 if (f.get("checks") or {}).get("eligible_4mono")]
     if eligible:
-        a("## 6 4-mono 文件深度分析\n")
+        a("## 7 4-mono 文件深度分析\n")
         for f in eligible:
             c = f["checks"]
             a(f"### {f.get('name')}  ({c.get('duration_s') or 0:.1f}s)\n")
@@ -951,8 +977,9 @@ def write_report(out: Path, files: list[dict], budget: Budget,
                     n_match += 1
                 ds = v.get("stream_diffs") or []
                 for dd in ds:
-                    key = (f"流{dd.get('stream')}:{dd.get('field')}"
-                           if dd.get("field") else f"流{dd.get('stream')}:missing")
+                    tag = (f"{dd.get('kind') or '流'}{dd.get('n')}")
+                    key = (f"{tag}:{dd.get('field')}"
+                           if dd.get("field") else f"{tag}:missing")
                     common_diffs[key] = common_diffs.get(key, 0) + 1
                 diff_desc = ",".join(sorted({(dd.get("field")
                                               or "missing") for dd in ds})) or "—"
@@ -982,6 +1009,7 @@ def write_report(out: Path, files: list[dict], budget: Budget,
     # 8 需要处理
     a("## 9 需要处理的文件\n")
     needs = []
+    NATURAL = {"CTR-05"}      # 相机原始素材 moov 在后: 属自然属性, 不逐条列
     for f in files:
         c = f.get("checks") or {}
         if "error" in c:
@@ -989,10 +1017,15 @@ def write_report(out: Path, files: list[dict], budget: Budget,
             continue
         fails = [it.get("id") for it in _items(f)
                  if (it.get("verdict") or it.get("status")) == "FAIL"]
+        warns = [it.get("id") for it in _items(f)
+                 if (it.get("verdict") or it.get("status")) == "WARN"
+                 and it.get("id") not in NATURAL]
         if fails:
-            needs.append((f.get("name"), "FAIL: " + ",".join(str(x) for x in fails)))
-        elif c.get("verdict") == "WARN":
-            needs.append((f.get("name"), "WARN"))
+            needs.append((f.get("name"),
+                          "FAIL: " + ",".join(str(x) for x in fails)))
+        elif warns:
+            needs.append((f.get("name"),
+                          "WARN: " + ",".join(str(x) for x in warns)))
     if needs:
         a("| 文件 | 原因 |")
         a("|---|---|")
@@ -1019,6 +1052,8 @@ def main() -> int:
                     help="只跑这些阶段: checks video profile stereo container pairs")
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--fresh", action="store_true")
+    ap.add_argument("--report-only", action="store_true",
+                    help="不测量, 只从 files/*.json 重建 report.md")
     ap.add_argument("--video-window", type=float, default=120.0,
                     help="码流结构分析窗口 (秒, 默认 120)")
     ap.add_argument("--container-seconds", type=float, default=5.0,
@@ -1060,6 +1095,20 @@ def main() -> int:
     records: list[dict] = []
     pending: list[str] = []
     n_containers = 0
+    if args.report_only:
+        # 从 checkpoint 重建报告: 不测量、不写 files/, 只产出 report.md
+        for path in files:
+            ck = out / "files" / f"{path.stem}.json"
+            rec = (json.loads(ck.read_text(encoding="utf-8"))
+                   if ck.is_file() else {"name": path.name,
+                                         "group": path.parent.name,
+                                         "checks": {"error": "无 checkpoint"}})
+            rec.setdefault("name", path.name)
+            rec.setdefault("group", path.parent.name)
+            records.append(rec)
+        write_report(out, records, budget, pending)
+        log(f"仅报告模式完成: {out / 'report.md'}")
+        return 0
     for n, path in enumerate(files, 1):
         ck = out / "files" / f"{path.stem}.json"
         rec = {} if args.fresh else (
