@@ -2148,7 +2148,10 @@ def run_channel_sync(
                                       sync_estimate.summarize_trajectory(
                                           e.frames, sample_rate),
                                       "untouched", "time_varying_refused")
-                    rows[i]["evidence"] = ev
+                    # 证据必须挂上: est_row 重建 dict 会丢掉它, 而 P4.3 (D1)
+                    # 要求"测量发生过"在报告里可追溯。TV 分支的 e 就是本轨
+                    # 估计, 直接由它重算同一份证据对象 (不是复制别处的 ev)。
+                    rows[i]["evidence"] = evidence_of_est(e)
                     rows[i]["time_varying"] = tv_detail
                     log(f"channel-sync: CH{i + 1} time-varying refused "
                         f"({tv_detail.get('reason')}) — 该轨 untouched")
