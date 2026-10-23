@@ -22,21 +22,32 @@ sys.path.insert(0, str(REPO))
 from preservation.gyroflow import check, find_gyroflow    # noqa: E402
 
 OUT = REPO / "data" / "sony_meta_crosscam"
+# F: 空间清理后, 往返成品已搬到 E:; 两处任一存在即可
+RESTORED_ROOTS = [OUT / "work",
+                  Path(r"E:\1kt_relocated_20261023\sony_meta_work")]
 SCRATCH = Path(r"E:\1kt_scratch\gyro_check")
+
+def _restored(name: str) -> Path:
+    for root in RESTORED_ROOTS:
+        cand = root / name.strip('"')
+        if cand.is_dir():
+            return cand
+    return RESTORED_ROOTS[0] / name.strip('"')
+
 
 CASES = [
     ("A7M5(control)",
      REPO / "data" / "align_4ch_proof" / "20260903_C1159.MP4",
-     OUT / "work" / "A7M5_control" / "restored.MP4"),
+     _restored("A7M5_control") / "restored.MP4"),
     ("A7M4",
      REPO / "data" / "_from_I" / "2026.09.24" / "A7M4" / "C0147.MP4",
-     OUT / "work" / "A7M4" / "restored.MP4"),
+     _restored("A7M4") / "restored.MP4"),
     ("FX3",
      REPO / "data" / "_from_I" / "2026.09.24" / "FX3" / "C0513.MP4",
-     OUT / "work" / "FX3" / "restored.MP4"),
+     _restored("FX3") / "restored.MP4"),
     ("FX30",
      REPO / "data" / "_from_I" / "2026.09.24" / "FX30" / "20260922_fx30_2_9757.MP4",
-     OUT / "work" / "FX30" / "restored.MP4"),
+     _restored("FX30") / "restored.MP4"),
 ]
 
 
