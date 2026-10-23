@@ -1,57 +1,58 @@
-# 断盘前的数据保全（E:/I: 暂时断开）
+# E:/I: 断开时的数据保全（2026-10-22 ~ 10-23）
 
-复制时间：2026-10-22。目的：E:、I: 断开后仍能在 F: 项目文件夹内继续分析与验证。
-**全部写入 F:\1KeyTranscoder\data\（项目文件夹内）**；F: 上未删除任何东西。
+目的：E:、I: 断开后仍能在 F: 项目文件夹内继续分析、验证与调参。
+**全部写入 `F:\1KeyTranscoder\data\`（项目文件夹内）**；项目外的 F: 内容只读，未写入、未删除。
 
 ## 已复制
 
 | 内容 | 复制到 | 规模 | 校验 |
 |---|---|---|---|
-| 两个离线跑批的全部产物（报告 + 全部 JSON + 日志） | `data\_from_E\1kt_work\` | 7.67 GiB / 387 文件 | report/s2e_oracle 已做 sha256 抽查一致 |
-| 交付件（`I:\repaired`，含 `_superseded`） | `data\_from_I\repaired\` | 2.20 GiB / 71 文件 | 文件数一致 |
-| 六机位各一件原始样本（跨机位格式/元数据验证用） | `data\_from_I\2026.09.24\<机位>\` | 61.04 GiB | 大小一致 |
+| 两个离线跑批的全部产物（报告 + 全部 JSON + 日志） | `data\_from_E\1kt_work\` | 7.67 GiB / 387 文件 | report、s2e_oracle 已 sha256 抽查一致 |
+| **调参语料 speech**（`E:\1kt_media\speech`） | `data\_from_E\1kt_media\speech\` | **90.99 GiB / 1078 文件** | 文件数与字节数与源一致 |
+| 长镜头素材 | `data\align_4ch_proof\`（原有） | 92.95 GiB / 2 文件 | 与 `E:\1kt_media\long` 同名同大小，无需再拷 |
+| Gyroflow 原始解析证据 + 日志 | `data\_from_E\gyro_evidence\` | 2.21 GiB / 10 文件 | 直接来源 |
+| 交付件（`I:\repaired`） | `data\_from_I\repaired\` | 2.20 GiB / 71 文件 | 文件数一致 |
+| 六机位原始样本 | `data\_from_I\2026.09.24\<机位>\` | 61.02 GiB / 6 文件 | 逐件大小一致 |
+| 元数据往返成品 | `data\sony_meta_crosscam\work\<机位>\restored.MP4` | 12.06 GiB / 4 文件 | 供复核 |
 
-六件样本：
+## 离线回退（已改代码）
 
-| 机位 | 文件 | 大小 |
+E: 断开时下列脚本自动改读项目内副本，不再崩溃：
+
+| 脚本 | 原来硬编码 | 回退 |
 |---|---|---|
-| A7M4 | `C0147.MP4` | 9.63 GiB |
-| FX3 | `C0513.MP4` | 0.38 GiB |
-| FX30 | `20260922_fx30_2_9757.MP4` | 0.94 GiB |
-| HXR-NX800 | `CA0230.MP4`（唯一 4-mono） | 41.16 GiB |
-| Mavic4P | `DJI_20260921164928_0296_D.MP4` | 1.10 GiB |
-| Pocket3 | `DJI_20260922193237_0001_D.MP4` | 7.83 GiB |
+| `tests/regression/run_arm_sharded.py` | `E:\1kt_media\speech`、`E:\1kt_media\long` | `data\_from_E\1kt_media\speech`；长镜头用 `data\align_4ch_proof` |
+| `tests/regression/long_take_probe.py` | `E:\1kt_scratch\pcm`、默认输出 `E:\1kt_work\...` | `data\_scratch\pcm`（空时自动从源解码）、`data\probe_long` |
+| `tests/regression/investigate_folder.py` | `E:\1kt_scratch\pcm`、`E:\1kt_scratch\investigate` | `data\_scratch\pcm`、`data\_scratch\investigate` |
 
-## 未复制（体积或可重建）
+验证：E: 在线时仍解析到 E:（`corpus` 226 件不变）；E: 不存在时走项目副本。
 
-| 内容 | 体积 | 原因 |
+## 未复制（体积原因，需要时单独处理）
+
+| 内容 | 体积 | 说明 |
 |---|---|---|
-| `E:\1kt_media`（226 件调参语料） | **205.44 GiB** | 复制后 F: 只剩约 10 GB，会挤死后续写盘；需要时再单独拷 |
-| `E:\1kt_scratch`（解码缓存） | 12.38 GiB | 可从源素材重建（`_decode_stream`） |
-| `I:\2026.09.24` 其余 78 件 | ~589 GiB | 六机位样本已覆盖格式/元数据结论；完整调研 JSON 已在 `_from_E` 里 |
-| `I:\2026xxxx` 归档测量源 | ~254 GiB | 归档 arm 的 JSON 本来就在项目 `work\regression_r087\out\` |
+| `E:\1kt_media\long` | 92.94 GiB | 与项目 `align_4ch_proof` 里的两件**完全相同**，不重复占空间 |
+| `E:\1kt_scratch`（解码缓存） | 14.59 GiB | 可从源重建；断 E: 后程序自动重新解码，只是变慢 |
+| `I:\2026.09.24` 其余 78 件 | 588.7 GiB | 六机位样本 + 完整调研 JSON 已覆盖结论 |
+| `I:\compact` | 370.9 GiB | 证明集 35 件（130.7 GiB）已在项目内 |
+| `I:\2026xxxx` 归档源 | ~254 GiB | 对应 arm JSON 已在 `work\regression_r087\out\` |
 
-## 断盘后怎么跑
+## 磁盘
+
+F: 剩余 **47.6 GB**（复制语料前 140.8 GB）。
+
+## 断盘后继续工作的命令
 
 ```powershell
 cd F:\1KeyTranscoder
 
-# 跨机位 Sony 元数据保留验证（已改为读 F: 副本）
+# 跨机位元数据验证（源指向 F: 副本）
 python -u tests/regression/sony_metadata_crosscam.py
+python -u tests/regression/gyroflow_consumer_check.py
 
-# 长镜头逐窗探针（默认输出已在 E:，断盘后请显式指到 F: 项目内）
-python -u tests/regression/long_take_probe.py --out "F:\1KeyTranscoder\data\probe_long" --budget-minutes 150
+# 长镜头逐窗探针（自动回退缓存/输出）
+python -u tests/regression/long_take_probe.py
 
-# 素材文件夹调研（root 需指向现有副本目录）
-python -u tests/regression/investigate_folder.py --root "F:\1KeyTranscoder\data\_from_I\2026.09.24" --out "F:\1KeyTranscoder\data\inv_from_copies" --budget-minutes 60
+# 素材调研（root 指向现有副本）
+python -u tests/regression/investigate_folder.py --root "F:\1KeyTranscoder\data\_from_I\2026.09.24" --out "F:\1KeyTranscoder\data\inv_from_copies"
 ```
-
-注意：E: 上是解码缓存的默认位置（`E:\1kt_scratch`）。断盘后这些程序会退回到
-"从源重新解码"，变慢但结果一致；scratch 目录会自动落到 E: 路径并失败——此时
-设 `E:` 相关路径不可用，需在程序里改 `PCM_CACHE`/`SCRATCH` 指向 F: 项目内。
-（当前 `investigate_folder.py` 与 `long_take_probe.py` 的 scratch 常量都指向 E:，
-断盘前请告知是否要我把它们改成 F: 项目内可配置。）
-
-## 磁盘
-
-F: 剩余 **215.6 GB**（复制前 286.5 GB）。

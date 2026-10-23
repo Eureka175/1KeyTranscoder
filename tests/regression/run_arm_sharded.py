@@ -33,7 +33,16 @@ MEDIA = (".mp4", ".MP4", ".mov", ".MOV")
 
 def gather(scope: str) -> list[Path]:
     if scope == "corpus":
-        roots = [Path(r"E:\1kt_media\speech"), Path(r"E:\1kt_media\long")]
+        # E: 断开时回退到项目内的副本（离线跑批用）
+        e_speech = Path(r"E:\1kt_media\speech")
+        e_long = Path(r"E:\1kt_media\long")
+        f_media = REPO / "data" / "_from_E" / "1kt_media"
+        f_long_dir = REPO / "data" / "align_4ch_proof"
+        roots = [e_speech if e_speech.is_dir() else f_media / "speech"]
+        if e_long.is_dir():
+            roots.append(e_long)
+        elif f_long_dir.is_dir():
+            roots.append(f_long_dir)   # 长镜头在证明集里, 同名文件
     elif scope == "archive":
         roots = [Path("I:/") / d.name for d in sorted(Path("I:/").iterdir())
                  if d.is_dir() and len(d.name) == 8 and d.name.isdigit()]

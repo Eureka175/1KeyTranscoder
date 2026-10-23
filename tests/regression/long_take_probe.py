@@ -85,9 +85,14 @@ FFMPEG = REPO / "tools" / "ffmpeg.exe"
 FFPROBE = REPO / "tools" / "ffprobe.exe"
 SR = 48000
 PCM_CACHE = Path(r"E:\1kt_scratch\pcm")   # 只读复用已有解码缓存
+# E: 断开时解码缓存不存在: 退到项目内路径(通常为空), 程序会自动改为从源解码
+if not PCM_CACHE.is_dir():
+    PCM_CACHE = REPO / "data" / "_scratch" / "pcm"
 DEFAULT_CLIPS = [r"F:\1KeyTranscoder\data\align_4ch_proof\20260919_C1305.MP4",
                  r"F:\1KeyTranscoder\data\align_4ch_proof\20260919_C1306.MP4"]
 DEFAULT_OUT = Path(r"E:\1kt_work\long_take_probe")   # F: 只允许项目文件夹; 输出放 E:
+if not Path("E:/").exists():        # E: 断开时输出改到项目内
+    DEFAULT_OUT = REPO / "data" / "probe_long"
 PREFER_STEMS: tuple[str, ...] = ("20260919_C1305", "20260919_C1306")
 
 #: 几何扫描: (frame_ms, hop_ms, anchor_segment_seconds)。生产默认是 (200,100,20)。

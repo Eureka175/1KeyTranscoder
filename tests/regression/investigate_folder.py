@@ -69,6 +69,10 @@ FFPROBE = REPO / "tools" / "ffprobe.exe"
 SR = 48000
 PCM_CACHE = Path(r"E:\1kt_scratch\pcm")
 SCRATCH = Path(r"E:\1kt_scratch\investigate")
+# E: 断开时: 缓存路径改到项目内(可能为空, 只是少复用), scratch 也落项目内
+if not Path("E:/").exists():
+    PCM_CACHE = REPO / "data" / "_scratch" / "pcm"
+    SCRATCH = REPO / "data" / "_scratch" / "investigate"
 BLOCK_S = 60.0
 T0 = time.time()
 
