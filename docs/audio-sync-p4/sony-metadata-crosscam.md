@@ -102,3 +102,26 @@ preservation.gyroflow.check 分别从**源**与**恢复后的成品**导出，�
 * 2026-10-23 约 01:10，因机器必须在 01:30 前进入休眠，主动终止该往返（已跑约 70 分钟，停在 GPAC 对 41 GiB stage 的元数据轨重建阶段）。
 * 已保留证据：抽取结果完整（rtmd 84480 样本 × 11264 B、uuid 8 个、nrtm、brand XAVC、movie_ts 50000）；同系列 A7M4/FX3/FX30 已通过 bundle 与 Gyroflow 两层验证。
 * 恢复时注意：GPAC import 走系统临时目录，C: 只有约 31 GB，必须把 TEMP/TMP 指到 E:；命令见 tests/regression/sony_metadata_crosscam.py 的 --scratch-root 用法。
+
+## HXR-NX800（4-mono，41 GiB）往返：已完成并验证
+
+2026-10-24 01:03 生成 `restored.MP4`（41.14 GiB，源码 41.16 GiB），逐项验证与 Gyroflow 消费方验证：
+
+| 检查项 | 结果 |
+|---|---|
+| ftyp brand / 兼容 brand | **一致**（XAVC） |
+| `tref`/`cdsc` | **一致** |
+| nrtm（lens profile + XML sha256） | **一致** |
+| uuid 多重集 | **8/8 一致**，无缺失无新增 |
+| rtmd 轨（84480 样本 × 11264 B、timescale、cdsc 引用） | **一致** |
+| 视频/音频流参数（4×ipcm 24bit 单声道等） | **一致** |
+| bundle 私有 box 8 个（label/ctx/guid/sha） | **一致** |
+| **Gyroflow 消费方** | **PASS**：3,379,227 IMU 样本 → 3,379,227，机型 HXR-NX800、identifier、镜头 profile 全一致，mismatches 为空 |
+| 顶层 box | 内容集合差异仅来自多出的 `free` 填充；uuid 位置移到末尾、moov/meta 次序不同（结构性差异，不影响消费方） |
+
+结论：**Sony 元数据保留在 NX800（4-mono XAVC，8 uuid，ipcm 24-bit）上同样成立**。至此五台 Sony 机位
+（A7M5/A7M4/FX3/FX30/NX800）在 bundle 与消费方两层全部通过。
+
+复现：`python tests/regression/sony_metadata_crosscam.py --cases "HXR-NX800" --scratch-root "E:\1kt_scratch\sony_meta_nx800"`
+（GPAC 导入走系统临时目录，C: 只有 ~31 GB，必须把 TEMP 指到 E:）
+验证脚本：`python tests/regression/verify_nx800_restore.py`（对已生成成品，不重跑 2.5 小时往返）

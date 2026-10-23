@@ -202,9 +202,9 @@ def run_case(label: str, src: Path, roundtrip: bool, gpac: GpacContainerBackend,
         "meta_tracks_equal": res["bundle"]["tracks"]
         == (after_inspect.get("tracks") if "tracks" in after_inspect else None),
         "boxes_content_equal": sorted(
-            (b["label"], b["parent_context"], b["extended_type"], b["sha256"])
+            (b["label"], b["ctx"], b["ext"], b["sha256"])
             for b in res["bundle"]["boxes"]) == sorted(
-            (b["label"], b["parent_context"], b["extended_type"], b["sha256"])
+            (b["label"], b["ctx"], b["ext"], b["sha256"])
             for b in (after_inspect.get("boxes") or [])),
         "nrtm_bundle_equal": res["bundle"]["nrtm"]
         == after_inspect.get("nrtm"),

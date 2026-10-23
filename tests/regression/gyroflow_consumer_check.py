@@ -48,6 +48,9 @@ CASES = [
     ("FX30",
      REPO / "data" / "_from_I" / "2026.09.24" / "FX30" / "20260922_fx30_2_9757.MP4",
      _restored("FX30") / "restored.MP4"),
+    ("HXR-NX800",
+     Path(r"F:\1KeyTranscoder\data\_from_I\2026.09.24\HXR-NX800\CA0230.MP4"),
+     Path(r"E:\1kt_scratch\sony_meta_nx800\HXR-NX800\restored.MP4")),
 ]
 
 
