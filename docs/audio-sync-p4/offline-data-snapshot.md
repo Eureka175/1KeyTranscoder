@@ -56,3 +56,9 @@ python -u tests/regression/long_take_probe.py
 # 素材调研（root 指向现有副本）
 python -u tests/regression/investigate_folder.py --root "F:\1KeyTranscoder\data\_from_I\2026.09.24" --out "F:\1KeyTranscoder\data\inv_from_copies"
 ```
+
+## 2026-10-24 空间释放（移动，未删除）
+
+- 调参语料 speech 副本：`data\_from_E\1kt_media` -> `E:\1kt_relocated_20261023\speech_corpus`（90.99 GiB，原件仍在 `E:\1kt_media\speech`）
+- 元数据往返成品与长镜头中间数组 -> `E:\1kt_relocated_20261023\`（见该目录）
+- F: 只做移动，未删除任何文件
