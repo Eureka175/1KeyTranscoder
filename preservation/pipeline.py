@@ -360,6 +360,21 @@ def run_sony_pipeline(
             else:
                 step("  AV1 colr already faithful to the source")
 
+    # 5e. tkhd 轨道启用标志 / alternate group 归一。
+    #
+    # GPAC 的 -new/-flat/-brand 不保证每轨写 flags=7 / alternate_group=0;
+    # ffmpeg 与部分硬件 wrapper 会给多音轨写 flags=2 + alternate_group=1..N。
+    # ISO/IEC 14496-12 把 alternate_group 定义为"同一轨的备选版本"(典型是
+    # 多语言), 所以 Premiere 会按规范只选一条 —— 四轨单声道 PCM 只显示一轨,
+    # 而 MediaInfo 仍列四条 (它不解释该语义)。源的每轨口径是 7/0, 这里把它
+    # 恢复回来; 只改 tkhd 的 4 个字节, 不动 mdat/样本表。详见
+    # preservation/isobmf.py:normalize_track_flags()。
+    try:
+        for desc in isobmf.normalize_track_flags(final):
+            step(f"  {desc}")
+    except (OSError, RuntimeError) as exc:
+        step(f"WARNING: tkhd track-flag normalization skipped: {exc}")
+
     # 6. post-encode checks (independent checker module, applies to
     # every backend's Sony output). Timing regression guards live in
     # validate.compare and make the run FAIL on any drift.

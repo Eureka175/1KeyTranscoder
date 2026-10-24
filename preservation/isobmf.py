@@ -750,3 +750,137 @@ def insert_uuid_boxes(
         # 4. root-context payloads at EOF
         for data in root_payloads:
             fout.write(data)
+
+
+# ---------------------------------------------------------------------------
+# tkhd track-enable / alternate-group normalization
+# ---------------------------------------------------------------------------
+
+#: ISO/IEC 14496-12 tkhd flag bits: 0x1 track_enabled, 0x2 track_in_movie,
+#: 0x4 track_in_preview. Sony writes 0x7 on every track of its sources. FFmpeg
+#: writes 0x2 (not enabled) on the extra mono tracks and puts all of them in
+#: ``alternate_group=1``; some hardware wrappers do the same.
+#:
+#: Why this is production code and not an NLE workaround: ISO/IEC 14496-12
+#: defines an alternate group as *alternative versions of one track* (the
+#: canonical use is language variants), so per spec a player picks one. Adobe
+#: Premiere does exactly that and imports four mono PCM tracks as a single
+#: selectable audio track, while MediaInfo lists four (it ignores the
+#: semantic) -- the defect only shows up in the editor. The Sony source has
+#: flags=7 / alternate_group=0 on all tracks, so restoring that is container
+#: fidelity of the same class as brand/tref/uuid, not a tuning knob.
+_TRACK_ENABLED_FLAGS = 0x7
+
+
+def _tkhd_field_offsets(tkhd: Box, version: int) -> tuple[int, int]:
+    """Absolute (track_id_offset, alternate_group_offset) inside a tkhd box.
+
+    tkhd is a FullBox: data_offset points at the version byte, then creation
+    and modification times (4 bytes each in v0, 8 in v1), track_ID,
+    reserved, duration, reserved[2], layer, alternate_group, ...
+    """
+    base = tkhd.data_offset
+    if version == 0:
+        return base + 12, base + 34
+    return base + 20, base + 46
+
+
+def track_flags(path: Path) -> list[dict[str, int | str]]:
+    """Read tkhd flags / alternate_group of every track (mdat never read)."""
+    roots = root_boxes(path)
+    moov = next((b for b in roots if b.type == "moov"), None)
+    if moov is None:
+        raise RuntimeError(f"no moov box in {path}")
+    out: list[dict[str, int | str]] = []
+    with path.open("rb") as f:
+        for trak in _children(f, moov):
+            if trak.type != "trak":
+                continue
+            tkhd = next(
+                (c for c in _children(f, trak) if c.type == "tkhd"), None
+            )
+            if tkhd is None:
+                continue
+            f.seek(tkhd.data_offset)
+            head = f.read(4)
+            if len(head) < 4:
+                continue
+            version = head[0]
+            flags = int.from_bytes(head[1:4], "big")
+            handler = _trak_handler(f, trak)
+            if version not in (0, 1):
+                out.append({"version": version, "flags": flags,
+                            "track_id": -1, "alternate_group": -1,
+                            "handler": handler})
+                continue
+            tid_off, alt_off = _tkhd_field_offsets(tkhd, version)
+            f.seek(tid_off)
+            track_id = struct.unpack(">I", f.read(4))[0]
+            f.seek(alt_off)
+            alternate_group = struct.unpack(">H", f.read(2))[0]
+            out.append({"version": version, "flags": flags,
+                        "track_id": track_id,
+                        "alternate_group": alternate_group,
+                        "handler": handler})
+    return out
+
+
+def normalize_track_flags(path: Path) -> list[str]:
+    """Enable every track and clear its alternate group, in place.
+
+    Only the tkhd version/flags and alternate_group fields are rewritten; mdat,
+    sample tables, brand, tref, uuid and every other box stay untouched and the
+    file size never changes (same-size in-place patch). GPAC can reset these
+    fields in a later ``-flat``/``-brand`` pass, so callers invoke this on the
+    *final* container file. Idempotent and cheap: the moov box is read for its
+    child headers only, mdat is seeked over.
+
+    Returns one human-readable description per changed track (empty list when
+    the file is already normalized).
+    """
+    roots = root_boxes(path)
+    moov = next((b for b in roots if b.type == "moov"), None)
+    if moov is None:
+        raise RuntimeError(f"no moov box in {path}")
+    changed: list[str] = []
+    with path.open("r+b") as f:
+        for trak in _children(f, moov):
+            if trak.type != "trak":
+                continue
+            tkhd = next(
+                (c for c in _children(f, trak) if c.type == "tkhd"), None
+            )
+            if tkhd is None:
+                continue
+            f.seek(tkhd.data_offset)
+            head = f.read(4)
+            if len(head) < 4:
+                continue
+            version = head[0]
+            if version not in (0, 1):
+                changed.append(
+                    f"tkhd version {version}: not normalized "
+                    f"(unknown layout)"
+                )
+                continue
+            flags = int.from_bytes(head[1:4], "big")
+            tid_off, alt_off = _tkhd_field_offsets(tkhd, version)
+            f.seek(tid_off)
+            track_id = struct.unpack(">I", f.read(4))[0]
+            f.seek(alt_off)
+            alt = struct.unpack(">H", f.read(2))[0]
+            new_flags = flags | _TRACK_ENABLED_FLAGS
+            if flags == new_flags and alt == 0:
+                continue
+            if flags != new_flags:
+                f.seek(tkhd.data_offset + 1)
+                f.write(new_flags.to_bytes(3, "big"))
+            if alt != 0:
+                f.seek(alt_off)
+                f.write(b"\x00\x00")
+            changed.append(
+                f"track {track_id} ({_trak_handler(f, trak)}): "
+                f"tkhd flags {flags} -> {new_flags}, "
+                f"alternate_group {alt} -> 0"
+            )
+    return changed

@@ -43,8 +43,9 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
         audio_encode, audio_external, audio_format, audio_integration,
         audio_mix, audio_model, audio_retention, audio_route,
         audio_selection, audio_sync, audio_timeline, channel_sync, cli,
-        codecs, core, hardware, hardware_audio, hwdecode_results, pipeline,
-        production_output, native_decode, source_contract, toolchain, workdir,
+        codecs, container_flags, core, hardware, hardware_audio,
+        hwdecode_results, pipeline, production_output, native_decode,
+        source_contract, toolchain, workdir,
     )
 
     return {
@@ -57,6 +58,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("classifier/scaling", core.l1_classifier_scaling),
             ("gpac/dji", core.l1_gpac_dji),
             ("gpac/paths", core.l1_gpac_paths),
+            ("tkhd 轨道标志/alternate group (PR 多音轨)",
+             container_flags.l1_track_flags),
             ("x265 P0", codecs.l1_x265),
             ("quality/versions", core.l1_quality),
             ("workdir lifecycle", workdir.l1_workdir),
@@ -101,6 +104,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
         "toolchain": [
             ("toolchain", toolchain.l2_toolchain),
             ("file-level meta", toolchain.l2_file_level_meta),
+            ("tkhd 轨道标志 (真实 muxer 输出)",
+             container_flags.l2_track_flags),
         ],
         "full": [
             ("pipeline", pipeline.l3_pipeline),

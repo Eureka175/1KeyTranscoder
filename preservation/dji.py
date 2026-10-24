@@ -325,6 +325,14 @@ def dji_rebuild(
         else:
             log(desc or "AV1 colr already faithful to the source")
 
+    # tkhd 轨道启用标志 / alternate group 归一 (同 isobmf.normalize_track_flags)。
+    # DJI 源常带多条音轨/数据轨; 按备选组语义写出的容器会让 NLE 只显示一条。
+    try:
+        for track_desc in isobmf.normalize_track_flags(final):
+            log(track_desc)
+    except (OSError, RuntimeError) as exc:
+        log(f"WARNING: track-flag normalization skipped: {exc}")
+
     log(f"validating original vs final (dji check={level})...")
     report = run_dji_check(
         original=original,

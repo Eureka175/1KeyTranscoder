@@ -120,6 +120,16 @@ def restore_after_transparent_remux(
             except RuntimeError as exc:
                 log(f"channel-sync: WARNING nrtm item_type patch 跳过: {exc}")
 
+    # tkhd 轨道启用标志 / alternate group 归一: GPAC -new 不保证每轨
+    # flags=7 / alternate_group=0, 而 alternate_group 会被 NLE 解释为
+    # "同一轨的备选版本" (只显示一条音轨)。放在文件结构全部落定之后,
+    # 只改 tkhd 头, 不动 payload (见 isobmf.normalize_track_flags)。
+    try:
+        for desc in isobmf.normalize_track_flags(dst):
+            log(f"channel-sync: {desc}")
+    except (OSError, RuntimeError) as exc:
+        log(f"channel-sync: WARNING tkhd normalization skipped: {exc}")
+
     try:
         stage.unlink()
     except OSError:

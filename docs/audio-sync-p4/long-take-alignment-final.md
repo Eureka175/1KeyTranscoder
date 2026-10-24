@@ -406,3 +406,22 @@ MediaInfo 仍按物理轨列出 4 条，所以"看起来正常"。
 
 `work/remux_final.py`、`work/p5_clips_final.py` 已加入"mux 后自动调用 fix_tkhd"，
 以后重新生成交付不会再出现该问题。
+
+### 15.4 已合入生产路径（2026-10-25）
+
+PR 测试通过后，`tkhd` 归一不再是外部脚本，而是生产容器层的一等步骤：
+
+- `preservation/isobmf.py` 新增 `track_flags()` / `normalize_track_flags()`：
+  流式原地修改每轨 tkhd flags（`|= 7`）与 `alternate_group`（`= 0`），
+  `mdat` 从不读入内存、文件大小不变、幂等；
+- 所有最终成品写出路径都调用：Sony 保留管线（step 5e）、透明模式
+  （`transparent_restore` 末尾）、channel-sync 透明重封装、classic 音频替换
+  （`preservation/audio_sync.remux_replace_audio`）、DJI 重建、硬件容器重封装
+  （`core/batch_hw.remux_container_lossless`）；
+- 回归：`tests/selftest/suites/container_flags.py`（L1 纯 ISOBMFF 构造 +
+  L2 真实 ffmpeg/MP4Box 多音轨），`--level unit` 930 PASS / 0 FAIL；
+  toolchain 唯一失败是 N 卡未接导致的 `caps.nvenc 实机探测`，与本次无关；
+- 文档：`docs/audio-sync-p4/tkhd-track-flags.md`。
+
+同时确认：软件不实现切片功能；`ffmpeg` 只承担 x265 编码器、解码与 wrapper 角色。
+抽检片段仍属外部工序，必要时可用 `fix_tkhd.py` 对手工产物做同样修补。

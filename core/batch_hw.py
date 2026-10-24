@@ -2007,10 +2007,21 @@ def remux_container_lossless(
         gpac.mux_new(dst, [f"{src}#{t['id']}" for t in usable])
     finally:
         gpac.movie_timescale = previous
+    # tkhd 轨道启用标志 / alternate group 归一 (同 isobmf.normalize_track_flags)。
+    # 多音轨重封装后的成品若不归一, NLE 会按"备选组"语义只显示一条音轨。
+    flags_desc: list[str] = []
+    try:
+        flags_desc = isobmf.normalize_track_flags(dst)
+    except (OSError, RuntimeError) as exc:
+        log(f"container re-mux: WARNING tkhd normalization skipped: {exc}")
+    flags_note = (
+        f"; tkhd: {len(flags_desc)} track flag(s) normalized"
+        if flags_desc else ""
+    )
     return (
         f"container-only re-mux: {src.name} ({len(usable)} track(s), "
         f"{len(skipped)} skipped, movie timescale {movie_ts}) -> "
-        f"{dst.name} [stream copy, no re-encode]"
+        f"{dst.name} [stream copy, no re-encode]{flags_note}"
     )
 
 

@@ -2587,6 +2587,20 @@ def run_channel_sync(
                     except Exception as exc:      # noqa: BLE001
                         log(f"channel-sync: WARNING sample entry 补丁异常: "
                             f"{exc}")
+                    # tkhd 轨道启用标志 / alternate group 归一 (最后一道容器补丁)。
+                    # ffmpeg/硬件 wrapper 会给第二条及之后的音轨写 flags=2 并把
+                    # 所有音轨放进 alternate_group=1..N; ISO/IEC 14496-12 把该组
+                    # 定义为"同一轨的备选版本", NLE 因此只显示一条音轨 (媒体信息
+                    # 仍列四条)。源文件是每轨 flags=7/alternate_group=0, 这里把
+                    # 容器事实恢复回来。失败只记 WARNING, 不阻断交付。
+                    try:
+                        from preservation.isobmf import normalize_track_flags
+
+                        for desc in normalize_track_flags(dst):
+                            log(f"channel-sync: {desc}")
+                    except Exception as exc:      # noqa: BLE001
+                        log("channel-sync: WARNING tkhd 轨道标志归一失败: "
+                            f"{exc}")
                     output_file = dst
                 except Exception as exc:      # noqa: BLE001
                     log(f"channel-sync: transparent remux failed: {exc} — "

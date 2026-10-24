@@ -79,3 +79,15 @@ def remux_replace_audio(
             raise RuntimeError(
                 f"音频 sample entry 自相矛盾且无法校正: 轨 {still}")
         log(f"WARNING 音频 sample entry 曾自相矛盾 (轨 {bad}), 已按 pcmC 校正")
+
+    # tkhd 轨道启用标志 / alternate group 归一。
+    #
+    # 这条路径的成品由 GPAC `-new` + 音频中间文件拼出。多音轨容器交给 NLE
+    # 时, ffmpeg/GPAC 默认的 flags=2 + alternate_group 会让 Premiere 按
+    # "备选组"语义只显示一条音轨 (详见 isobmf.normalize_track_flags 说明);
+    # 源文件口径是每轨 flags=7 / alternate_group=0, 所以这是在恢复容器事实。
+    try:
+        for desc in isobmf.normalize_track_flags(dst):
+            log(f"track flags: {desc}")
+    except (OSError, RuntimeError) as exc:
+        log(f"WARNING track-flag normalization skipped: {exc}")
