@@ -1,0 +1,377 @@
+{
+ "stem": "20260919_C1305",
+ "source": "F:\\1KeyTranscoder\\data\\align_4ch_proof\\20260919_C1305.MP4",
+ "restored": "E:\\1kt_work\\long_align\\deliver\\20260919_C1305_4ch_aligned_restored.mp4",
+ "container": {
+  "source_brand": "XAVC",
+  "restored_brand": "XAVC",
+  "source_compat": [
+   "XAVC",
+   "mp42",
+   "nras",
+   "iso6"
+  ],
+  "restored_compat": [
+   "XAVC",
+   "mp42",
+   "nras",
+   "iso6"
+  ],
+  "source_tracks": [
+   [
+    "vide",
+    null
+   ],
+   [
+    "soun",
+    null
+   ],
+   [
+    "soun",
+    null
+   ],
+   [
+    "soun",
+    null
+   ],
+   [
+    "soun",
+    null
+   ],
+   [
+    "meta",
+    null
+   ]
+  ],
+  "restored_tracks": [
+   [
+    "vide",
+    null
+   ],
+   [
+    "soun",
+    null
+   ],
+   [
+    "soun",
+    null
+   ],
+   [
+    "soun",
+    null
+   ],
+   [
+    "soun",
+    null
+   ],
+   [
+    "meta",
+    null
+   ]
+  ],
+  "source_uuid": 9,
+  "restored_uuid": 9,
+  "uuid_diff": {
+   "equal": true,
+   "missing": [],
+   "added": [],
+   "count_a": 9,
+   "count_b": 9
+  },
+  "source_nrtm": true,
+  "restored_nrtm": true,
+  "source_tref": [
+   {
+    "handler": "meta",
+    "refs": [
+     1
+    ]
+   }
+  ],
+  "restored_tref": [
+   {
+    "handler": "meta",
+    "refs": [
+     1
+    ]
+   }
+  ],
+  "source_audio_entries": [
+   {
+    "handler": "vide",
+    "fourcc": "hvc1"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   }
+  ],
+  "restored_audio_entries": [
+   {
+    "handler": "vide",
+    "fourcc": "hvc1"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   }
+  ],
+  "mvhd": [
+   {
+    "timescale": 60000,
+    "duration": 288438150,
+    "seconds": 4807.3025
+   },
+   {
+    "timescale": 60000,
+    "duration": 288438150,
+    "seconds": 4807.3025
+   }
+  ],
+  "top_level": [
+   [
+    "ftyp",
+    "uuid",
+    "uuid",
+    "free",
+    "mdat",
+    "moov",
+    "meta"
+   ],
+   [
+    "ftyp",
+    "moov",
+    "mdat",
+    "uuid",
+    "uuid",
+    "meta"
+   ]
+  ]
+ },
+ "streams": {
+  "source": [
+   [
+    "video",
+    "hevc",
+    "hvc1",
+    3840,
+    2160,
+    null,
+    null,
+    null,
+    "4807.302500"
+   ],
+   [
+    "audio",
+    "pcm_s24be",
+    "ipcm",
+    null,
+    null,
+    1,
+    "48000",
+    24,
+    "4807.302500"
+   ],
+   [
+    "audio",
+    "pcm_s24be",
+    "ipcm",
+    null,
+    null,
+    1,
+    "48000",
+    24,
+    "4807.302500"
+   ],
+   [
+    "audio",
+    "pcm_s24be",
+    "ipcm",
+    null,
+    null,
+    1,
+    "48000",
+    24,
+    "4807.302500"
+   ],
+   [
+    "audio",
+    "pcm_s24be",
+    "ipcm",
+    null,
+    null,
+    1,
+    "48000",
+    24,
+    "4807.302500"
+   ],
+   [
+    "data",
+    null,
+    "rtmd",
+    null,
+    null,
+    null,
+    null,
+    null,
+    "4807.302500"
+   ]
+  ],
+  "restored": [
+   [
+    "video",
+    "hevc",
+    "hvc1",
+    3840,
+    2160,
+    null,
+    null,
+    null,
+    "4807.302500"
+   ],
+   [
+    "audio",
+    "pcm_s24be",
+    "ipcm",
+    null,
+    null,
+    1,
+    "48000",
+    24,
+    "4807.302500"
+   ],
+   [
+    "audio",
+    "pcm_s24be",
+    "ipcm",
+    null,
+    null,
+    1,
+    "48000",
+    24,
+    "4807.302500"
+   ],
+   [
+    "audio",
+    "pcm_s24be",
+    "ipcm",
+    null,
+    null,
+    1,
+    "48000",
+    24,
+    "4807.302500"
+   ],
+   [
+    "audio",
+    "pcm_s24be",
+    "ipcm",
+    null,
+    null,
+    1,
+    "48000",
+    24,
+    "4807.302500"
+   ],
+   [
+    "data",
+    null,
+    "rtmd",
+    null,
+    null,
+    null,
+    null,
+    null,
+    "4807.302500"
+   ]
+  ],
+  "duration": [
+   "4807.302500",
+   "4807.302500"
+  ]
+ },
+ "video_streamhash_equal": false,
+ "audio": [
+  {
+   "wav": "F:\\1KeyTranscoder\\data\\_scratch\\aligned_fine\\20260919_C1305\\ch0_pol.wav",
+   "wav_md5": "MD5=aaa773b6d97d1b9ad1b5186fa6b53d61",
+   "restored_md5": "MD5=c63b97fd02aa7f4ea87ed8c26640ed92",
+   "match": false
+  },
+  {
+   "wav": "F:\\1KeyTranscoder\\data\\_scratch\\aligned_fine\\20260919_C1305\\ch1_pol.wav",
+   "wav_md5": "MD5=323f50a43edf41c3ef8af3ade383f8a2",
+   "restored_md5": "MD5=9bf88eb86bafe1c47b3fc076c19adb27",
+   "match": false
+  },
+  {
+   "wav": "F:\\1KeyTranscoder\\data\\_scratch\\aligned_fine\\20260919_C1305\\ch2_pol.wav",
+   "wav_md5": "MD5=9604c972329c9fa4662d4fcad2718e20",
+   "restored_md5": "MD5=3830e31742d4b7d7c4d6d913cf7f7b3a",
+   "match": false
+  },
+  {
+   "wav": "F:\\1KeyTranscoder\\data\\_scratch\\aligned_fine\\20260919_C1305\\ch3_pol.wav",
+   "wav_md5": "MD5=fe4a79d231549663a764963c904b8af6",
+   "restored_md5": "MD5=da0753e4f92a7a75af05295765b383d3",
+   "match": false
+  }
+ ],
+ "gyroflow": {
+  "source": {
+   "frames": 288150,
+   "path": "F:\\1KeyTranscoder\\work\\task3_20261025\\gyro_probe\\src_camera_type3.json",
+   "note": "re-parsed from existing export",
+   "quat_varying": 288149,
+   "first_timestamp_ms": 7.375976461433124,
+   "last_timestamp_ms": 4807293.192643127,
+   "first_quat": [
+    0.7092802554106632,
+    0.7042037490278427,
+    0.031915427301344,
+    6.801178267835927e-05
+   ]
+  },
+  "restored": {
+   "frames": 288150,
+   "quat_varying": 0,
+   "first_timestamp_ms": 0.0,
+   "last_timestamp_ms": 4807285.816666666,
+   "first_quat": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "path": "F:\\1KeyTranscoder\\work\\task3_20261025\\gyro_probe\\20260919_C1305_restored_camera_type3.json"
+  },
+  "timestamp_diff_ms": {
+   "max": 7.376,
+   "mean": 7.376
+  }
+ }
+}

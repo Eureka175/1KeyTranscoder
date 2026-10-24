@@ -1,0 +1,2620 @@
+[
+ {
+  "path": "I:\\2026.09.24\\A7M4\\C0147.MP4",
+  "name": "C0147.MP4",
+  "size_mib": 9856.5,
+  "duration_s": 385.92,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "385.920000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "19296"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.47
+ },
+ {
+  "path": "I:\\2026.09.24\\A7M4\\C0149.MP4",
+  "name": "C0149.MP4",
+  "size_mib": 27264.8,
+  "duration_s": 1068.96,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "1068.960000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "53448"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.52
+ },
+ {
+  "path": "I:\\2026.09.24\\A7M4\\C0148.MP4",
+  "name": "C0148.MP4",
+  "size_mib": 13696.5,
+  "duration_s": 537.6,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "537.600000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "26880"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.54
+ },
+ {
+  "path": "I:\\2026.09.24\\A7M4\\C0150.MP4",
+  "name": "C0150.MP4",
+  "size_mib": 43137.1,
+  "duration_s": 1694.4,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "1694.400000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "84720"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.55
+ },
+ {
+  "path": "I:\\2026.09.24\\A7M4\\C0151.MP4",
+  "name": "C0151.MP4",
+  "size_mib": 15040.6,
+  "duration_s": 588.96,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "588.960000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "29448"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.58
+ },
+ {
+  "path": "I:\\2026.09.24\\A7M4\\C0152.MP4",
+  "name": "C0152.MP4",
+  "size_mib": 43585.1,
+  "duration_s": 1711.2,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "1711.200000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "85560"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.46
+ },
+ {
+  "path": "I:\\2026.09.24\\A7M4\\C0154.MP4",
+  "name": "C0154.MP4",
+  "size_mib": 256.3,
+  "duration_s": 8.16,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "8.160000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "408"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.43
+ },
+ {
+  "path": "I:\\2026.09.24\\A7M4\\C0153.MP4",
+  "name": "C0153.MP4",
+  "size_mib": 768.3,
+  "duration_s": 28.32,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "28.320000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "1416"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.47
+ },
+ {
+  "path": "I:\\2026.09.24\\A7M4\\C0155.MP4",
+  "name": "C0155.MP4",
+  "size_mib": 192.3,
+  "duration_s": 7.2,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "7.200000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "360"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.47
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0513.MP4",
+  "name": "C0513.MP4",
+  "size_mib": 384.3,
+  "duration_s": 14.4,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "14.400000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "720"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.45
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0514.MP4",
+  "name": "C0514.MP4",
+  "size_mib": 576.3,
+  "duration_s": 20.16,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "20.160000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "1008"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.43
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0515.MP4",
+  "name": "C0515.MP4",
+  "size_mib": 320.3,
+  "duration_s": 12.48,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "12.480000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "624"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.42
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0517.MP4",
+  "name": "C0517.MP4",
+  "size_mib": 320.3,
+  "duration_s": 12.0,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "12.000000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "600"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.35
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0516.MP4",
+  "name": "C0516.MP4",
+  "size_mib": 512.3,
+  "duration_s": 19.2,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "19.200000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "960"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.42
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0518.MP4",
+  "name": "C0518.MP4",
+  "size_mib": 448.3,
+  "duration_s": 15.84,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "15.840000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "792"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.47
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0519.MP4",
+  "name": "C0519.MP4",
+  "size_mib": 448.3,
+  "duration_s": 16.32,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "16.320000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "816"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.39
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0522.MP4",
+  "name": "C0522.MP4",
+  "size_mib": 512.3,
+  "duration_s": 17.76,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "17.760000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "888"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.37
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0521.MP4",
+  "name": "C0521.MP4",
+  "size_mib": 1472.3,
+  "duration_s": 57.6,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "57.600000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "2880"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.42
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0520.MP4",
+  "name": "C0520.MP4",
+  "size_mib": 384.3,
+  "duration_s": 13.92,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "13.920000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "696"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.45
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0523.MP4",
+  "name": "C0523.MP4",
+  "size_mib": 59329.4,
+  "duration_s": 2330.4,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "2330.400000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "116520"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.47
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0526.MP4",
+  "name": "C0526.MP4",
+  "size_mib": 2112.3,
+  "duration_s": 82.56,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "82.560000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "4128"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.38
+ },
+ {
+  "path": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9757.MP4",
+  "name": "20260922_fx30_2_9757.MP4",
+  "size_mib": 960.3,
+  "duration_s": 36.96,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "36.960000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "1848"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.37
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0525.MP4",
+  "name": "C0525.MP4",
+  "size_mib": 44097.1,
+  "duration_s": 1731.36,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "1731.360000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "86568"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.42
+ },
+ {
+  "path": "I:\\2026.09.24\\FX3\\C0524.MP4",
+  "name": "C0524.MP4",
+  "size_mib": 68225.6,
+  "duration_s": 2679.36,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "2679.360000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "133968"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.5
+ },
+ {
+  "path": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9758.MP4",
+  "name": "20260922_fx30_2_9758.MP4",
+  "size_mib": 1920.3,
+  "duration_s": 74.88,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "74.880000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "3744"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.42
+ },
+ {
+  "path": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9760.MP4",
+  "name": "20260922_fx30_2_9760.MP4",
+  "size_mib": 1152.3,
+  "duration_s": 44.64,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "44.640000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "2232"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.41
+ },
+ {
+  "path": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9762.MP4",
+  "name": "20260922_fx30_2_9762.MP4",
+  "size_mib": 27264.8,
+  "duration_s": 1070.4,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "1070.400000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "53520"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.39
+ },
+ {
+  "path": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9759.MP4",
+  "name": "20260922_fx30_2_9759.MP4",
+  "size_mib": 2048.3,
+  "duration_s": 79.68,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "79.680000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "3984"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.45
+ },
+ {
+  "path": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9761.MP4",
+  "name": "20260922_fx30_2_9761.MP4",
+  "size_mib": 27776.8,
+  "duration_s": 1091.52,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "1091.520000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "54576"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.48
+ },
+ {
+  "path": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9763.MP4",
+  "name": "20260922_fx30_2_9763.MP4",
+  "size_mib": 43137.1,
+  "duration_s": 1693.92,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "1693.920000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "84696"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.49
+ },
+ {
+  "path": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9764.MP4",
+  "name": "20260922_fx30_2_9764.MP4",
+  "size_mib": 16000.6,
+  "duration_s": 627.36,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "627.360000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "31368"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.45
+ },
+ {
+  "path": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9765.MP4",
+  "name": "20260922_fx30_2_9765.MP4",
+  "size_mib": 43649.1,
+  "duration_s": 1715.04,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "1715.040000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "85752"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.46
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260921164928_0296_D.MP4",
+  "name": "DJI_20260921164928_0296_D.MP4",
+  "size_mib": 1124.4,
+  "duration_s": 108.291517,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "6491"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.16
+ },
+ {
+  "path": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9766.MP4",
+  "name": "20260922_fx30_2_9766.MP4",
+  "size_mib": 768.3,
+  "duration_s": 27.84,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s16be",
+    "tag": "twos",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "27.840000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "1392"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.49
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922194137_0299_D.MP4",
+  "name": "DJI_20260922194137_0299_D.MP4",
+  "size_mib": 3508.5,
+  "duration_s": 323.9236,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "19416"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.19
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922194704_0300_D.MP4",
+  "name": "DJI_20260922194704_0300_D.MP4",
+  "size_mib": 554.4,
+  "duration_s": 49.315933,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "2956"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.19
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922193226_0298_D.MP4",
+  "name": "DJI_20260922193226_0298_D.MP4",
+  "size_mib": 4152.8,
+  "duration_s": 385.668617,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "23117"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.24
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922193037_0297_D.MP4",
+  "name": "DJI_20260922193037_0297_D.MP4",
+  "size_mib": 693.1,
+  "duration_s": 63.780383,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "3823"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.32
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922194910_0301_D.MP4",
+  "name": "DJI_20260922194910_0301_D.MP4",
+  "size_mib": 867.8,
+  "duration_s": 80.08,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "4800"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.14
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922195740_0304_D.MP4",
+  "name": "DJI_20260922195740_0304_D.MP4",
+  "size_mib": 1846.1,
+  "duration_s": 166.81665,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "9999"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.08
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922195349_0302_D.MP4",
+  "name": "DJI_20260922195349_0302_D.MP4",
+  "size_mib": 2325.8,
+  "duration_s": 216.382833,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "12970"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.14
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922195727_0303_D.MP4",
+  "name": "DJI_20260922195727_0303_D.MP4",
+  "size_mib": 27.2,
+  "duration_s": 0.633967,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "38"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.17
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922200050_0306_D.MP4",
+  "name": "DJI_20260922200050_0306_D.MP4",
+  "size_mib": 1768.3,
+  "duration_s": 163.279783,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "9787"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.08
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922200029_0305_D.MP4",
+  "name": "DJI_20260922200029_0305_D.MP4",
+  "size_mib": 29.1,
+  "duration_s": 0.85085,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "51"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.1
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922200424_0307_D.MP4",
+  "name": "DJI_20260922200424_0307_D.MP4",
+  "size_mib": 4362.5,
+  "duration_s": 407.974233,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "24454"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.12
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922201611_0308_D.MP4",
+  "name": "DJI_20260922201611_0308_D.MP4",
+  "size_mib": 4858.7,
+  "duration_s": 450.70025,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "27015"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.13
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922202345_0309_D.MP4",
+  "name": "DJI_20260922202345_0309_D.MP4",
+  "size_mib": 826.2,
+  "duration_s": 71.604867,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "4292"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.12
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922202459_0310_D.MP4",
+  "name": "DJI_20260922202459_0310_D.MP4",
+  "size_mib": 5800.7,
+  "duration_s": 533.900033,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "32002"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.17
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922203514_0311_D.MP4",
+  "name": "DJI_20260922203514_0311_D.MP4",
+  "size_mib": 1034.7,
+  "duration_s": 95.54545,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "5727"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.25
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922204610_0314_D.MP4",
+  "name": "DJI_20260922204610_0314_D.MP4",
+  "size_mib": 17.8,
+  "verdict": "error",
+  "error": "RuntimeError: ffprobe found no streams.",
+  "traceback": "Traceback (most recent call last):\n  File \"F:\\1KeyTranscoder\\work\\probe_align_api.py\", line 107, in probe_one\n    fmt, streams = probe_streams(FFPROBE, path)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"F:\\1KeyTranscoder\\core\\probe.py\", line 207, in probe_streams\n    raise RuntimeError(\"ffprobe found no streams.\")\nRuntimeError: ffprobe found no streams.\n",
+  "elapsed_s": 0.13
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922204339_0312_D.MP4",
+  "name": "DJI_20260922204339_0312_D.MP4",
+  "size_mib": 461.9,
+  "duration_s": 41.49145,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "2487"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.24
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922204541_0313_D.MP4",
+  "name": "DJI_20260922204541_0313_D.MP4",
+  "size_mib": 319.0,
+  "duration_s": 27.961267,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "1676"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.2
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922204612_0315_D.MP4",
+  "name": "DJI_20260922204612_0315_D.MP4",
+  "size_mib": 134.1,
+  "duration_s": 10.66065,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "639"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.12
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922204627_0317_D.MP4",
+  "name": "DJI_20260922204627_0317_D.MP4",
+  "size_mib": 498.6,
+  "duration_s": 44.761383,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "2683"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.14
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922204624_0316_D.MP4",
+  "name": "DJI_20260922204624_0316_D.MP4",
+  "size_mib": 28.4,
+  "duration_s": 0.767433,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "46"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.18
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922204713_0318_D.MP4",
+  "name": "DJI_20260922204713_0318_D.MP4",
+  "size_mib": 51.3,
+  "duration_s": 2.85285,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "171"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.2
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922204717_0319_D.MP4",
+  "name": "DJI_20260922204717_0319_D.MP4",
+  "size_mib": 158.4,
+  "duration_s": 12.96295,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "777"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.21
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922204731_0320_D.MP4",
+  "name": "DJI_20260922204731_0320_D.MP4",
+  "size_mib": 65.5,
+  "duration_s": 4.15415,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "249"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.57
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922204859_0322_D.MP4",
+  "name": "DJI_20260922204859_0322_D.MP4",
+  "size_mib": 1352.0,
+  "duration_s": 125.108317,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "7499"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.91
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922204737_0321_D.MP4",
+  "name": "DJI_20260922204737_0321_D.MP4",
+  "size_mib": 453.3,
+  "duration_s": 40.507133,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "2428"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 1.19
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922205444_0323_D.MP4",
+  "name": "DJI_20260922205444_0323_D.MP4",
+  "size_mib": 2474.8,
+  "duration_s": 238.238,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "14280"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 1.1
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922210354_0324_D.MP4",
+  "name": "DJI_20260922210354_0324_D.MP4",
+  "size_mib": 4859.9,
+  "duration_s": 461.294167,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "27650"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 1.52
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922211137_0325_D.MP4",
+  "name": "DJI_20260922211137_0325_D.MP4",
+  "size_mib": 584.4,
+  "duration_s": 51.3513,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "3078"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 2.05
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922211231_0326_D.MP4",
+  "name": "DJI_20260922211231_0326_D.MP4",
+  "size_mib": 30.4,
+  "duration_s": 1.017683,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "61"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 2.11
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922211235_0327_D.MP4",
+  "name": "DJI_20260922211235_0327_D.MP4",
+  "size_mib": 28.1,
+  "duration_s": 0.767433,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "46"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 2.21
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922211239_0328_D.MP4",
+  "name": "DJI_20260922211239_0328_D.MP4",
+  "size_mib": 627.6,
+  "duration_s": 55.722333,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "3340"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 2.57
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922211339_0330_D.MP4",
+  "name": "DJI_20260922211339_0330_D.MP4",
+  "size_mib": 533.0,
+  "duration_s": 45.862483,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "2749"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 1.37
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922211427_0331_D.MP4",
+  "name": "DJI_20260922211427_0331_D.MP4",
+  "size_mib": 27.7,
+  "duration_s": 0.684017,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "41"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 1.25
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922211337_0329_D.MP4",
+  "name": "DJI_20260922211337_0329_D.MP4",
+  "size_mib": 27.7,
+  "duration_s": 0.717383,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "43"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 1.71
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922211428_0332_D.MP4",
+  "name": "DJI_20260922211428_0332_D.MP4",
+  "size_mib": 814.3,
+  "duration_s": 74.541133,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "4468"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.2
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922212143_0334_D.MP4",
+  "name": "DJI_20260922212143_0334_D.MP4",
+  "size_mib": 1875.1,
+  "duration_s": 175.108267,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "10496"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.16
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922211624_0333_D.MP4",
+  "name": "DJI_20260922211624_0333_D.MP4",
+  "size_mib": 2308.0,
+  "duration_s": 218.334783,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "13087"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.27
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922212535_0335_D.MP4",
+  "name": "DJI_20260922212535_0335_D.MP4",
+  "size_mib": 1781.4,
+  "duration_s": 163.346517,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "9791"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.67
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922212821_0336_D.MP4",
+  "name": "DJI_20260922212821_0336_D.MP4",
+  "size_mib": 198.1,
+  "duration_s": 15.648967,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "938"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 0.71
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922212838_0337_D.MP4",
+  "name": "DJI_20260922212838_0337_D.MP4",
+  "size_mib": 27.2,
+  "duration_s": 0.684017,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "41"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 1.46
+ },
+ {
+  "path": "I:\\2026.09.24\\Mavic4P\\DJI_20260922212840_0338_D.MP4",
+  "name": "DJI_20260922212840_0338_D.MP4",
+  "size_mib": 1782.4,
+  "duration_s": 162.629133,
+  "n_audio": 0,
+  "audio": [],
+  "n_data": 2,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "9748"
+  },
+  "eligible": false,
+  "eligibility": "仅 0 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 1.9
+ },
+ {
+  "path": "I:\\2026.09.24\\Pocket3\\DJI_20260922193237_0001_D.MP4",
+  "name": "DJI_20260922193237_0001_D.MP4",
+  "size_mib": 8018.2,
+  "duration_s": 584.448,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "aac",
+    "tag": "mp4a",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "584.448000"
+   }
+  ],
+  "n_data": 3,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "35030"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 2.88
+ },
+ {
+  "path": "I:\\2026.09.24\\Pocket3\\DJI_20260922194233_0002_D.MP4",
+  "name": "DJI_20260922194233_0002_D.MP4",
+  "size_mib": 452.9,
+  "duration_s": 32.9329,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "aac",
+    "tag": "mp4a",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "32.917333"
+   }
+  ],
+  "n_data": 3,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "60000/1001",
+   "avg_fps": "60000/1001",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "1974"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 2.82
+ },
+ {
+  "path": "I:\\2026.09.24\\Pocket3\\DJI_20260922194405_0003_D.MP4",
+  "name": "DJI_20260922194405_0003_D.MP4",
+  "size_mib": 3957.9,
+  "duration_s": 403.08,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "aac",
+    "tag": "mp4a",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "403.050667"
+   }
+  ],
+  "n_data": 3,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "25/1",
+   "avg_fps": "25/1",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "10077"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 2.34
+ },
+ {
+  "path": "I:\\2026.09.24\\Pocket3\\DJI_20260922195342_0004_D.MP4",
+  "name": "DJI_20260922195342_0004_D.MP4",
+  "size_mib": 16389.3,
+  "duration_s": 1669.28,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "aac",
+    "tag": "mp4a",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "1669.248000"
+   }
+  ],
+  "n_data": 3,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "25/1",
+   "avg_fps": "25/1",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "41732"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 2.2
+ },
+ {
+  "path": "I:\\2026.09.24\\Pocket3\\DJI_20260922202132_0005_D.MP4",
+  "name": "DJI_20260922202132_0005_D.MP4",
+  "size_mib": 16388.0,
+  "duration_s": 1669.28,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "aac",
+    "tag": "mp4a",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "1669.248000"
+   }
+  ],
+  "n_data": 3,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "25/1",
+   "avg_fps": "25/1",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "41732"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 1.39
+ },
+ {
+  "path": "I:\\2026.09.24\\Pocket3\\DJI_20260922204921_0006_D.MP4",
+  "name": "DJI_20260922204921_0006_D.MP4",
+  "size_mib": 16387.9,
+  "duration_s": 1669.24,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "aac",
+    "tag": "mp4a",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "1669.184000"
+   }
+  ],
+  "n_data": 3,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "25/1",
+   "avg_fps": "25/1",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "41731"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 1.49
+ },
+ {
+  "path": "I:\\2026.09.24\\Pocket3\\DJI_20260922211711_0007_D.MP4",
+  "name": "DJI_20260922211711_0007_D.MP4",
+  "size_mib": 8675.6,
+  "duration_s": 883.72,
+  "n_audio": 1,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "aac",
+    "tag": "mp4a",
+    "rate": "48000",
+    "channels": 2,
+    "bits": null,
+    "dur_s": "883.669333"
+   }
+  ],
+  "n_data": 3,
+  "has_rtmd": false,
+  "video": {
+   "codec": "hevc",
+   "tag": "hvc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "25/1",
+   "avg_fps": "25/1",
+   "pix_fmt": "yuv420p10le",
+   "bits": null,
+   "nb_frames": "22093"
+  },
+  "eligible": false,
+  "eligibility": "仅 1 条音频流: 1ch/2ch 布局默认不做对齐 (需 >= 3 条独立单声道 PCM 流)",
+  "verdict": "not_eligible_layout",
+  "elapsed_s": 1.29
+ },
+ {
+  "path": "I:\\2026.09.24\\HXR-NX800\\CA0230.MP4",
+  "name": "CA0230.MP4",
+  "size_mib": 42145.2,
+  "duration_s": 1689.6,
+  "n_audio": 4,
+  "audio": [
+   {
+    "index": 1,
+    "codec": "pcm_s24be",
+    "tag": "ipcm",
+    "rate": "48000",
+    "channels": 1,
+    "bits": "24",
+    "dur_s": "1689.600000"
+   },
+   {
+    "index": 2,
+    "codec": "pcm_s24be",
+    "tag": "ipcm",
+    "rate": "48000",
+    "channels": 1,
+    "bits": "24",
+    "dur_s": "1689.600000"
+   },
+   {
+    "index": 3,
+    "codec": "pcm_s24be",
+    "tag": "ipcm",
+    "rate": "48000",
+    "channels": 1,
+    "bits": "24",
+    "dur_s": "1689.600000"
+   },
+   {
+    "index": 4,
+    "codec": "pcm_s24be",
+    "tag": "ipcm",
+    "rate": "48000",
+    "channels": 1,
+    "bits": "24",
+    "dur_s": "1689.600000"
+   }
+  ],
+  "n_data": 1,
+  "has_rtmd": true,
+  "video": {
+   "codec": "h264",
+   "tag": "avc1",
+   "w": 3840,
+   "h": 2160,
+   "fps": "50/1",
+   "avg_fps": "50/1",
+   "pix_fmt": "yuv422p10le",
+   "bits": "10",
+   "nb_frames": "84480"
+  },
+  "eligible": true,
+  "eligibility": "",
+  "default": {
+   "status": "already_aligned",
+   "detail": "no track requires a fix",
+   "anchor_stream": 2,
+   "anchor_channel": null,
+   "channels": [
+    {
+     "stream": 0,
+     "decision": "untouched",
+     "reason": "insufficient_frames",
+     "delay_ms": null,
+     "delay_samples": null,
+     "fine_delay_ms": null,
+     "confidence": 0.0,
+     "polarity": 1,
+     "drift_ppm": 0.0,
+     "constant": false,
+     "rms_dbfs": -53.2,
+     "usable_frames": 0,
+     "warnings": [
+      "phase slope estimate degenerated (diagnostic)"
+     ],
+     "traj_mad_ms": null,
+     "traj_spread_samples": null
+    },
+    {
+     "stream": 1,
+     "decision": "untouched",
+     "reason": "insufficient_frames",
+     "delay_ms": null,
+     "delay_samples": null,
+     "fine_delay_ms": null,
+     "confidence": 0.0,
+     "polarity": 1,
+     "drift_ppm": 0.0,
+     "constant": false,
+     "rms_dbfs": -53.2,
+     "usable_frames": 0,
+     "warnings": [
+      "phase slope estimate degenerated (diagnostic)"
+     ],
+     "traj_mad_ms": null,
+     "traj_spread_samples": null
+    },
+    {
+     "stream": 2,
+     "decision": "anchor",
+     "reason": null,
+     "delay_ms": 0.0,
+     "delay_samples": 0.0,
+     "fine_delay_ms": 0.0,
+     "confidence": 1.0,
+     "polarity": 1,
+     "drift_ppm": 0.0,
+     "constant": true,
+     "rms_dbfs": -15.5,
+     "usable_frames": null,
+     "warnings": [],
+     "traj_mad_ms": null,
+     "traj_spread_samples": null
+    },
+    {
+     "stream": 3,
+     "decision": "already_aligned",
+     "reason": null,
+     "delay_ms": 0.0208,
+     "delay_samples": 1.0,
+     "fine_delay_ms": 0.0069,
+     "confidence": 0.829,
+     "polarity": 1,
+     "drift_ppm": -0.0,
+     "constant": true,
+     "rms_dbfs": -13.8,
+     "usable_frames": 13463,
+     "warnings": [],
+     "traj_mad_ms": 0.0,
+     "traj_spread_samples": 2.0
+    }
+   ],
+   "fixed_files": 0
+  },
+  "default_log": [
+   "channel-sync: frame-parallel estimation (16895 frames -> 12 processes)",
+   "channel-sync: CH1 宽窗复测仍未通过证据门 (low_confidence: usable 0/16895 = 0%, conf 0.00) — 按未通过处理 (窄窗原因 usable_frames)",
+   "channel-sync: CH1 insufficient_frames (conf 0.00, usable 0, mad nanms, ppm 0.00) — 该轨 untouched",
+   "channel-sync: CH2 宽窗复测仍未通过证据门 (low_confidence: usable 0/16895 = 0%, conf 0.00) — 按未通过处理 (窄窗原因 usable_frames)",
+   "channel-sync: CH2 insufficient_frames (conf 0.00, usable 0, mad nanms, ppm 0.00) — 该轨 untouched",
+   "channel-sync: anchor=CH3, measured CH1=nan, CH2=nan, CH4=+0.021ms(conf 0.83)",
+   "channel-sync: already aligned (无轨需要修正; 可测轨 |delay| < 0.05 ms)"
+  ],
+  "n_silent": 0,
+  "rms_dbfs": [
+   -53.2,
+   -53.2,
+   -15.5,
+   -13.8
+  ],
+  "verdict": "alignable",
+  "elapsed_s": 57.48
+ }
+]

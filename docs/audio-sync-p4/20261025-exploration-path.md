@@ -198,3 +198,49 @@ work/task3_20261025/
 work/analyze_all.py / probe_align_api.py / task3_restore.py / mp4_inventory.py
 docs/audio-sync-p4/plots/task2_*.png
 ```
+
+### 5.1 后续：GPAC 标准还原在超大文件上不可行 → 字节级快速还原
+
+`transparent_restore` 的标准流程对 49.78 GiB stage 执行 MP4Box `-ref`（tref）、
+meta、`-flat`、`-brand` 四次整文件重写；实测 `-ref` 一步 17 分钟仅推进 <1 GiB
+I/O（GPAC 在大文件上的随机写性能不可接受）。因此改用 `work/fast_restore.py`：
+
+- stage 已经由 GPAC `mux_new` 生成（video + 4×对齐 WAV + rtmd 轨，结构合法）；
+- 一次顺序拷贝完成：ftyp 替换为源 32 B（XAVC/XAVC,mp42,nras,iso6）、9 个 uuid
+  box 补齐（root PROF/XMP、moov USMT、6×per-trak USMT，且**跳过 GPAC 已带上的
+  重复 uuid**）、文件级 meta box（nrtm lens profile+XML，idat 自包含）原样追加、
+  meta 轨 tref/cdsc 插入；
+- 因为 ftyp 变长 + moov 插入 box 会让 mdat 后移，**同步修正全部 co64/stco
+  chunk offset**（6 轨共 6 组）；
+- 音频 sample entry 从 GPAC 的 QuickTime `in24`(78 B) 换回源的 `ipcm`(50 B)，
+  同时修正 stsd/stbl/minf/mdia/trak/moov 六层大小；GPAC 尾部 size=0 的零类型
+  padding box 丢弃（否则它的"到文件尾"语义会吞掉后面追加的 root uuid/meta）；
+- 最后用程序 API `patch_track_durations` / `patch_movie_duration` /
+  `normalize_track_flags` 收尾。
+
+一次拷贝即可完成（实测 ~3–5 min / 50 GiB），不需要任何 GPAC 整文件重写。
+
+### 5.2 关键对照实验：真实短 Sony 源（C1093，3 s）上的 std vs fast 还原
+
+testsets 的 `20260903_C1093.MP4`（4×mono PCM + rtmd，180 帧）上同时跑了：
+`preservation.transparent_restore`（生产标准流程）与 `work/fast_restore.py`
+（字节级一次拷贝补齐），然后用 Gyroflow type-3 对比：
+
+| | 源 | 标准还原 | fast 还原 |
+|---|---|---|---|
+| 帧数 | 180 | 180 | 180 |
+| org_quat 变化帧 | 179 | **179** | **179** |
+| 首帧时间戳/首四元数 | 6.6565 ms / 一致 | **完全一致** | **完全一致** |
+| brand/uuid/nrtm/tref | XAVC / 8 / True / meta→1 | 一致 | 一致 |
+
+结论：**fast_restore 与生产标准还原在消费方层面等价**（短文件上完全一致）。
+这同时说明字节级还原方法本身正确；C1305 全长验证中 Gyroflow 未识别的问题
+来自 stage/音频中间文件差异（详见 §5.3），不是 fast_restore 的补箱逻辑。
+
+### 5.3 音频中间文件：必须用 ffmpeg 的 `.mov`，不能用 WAV 直接给 GPAC
+
+实测 GPAC `-add chX_pol.wav#audio` 写出的 `in24` payload 与 WAV 内容**完全不符**
+（解码后与 WAV 零样本相等、最佳 lag 6.4 万采样），而生产 channel-sync 透明模式
+一直使用 ffmpeg 生成的 `.mov`（pcm_s24be）中间文件。已修正 stage 构建：
+先 `ffmpeg -c:a pcm_s24be -f mov` 再交给 GPAC；音频 sample entry 在 fast_restore
+中替换为源的 `ipcm`(50 B)，并同步修正六层祖先大小。

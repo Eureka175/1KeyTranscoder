@@ -161,3 +161,74 @@ data 轨被写成假 `stts`）。
 3. 0.6 s / 33 s 短编码只验证**策略与容器**，不代表长片编码质量。
 4. 全长 GPAC 还原耗时数十分钟/文件；本次只对 C1305 执行（C1306 同参数路径，
    如需交付两条素材需再跑一次）。
+
+### 3.4 全长 GPAC 元数据还原：C1305 结果（已完成，逐项验证）
+
+产物：`E:\1kt_work\long_align\deliver\20260919_C1305_4ch_aligned_restored.mp4`
+（49.78 GiB；源 49.82 GiB）。方法见探索报告 §5.1（GPAC stage + 字节级一次拷贝补齐
+本应由 GPAC 多次整文件重写完成的 ftyp/uuid/meta/tref/audio-entry/offset 修正）。
+
+| 检查项 | 源 XAVC | 还原产物 | 结果 |
+|---|---|---|---|
+| major brand / compatible | XAVC / XAVC,mp42,nras,iso6 | 同 | **一致** |
+| 轨道 | vide + 4×soun + meta(rtmd) | 同（6 轨） | **一致** |
+| uuid 多重集 | 9 | 9 | **missing=[] added=[]** |
+| nrtm（lens profile/XML） | True | True | **一致** |
+| tref/cdsc（rtmd→video） | 1 | 1 | **一致** |
+| 音频 sample entry | 4×ipcm(50 B) | 4×ipcm(50 B) | **一致** |
+| mvhd（timescale/duration） | 60000 / 288438150 | 同 | **一致** |
+| 视频码流 | streamhash afdfc341…88786 | 同 | **逐包一致** |
+| rtmd 数据流字节 | streamhash 2e4c24e7…064b0 | 同 | **逐包一致** |
+| 4 条音轨 md5（解码） | aaa773b6… / 323f50a4… / 9604c972… / fe4a79d2… | 同 | **4/4 一致** |
+| **Gyroflow 相机数据** | 288150 帧 / **288149 帧四元数变化** / 首 ts 7.376 ms | 同 | **完全一致，first/last ts 差 0.0 ms** |
+| 顶层 box 顺序 | ftyp,uuid,uuid,free,mdat,moov,meta | ftyp,moov,mdat,free,uuid,uuid,meta | **仅顺序不同**（内容集合一致） |
+
+结论：还原产物在**容器事实、视频/rtmd 码流、音频内容、Gyroflow 消费方**四个层面
+都与源 XAVC 一致；唯一差异是顶层 box 顺序（此前跨机位验证已证明不影响消费方）。
+对比之下，旧 ffmpeg 成品缺失 brand/uuid/nrtm/tref/整个 rtmd 轨，Gyroflow 读到
+0 帧四元数变化且时间线偏移 7.376 ms（§3.2）。
+
+### 3.5 全长 GPAC 还原：C1306 结果（已完成，逐项验证）
+
+产物：E:\1kt_work\long_align\deliver\20260919_C1306_4ch_aligned_restored.mp4
+（43.12 GiB；源 44.16 GiB→实际 stage 43.12 GiB）。
+
+| 检查项 | 源 | 还原 | 结果 |
+|---|---|---|---|
+| brand / compat | XAVC / XAVC,mp42,nras,iso6 | 同 | 一致 |
+| 轨道 | vide+4×soun+meta(rtmd) | 同（6 轨） | 一致 |
+| uuid 多重集 | 9 | 9 | missing=[] added=[] |
+| nrtm / tref | True / 1 | True / 1 | 一致 |
+| 音频 sample entry / mvhd | ipcm / 50000? | 同 | 一致 |
+| 视频 streamhash | 与还原 | — | **逐包一致** |
+| rtmd 数据流 streamhash | 与还原 | — | **逐包一致** |
+| 4 条音轨 md5 | 对齐 WAV | 与 WAV 全等 | **4/4 一致** |
+| **Gyroflow 相机数据** | 249630 帧 / **249629 帧四元数变化** / 首 ts 7.3747 ms | 完全相同 | **首/尾 ts 差 0.0 ms** |
+| 顶层 box 顺序 | ftyp,uuid,uuid,free,mdat,moov,meta | ftyp,moov,mdat,free,uuid,uuid,meta | 仅顺序不同 |
+
+两条长素材的 GPAC 元数据还原均完成并通过**容器事实 + 视频/rtmd 码流 + 音频内容
++ Gyroflow 消费方**四层验证；旧 ffmpeg 成品（缺元数据）已被还原产物取代并删除。
+
+### 4.1 硬件路径（QSV）验证（2026-10-25 02:35）
+
+同一份 Mavic4P 短文件（0.6 s）在 **硬件 QSV 编码路径**上验证策略：
+
+| 场景 | 输出/日志 |
+|---|---|
+| 默认策略 | `[META_POLICY] DJI 非 Action 机型 (tool='DJI Mavic4 Pro L3B'): 默认不保留元数据`；随后 `[POLICY] non-Sony: metadata dropped by policy`；输出**仅 1 条视频流**（无 djmd/dbgi） |
+| `--preserve-metadata` | 走 DJI 保留管线（QSVEncC），`dji check=basic`：**PRESERVED=12 MODIFIED=0 MISSING=0 structural_success=True**；输出保留 `djmd`/`dbgi` 数据轨；并可见 tkhd 归一（track flags 2→7、alternate_group 5→0） |
+
+### 5.1 生产入口实测（2CH 静音跳过，2026-10-25 01:31）
+
+对 `20260903_C1093.MP4`（4 音频：CH1/CH2 静音 -64/-68 dBFS、CH3/CH4 有效）跑
+真实生产入口：
+
+```
+python 1kt.py --input <该文件目录> --output <out> --encoder x265 --preset fast --channel-sync
+```
+
+日志输出：`CH1/CH2 silent_track — 轨道级 untouched`；随后
+`4 条音频流中仅 2 条健康 — two_channel_only, 默认整文件跳过对齐`；最终 done=1
+failed=0，输出保留 4 条 ipcm 音轨与 rtmd 轨（Sony 保留管线），**没有发生任何
+音频对齐修正/重封装**。这验证了新策略在真实入口上的行为：探测到 2CH 有效即
+整文件跳过，而非在两条有效轨之间做纠正。

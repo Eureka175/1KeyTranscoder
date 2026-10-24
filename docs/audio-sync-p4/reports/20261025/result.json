@@ -1,0 +1,313 @@
+{
+ "source": "F:\\1KeyTranscoder\\testsets\\a7m5_4ch_speech\\20260903\\A7M5\\20260903_C1093.MP4",
+ "movie_ts": 60000,
+ "tracks": [
+  [
+   1,
+   "vide",
+   "hvc1"
+  ],
+  [
+   2,
+   "soun",
+   "ipcm"
+  ],
+  [
+   3,
+   "soun",
+   "ipcm"
+  ],
+  [
+   4,
+   "soun",
+   "ipcm"
+  ],
+  [
+   5,
+   "soun",
+   "ipcm"
+  ],
+  [
+   6,
+   "meta",
+   "rtmd"
+  ]
+ ],
+ "facts": {
+  "source": {
+   "ftyp_major": "XAVC",
+   "ftyp_compatible": [
+    "XAVC",
+    "mp42",
+    "nras",
+    "iso6"
+   ],
+   "nrtm": true,
+   "tref_cdsc": [
+    {
+     "handler": "meta",
+     "refs": [
+      1
+     ]
+    }
+   ],
+   "audio_entries": [
+    {
+     "handler": "vide",
+     "fourcc": "hvc1"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    }
+   ],
+   "mvhd": {
+    "timescale": 60000,
+    "duration": 180180,
+    "seconds": 3.003
+   },
+   "top_level": [
+    "ftyp",
+    "uuid",
+    "free",
+    "mdat",
+    "moov",
+    "meta"
+   ],
+   "tracks": [
+    [
+     "vide",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "meta",
+     null
+    ]
+   ],
+   "uuid_n": 8
+  },
+  "std": {
+   "ftyp_major": "XAVC",
+   "ftyp_compatible": [
+    "XAVC",
+    "mp42",
+    "nras",
+    "iso6"
+   ],
+   "nrtm": true,
+   "tref_cdsc": [
+    {
+     "handler": "meta",
+     "refs": [
+      1
+     ]
+    }
+   ],
+   "audio_entries": [
+    {
+     "handler": "vide",
+     "fourcc": "hvc1"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    }
+   ],
+   "mvhd": {
+    "timescale": 60000,
+    "duration": 180180,
+    "seconds": 3.003
+   },
+   "top_level": [
+    "ftyp",
+    "mdat",
+    "free",
+    "meta",
+    "moov",
+    "uuid"
+   ],
+   "tracks": [
+    [
+     "vide",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "meta",
+     null
+    ]
+   ],
+   "uuid_n": 8
+  },
+  "fast": {
+   "ftyp_major": "XAVC",
+   "ftyp_compatible": [
+    "XAVC",
+    "mp42",
+    "nras",
+    "iso6"
+   ],
+   "nrtm": true,
+   "tref_cdsc": [
+    {
+     "handler": "meta",
+     "refs": [
+      1
+     ]
+    }
+   ],
+   "audio_entries": [
+    {
+     "handler": "vide",
+     "fourcc": "hvc1"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    },
+    {
+     "handler": "soun",
+     "fourcc": "ipcm"
+    }
+   ],
+   "mvhd": {
+    "timescale": 60000,
+    "duration": 180180,
+    "seconds": 3.003
+   },
+   "top_level": [
+    "ftyp",
+    "moov",
+    "mdat",
+    "free",
+    "uuid",
+    "meta"
+   ],
+   "tracks": [
+    [
+     "vide",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "meta",
+     null
+    ]
+   ],
+   "uuid_n": 8
+  }
+ },
+ "gyro_type3": {
+  "source": {
+   "frames": 180,
+   "quat_varying": 179,
+   "first_ts": 6.656500184533531,
+   "first_quat": [
+    -0.6960831343745002,
+    -0.7172842629823387,
+    -0.0036380738342177395,
+    0.030956741970547656
+   ]
+  },
+  "std": {
+   "frames": 180,
+   "quat_varying": 179,
+   "first_ts": 6.656500184533531,
+   "first_quat": [
+    -0.6960831343745002,
+    -0.7172842629823387,
+    -0.0036380738342177395,
+    0.030956741970547656
+   ]
+  },
+  "fast": {
+   "frames": 180,
+   "quat_varying": 179,
+   "first_ts": 6.656500184533531,
+   "first_quat": [
+    -0.6960831343745002,
+    -0.7172842629823387,
+    -0.0036380738342177395,
+    0.030956741970547656
+   ]
+  }
+ }
+}

@@ -425,3 +425,28 @@ PR 测试通过后，`tkhd` 归一不再是外部脚本，而是生产容器层�
 
 同时确认：软件不实现切片功能；`ffmpeg` 只承担 x265 编码器、解码与 wrapper 角色。
 抽检片段仍属外部工序，必要时可用 `fix_tkhd.py` 对手工产物做同样修补。
+
+## 16. 最终交付更新（2026-10-25）：GPAC 元数据还原版
+
+因任务3要求"输出文件尽可能还原原始 XAVC 流格式并用 Gyroflow 验证"，两条长素材
+已重新产出**元数据还原版**并逐项验证（旧 ffmpeg stream-copy 成品缺 brand/uuid/nrtm/
+tref/rtmd 轨，已删除、由下列文件取代）：
+
+| 文件 | 大小 | 说明 |
+|---|---|---|
+| `E:\1kt_work\long_align\deliver\20260919_C1305_4ch_aligned_restored.mp4` | 49.78 GiB | 源视频+rtmd 轨 + 对齐/极性修正 4CH；brand XAVC、uuid 9/9、nrtm、tref 全部还原 |
+| `E:\1kt_work\long_align\deliver\20260919_C1306_4ch_aligned_restored.mp4` | 43.12 GiB | 同上 |
+
+**逐项验证（C1305 / C1306 均通过）**：视频 streamhash 逐包等于源；rtmd 数据流
+streamhash 逐包等于源；4 条音轨解码 md5 等于对齐 WAV（4/4）；容器事实 brand /
+compat / 6 轨 / uuid 多重集 9/9 / nrtm / tref / audio entries / mvhd 全部等于源；
+**Gyroflow type-3 相机数据与源完全一致**（C1305: 288149 帧变化四元数、首尾
+时间戳差 0.0 ms；C1306: 249629 帧、差 0.0 ms）。唯一差异：顶层 box 顺序
+（内容集合一致，此前跨机位验证已证明不影响 Gyroflow 等消费方）。
+
+实现方式：GPAC `mux_new` 生成合法 6 轨 stage（音频用 ffmpeg 的 `.mov` 中间文件，
+不能用 WAV 直接喂 GPAC —— 实测会写坏 in24 payload），随后 `work/fast_restore.py`
+一次顺序拷贝补齐 ftyp/uuid/meta/tref、替换 ipcm sample entry、修正 co64/stco
+偏移与 mdhd 时长；避免 GPAC 对 50 GiB 文件的多轮整文件重写（实测 `-ref` 一步
+17 min 仅 <1 GiB I/O）。验证脚本 `work/verify_v2.py`，证据 JSON 已归档到
+`docs/audio-sync-p4/reports/20261025/`。

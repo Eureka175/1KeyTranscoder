@@ -1,0 +1,300 @@
+{
+ "testsets_before_2ch_policy": {
+  "count": 326,
+  "by_verdict": {
+   "not_eligible_layout": 180,
+   "alignable_relaxed_threshold": 5,
+   "alignable": 129,
+   "two_channel_only": 5,
+   "not_alignable": 7
+  },
+  "by_duration_bucket": {
+   "10-30s": 116,
+   "<=10s": 149,
+   "30-60s": 33,
+   "1-5min": 18,
+   ">20min": 7,
+   "5-20min": 3
+  },
+  "audio_categories": {
+   "1x 2ch (pcm_s16be)": 112,
+   "0-audio": 18,
+   "4x mono PCM": 146,
+   "1x 2ch (aac)": 50
+  },
+  "total_gib": 306.94,
+  "silent_hist": {
+   "null": 180,
+   "4": 5,
+   "2": 73,
+   "0": 58,
+   "1": 10
+  },
+  "with_rtmd": 258,
+  "with_data": 325
+ },
+ "testsets_after_2ch_policy": {
+  "count": 326,
+  "by_verdict": {
+   "not_eligible_layout": 180,
+   "alignable_relaxed_threshold": 5,
+   "two_channel_only": 73,
+   "alignable": 61,
+   "not_alignable": 7
+  },
+  "by_duration_bucket": {
+   "10-30s": 116,
+   "<=10s": 149,
+   "30-60s": 33,
+   "1-5min": 18,
+   ">20min": 7,
+   "5-20min": 3
+  },
+  "audio_categories": {
+   "1x 2ch (pcm_s16be)": 112,
+   "0-audio": 18,
+   "4x mono PCM": 146,
+   "1x 2ch (aac)": 50
+  },
+  "total_gib": 306.94,
+  "silent_hist": {
+   "null": 180,
+   "4": 5,
+   "2": 73,
+   "0": 58,
+   "1": 10
+  },
+  "with_rtmd": 258,
+  "with_data": 325
+ },
+ "i_20260924": {
+  "count": 84,
+  "by_verdict": {
+   "not_eligible_layout": 82,
+   "error": 1,
+   "alignable": 1
+  },
+  "by_duration_bucket": {
+   "5-20min": 16,
+   ">20min": 11,
+   "<=10s": 12,
+   "10-30s": 15,
+   "30-60s": 11,
+   "1-5min": 18,
+   "unknown": 1
+  },
+  "audio_categories": {
+   "1x 2ch (pcm_s16be)": 33,
+   "0-audio": 42,
+   "unknown": 1,
+   "1x 2ch (aac)": 7,
+   "4x mono PCM": 1
+  },
+  "total_gib": 649.74,
+  "silent_hist": {
+   "null": 83,
+   "0": 1
+  },
+  "with_rtmd": 34,
+  "with_data": 83
+ },
+ "testsets_by_group": {
+  "root": {
+   "count": 326,
+   "by_verdict": {
+    "not_eligible_layout": 180,
+    "alignable_relaxed_threshold": 5,
+    "alignable": 129,
+    "two_channel_only": 5,
+    "not_alignable": 7
+   },
+   "by_duration_bucket": {
+    "10-30s": 116,
+    "<=10s": 149,
+    "30-60s": 33,
+    "1-5min": 18,
+    ">20min": 7,
+    "5-20min": 3
+   },
+   "audio_categories": {
+    "1x 2ch (pcm_s16be)": 112,
+    "0-audio": 18,
+    "4x mono PCM": 146,
+    "1x 2ch (aac)": 50
+   },
+   "total_gib": 306.94,
+   "silent_hist": {
+    "null": 180,
+    "4": 5,
+    "2": 73,
+    "0": 58,
+    "1": 10
+   },
+   "with_rtmd": 258,
+   "with_data": 325
+  }
+ },
+ "i_by_group": {
+  "A7M4": {
+   "count": 9,
+   "by_verdict": {
+    "not_eligible_layout": 9
+   },
+   "by_duration_bucket": {
+    "5-20min": 4,
+    ">20min": 2,
+    "<=10s": 2,
+    "10-30s": 1
+   },
+   "audio_categories": {
+    "1x 2ch (pcm_s16be)": 9
+   },
+   "total_gib": 150.19,
+   "silent_hist": {
+    "null": 9
+   },
+   "with_rtmd": 9,
+   "with_data": 9
+  },
+  "FX3": {
+   "count": 14,
+   "by_verdict": {
+    "not_eligible_layout": 14
+   },
+   "by_duration_bucket": {
+    "10-30s": 9,
+    "30-60s": 1,
+    ">20min": 3,
+    "1-5min": 1
+   },
+   "audio_categories": {
+    "1x 2ch (pcm_s16be)": 14
+   },
+   "total_gib": 174.94,
+   "silent_hist": {
+    "null": 14
+   },
+   "with_rtmd": 14,
+   "with_data": 14
+  },
+  "FX30": {
+   "count": 10,
+   "by_verdict": {
+    "not_eligible_layout": 10
+   },
+   "by_duration_bucket": {
+    "30-60s": 2,
+    "1-5min": 2,
+    "5-20min": 3,
+    ">20min": 2,
+    "10-30s": 1
+   },
+   "audio_categories": {
+    "1x 2ch (pcm_s16be)": 10
+   },
+   "total_gib": 160.82,
+   "silent_hist": {
+    "null": 10
+   },
+   "with_rtmd": 10,
+   "with_data": 10
+  },
+  "HXR-NX800": {
+   "count": 1,
+   "by_verdict": {
+    "alignable": 1
+   },
+   "by_duration_bucket": {
+    ">20min": 1
+   },
+   "audio_categories": {
+    "4x mono PCM": 1
+   },
+   "total_gib": 41.16,
+   "silent_hist": {
+    "0": 1
+   },
+   "with_rtmd": 1,
+   "with_data": 1
+  },
+  "Mavic4P": {
+   "count": 43,
+   "by_verdict": {
+    "not_eligible_layout": 42,
+    "error": 1
+   },
+   "by_duration_bucket": {
+    "1-5min": 15,
+    "5-20min": 6,
+    "30-60s": 7,
+    "<=10s": 10,
+    "unknown": 1,
+    "10-30s": 4
+   },
+   "audio_categories": {
+    "0-audio": 42,
+    "unknown": 1
+   },
+   "total_gib": 54.0,
+   "silent_hist": {
+    "null": 43
+   },
+   "with_rtmd": 0,
+   "with_data": 42
+  },
+  "Pocket3": {
+   "count": 7,
+   "by_verdict": {
+    "not_eligible_layout": 7
+   },
+   "by_duration_bucket": {
+    "5-20min": 3,
+    "30-60s": 1,
+    ">20min": 3
+   },
+   "audio_categories": {
+    "1x 2ch (aac)": 7
+   },
+   "total_gib": 68.62,
+   "silent_hist": {
+    "null": 7
+   },
+   "with_rtmd": 0,
+   "with_data": 7
+  }
+ },
+ "silent_combos_after": {
+  "1111": 5,
+  "1100": 73,
+  "0000": 58,
+  "0100": 5,
+  "1000": 5
+ },
+ "silent_combos_before": {
+  "1111": 5,
+  "1100": 73,
+  "0000": 58,
+  "0100": 5,
+  "1000": 5
+ },
+ "two_channel_only_examples": [
+  {
+   "name": "20260903_C1088.MP4",
+   "rms": [
+    -64.0,
+    -68.1,
+    -18.2,
+    -18.7
+   ],
+   "silent_mask": "1100",
+   "duration_s": 5.5055
+  }
+ ],
+ "quality_before": {
+  "n": 136,
+  "median_abs_delay_ms": 0.0,
+  "p90_abs_delay_ms": 0.0,
+  "median_confidence": 1.0,
+  "constant_frac": 1.0
+ }
+}

@@ -1,0 +1,44 @@
+{
+ "stem": "20260919_C1305",
+ "build": {
+  "dst": "E:\\1kt_work\\long_align\\deliver\\20260919_C1305_4ch_aligned_restored.mp4",
+  "written_bytes": 53447749928,
+  "stage_bytes": 53447734333,
+  "delta": 174,
+  "trak_uuid_inserted": 5,
+  "tref_inserted": 1,
+  "root_uuid_bytes": 4218,
+  "meta_bytes": 11304,
+  "ftyp": [
+   20,
+   32
+  ],
+  "offset_patches": [
+   "co64: 11774 offsets +174",
+   "co64: 9937 offsets +174",
+   "co64: 9936 offsets +174",
+   "co64: 9935 offsets +174",
+   "co64: 9934 offsets +174",
+   "co64: 9937 offsets +174"
+  ],
+  "audio_entries": [
+   "audio entry 78 -> 50 bytes",
+   "audio entry 78 -> 50 bytes",
+   "audio entry 78 -> 50 bytes",
+   "audio entry 78 -> 50 bytes"
+  ]
+ },
+ "postprocess": {
+  "duration_patches": [
+   "trak:vide: tkhd duration 288438100 -> 288438150",
+   "trak:vide: elst duration 288438100 -> 288438150",
+   "trak:meta: tkhd duration 288438100 -> 288438150",
+   "trak:meta: elst duration 288438100 -> 288438150"
+  ],
+  "sample_entries": {
+   "ok": true,
+   "reason": "全部音频 sample entry 已与源一致"
+  },
+  "tkhd": 4
+ }
+}

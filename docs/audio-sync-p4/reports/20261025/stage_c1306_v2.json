@@ -1,0 +1,20 @@
+{
+ "mode": "stage",
+ "source": "F:\\1KeyTranscoder\\data\\align_4ch_proof\\20260919_C1306.MP4",
+ "stage": "E:\\1kt_work\\long_align\\restore_work\\20260919_C1306\\transparent_stage.mov",
+ "bundle_dir": "E:\\1kt_work\\long_align\\restore_work\\20260919_C1306\\metadata",
+ "audio_movs": [
+  "E:\\1kt_work\\long_align\\restore_work\\20260919_C1306\\audio\\ch0_pol.mov",
+  "E:\\1kt_work\\long_align\\restore_work\\20260919_C1306\\audio\\ch1_pol.mov",
+  "E:\\1kt_work\\long_align\\restore_work\\20260919_C1306\\audio\\ch2_pol.mov",
+  "E:\\1kt_work\\long_align\\restore_work\\20260919_C1306\\audio\\ch3_pol.mov"
+ ],
+ "movie_timescale": 60000,
+ "data_track_ids": [
+  6
+ ],
+ "uuid_boxes": 9,
+ "nrtm": true,
+ "brand": "XAVC",
+ "stage_bytes": 46303315723
+}

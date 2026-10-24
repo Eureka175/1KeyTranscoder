@@ -1,0 +1,160 @@
+{
+ "stem": "20260919_C1305",
+ "build": {
+  "dst": "E:\\1kt_work\\long_align\\deliver\\20260919_C1305_4ch_aligned_restored.mp4",
+  "written_bytes": 53447750088,
+  "stage_bytes": 53447734536,
+  "delta": 30,
+  "trak_uuid_inserted": 5,
+  "tref_inserted": 1,
+  "root_uuid_bytes": 4218,
+  "meta_bytes": 11304,
+  "ftyp": [
+   20,
+   32
+  ],
+  "offset_patches": [
+   "co64: 11774 offsets +30",
+   "co64: 9937 offsets +30",
+   "co64: 9936 offsets +30",
+   "co64: 9935 offsets +30",
+   "co64: 9934 offsets +30",
+   "co64: 9937 offsets +30"
+  ],
+  "audio_entries": [
+   "audio entry 114 -> 50 bytes",
+   "audio entry 114 -> 50 bytes",
+   "audio entry 114 -> 50 bytes",
+   "audio entry 114 -> 50 bytes"
+  ]
+ },
+ "postprocess": {
+  "duration_patches": [
+   "trak:soun: tkhd duration 288438180 -> 288438150",
+   "trak:soun: elst duration 288438180 -> 288438150",
+   "trak:soun: tkhd duration 288438180 -> 288438150",
+   "trak:soun: elst duration 288438180 -> 288438150",
+   "trak:soun: tkhd duration 288438180 -> 288438150",
+   "trak:soun: elst duration 288438180 -> 288438150",
+   "trak:soun: tkhd duration 288438180 -> 288438150",
+   "trak:soun: elst duration 288438180 -> 288438150",
+   "mvhd duration 288438180 -> 288438150 (timescale 60000)"
+  ],
+  "sample_entries": {
+   "ok": true,
+   "reason": "全部音频 sample entry 已与源一致"
+  },
+  "tkhd": 4
+ },
+ "mdhd": [
+  "vide: mdhd 288440152 -> 288438150"
+ ],
+ "container": {
+  "brand_equal": [
+   "XAVC",
+   "XAVC"
+  ],
+  "compat_equal": true,
+  "tracks_equal": true,
+  "uuid": {
+   "equal": true,
+   "missing": [],
+   "added": [],
+   "count_a": 9,
+   "count_b": 9
+  },
+  "nrtm": [
+   true,
+   true
+  ],
+  "tref": [
+   1,
+   1
+  ],
+  "audio_entries_equal": true,
+  "mvhd_equal": true,
+  "top_level": [
+   [
+    "ftyp",
+    "uuid",
+    "uuid",
+    "free",
+    "mdat",
+    "moov",
+    "meta"
+   ],
+   [
+    "ftyp",
+    "moov",
+    "mdat",
+    "free",
+    "uuid",
+    "uuid",
+    "meta"
+   ]
+  ]
+ },
+ "video_streamhash": {
+  "source": "0,v,SHA256=afdfc341e04e0c2cfdb874748d8195d5c537df0a22b2056b2c7f934e3ca88786",
+  "restored": "0,v,SHA256=afdfc341e04e0c2cfdb874748d8195d5c537df0a22b2056b2c7f934e3ca88786",
+  "equal": true
+ },
+ "rtmd_streamhash": {
+  "source": "0,d,SHA256=2e4c24e7dd3bcc8c3972c1a9b2532f55c58f445badb16e8c49da3faa93c064b0",
+  "restored": "0,d,SHA256=2e4c24e7dd3bcc8c3972c1a9b2532f55c58f445badb16e8c49da3faa93c064b0",
+  "equal": true
+ },
+ "audio_md5": [
+  {
+   "wav": "MD5=aaa773b6d97d1b9ad1b5186fa6b53d61",
+   "restored": "MD5=aaa773b6d97d1b9ad1b5186fa6b53d61",
+   "match": true
+  },
+  {
+   "wav": "MD5=323f50a43edf41c3ef8af3ade383f8a2",
+   "restored": "MD5=323f50a43edf41c3ef8af3ade383f8a2",
+   "match": true
+  },
+  {
+   "wav": "MD5=9604c972329c9fa4662d4fcad2718e20",
+   "restored": "MD5=9604c972329c9fa4662d4fcad2718e20",
+   "match": true
+  },
+  {
+   "wav": "MD5=fe4a79d231549663a764963c904b8af6",
+   "restored": "MD5=fe4a79d231549663a764963c904b8af6",
+   "match": true
+  }
+ ],
+ "gyro": {
+  "restored": {
+   "frames": 288150,
+   "quat_varying": 288149,
+   "first_ts": 7.375976461433124,
+   "last_ts": 4807293.192643127,
+   "first_quat": [
+    0.7092802554106632,
+    0.7042037490278427,
+    0.031915427301344,
+    6.801178267835927e-05
+   ],
+   "path": "F:\\1KeyTranscoder\\work\\task3_20261025\\gyro_probe\\20260919_C1305_restored_t3.json"
+  },
+  "source": {
+   "frames": 288150,
+   "quat_varying": 288149,
+   "first_ts": 7.375976461433124,
+   "last_ts": 4807293.192643127,
+   "first_quat": [
+    0.7092802554106632,
+    0.7042037490278427,
+    0.031915427301344,
+    6.801178267835927e-05
+   ]
+  },
+  "timestamp_diff_ms": {
+   "first": 0.0,
+   "last": 0.0
+  }
+ }
+}

@@ -1,0 +1,212 @@
+{
+ "source": {
+  "ftyp_major": "XAVC",
+  "ftyp_compatible": [
+   "XAVC",
+   "mp42",
+   "nras",
+   "iso6"
+  ],
+  "top_level": [
+   "ftyp",
+   "uuid",
+   "uuid",
+   "free",
+   "mdat",
+   "moov",
+   "meta"
+  ],
+  "tracks": [
+   {
+    "handler": "vide",
+    "tkhd_size": 92
+   },
+   {
+    "handler": "soun",
+    "tkhd_size": 92
+   },
+   {
+    "handler": "soun",
+    "tkhd_size": 92
+   },
+   {
+    "handler": "soun",
+    "tkhd_size": 92
+   },
+   {
+    "handler": "soun",
+    "tkhd_size": 92
+   },
+   {
+    "handler": "meta",
+    "tkhd_size": 92
+   }
+  ],
+  "uuid": [
+   {
+    "ctx": "moov",
+    "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+    "sha": "92967950e78d7c13142089c46482dfbda64f7134368e8ae15753a7a7c4130e83"
+   },
+   {
+    "ctx": "root",
+    "guid": "{50524F46-21D2-4FCE-BB88-695CFAC9C740}",
+    "sha": "bc4c81d4a4de6716876d0a114f75430a26f77728cee1e04eb6f8c4a9358957d4"
+   },
+   {
+    "ctx": "root",
+    "guid": "{BE7ACFCB-97A9-42E8-9C71-999491E3AFAC}",
+    "sha": "23cdb73838be99e1d51a7435c529ca2c09f70fdc6049c2731e9d5e52e6f539e1"
+   },
+   {
+    "ctx": "trak:meta",
+    "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+    "sha": "c631fb7b3118174cf194f87ad9f5cd8d22f915b63dc1850856dc7e5a9f600c53"
+   },
+   {
+    "ctx": "trak:soun",
+    "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+    "sha": "2c04274ce641b725aa420652666671628792124a2790cbe0eee60ac928f81cbb"
+   },
+   {
+    "ctx": "trak:soun",
+    "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+    "sha": "2c04274ce641b725aa420652666671628792124a2790cbe0eee60ac928f81cbb"
+   },
+   {
+    "ctx": "trak:soun",
+    "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+    "sha": "2c04274ce641b725aa420652666671628792124a2790cbe0eee60ac928f81cbb"
+   },
+   {
+    "ctx": "trak:soun",
+    "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+    "sha": "2c04274ce641b725aa420652666671628792124a2790cbe0eee60ac928f81cbb"
+   },
+   {
+    "ctx": "trak:vide",
+    "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+    "sha": "2c04274ce641b725aa420652666671628792124a2790cbe0eee60ac928f81cbb"
+   }
+  ],
+  "nrtm": true,
+  "tref_cdsc": [
+   {
+    "handler": "meta",
+    "refs": [
+     1
+    ]
+   }
+  ],
+  "audio_entries": [
+   {
+    "handler": "vide",
+    "fourcc": "hvc1"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   }
+  ],
+  "mvhd": {
+   "timescale": 60000,
+   "duration": 288438150,
+   "seconds": 4807.3025
+  },
+  "meta_scopes": [
+   "root"
+  ]
+ },
+ "current_final_ffmpeg": {
+  "ftyp_major": "isom",
+  "ftyp_compatible": [
+   "isom",
+   "iso2",
+   "mp41"
+  ],
+  "top_level": [
+   "ftyp",
+   "moov",
+   "mdat"
+  ],
+  "tracks": [
+   {
+    "handler": "vide",
+    "tkhd_size": 92
+   },
+   {
+    "handler": "soun",
+    "tkhd_size": 92
+   },
+   {
+    "handler": "soun",
+    "tkhd_size": 92
+   },
+   {
+    "handler": "soun",
+    "tkhd_size": 92
+   },
+   {
+    "handler": "soun",
+    "tkhd_size": 92
+   }
+  ],
+  "uuid": [],
+  "nrtm": false,
+  "tref_cdsc": [],
+  "audio_entries": [
+   {
+    "handler": "vide",
+    "fourcc": "hvc1"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   },
+   {
+    "handler": "soun",
+    "fourcc": "ipcm"
+   }
+  ],
+  "mvhd": {
+   "timescale": 1000,
+   "duration": 4807303,
+   "seconds": 4807.303
+  },
+  "meta_scopes": []
+ },
+ "uuid_diff": {
+  "equal": false,
+  "missing": [
+   "moov/{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+   "root/{50524F46-21D2-4FCE-BB88-695CFAC9C740}",
+   "root/{BE7ACFCB-97A9-42E8-9C71-999491E3AFAC}",
+   "trak:meta/{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+   "trak:soun/{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+   "trak:vide/{55534D54-21D2-4FCE-BB88-695CFAC9C740}"
+  ],
+  "added": [],
+  "count_a": 9,
+  "count_b": 0
+ }
+}
