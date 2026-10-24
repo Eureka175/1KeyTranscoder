@@ -2157,6 +2157,16 @@ def place_final(
                 f"metadata: {exc}"
             ) from exc
 
+    # 元数据恢复 (file-level meta / tref/cdsc) 由 GPAC 重新执行 -set-meta /
+    # -add-item / -set-xml / -ref, 每次都会重建 moov —— 因此 tkhd 的
+    # flags/alternate_group 可能在恢复步骤之后被重置。落盘前再归一一次;
+    # 幂等、只改头字节, 不触碰 mdat (见 isobmf.normalize_track_flags)。
+    try:
+        for desc in isobmf.normalize_track_flags(staged):
+            log(f"final: {desc}")
+    except (OSError, RuntimeError) as exc:
+        log(f"final: WARNING tkhd normalization skipped: {exc}")
+
     safe_unlink(dst)
     os.replace(staged, dst)
     log(f"final: {staged.name} -> {dst.name}")

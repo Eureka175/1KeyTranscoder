@@ -46,6 +46,7 @@ normalize_track_flags(path)    # 原地归一: flags |= 0x7, alternate_group = 0
 | classic 路径音频替换 | `preservation/audio_sync.py` `remux_replace_audio` 末尾 |
 | DJI 重建 | `preservation/dji.py` 最终 output.mov |
 | 硬件路径容器重封装 | `core/batch_hw.py` `remux_container_lossless`（返回描述含 `tkhd: N track flag(s) normalized`） |
+| 落盘前兜底 | `core/batch_hw.py` `place_final`：file-level meta / tref 恢复会用 GPAC 重建 moov，可能重置标志，因此在 `os.replace` 前再归一一次 |
 
 说明：`ffmpeg` 仍然只承担**编码器（x265）/解码 / wrapper** 角色；软件不实现切片
 功能，切片属于外部工序。此修复只是容器事实恢复，不改变任何媒体 payload。
