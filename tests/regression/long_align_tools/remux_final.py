@@ -24,6 +24,7 @@ from pathlib import Path
 
 REPO = Path(r"F:\1KeyTranscoder")
 sys.path.insert(0, str(REPO / "tests" / "regression"))
+sys.path.insert(0, str(REPO / "work"))
 import long_align as la  # noqa: E402
 
 SR = 48000
@@ -107,6 +108,9 @@ def main() -> int:
         r = run(cmd)
         if r.returncode != 0:
             raise SystemExit(f"remux failed: {r.stderr[-500:]}")
+        # ffmpeg 给多条音轨写 alternate_group=1..N, PR 会当成一条可选轨 -> 修补 tkhd
+        import fix_tkhd
+        fix_tkhd.patch_file(dst)
         # ---- verification
         src_probe, out_probe = probe(src), probe(dst)
         src_v = [s for s in src_probe["streams"] if s["codec_type"] == "video"]

@@ -22,7 +22,9 @@ from pathlib import Path
 
 REPO = Path(r"F:\1KeyTranscoder")
 sys.path.insert(0, str(REPO / "tests" / "regression"))
+sys.path.insert(0, str(REPO / "work"))
 import long_align as la  # noqa: E402
+import fix_tkhd  # noqa: E402
 
 SR = 48000
 OUT = Path(r"E:\1kt_work\long_align")
@@ -109,6 +111,7 @@ def main() -> int:
             dst = CLIP_DIR / name
             if cut(d, t, CLIP_S, dst) != 0 or not dst.is_file():
                 continue
+            fix_tkhd.patch_file(dst)
             ref = CLIP_DIR / f"_ref_{stem}_{int(t)}.mp4"
             cut(SOURCE / f"{stem}.MP4", t, CLIP_S, ref, video_only=True)
             hs_src = streamhash(ref, "0:v:0")
@@ -185,6 +188,8 @@ def main() -> int:
                 "-movflags", "+faststart", str(dst)]
         r = run(cmd)
         ok = r.returncode == 0 and dst.is_file()
+        if ok:
+            fix_tkhd.patch_file(dst)
         print(f"  polarity demo {name}: {'OK' if ok else 'FAIL'} -> {dst.name}",
               flush=True)
         if not ok:

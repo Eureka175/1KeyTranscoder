@@ -370,3 +370,39 @@ CH3 音频 md5 不同（`857455…` vs `de0694…`），即两片只差在极性
 - **极性**：CH3/CH4 相对 CH1/CH2 反相（两条素材一致，投票一致率 95–100%）；
   翻转后 4CH 和信号 RMS 增益 **+4.61 / +4.78 dB**，群组相关由负转正。
 - **视频**：完全未动（逐包哈希一致，无 VFR）。
+
+## 15. 致命问题修复：PR 只识别 1 条音轨（alternate group）
+
+### 15.1 根因
+
+MediaInfo 显示 4 条 PCM 音轨，但 Adobe Premiere 打开时只有 1 条。用 GPAC `mp4box -diso`
+对比 Sony 源与 ffmpeg 输出，差异只在 `tkhd`：
+
+| 字段 | Sony 源 | ffmpeg 输出（修复前） |
+|---|---|---|
+| 每轨 `tkhd` flags | **7**（enabled+in_movie+in_preview） | 视频/第 1 音轨 3，**其余音轨 2（未启用）** |
+| `alternate_group` | **0** | **全部 1** |
+
+MP4/MOV 语义中 `alternate_group` 表示"可选之一"（多语言音轨的典型用法）。
+4 条音轨同属 group 1 后，Premiere 把它们当成同一条轨的备选版本，只显示 1 条；
+MediaInfo 仍按物理轨列出 4 条，所以"看起来正常"。
+
+### 15.2 修复
+
+新增 `work/fix_tkhd.py`：流式原地修补 MP4/MOV 的 `tkhd`（只读 moov、seek 跳过 mdat，
+不触碰任何 payload）：
+- 所有 track `flags` → **7**；
+- 所有 track `alternate_group` → **0**；
+- 原值保存到 `<file>.tkhd.json`，支持 `--revert`。
+
+对全部产物执行后已验证：
+- 5 个 track 的 tkhd flags 均为 7、alternate_group 均为 0、4 个 `soun` handler；
+- 视频 streamhash 与源**逐包一致**（仍是 `2107…b55` 类哈希，与修补前相同）；
+- 前 5 s 解码（视频 + 4 音轨）无错误。
+
+修补文件（9 个）：2 个最终交付、5 个抽检片段、2 个极性 A/B 对比。
+
+### 15.3 后续
+
+`work/remux_final.py`、`work/p5_clips_final.py` 已加入"mux 后自动调用 fix_tkhd"，
+以后重新生成交付不会再出现该问题。
