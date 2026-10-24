@@ -1,0 +1,277 @@
+[
+ {
+  "stem": "20260919_C1305",
+  "start": 608.0,
+  "file": "E:\\1kt_work\\long_align\\clips_refined\\20260919_C1305_restored_clip_608s.mp4",
+  "container": {
+   "brand": "XAVC",
+   "tracks": [
+    [
+     "vide",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "meta",
+     null
+    ]
+   ],
+   "uuid": 9,
+   "nrtm": true,
+   "tref": 1,
+   "mvhd": {
+    "timescale": 60000,
+    "duration": 628980,
+    "seconds": 10.483
+   }
+  },
+  "gyro": {
+   "frames": 629,
+   "quat_varying": 628,
+   "first_ts": 7.384740499975618,
+   "last_ts": 10484.51807383331,
+   "first_quat": [
+    0.7092247347591716,
+    0.7042738366928238,
+    0.03160113407527927,
+    -8.29375562412916e-05
+   ]
+  },
+  "first_frame_matched_source_time_s": 280.9213426431281
+ },
+ {
+  "stem": "20260919_C1305",
+  "start": 1446.0,
+  "file": "E:\\1kt_work\\long_align\\clips_refined\\20260919_C1305_restored_clip_1446s.mp4",
+  "container": {
+   "brand": "XAVC",
+   "tracks": [
+    [
+     "vide",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "meta",
+     null
+    ]
+   ],
+   "uuid": 9,
+   "nrtm": true,
+   "tref": 1,
+   "mvhd": {
+    "timescale": 60000,
+    "duration": 578700,
+    "seconds": 9.645
+   }
+  },
+  "gyro": {
+   "frames": 579,
+   "quat_varying": 578,
+   "first_ts": 7.388472632322427,
+   "last_ts": 9650.35513929899,
+   "first_quat": [
+    0.7096336689628459,
+    0.7038461792472317,
+    0.031947010551483884,
+    1.8711123517937903e-05
+   ]
+  },
+  "first_frame_matched_source_time_s": 1057.7140259764617
+ },
+ {
+  "stem": "20260919_C1305",
+  "start": 2527.0,
+  "file": "E:\\1kt_work\\long_align\\clips_refined\\20260919_C1305_restored_clip_2527s.mp4",
+  "container": {
+   "brand": "XAVC",
+   "tracks": [
+    [
+     "vide",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "meta",
+     null
+    ]
+   ],
+   "uuid": 9,
+   "nrtm": true,
+   "tref": 1,
+   "mvhd": {
+    "timescale": 60000,
+    "duration": 633960,
+    "seconds": 10.566
+   }
+  },
+  "gyro": {
+   "frames": 633,
+   "quat_varying": 632,
+   "first_ts": 7.385028800276267,
+   "last_ts": 10551.251695466943,
+   "first_quat": [
+    0.7097964127936581,
+    0.7036654965233455,
+    0.03230976744496464,
+    -1.775995261004126e-05
+   ]
+  },
+  "first_frame_matched_source_time_s": 1469.2251259764614
+ },
+ {
+  "stem": "20260919_C1306",
+  "start": 153.0,
+  "file": "E:\\1kt_work\\long_align\\clips_refined\\20260919_C1306_restored_clip_153s.mp4",
+  "container": {
+   "brand": "XAVC",
+   "tracks": [
+    [
+     "vide",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "meta",
+     null
+    ]
+   ],
+   "uuid": 9,
+   "nrtm": true,
+   "tref": 1,
+   "mvhd": {
+    "timescale": 60000,
+    "duration": 596220,
+    "seconds": 9.937
+   }
+  },
+  "gyro": {
+   "frames": 596,
+   "quat_varying": 595,
+   "first_ts": 7.381825711816393,
+   "last_ts": 9933.96515904515,
+   "first_quat": [
+    0.7073511644515063,
+    0.7060902853876732,
+    0.03302784800976989,
+    1.6909912548746404e-05
+   ]
+  },
+  "first_frame_matched_source_time_s": null
+ },
+ {
+  "stem": "20260919_C1306",
+  "start": 1569.0,
+  "file": "E:\\1kt_work\\long_align\\clips_refined\\20260919_C1306_restored_clip_1569s.mp4",
+  "container": {
+   "brand": "XAVC",
+   "tracks": [
+    [
+     "vide",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "soun",
+     null
+    ],
+    [
+     "meta",
+     null
+    ]
+   ],
+   "uuid": 9,
+   "nrtm": true,
+   "tref": 1,
+   "mvhd": {
+    "timescale": 60000,
+    "duration": 631380,
+    "seconds": 10.523
+   }
+  },
+  "gyro": {
+   "frames": 631,
+   "quat_varying": 630,
+   "first_ts": 7.379804293198769,
+   "last_ts": 10517.8798042932,
+   "first_quat": [
+    0.7152174120223272,
+    0.6981793911222562,
+    0.03177405511386475,
+    2.7742560847741756e-05
+   ]
+  },
+  "first_frame_matched_source_time_s": null
+ }
+]

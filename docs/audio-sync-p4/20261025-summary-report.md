@@ -327,3 +327,11 @@ missing=[]、added=[]**；brand/compat/6 轨/uuid 9-9/nrtm/tref/audio entries/mv
 
 本轮真正作为门禁的自测结果：**unit 951 PASS / 0 FAIL；toolchain 976 PASS /
 1 FAIL（唯一失败 = 无 CUDA 设备的 nvenc 探测）**。
+
+### 3.7 补充：片段级 metadata 保留（2026-10-25 03:37）
+
+对最终还原交付文件用 GPAC `splitx` 切 5 段（总 51.15 s）+ 追加文件级
+root uuid/meta（`work/clip_meta.py`），生成 `E:\1kt_work\long_align\clips_refined\*`：
+每段都是 brand XAVC / 6 轨（含 rtmd）/ uuid 9/9 / nrtm / tref，Gyroflow 可读到
+片段内相机数据（例如 C1305 608 s 段：629 帧、628 帧四元数变化）。旧的
+`clips_final`（10.09 s 规格、无文件级 metadata）保留不动。

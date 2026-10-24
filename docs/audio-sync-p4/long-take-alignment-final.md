@@ -459,3 +459,20 @@ mvhd/tkhd/mdhd 时间戳、mdia/hdlr、mdhd language 全部与源逐字节一致
 并删除了 GPAC 多写的 minf/hdlr。细化后 box 清单 119 vs 119、无缺失/新增；
 仅剩顶层 box 顺序、GPAC chunk 表（stsc/co64）与 mdat/free 填充尺寸差异，
 样本内容/顺序/时间戳完全一致。文件名与大小不变。
+
+### 17.1 保留 metadata 的抽检片段（补充交付，2026-10-25 03:37）
+
+旧的 `clips_final/*` 是在元数据还原之前从 ffmpeg 成品切的（视频/音频内容经逐包
+校验与源同段一致，但没有文件级 metadata）。用最终还原交付文件重新生成了一套
+**保留 metadata** 的片段，放在 `E:\1kt_work\long_align\clips_refined\`：
+
+| 片段 | 时长 | 容器 | Gyroflow |
+|---|---|---|---|
+| C1305 clip 608s / 1446s / 2527s | 10.483 / 9.645 / 10.566 s | brand XAVC、6 轨（含 rtmd）、uuid 9/9、nrtm、tref ✓ | 629/579/633 帧，628/578/632 帧四元数变化 |
+| C1306 clip 153s / 1569s | 9.937 / 10.523 s | 同上 | 596/631 帧，595/630 帧变化 |
+
+生成方式：GPAC `splitx` 切段（保留 brand/轨道/轨级 uuid/tref/rtmd）+
+`work/clip_meta.py` 从完整还原文件追加 root uuid×2 与 top-level meta
+（nrtm/XMP，idat 自包含），因此 **Gyroflow 能像读源文件一样读到片段内的相机
+数据**（总时长 51.15 s，仍满足 P5 的 ≤60 s 约束）。旧 clips_final 未删除，
+继续作为 10.09 s 规格的 A/V 抽检片段。

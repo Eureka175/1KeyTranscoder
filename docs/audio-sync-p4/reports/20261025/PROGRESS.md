@@ -123,3 +123,7 @@
   （6）、缺失测试素材/fixture（12）、既有 transparent/合成测量用例（5，含 C23
   输出扩展名 .MOV vs 期望 .MP4），与本次改动无交集。门禁级结果 unit 951/0、
   toolchain 976/1（nvenc）。
+
+- [03:37] 补充交付：从最终还原文件生成 5 个"保留 metadata"的抽检片段
+  （clips_refined，总 51.15 s；每个 brand XAVC/6 轨/uuid9/nrtm/tref，Gyroflow
+  可读取片段内相机数据）。旧 clips_final 保留。
