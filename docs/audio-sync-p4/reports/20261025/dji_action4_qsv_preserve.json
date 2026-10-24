@@ -1,0 +1,96 @@
+{
+  "original": "E:\\1kt_scratch\\task4_action_in\\DJI_20260922101750_0031_D.MP4",
+  "final": "E:\\1kt_scratch\\task4_action_out\\.1ktwork\\DJI_20260922101750_0031_D-16fbf7e1\\final\\output.mov",
+  "summary": {
+    "PRESERVED": 15,
+    "MODIFIED": 0,
+    "MISSING": 0,
+    "UNKNOWN": 0
+  },
+  "structural_success": true,
+  "critical_missing": [],
+  "critical_modified": [],
+  "items": [
+    {
+      "item": "dji.track_inventory",
+      "status": "PRESERVED",
+      "detail": "[('meta', 'dbgi'), ('meta', 'djmd'), ('soun', 'mp4a'), ('tmcd', 'tmcd')]"
+    },
+    {
+      "item": "dji.video.track",
+      "status": "PRESERVED",
+      "detail": "vide:hvc1"
+    },
+    {
+      "item": "dji.djmd.payload_sha256",
+      "status": "PRESERVED",
+      "detail": "'9b48e7c2857f4d0d0923b27e668a0695ffb8ab3cd132bd65270efd779f6134b0'"
+    },
+    {
+      "item": "dji.djmd.payload_size",
+      "status": "PRESERVED",
+      "detail": "761174"
+    },
+    {
+      "item": "dji.djmd.sample_count",
+      "status": "PRESERVED",
+      "detail": "6240"
+    },
+    {
+      "item": "dji.dbgi.payload_sha256",
+      "status": "PRESERVED",
+      "detail": "'13e4c2a36a78d332e96963e34119ed29df833ce5487779ef066634e393beb7a2'"
+    },
+    {
+      "item": "dji.dbgi.payload_size",
+      "status": "PRESERVED",
+      "detail": "46311713"
+    },
+    {
+      "item": "dji.dbgi.sample_count",
+      "status": "PRESERVED",
+      "detail": "6240"
+    },
+    {
+      "item": "dji.tmcd.payload_sha256",
+      "status": "PRESERVED",
+      "detail": "'633b67fd3d2e239e2174bfeb1ad89e32f96ae4c7774dad4212bb45b2284f1439'"
+    },
+    {
+      "item": "dji.tmcd.payload_size",
+      "status": "PRESERVED",
+      "detail": "4"
+    },
+    {
+      "item": "dji.tmcd.sample_count",
+      "status": "PRESERVED",
+      "detail": "1"
+    },
+    {
+      "item": "dji.audio.streams",
+      "status": "PRESERVED",
+      "detail": "[('aac', '48000', 2)]"
+    },
+    {
+      "item": "dji.video.frame_count",
+      "status": "PRESERVED",
+      "detail": "6240"
+    },
+    {
+      "item": "dji.video.frame_rate",
+      "status": "PRESERVED",
+      "detail": "'30000/1001'"
+    },
+    {
+      "item": "dji.movie_timescale",
+      "status": "PRESERVED",
+      "detail": "30000"
+    }
+  ],
+  "gyroflow": {
+    "status": "SKIP",
+    "detail": "skipped at check=basic"
+  },
+  "quality": null,
+  "job_dir": "E:\\1kt_scratch\\task4_action_out\\.1ktwork\\DJI_20260922101750_0031_D-16fbf7e1"
+}

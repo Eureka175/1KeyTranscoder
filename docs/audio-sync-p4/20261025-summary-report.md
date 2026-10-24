@@ -64,7 +64,7 @@
 
 ### 3.1 容器事实差异（C1305；`container_facts`）
 
-| 项 | 源 | 当前 ffmpeg 成品 |
+| 项 | 源 | 旧 ffmpeg 成品（已被 3.4/3.5 的还原版取代并删除） |
 |---|---|---|
 | major brand / compat | **XAVC** / XAVC,mp42,nras,iso6 | **isom** / isom,iso2,mp41 |
 | 顶层 box | ftyp, **uuid×2**, free, mdat, moov, **meta** | ftyp, moov, mdat |
@@ -119,7 +119,7 @@ data 轨被写成假 `stts`）。
 |---|---|
 | Mavic4P 默认 | 仅主视频（无 djmd/dbgi/attached_pic、无 encoder 标签） |
 | Pocket3 默认 | 同上 |
-| Action4 默认 | 保留管线（dry-run：djmd/dbgi/tmcd 原生保留） |
+| Action4 默认（真实 QSV 编码 208 s/4K） | 保留管线：输出含 djmd/dbgi/	mcd，[PRESERVE-OK] PRESERVED=15 MODIFIED=0 MISSING=0 structural_success=True |
 | Mavic + `--preserve-metadata` | 输出保留 djmd/dbgi 数据轨 |
 
 **测试**：`tests/selftest/suites/dji_metadata.py`（L1 机型分类矩阵 + L2 真实样本
@@ -159,8 +159,9 @@ data 轨被写成假 `stts`）。
 2. I: 上专业机位（A7M4/FX3/FX30）本身是 2CH 封装，没有可测的 4CH 素材；
    "4CH 中 2CH 有效"的样本在 testsets。
 3. 0.6 s / 33 s 短编码只验证**策略与容器**，不代表长片编码质量。
-4. 全长 GPAC 还原耗时数十分钟/文件；本次只对 C1305 执行（C1306 同参数路径，
-   如需交付两条素材需再跑一次）。
+4. 全长 GPAC 还原已对 C1305/C1306 都执行并通过验证；本报告采用的字节级方案
+   每条约 8–9 min（GPAC stage mux）+ 3–5 min（一次顺序拷贝补齐），避免了 GPAC
+   标准流程在 50 GiB 文件上的多轮整文件重写（实测不可接受）。
 
 ### 3.4 全长 GPAC 元数据还原：C1305 结果（已完成，逐项验证）
 
@@ -232,3 +233,44 @@ python 1kt.py --input <该文件目录> --output <out> --encoder x265 --preset f
 failed=0，输出保留 4 条 ipcm 音轨与 rtmd 轨（Sony 保留管线），**没有发生任何
 音频对齐修正/重封装**。这验证了新策略在真实入口上的行为：探测到 2CH 有效即
 整文件跳过，而非在两条有效轨之间做纠正。
+
+### 5.2 在 I:\2026.09.24 专业机位文件上的验证（任务5 要求）
+
+I: 上 A7M4/FX3/FX30 都是 2CH 封装（不参与 4CH 对齐），但都带 Sony XAVC 元数据
+（brand/uuid/nrtm/tref/rtmd 轨）。对其中 3 个短文件跑了任务3的完整还原流程
+（GPAC extract + mux stage + fast_restore 字节级补齐 + movie 时间基修正）：
+
+| 文件 | 大小/时长 | brand/uuid/nrtm/tref | 视频 streamhash | rtmd streamhash | 音轨 md5 | Gyroflow 相机数据 |
+|---|---|---|---|---|---|---|
+| `A7M4\C0155.MP4` | 192 MiB / 7.2 s | 一致（uuid 5/5） | **逐包一致** | **逐包一致** | 一致 | 360 帧 / **359** 变化帧，首尾 ts 差 **0.0 ms** |
+| `FX3\C0515.MP4` | 320 MiB / 12.5 s | 一致（uuid 5/5） | **逐包一致** | **逐包一致** | 一致 | 624 帧 / **623** 变化帧，ts 差 **0.0 ms** |
+| `FX30\20260922_fx30_2_9766.MP4` | 768 MiB / 27.8 s | 一致（uuid 5/5） | **逐包一致** | **逐包一致** | 一致 | 1392 帧 / **1391** 变化帧，ts 差 **0.0 ms** |
+
+三个文件的容器事实（brand/compat/轨道/uuid/nrtm/tref/audio entries/**mvhd**）全部
+与源一致；唯一差异仍是顶层 box 顺序。附带发现并修复：GPAC 对 A7M4/FX3/FX30 会把
+movie timescale 选成 5000（源 50000），`patch_movie_timing.py` 从源复制
+mvhd/tkhd/elst 时长后 mvhd 也恢复一致；该问题不影响 C1305/C1306（两者源 movie
+timescale 恰为 60000，与 GPAC 默认一致）。
+
+> 说明：A7M4/FX3/FX30 的音频是 **2CH 单轨**，按"2CH 不对齐"口径不进入对齐流程，
+> 这里只验证 metadata 还原（任务3）路径；对齐（任务1）在 NX800（4×mono）与
+> testsets 的 4CH 素材上验证。
+
+## 6.1 回归自测结果（2026-10-25 02:51 重跑）
+
+- `python tests/full_autotest.py --level unit`：**951 PASS / 0 FAIL**（含新增
+  tkhd / DJI 策略 / 2CH 策略三个 suite）。
+- `python tests/full_autotest.py --level toolchain`：**976 PASS / 1 FAIL**，唯一失败为
+  `[toolchain] caps.nvenc 实机探测: device=?` —— 本机无 CUDA 设备（N 卡未接），
+  属环境性失败，与本次改动无关；其余工具链/L2 套件全部通过。
+
+### 4.2 Action4 真实编码验证（2026-10-25 02:57）
+
+对 testsets 中 208 s / 3840×2880 / 10-bit 的 Action4 素材跑真实 QSV 编码（2.8 GiB
+输入，约 4 分钟完成，非长编码）：
+
+- 策略路由：`[POLICY] DJI: video re-encoded, djmd/dbgi/tmcd preserved, cover/udta dropped`
+- 输出流：`video(hvc1) + audio(mp4a) + data(djmd) + data(dbgi) + data(tmcd)`
+- 保留校验：`[PRESERVE-OK] PRESERVED=15 MODIFIED=0 MISSING=0 UNKNOWN=0 structural_success=True`
+- tkhd 归一化在本路径同样生效（track flags 3/2 → 7，alternate_group → 0）
+- 总体 `done=1 skipped=0 failed=0`

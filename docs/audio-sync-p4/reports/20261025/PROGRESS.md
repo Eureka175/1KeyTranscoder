@@ -98,3 +98,19 @@
   完全相同、首尾时间戳差 0.0 ms）。旧 ffmpeg 成品（C1305/C1306）已删除，最终
   交付 = E:\1kt_work\long_align\deliver\*_4ch_aligned_restored.mp4（49.78/43.12 GiB）。
 - 证据 JSON 已归档 docs/audio-sync-p4/reports/20261025/；开始收尾写总结与提交。
+
+- [02:48] 任务5 I: 专业机位 metadata 还原验证：A7M4 C0155 / FX3 C0515 / FX30 9766
+  三个文件全部通过（容器事实全等、视频/rtmd streamhash 逐包一致、音轨 md5 一致、
+  Gyroflow 变化四元数与源相同、首尾时间戳差 0.0 ms）。发现并修复 GPAC 对
+  A7M4/FX3/FX30 把 movie timescale 选成 5000 的问题（patch_movie_timing.py）。
+- [02:49] 任务脚本归档到 docs/audio-sync-p4/scripts/，I: 验证 JSON 归档到
+  docs/audio-sync-p4/reports/20261025/。
+
+- [02:51] 回归：unit 951 PASS/0 FAIL；toolchain 976 PASS/1 FAIL（唯一失败为
+  caps.nvenc 实机探测: 本机无 CUDA 设备，环境性）。
+- [02:52] 任务4 补充：Action4 真实 QSV 编码（208 s/4K）进行中，策略日志
+  `[POLICY] DJI: video re-encoded, djmd/dbgi/tmcd preserved, cover/udta dropped`。
+
+- [02:57] 任务4 Action4 真实 QSV 编码完成：208 s/4K 输入，输出保留 djmd/dbgi/tmcd；
+  [PRESERVE-OK] PRESERVED=15 MODIFIED=0 MISSING=0 structural_success=True，
+  done=1 failed=0。任务4 的"Action 保留 / 非 Action 默认不保留"两条路径均有真实编码证据。

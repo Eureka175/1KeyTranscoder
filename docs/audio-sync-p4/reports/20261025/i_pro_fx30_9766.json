@@ -1,0 +1,152 @@
+{
+ "source": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9766.MP4",
+ "stage": "E:\\1kt_scratch\\i_pro\\20260922_fx30_2_9766\\transparent_stage.mov",
+ "out": "E:\\1kt_scratch\\i_pro\\20260922_fx30_2_9766\\20260922_fx30_2_9766_restored.mp4",
+ "movie_timescale": 50000,
+ "tracks": [
+  [
+   1,
+   "vide",
+   "avc1"
+  ],
+  [
+   2,
+   "soun",
+   "twos"
+  ],
+  [
+   3,
+   "meta",
+   "rtmd"
+  ]
+ ],
+ "build": {
+  "dst": "E:\\1kt_scratch\\i_pro\\20260922_fx30_2_9766\\20260922_fx30_2_9766_restored.mp4",
+  "written_bytes": 743613487,
+  "stage_bytes": 743603099,
+  "delta": 58,
+  "trak_uuid_inserted": 1,
+  "tref_inserted": 1,
+  "root_uuid_bytes": 148,
+  "meta_bytes": 10182,
+  "ftyp": [
+   20,
+   28
+  ],
+  "offset_patches": [
+   "stco: 194 offsets +58",
+   "stco: 56 offsets +58",
+   "stco: 56 offsets +58"
+  ],
+  "audio_entries": [
+   "audio entry 52 -> 36 bytes"
+  ]
+ },
+ "postprocess": {
+  "duration_patches": [
+   "trak:vide: tkhd duration 139200 -> 1670400",
+   "trak:vide: elst duration 139200 -> 1670400",
+   "trak:soun: tkhd duration 139200 -> 1670400",
+   "trak:soun: elst duration 139200 -> 1670400",
+   "trak:meta: tkhd duration 139200 -> 1670400",
+   "trak:meta: elst duration 139200 -> 1670400",
+   "mvhd duration 139200 -> 1670400 (timescale 5000)"
+  ],
+  "sample_entries": {
+   "ok": true,
+   "reason": "全部音频 sample entry 已与源一致"
+  },
+  "tkhd": 0
+ },
+ "mdhd": [
+  "vide: mdhd 1393000 -> 139200"
+ ],
+ "movie_timing": [
+  "mvhd timescale 5000->50000 duration 1670400->1392000",
+  "vide tkhd duration 1670400->1392000",
+  "soun tkhd duration 1670400->1392000",
+  "meta tkhd duration 1670400->1392000"
+ ],
+ "container": {
+  "brand": [
+   "XAVC",
+   "XAVC"
+  ],
+  "compat_equal": true,
+  "tracks_equal": true,
+  "uuid": {
+   "equal": true,
+   "missing": [],
+   "added": [],
+   "count_a": 5,
+   "count_b": 5
+  },
+  "nrtm": [
+   true,
+   true
+  ],
+  "tref": [
+   1,
+   1
+  ],
+  "audio_entries_equal": true,
+  "mvhd": true,
+  "top_level": [
+   [
+    "ftyp",
+    "uuid",
+    "free",
+    "mdat",
+    "moov",
+    "meta"
+   ],
+   [
+    "ftyp",
+    "moov",
+    "mdat",
+    "free",
+    "uuid",
+    "meta"
+   ]
+  ]
+ },
+ "video_streamhash_equal": true,
+ "rtmd_streamhash_equal": true,
+ "audio_md5": [
+  {
+   "source": "MD5=6bad4f98faacecb553cc395e50587997",
+   "restored": "MD5=6bad4f98faacecb553cc395e50587997",
+   "match": true
+  }
+ ],
+ "gyro": {
+  "source": {
+   "frames": 1392,
+   "quat_varying": 1391,
+   "first_ts": 7.914000002552687,
+   "last_ts": 27827.91400000255,
+   "first_quat": [
+    0.07502496883654,
+    0.10437263334356346,
+    0.8598936789467095,
+    0.49402476491808667
+   ]
+  },
+  "restored": {
+   "frames": 1392,
+   "quat_varying": 1391,
+   "first_ts": 7.914000002552687,
+   "last_ts": 27827.91400000255,
+   "first_quat": [
+    0.07502496883702799,
+    0.10437263333206924,
+    0.8598936789463485,
+    0.49402476492106917
+   ]
+  },
+  "timestamp_diff_ms": {
+   "first": 0.0,
+   "last": 0.0
+  }
+ }
+}
