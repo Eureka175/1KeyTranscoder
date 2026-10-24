@@ -506,6 +506,7 @@ def encode_one(
     file_logger: logging.Logger,
     dry_run: bool,
     decode_plan: Any = None,
+    drop_metadata_streams: bool = False,
 ) -> str:
     """Classic single-pass (x265/svtav1 software backends). At
     check_level='full' the PSNR/SSIM sample gates delivery; with
@@ -514,6 +515,11 @@ def encode_one(
     With an explicit audio plan the same encoder command is derived into a
     video-only one and the audio is produced separately, then composed at the
     end (Phase 4C). Without a plan nothing here changes.
+
+    ``drop_metadata_streams`` is the metadata-skip policy (``--no-metadata`` /
+    DJI non-Action default): the encoder command then keeps only the main
+    video + audio + subtitles, because camera data tracks and attached cover
+    pictures cannot survive FFmpeg's MOV intermediate anyway.
 
     ``decode_plan`` is the hardware-first decode decision (see
     ``encoders/hwdecode_ffmpeg.plan_decode``). It is applied to the argv here
@@ -529,6 +535,7 @@ def encode_one(
     cmd, effective_params = backend.build_command(
         ffmpeg, src, part_dst, profile, prepared.effective,
         source_summary["video_streams"], prepared.src_info,
+        drop_metadata_streams=drop_metadata_streams,
     )
     if decode_plan is not None:
         from encoders.hwdecode_ffmpeg import apply_decode_plan
@@ -1402,6 +1409,16 @@ def parse_args() -> argparse.Namespace:
             "跳过), 但输出有效性、音视频流完整性、帧数与失败检测**一项都"
             "不减** —— 进程失败、产物缺失/损坏、不支持的输入都不会被当成"
             "成功. 音频轨与 channel-sync 行为不变."
+        ),
+    )
+    parser.add_argument(
+        "--preserve-metadata",
+        action="store_true",
+        help=(
+            "强制保留相机厂商元数据. 默认策略下 DJI **除 Action 系列外** "
+            "(Pocket / 无人机) 不保留 metadata (走普通转码路径); 本开关可"
+            "覆盖该默认策略, 让 Pocket/无人机也走 DJI 保留管线. "
+            "与 --no-metadata 同时给出时以后者为准 (显式关闭优先)."
         ),
     )
     parser.add_argument(
@@ -2551,14 +2568,37 @@ def main() -> int:
                     # handling and the frame checks. Skipping preservation must
                     # never be read as "skip validation".
                     no_metadata = bool(getattr(args, "no_metadata", False))
+                    preserve_metadata = bool(
+                        getattr(args, "preserve_metadata", False))
                     is_sony = any(
                         st.get("codec_type") == "data"
                         and st.get("codec_tag_string") == "rtmd"
                         for st in prepared.streams
                     )
+                    is_dji = is_dji_source(prepared.streams)
+                    dji_tool: str | None = None
+                    # DJI 默认元数据策略 (2026-10-25): 除 Action 系列外
+                    # (Pocket / 无人机) 默认**不保留** metadata, 走普通转码
+                    # 路径; 需要保留时显式 --preserve-metadata。
+                    if is_dji and not no_metadata and not preserve_metadata:
+                        from preservation.dji import keep_metadata_by_default
+
+                        keep_dji, dji_tool = keep_metadata_by_default(gpac, src)
+                        if not keep_dji:
+                            no_metadata = True
+                            logger.info(
+                                "[META_POLICY] %s | DJI 非 Action 机型 "
+                                "(tool=%r): 默认不保留元数据, 走普通转码路径 "
+                                "(可用 --preserve-metadata 覆盖)",
+                                src.name, dji_tool,
+                            )
+                            file_logger.info(
+                                "META_POLICY | dji_default_skip | tool=%r | "
+                                "container rebuild skipped", dji_tool,
+                            )
                     if no_metadata:
                         keep = ("sony" if is_sony
-                                else "dji" if is_dji_source(prepared.streams)
+                                else "dji" if is_dji
                                 else "generic")
                         logger.info(
                             "[META_POLICY] %s | no_metadata: %s preservation "
@@ -2586,7 +2626,7 @@ def main() -> int:
                             dry_run=args.dry_run,
                             decode_plan=decode_plan,
                         )
-                    elif is_dji_source(prepared.streams) and not no_metadata:
+                    elif is_dji and not no_metadata:
                         result = encode_one_dji_x265(
                             src=src, dst=dst, prepared=prepared, profile=profile,
                             preset=preset, backend=backend, engine=engine,
@@ -2621,6 +2661,11 @@ def main() -> int:
                             logger=logger,
                             file_logger=file_logger, dry_run=args.dry_run,
                             decode_plan=decode_plan,
+                            # 元数据策略 = 不保留 (--no-metadata / DJI 非
+                            # Action 默认) 时, 普通转码命令只保留主视频+
+                            # 音频+字幕: 相机 data 轨与 attached_pic 无法
+                            # 忠实穿过 FFmpeg MOV 中间容器。
+                            drop_metadata_streams=no_metadata,
                         )
                     if result == "failed":
                         record_failure(
@@ -2669,6 +2714,7 @@ def main() -> int:
             quality_opts=quality_opts,
             channel_sync=channel_sync_enabled,
             channel_sync_opts=channel_sync_opts,
+            preserve_metadata=bool(getattr(args, "preserve_metadata", False)),
             dry_run=args.dry_run,
             failed_path=failed_path,
             status=status,

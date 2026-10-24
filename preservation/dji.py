@@ -47,6 +47,50 @@ DJI_DATA_ENTRIES = ("djmd", "dbgi", "tmcd")
 QUAT_EPS = 1e-4
 READOUT_EPS = 0.05  # ms
 
+# ---------------------------------------------------------------------------
+# 机型 → 元数据默认保留策略 (2026-10-25)
+# ---------------------------------------------------------------------------
+#: `mp4box -info` 的 Movie Meta 会给出 DJI 机型, 例如:
+#:   tool: DJI OsmoAction4 / DJI OsmoPocket3 / DJI Mavic4 Pro L3B
+#: 用户策略: DJI 源**除 Action 系列外** (Pocket / 无人机) 默认不保留厂商
+#: 元数据 (走普通转码路径, 不重建 djmd/dbgi/tmcd); Action 系列默认保留,
+#: 因为 Gyroflow 增稳依赖其 djmd 四元数。
+_ACTION_MARKERS = ("action", "osmoaction")
+
+
+def camera_tool(gpac: GpacContainerBackend, source: Path) -> str | None:
+    """DJI 机型字符串 (`MP4Box -info` 的 `tool:` meta 标签); 取不到返回 None。"""
+    import re
+
+    try:
+        text = gpac.info(source)
+    except (OSError, RuntimeError):
+        return None
+    match = re.search(r"^\s*tool:\s*(.+?)\s*$", text, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def is_action_series(tool: str | None) -> bool:
+    """是否 DJI Action 系列 (Osmo Action / Action 4/5/6 …)。"""
+    compact = (tool or "").lower()
+    for ch in (" ", "_", "-"):
+        compact = compact.replace(ch, "")
+    return any(marker in compact for marker in _ACTION_MARKERS)
+
+
+def keep_metadata_by_default(
+    gpac: GpacContainerBackend, source: Path
+) -> tuple[bool, str | None]:
+    """DJI 默认元数据策略: 仅 Action 系列 keep=True; Pocket/无人机 keep=False。
+
+    返回 ``(keep, tool)``。``tool`` 为 None (无法识别机型) 时按**不保留**
+    处理 —— 这是用户给定的默认策略: DJI 除 Action 外默认不留 metadata;
+    需要保留时必须显式 ``--preserve-metadata``。
+    """
+    tool = camera_tool(gpac, source)
+    return is_action_series(tool), tool
+
+
 
 def track_manifest(
     gpac: GpacContainerBackend, source: Path

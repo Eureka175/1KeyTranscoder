@@ -2219,6 +2219,9 @@ class BatchCtx:
     quality_opts: dict[str, Any] | None = None
     channel_sync: bool = False
     channel_sync_opts: dict[str, Any] | None = None
+    #: DJI 默认元数据策略的覆盖开关 (--preserve-metadata)。默认 False 时
+    #: Pocket/无人机按"不保留 metadata"的普通转码路径处理; Action 系列不受影响。
+    preserve_metadata: bool = False
     dry_run: bool = False
     failed_path: Path | None = None
     status: DashboardStatus | None = None
@@ -2331,6 +2334,24 @@ def process_file_hw(
             )
         return "failed"
 
+    is_dji = is_dji_source(source_streams)
+    dji_keep_meta, dji_tool = (True, None)
+    if is_dji:
+        # DJI 默认元数据策略 (2026-10-25): 除 Action 系列外 (Pocket / 无人机)
+        # 默认不保留 metadata, 走普通转码路径; --preserve-metadata 可覆盖。
+        dji_keep_meta, dji_tool = dji.keep_metadata_by_default(ctx.gpac, src)
+        if not dji_keep_meta and not ctx.preserve_metadata:
+            logger.info(
+                "[META_POLICY] %s | DJI 非 Action 机型 (tool=%r): "
+                "默认不保留元数据, 走普通转码路径 "
+                "(可用 --preserve-metadata 覆盖)",
+                src.name, dji_tool,
+            )
+            file_logger.info(
+                "META_POLICY | dji_default_skip | tool=%r | "
+                "container rebuild skipped", dji_tool,
+            )
+
     if is_sony_source(source_streams):
         result = encode_one_sony_hw(
             src=src,
@@ -2368,7 +2389,7 @@ def process_file_hw(
                 (backend.name, fps)
             ),
         )
-    elif is_dji_source(source_streams):
+    elif is_dji and (dji_keep_meta or ctx.preserve_metadata):
         result = encode_one_dji_hw(
             src=src,
             dst=dst,

@@ -259,6 +259,13 @@ DEFAULTS: dict[str, Any] = {
     # 真实测量"的下限, 不是精度要求 —— 精度由中位数与 D3 的残差报告承担。
     "tv_min_frames_per_window": 3,
 
+    # —— 布局策略 (2026-10-25) ——
+    #: 音频流 >= 3 但只有 2 条健康 (其余静音/非有限) 时, 默认**整文件跳过
+    #: 对齐**: 4CH 素材里只有 2CH 有效是专业机常见的采样形态 (2CH 副本或
+    #: 关闭轨), 对剩余 2 条做纠正在用户口径里没有意义, 还会让透明模式白白
+    #: 重封装整个文件。保持为可覆盖项 (False 可恢复旧行为)。
+    "skip_two_channel_only": True,
+
     # —— 兼容 ——
     "max_lag_seconds": None,             # 旧键: 读取时映射为 search_window_ms
     "algo_version": "2.3.0-p1",
@@ -330,7 +337,7 @@ def production_opts(
 
 _BOOL_KEYS = ("channel_sync_transparent", "time_varying", "group_anchor_enabled",
               "channel_sync_accurate", "verify_agree_veto",
-              "track_reference")
+              "track_reference", "skip_two_channel_only")
 
 # 参与"全部健康 target 均失败 -> 文件级 measure_failed" 判定的轨道级原因
 _ESTIMATION_FAIL_REASONS = frozenset({
@@ -784,6 +791,22 @@ MetadataRestoreHook = Callable[
 ]
 
 
+def skip_two_channel_only(
+    n_tracks: int,
+    n_healthy: int,
+    enabled: bool = True,
+) -> bool:
+    """音频流 >= 3 但只有 2 条健康时, 是否按默认策略整文件跳过对齐。
+
+    为什么是"2"而不是"少于 3": 3 条音频流里 2 条健康 (2CH 有效) 与 4 条里
+    2 条健康是同一类素材形态; 对这两条有效轨做相对纠正在用户口径里没有
+    意义 (它们本来就是一对), 但重封装/重编码成本是整文件级的。因此默认
+    跳过, 报告 `two_channel_only`; 需要时可用
+    ``opts={"skip_two_channel_only": False}`` 恢复逐轨处理。
+    """
+    return bool(enabled) and int(n_tracks) >= 3 and int(n_healthy) == 2
+
+
 def is_aligned_decision(
     delay_ms: float,
     delay_samples: float,
@@ -1107,6 +1130,8 @@ def run_channel_sync(
                       (fixed 轨已移位; 其余轨为源轨 stream copy)
       already_aligned 无轨需要修正 (可含轨道级 untouched, 见 channels)
       not_eligible    布局不满足 (非多流单声道 PCM / 采样率超范围)
+      two_channel_only 音频流 >= 3 但只有 2 条健康 (其余静音/不可测):
+                      按 2026-10-25 默认策略整文件跳过对齐 (原音频不动)
       measure_failed  文件级: 无有效锚点 / 全部健康 target 均不可靠 /
                       解码失败 (原音频照旧 + 警告)
       verify_failed   文件级: 回编码/重封装失败 (原音频照旧 + 警告)
@@ -1398,6 +1423,27 @@ def run_channel_sync(
                     f"{' (rms ' + format(_r, '.1f') + ' dBFS)' if _r == _r else ''}"
                 )
         healthy = [i for i in range(n_tracks) if health[i][0]]
+
+        # 2026-10-25 用户策略: 音频流 >= 3 但只有 2 条健康 → 默认整文件跳过
+        # 对齐 (two_channel_only)。放在锚点选择**之前**: 一旦进入估计/修正,
+        # 透明模式就会产生整文件重封装, 而这两条有效轨本来就是一对, 没有
+        # 需要纠正的相对关系。
+        if skip_two_channel_only(n_tracks, len(healthy),
+                                 eff["skip_two_channel_only"]):
+            for i in range(n_tracks):
+                rows[i]["decision"] = "untouched"
+                if not rows[i].get("reason"):
+                    rows[i]["reason"] = "two_channel_only"
+            log(
+                f"channel-sync: {n_tracks} 条音频流中仅 {len(healthy)} 条健康"
+                " — two_channel_only, 默认整文件跳过对齐")
+            return report(
+                "two_channel_only",
+                f"{n_tracks} 条音频流中仅 {len(healthy)} 条有效 (其余静音/"
+                f"不可测); 按默认策略整文件跳过对齐 "
+                f"(可用 skip_two_channel_only=false 覆盖)",
+                channels=rows,
+            )
 
         # 3. 锚点候选回退: [CH3, CH4, CH1, CH2], 仅健康轨可当选
         order = [c for c in eff["anchor_candidates"]

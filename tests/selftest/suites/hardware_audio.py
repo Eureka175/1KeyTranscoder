@@ -340,7 +340,10 @@ def l1_hardware_audio() -> None:
     #       switch: hardware-first decode applies in both modes.
     HW_DECODE_REMOVED = {"--hw-decode", "--hw-decode-verify",
                          "--no-hw-autoselect"}
-    THIS_PHASE_ADDED = {"--no-metadata"}
+    # v0.8.7+ DJI metadata policy (2026-10-25): --no-metadata 是策略开关,
+    # --preserve-metadata 是它的显式覆盖 (DJI Pocket/无人机默认不保留 metadata;
+    # 需要保留时必须显式给出, 所以选项本身就属于策略契约的一部分)。
+    THIS_PHASE_ADDED = {"--no-metadata", "--preserve-metadata"}
     V080_BASELINE = {
         "--version", "--input", "--output", "--preset", "--encoder", "--config",
         "--scaling-config", "--tool-nvencc", "--tool-qsvencc",

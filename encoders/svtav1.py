@@ -110,6 +110,7 @@ def build_command(
     effective: EffectiveParams,
     video_stream_count: int,
     src_info: SourceInfo,
+    drop_metadata_streams: bool = False,
 ) -> tuple[list[str], dict[str, Any]]:
     svt_params, effective_dict = build_svt_params(effective)
 
@@ -120,32 +121,52 @@ def build_command(
         "-stats",
         "-y",
         "-i", str(src),
-
-        # Preserve all streams.
-        "-map", "0",
-        "-map_metadata", "0",
-        "-map_chapters", "0",
-
-        # Only primary video stream is encoded.
-        "-c:v:0", "libsvtav1",
+    ]
+    encode_params = [
         "-preset", str(profile["preset"]),
         "-crf", str(profile["crf"]),
         "-pix_fmt", av1_pix_fmt(src_info),
     ]
-
-    # Any additional video stream (DJI attached picture, cover image, etc.)
-    # is copied rather than encoded as a second SVT-AV1 stream.
-    for stream_index in range(1, max(1, video_stream_count)):
+    if drop_metadata_streams:
+        # 元数据策略 = 不保留: 主视频 + 音频 + 字幕 (见 x265.build_command
+        # 同名参数的注释; DJI data 轨与 attached_pic 无法穿过 MOV 中间容器)。
         cmd += [
-            f"-c:v:{stream_index}",
-            "copy",
+            "-map", "0:v:0",
+            "-map", "0:a?",
+            "-map", "0:s?",
+            "-map_metadata", "0",
+            "-map_chapters", "0",
+            "-c:v:0", "libsvtav1",
+        ] + encode_params + [
+            "-c:a", "copy",
+            "-c:s", "copy",
+        ]
+    else:
+        cmd += [
+            # Preserve all streams.
+            "-map", "0",
+            "-map_metadata", "0",
+            "-map_chapters", "0",
+            # Only primary video stream is encoded.
+            "-c:v:0", "libsvtav1",
+        ] + encode_params
+
+        # Any additional video stream (DJI attached picture, cover image, etc.)
+        # is copied rather than encoded as a second SVT-AV1 stream.
+        for stream_index in range(1, max(1, video_stream_count)):
+            cmd += [
+                f"-c:v:{stream_index}",
+                "copy",
+            ]
+
+        cmd += [
+            "-c:a", "copy",
+            "-c:s", "copy",
+            "-c:d", "copy",
+            "-c:t", "copy",
         ]
 
     cmd += [
-        "-c:a", "copy",
-        "-c:s", "copy",
-        "-c:d", "copy",
-        "-c:t", "copy",
         "-fps_mode", "passthrough",
         "-svtav1-params", svt_params,
         "-movflags", "+use_metadata_tags",
@@ -217,6 +238,7 @@ class SvtAv1Backend(EncoderBackend):
         effective: EffectiveParams,
         video_stream_count: int,
         src_info: SourceInfo,
+        drop_metadata_streams: bool = False,
     ) -> tuple[list[str], dict[str, Any]]:
         return build_command(
             ffmpeg,
@@ -226,6 +248,7 @@ class SvtAv1Backend(EncoderBackend):
             effective,
             video_stream_count,
             src_info,
+            drop_metadata_streams,
         )
 
     def build_video_command(

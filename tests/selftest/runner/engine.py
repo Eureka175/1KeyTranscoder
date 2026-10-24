@@ -41,9 +41,9 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
     """
     from ..suites import (
         audio_encode, audio_external, audio_format, audio_integration,
-        audio_mix, audio_model, audio_retention, audio_route,
+        audio_2ch_policy, audio_mix, audio_model, audio_retention, audio_route,
         audio_selection, audio_sync, audio_timeline, channel_sync, cli,
-        codecs, container_flags, core, hardware, hardware_audio,
+        codecs, container_flags, core, dji_metadata, hardware, hardware_audio,
         hwdecode_results, pipeline, production_output, native_decode,
         source_contract, toolchain, workdir,
     )
@@ -60,6 +60,10 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("gpac/paths", core.l1_gpac_paths),
             ("tkhd 轨道标志/alternate group (PR 多音轨)",
              container_flags.l1_track_flags),
+            ("DJI 元数据默认策略 (仅 Action 保留)",
+             dji_metadata.l1_dji_metadata_policy),
+            ("2CH 有效默认跳过对齐 (4CH 中 2 静音)",
+             audio_2ch_policy.l1_two_channel_only_policy),
             ("x265 P0", codecs.l1_x265),
             ("quality/versions", core.l1_quality),
             ("workdir lifecycle", workdir.l1_workdir),
@@ -106,6 +110,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("file-level meta", toolchain.l2_file_level_meta),
             ("tkhd 轨道标志 (真实 muxer 输出)",
              container_flags.l2_track_flags),
+            ("DJI 元数据默认策略 (真实样本)",
+             dji_metadata.l2_dji_metadata_policy),
         ],
         "full": [
             ("pipeline", pipeline.l3_pipeline),

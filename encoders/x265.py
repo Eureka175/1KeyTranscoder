@@ -162,6 +162,7 @@ def build_command(
     effective: EffectiveParams,
     video_stream_count: int,
     src_info: SourceInfo,
+    drop_metadata_streams: bool = False,
 ) -> tuple[list[str], dict[str, Any]]:    # Effective parameters are final: only serialization happens here.
     x265_params, effective_dict = build_x265_params(effective)
 
@@ -172,32 +173,55 @@ def build_command(
         "-stats",
         "-y",
         "-i", str(src),
-
-        # Preserve all streams.
-        "-map", "0",
-        "-map_metadata", "0",
-        "-map_chapters", "0",
-
-        # Only primary video stream is encoded.
-        "-c:v:0", "libx265",
+    ]
+    encode_params = [
         "-preset", str(profile["preset"]),
         "-crf", str(profile["crf"]),
         "-pix_fmt", ffmpeg_pix_fmt(src_info),
     ]
-
-    # Any additional video stream (DJI attached picture, cover image, etc.)
-    # is copied rather than encoded as a second libx265 stream.
-    for stream_index in range(1, max(1, video_stream_count)):
+    if drop_metadata_streams:
+        # 元数据策略 = 不保留 (--no-metadata / DJI 非 Action 的默认策略):
+        # 只保留主视频 + 音频 + 字幕。相机 data 轨 (rtmd/djmd/dbgi/tmcd)
+        # 与 attached_pic (封面缩略图) 都属于"元数据"类载荷; 且 FFmpeg 的
+        # MOV 中间容器无法忠实承载它们 —— 实测 DJI: data 轨会被写成假的
+        # stts 轨, attached_pic 与 hwdownload 滤镜冲突直接 -22 失败。
         cmd += [
-            f"-c:v:{stream_index}",
-            "copy",
+            "-map", "0:v:0",
+            "-map", "0:a?",
+            "-map", "0:s?",
+            "-map_metadata", "0",
+            "-map_chapters", "0",
+            "-c:v:0", "libx265",
+        ] + encode_params + [
+            "-c:a", "copy",
+            "-c:s", "copy",
+        ]
+    else:
+        cmd += [
+            # Preserve all streams.
+            "-map", "0",
+            "-map_metadata", "0",
+            "-map_chapters", "0",
+            # Only primary video stream is encoded.
+            "-c:v:0", "libx265",
+        ] + encode_params
+
+        # Any additional video stream (DJI attached picture, cover image, etc.)
+        # is copied rather than encoded as a second libx265 stream.
+        for stream_index in range(1, max(1, video_stream_count)):
+            cmd += [
+                f"-c:v:{stream_index}",
+                "copy",
+            ]
+
+        cmd += [
+            "-c:a", "copy",
+            "-c:s", "copy",
+            "-c:d", "copy",
+            "-c:t", "copy",
         ]
 
     cmd += [
-        "-c:a", "copy",
-        "-c:s", "copy",
-        "-c:d", "copy",
-        "-c:t", "copy",
         "-fps_mode", "passthrough",
         "-x265-params", x265_params,
         "-movflags", "+use_metadata_tags",
@@ -268,6 +292,7 @@ class X265Backend(EncoderBackend):
         effective: EffectiveParams,
         video_stream_count: int,
         src_info: SourceInfo,
+        drop_metadata_streams: bool = False,
     ) -> tuple[list[str], dict[str, Any]]:
         return build_command(
             ffmpeg,
@@ -277,6 +302,7 @@ class X265Backend(EncoderBackend):
             effective,
             video_stream_count,
             src_info,
+            drop_metadata_streams,
         )
 
     def build_video_command(

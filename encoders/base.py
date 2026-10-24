@@ -67,6 +67,7 @@ class EncoderBackend(Protocol):
         effective: EffectiveParams,
         video_stream_count: int,
         src_info: SourceInfo,
+        drop_metadata_streams: bool = False,
     ) -> tuple[list[str], dict[str, Any]]:
         """
         Build the full FFmpeg command for one source file.
@@ -75,6 +76,11 @@ class EncoderBackend(Protocol):
         must NOT recalculate scaling, classification, or bitrate rules.
         `src_info` supplies the original source format for encoder-specific
         decisions such as output pixel format.
+        `drop_metadata_streams=True` is the metadata-skip policy (Sony
+        ``--no-metadata`` / DJI non-Action default): the output keeps the
+        main video + audio + subtitles only, so camera data tracks and
+        attached cover pictures do not have to survive FFmpeg's MOV
+        intermediate (which mangles/refuses them).
         Returns (argv, effective-parameter dict for logging).
         """
         ...
