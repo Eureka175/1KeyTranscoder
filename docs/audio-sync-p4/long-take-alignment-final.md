@@ -325,3 +325,48 @@ C1306 CH3 中位 4 / p90 17、CH4 中位 5 / p90 13.5。与 §11 的"内容歧�
 
 ![polarity](plots/polarity.png)
 ![polarity gain](plots/polarity_gain.png)
+
+## 14. 最终交付（final）：细化延迟 + 极性修正
+
+E:/I: 接回后，把 round-3 细化音频（`aligned_fine`）与极性修正（翻转 CH3/CH4）合入最终 MP4。
+视频全程 stream copy，未重编码、未重定时。
+
+### 14.1 交付文件
+
+| 文件 | 大小 | 内容 |
+|---|---|---|
+| `E:\1kt_work\long_align\deliver\20260919_C1305_4ch_aligned_final.mp4` | 44.56 GiB | 视频原样 + 4 轨对齐/极性修正 PCM |
+| `E:\1kt_work\long_align\deliver\20260919_C1306_4ch_aligned_final.mp4` | 38.60 GiB | 同上 |
+| `E:\1kt_work\long_align\clips_final\*_final_clip*.mp4` | 5×~96 MB | 抽检片段（10.09 s×5，总 50.47 s） |
+| `E:\1kt_work\long_align\clips_final\polarity_demo_{before,after}.mp4` | 2×96 MB | 极性 A/B 对比（同段视频、同段音频，before 未翻转） |
+
+旧版 `*_4ch_aligned.mp4`（v2，仅 2 分钟锚点、未修极性）已被 final 取代并从 E: 删除，节省 83.2 GiB。
+
+### 14.2 交付校验（每条素材）
+
+| 检查项 | C1305 | C1306 |
+|---|---|---|
+| 视频 streamhash 逐包一致 | **True** | **True** |
+| 视频包数 / 帧数 / 帧率 | 不变（288150 / 249630 帧） | 不变 |
+| 无 VFR / 无重定时 | True（pts/dts 序列完全一致） | True |
+| 音频轨 | 4× pcm_s24be/ipcm 24bit 48k mono | 同 |
+| 逐轨 dur_ts = 源 | 230,750,520 | 199,903,704 |
+| 总时长 = 源 | 4807.3025 s | 4164.6605 s |
+| 交付音轨 md5 = 极性修正 WAV | **True（4/4）** | **True（4/4）** |
+| 极性处理 | CH1/CH2 原样，**CH3/CH4 反转** | 同 |
+
+A/B 示例校验：`polarity_demo_before/after` 的 **视频 streamhash 相同**（`2107…b55`），
+CH3 音频 md5 不同（`857455…` vs `de0694…`），即两片只差在极性与时间对齐的音频上。
+
+### 14.3 抽检片段
+
+5 段随机位置、原始 GOP 关键帧起点、各 10.09 s、总 **50.47 s ≤ 60 s**；
+每段视频与源同段 **bit-exact**（streamhash 相同）、每段 4 轨 PCM 音频、首包为关键帧。
+
+### 14.4 结论
+
+- **时间对齐**：4CH 已绑到同一时间轴（2 分钟锚点粗校正 + 残差二次校正），强相干块残差
+  中位 1–3 采样、p90 5–27 采样（C1305 CH4 略高，受内容共享度限制）。
+- **极性**：CH3/CH4 相对 CH1/CH2 反相（两条素材一致，投票一致率 95–100%）；
+  翻转后 4CH 和信号 RMS 增益 **+4.61 / +4.78 dB**，群组相关由负转正。
+- **视频**：完全未动（逐包哈希一致，无 VFR）。
