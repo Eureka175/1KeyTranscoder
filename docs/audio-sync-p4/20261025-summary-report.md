@@ -274,3 +274,56 @@ timescale 恰为 60000，与 GPAC 默认一致）。
 - 保留校验：`[PRESERVE-OK] PRESERVED=15 MODIFIED=0 MISSING=0 UNKNOWN=0 structural_success=True`
 - tkhd 归一化在本路径同样生效（track flags 3/2 → 7，alternate_group → 0）
 - 总体 `done=1 skipped=0 failed=0`
+
+### 3.6 第二轮"流格式"细化：box 级对齐（2026-10-25 03:35，最终交付）
+
+在第一轮 GPAC 还原（§3.4/3.5）通过消费方验证后，又做了一轮**只改 moov 的字节级
+细化**（`work/refine_restored.py`），把剩余可无损消除的容器差异补齐：
+
+- `mvhd/tkhd/mdhd` 的 creation/modification time 从源复制；
+- 每轨 `stsd` sample entry 用源条目替换（GPAC 在 hvc1 entry 内多写 `btrt`，
+  视频 entry 755→789 字节；替换后与源逐字节一致）；
+- 删除源没有、GPAC 补写的 `minf/hdlr`（C1305 的 4 条音轨）；
+- `mdia/hdlr`（handler 名字/保留字段）与 `mdhd`（GPAC 把 language 写成 0x7fff）
+  从源逐字节复制；
+- 因 moov 变小，同步修正全部 co64/stco（-210 字节）。
+
+细化后**box 清单与源完全一致**：C1305/C1306 均为 **119 vs 119 个 box，
+missing=[]、added=[]**；brand/compat/6 轨/uuid 9-9/nrtm/tref/audio entries/mvhd
+全部相等；视频与 rtmd streamhash 逐包一致；4 条音轨 md5 4/4；Gyroflow 与源
+完全一致（C1305 288149 变化四元数、C1306 249629，首尾时间戳差 0.0 ms）。
+
+**仍存在的差异（全部无内容/语义影响）**：
+
+1. 顶层 box 布局：`ftyp,moov,mdat,free,uuid,uuid,meta` vs 源
+   `ftyp,uuid,uuid,free,mdat,moov,meta`（moov 被 GPAC 前置、uuid/meta 移到
+   mdat 之后；跨机位验证已证明不影响消费方）；
+2. 每条轨的 **chunk 表（stsc/co64）不同**：GPAC 重封装时按自己的 1024 样本
+   chunk 策略重排，源是整秒/大 chunk（例如视频 co64 11774 vs 9937 chunk）；
+   但**样本内容、顺序、时间戳完全一致**（streamhash/逐包数据相等）；
+3. `mdat`/`free` 的**填充尺寸**不同：源 mdat 比实际样本总和大 ~42.3 MB
+   （样本间对齐填充），GPAC 写出紧凑 mdat；free box 126806→69 字节。
+4. `moov` 总大小因此仍比源大约 0.58 MB（chunk 表差异），不影响任何样本。
+
+以上 1–4 均无法在不重写 chunk 布局/不改变 GPAC muxer 的前提下进一步消除；
+声明的"最大努力还原"以 **消费方 + 码流 + 样本级一致** 为判据已达成。
+
+## 6.2 full 级自测（环境受限，2026-10-25 03:07）
+
+`python tests/full_autotest.py --level full`：**1157 PASS / 23 FAIL**。逐项核对
+失败原因，均与本轮代码改动无关：
+
+- **无 NVIDIA GPU**（nvenc 相关 6 项）：`caps.nvenc`、`v08hw.nvenc` 3 项、
+  `l3.p4c.T9` 硬件后端 2 项；日志均为 CUDA_ERROR_NO_DEVICE / all format rungs fail。
+- **fixture/素材缺失**（12 项）：`testsets\a7m4_4k30p_264_hi422p_xavcs` 组、
+  `work/autotest/in/classic` 合成输入、以及若干"真实 A7M5 素材不存在"的
+  L3 用例（这些素材组不在当前 testsets 配置里）。
+- **既有 transparent/合成测量用例**（5 项）：C15/C16 用 `--encoder nvenc` →
+  rc=1（同无 GPU）；C17/C23/C32 的失败信息分别为 recheck 空测量、输出扩展名
+  `.MOV` vs 用例期望 `.MP4`、合成 speech 素材 measure_failed —— 这些用例在
+  unit/toolchain 关卡之外，且 C23 失败原因是输出名扩展名而非内容差异，
+  与本次 DJI 策略/2CH 跳过/元数据还原改动无交集（改动点只在 DJI 与
+  >=3 轨且恰好 2 条健康的音频策略、以及任务脚本）。
+
+本轮真正作为门禁的自测结果：**unit 951 PASS / 0 FAIL；toolchain 976 PASS /
+1 FAIL（唯一失败 = 无 CUDA 设备的 nvenc 探测）**。

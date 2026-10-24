@@ -114,3 +114,12 @@
 - [02:57] 任务4 Action4 真实 QSV 编码完成：208 s/4K 输入，输出保留 djmd/dbgi/tmcd；
   [PRESERVE-OK] PRESERVED=15 MODIFIED=0 MISSING=0 structural_success=True，
   done=1 failed=0。任务4 的"Action 保留 / 非 Action 默认不保留"两条路径均有真实编码证据。
+
+- [03:35] 任务3 第二轮细化完成：box 级与源完全一致（C1305/C1306 均 119 vs 119，
+  missing/added 为空）；剩余差异仅顶层 box 顺序、GPAC chunk 表（stsc/co64）与
+  mdat/free 填充尺寸，样本内容/顺序/时间戳完全一致。最终交付文件名不变
+  （*_4ch_aligned_restored.mp4，49.78/43.12 GiB），V2/V3 中间文件已清理。
+- [03:36] full 级自测 1157 PASS / 23 FAIL：失败全部为无 GPU 的 nvenc 用例
+  （6）、缺失测试素材/fixture（12）、既有 transparent/合成测量用例（5，含 C23
+  输出扩展名 .MOV vs 期望 .MP4），与本次改动无交集。门禁级结果 unit 951/0、
+  toolchain 976/1（nvenc）。

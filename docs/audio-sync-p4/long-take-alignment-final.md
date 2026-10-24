@@ -450,3 +450,12 @@ compat / 6 轨 / uuid 多重集 9/9 / nrtm / tref / audio entries / mvhd 全部�
 偏移与 mdhd 时长；避免 GPAC 对 50 GiB 文件的多轮整文件重写（实测 `-ref` 一步
 17 min 仅 <1 GiB I/O）。验证脚本 `work/verify_v2.py`，证据 JSON 已归档到
 `docs/audio-sync-p4/reports/20261025/`。
+
+## 17. 交付文件的最终 box 级细化（2026-10-25 03:35）
+
+两条还原交付文件又做了一轮只改 moov 的字节级细化（详见
+`20261025-summary-report.md` §3.6）：sample entry（hvc1 内的 btrt）、
+mvhd/tkhd/mdhd 时间戳、mdia/hdlr、mdhd language 全部与源逐字节一致，
+并删除了 GPAC 多写的 minf/hdlr。细化后 box 清单 119 vs 119、无缺失/新增；
+仅剩顶层 box 顺序、GPAC chunk 表（stsc/co64）与 mdat/free 填充尺寸差异，
+样本内容/顺序/时间戳完全一致。文件名与大小不变。

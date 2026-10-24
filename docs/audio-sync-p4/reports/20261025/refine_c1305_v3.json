@@ -1,0 +1,52 @@
+{
+ "source": "F:\\1KeyTranscoder\\data\\align_4ch_proof\\20260919_C1305.MP4",
+ "restored": "E:\\1kt_work\\long_align\\deliver\\20260919_C1305_4ch_aligned_restored.mp4",
+ "out": "E:\\1kt_work\\long_align\\deliver\\20260919_C1305_4ch_aligned_restored_v3.mp4",
+ "delta": -182,
+ "moov": [
+  4295488,
+  4295306
+ ],
+ "timestamps": [
+  "moov/mvhd",
+  "trak[0]/tkhd",
+  "trak[0]/mdhd",
+  "trak[1]/tkhd",
+  "trak[1]/mdhd",
+  "trak[2]/tkhd",
+  "trak[2]/mdhd",
+  "trak[3]/tkhd",
+  "trak[3]/mdhd",
+  "trak[4]/tkhd",
+  "trak[4]/mdhd",
+  "trak[5]/tkhd",
+  "trak[5]/mdhd"
+ ],
+ "stsd": [
+  "trak[0]: entry 789 -> 755 bytes"
+ ],
+ "minf_hdlr_removed": [
+  "trak[4] -44 bytes",
+  "trak[3] -44 bytes",
+  "trak[2] -44 bytes",
+  "trak[1] -44 bytes"
+ ],
+ "offsets": [
+  "co64: 11774 offsets -182",
+  "co64: 9937 offsets -182",
+  "co64: 9936 offsets -182",
+  "co64: 9935 offsets -182",
+  "co64: 9934 offsets -182",
+  "co64: 9937 offsets -182"
+ ],
+ "mdhd_hdlr": [
+  "trak[4] mdhd 32 -> 32 bytes",
+  "trak[4] hdlr 45 -> 52 bytes",
+  "trak[3] mdhd 32 -> 32 bytes",
+  "trak[3] hdlr 45 -> 52 bytes",
+  "trak[2] mdhd 32 -> 32 bytes",
+  "trak[2] hdlr 45 -> 52 bytes",
+  "trak[1] mdhd 32 -> 32 bytes",
+  "trak[1] hdlr 45 -> 52 bytes"
+ ]
+}

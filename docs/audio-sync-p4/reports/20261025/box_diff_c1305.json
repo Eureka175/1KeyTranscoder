@@ -1,0 +1,454 @@
+{
+ "source": "F:\\1KeyTranscoder\\data\\align_4ch_proof\\20260919_C1305.MP4",
+ "restored": "E:\\1kt_work\\long_align\\deliver\\20260919_C1305_4ch_aligned_restored.mp4",
+ "box_count": [
+  119,
+  123
+ ],
+ "missing_boxes": [],
+ "added_boxes": [
+  "moov/trak[2]/mdia/minf/hdlr",
+  "moov/trak[3]/mdia/minf/hdlr",
+  "moov/trak[4]/mdia/minf/hdlr",
+  "moov/trak[5]/mdia/minf/hdlr"
+ ],
+ "size_diff": [
+  {
+   "path": "free",
+   "source": 126806,
+   "restored": 69
+  },
+  {
+   "path": "mdat",
+   "source": 53485764624,
+   "restored": 53443438977
+  },
+  {
+   "path": "moov",
+   "source": 3711534,
+   "restored": 4295488
+  },
+  {
+   "path": "moov/trak[1]",
+   "source": 3516691,
+   "restored": 3705261
+  },
+  {
+   "path": "moov/trak[1]/mdia",
+   "source": 3516503,
+   "restored": 3705073
+  },
+  {
+   "path": "moov/trak[1]/mdia/minf",
+   "source": 3516411,
+   "restored": 3704981
+  },
+  {
+   "path": "moov/trak[1]/mdia/minf/stbl",
+   "source": 3516347,
+   "restored": 3704917
+  },
+  {
+   "path": "moov/trak[1]/mdia/minf/stbl/stsd",
+   "source": 771,
+   "restored": 805
+  },
+  {
+   "path": "moov/trak[1]/mdia/minf/stbl/stsc",
+   "source": 40,
+   "restored": 132808
+  },
+  {
+   "path": "moov/trak[1]/mdia/minf/stbl/co64",
+   "source": 38440,
+   "restored": 94208
+  },
+  {
+   "path": "moov/trak[2]",
+   "source": 38938,
+   "restored": 127759
+  },
+  {
+   "path": "moov/trak[2]/mdia",
+   "source": 38750,
+   "restored": 127571
+  },
+  {
+   "path": "moov/trak[2]/mdia/hdlr",
+   "source": 52,
+   "restored": 45
+  },
+  {
+   "path": "moov/trak[2]/mdia/minf",
+   "source": 38658,
+   "restored": 127486
+  },
+  {
+   "path": "moov/trak[2]/mdia/minf/stbl",
+   "source": 38598,
+   "restored": 127382
+  },
+  {
+   "path": "moov/trak[2]/mdia/minf/stbl/stsc",
+   "source": 40,
+   "restored": 47752
+  },
+  {
+   "path": "moov/trak[2]/mdia/minf/stbl/co64",
+   "source": 38440,
+   "restored": 79512
+  },
+  {
+   "path": "moov/trak[3]",
+   "source": 38938,
+   "restored": 127595
+  },
+  {
+   "path": "moov/trak[3]/mdia",
+   "source": 38750,
+   "restored": 127407
+  },
+  {
+   "path": "moov/trak[3]/mdia/hdlr",
+   "source": 52,
+   "restored": 45
+  },
+  {
+   "path": "moov/trak[3]/mdia/minf",
+   "source": 38658,
+   "restored": 127322
+  },
+  {
+   "path": "moov/trak[3]/mdia/minf/stbl",
+   "source": 38598,
+   "restored": 127218
+  },
+  {
+   "path": "moov/trak[3]/mdia/minf/stbl/stsc",
+   "source": 40,
+   "restored": 47596
+  },
+  {
+   "path": "moov/trak[3]/mdia/minf/stbl/co64",
+   "source": 38440,
+   "restored": 79504
+  },
+  {
+   "path": "moov/trak[4]",
+   "source": 38938,
+   "restored": 127431
+  },
+  {
+   "path": "moov/trak[4]/mdia",
+   "source": 38750,
+   "restored": 127243
+  },
+  {
+   "path": "moov/trak[4]/mdia/hdlr",
+   "source": 52,
+   "restored": 45
+  },
+  {
+   "path": "moov/trak[4]/mdia/minf",
+   "source": 38658,
+   "restored": 127158
+  },
+  {
+   "path": "moov/trak[4]/mdia/minf/stbl",
+   "source": 38598,
+   "restored": 127054
+  },
+  {
+   "path": "moov/trak[4]/mdia/minf/stbl/stsc",
+   "source": 40,
+   "restored": 47440
+  },
+  {
+   "path": "moov/trak[4]/mdia/minf/stbl/co64",
+   "source": 38440,
+   "restored": 79496
+  },
+  {
+   "path": "moov/trak[5]",
+   "source": 38938,
+   "restored": 127279
+  },
+  {
+   "path": "moov/trak[5]/mdia",
+   "source": 38750,
+   "restored": 127091
+  },
+  {
+   "path": "moov/trak[5]/mdia/hdlr",
+   "source": 52,
+   "restored": 45
+  },
+  {
+   "path": "moov/trak[5]/mdia/minf",
+   "source": 38658,
+   "restored": 127006
+  },
+  {
+   "path": "moov/trak[5]/mdia/minf/stbl",
+   "source": 38598,
+   "restored": 126902
+  },
+  {
+   "path": "moov/trak[5]/mdia/minf/stbl/stsc",
+   "source": 40,
+   "restored": 47296
+  },
+  {
+   "path": "moov/trak[5]/mdia/minf/stbl/co64",
+   "source": 38440,
+   "restored": 79488
+  },
+  {
+   "path": "moov/trak[6]",
+   "source": 38929,
+   "restored": 80001
+  },
+  {
+   "path": "moov/trak[6]/mdia",
+   "source": 38721,
+   "restored": 79793
+  },
+  {
+   "path": "moov/trak[6]/mdia/minf",
+   "source": 38620,
+   "restored": 79692
+  },
+  {
+   "path": "moov/trak[6]/mdia/minf/stbl",
+   "source": 38564,
+   "restored": 79636
+  },
+  {
+   "path": "moov/trak[6]/mdia/minf/stbl/co64",
+   "source": 38440,
+   "restored": 79512
+  }
+ ],
+ "hash_diff": [
+  {
+   "path": "moov",
+   "size": 3711534
+  },
+  {
+   "path": "moov/mvhd",
+   "size": 108
+  },
+  {
+   "path": "moov/trak[1]",
+   "size": 3516691
+  },
+  {
+   "path": "moov/trak[1]/tkhd",
+   "size": 92
+  },
+  {
+   "path": "moov/trak[1]/mdia",
+   "size": 3516503
+  },
+  {
+   "path": "moov/trak[1]/mdia/mdhd",
+   "size": 32
+  },
+  {
+   "path": "moov/trak[1]/mdia/minf",
+   "size": 3516411
+  },
+  {
+   "path": "moov/trak[1]/mdia/minf/stbl",
+   "size": 3516347
+  },
+  {
+   "path": "moov/trak[1]/mdia/minf/stbl/stsd",
+   "size": 771
+  },
+  {
+   "path": "moov/trak[1]/mdia/minf/stbl/stsc",
+   "size": 40
+  },
+  {
+   "path": "moov/trak[1]/mdia/minf/stbl/co64",
+   "size": 38440
+  },
+  {
+   "path": "moov/trak[2]",
+   "size": 38938
+  },
+  {
+   "path": "moov/trak[2]/tkhd",
+   "size": 92
+  },
+  {
+   "path": "moov/trak[2]/mdia",
+   "size": 38750
+  },
+  {
+   "path": "moov/trak[2]/mdia/mdhd",
+   "size": 32
+  },
+  {
+   "path": "moov/trak[2]/mdia/hdlr",
+   "size": 52
+  },
+  {
+   "path": "moov/trak[2]/mdia/minf",
+   "size": 38658
+  },
+  {
+   "path": "moov/trak[2]/mdia/minf/stbl",
+   "size": 38598
+  },
+  {
+   "path": "moov/trak[2]/mdia/minf/stbl/stsc",
+   "size": 40
+  },
+  {
+   "path": "moov/trak[2]/mdia/minf/stbl/co64",
+   "size": 38440
+  },
+  {
+   "path": "moov/trak[3]",
+   "size": 38938
+  },
+  {
+   "path": "moov/trak[3]/tkhd",
+   "size": 92
+  },
+  {
+   "path": "moov/trak[3]/mdia",
+   "size": 38750
+  },
+  {
+   "path": "moov/trak[3]/mdia/mdhd",
+   "size": 32
+  },
+  {
+   "path": "moov/trak[3]/mdia/hdlr",
+   "size": 52
+  },
+  {
+   "path": "moov/trak[3]/mdia/minf",
+   "size": 38658
+  },
+  {
+   "path": "moov/trak[3]/mdia/minf/stbl",
+   "size": 38598
+  },
+  {
+   "path": "moov/trak[3]/mdia/minf/stbl/stsc",
+   "size": 40
+  },
+  {
+   "path": "moov/trak[3]/mdia/minf/stbl/co64",
+   "size": 38440
+  },
+  {
+   "path": "moov/trak[4]",
+   "size": 38938
+  },
+  {
+   "path": "moov/trak[4]/tkhd",
+   "size": 92
+  },
+  {
+   "path": "moov/trak[4]/mdia",
+   "size": 38750
+  },
+  {
+   "path": "moov/trak[4]/mdia/mdhd",
+   "size": 32
+  },
+  {
+   "path": "moov/trak[4]/mdia/hdlr",
+   "size": 52
+  },
+  {
+   "path": "moov/trak[4]/mdia/minf",
+   "size": 38658
+  },
+  {
+   "path": "moov/trak[4]/mdia/minf/stbl",
+   "size": 38598
+  },
+  {
+   "path": "moov/trak[4]/mdia/minf/stbl/stsc",
+   "size": 40
+  },
+  {
+   "path": "moov/trak[4]/mdia/minf/stbl/co64",
+   "size": 38440
+  },
+  {
+   "path": "moov/trak[5]",
+   "size": 38938
+  },
+  {
+   "path": "moov/trak[5]/tkhd",
+   "size": 92
+  },
+  {
+   "path": "moov/trak[5]/mdia",
+   "size": 38750
+  },
+  {
+   "path": "moov/trak[5]/mdia/mdhd",
+   "size": 32
+  },
+  {
+   "path": "moov/trak[5]/mdia/hdlr",
+   "size": 52
+  },
+  {
+   "path": "moov/trak[5]/mdia/minf",
+   "size": 38658
+  },
+  {
+   "path": "moov/trak[5]/mdia/minf/stbl",
+   "size": 38598
+  },
+  {
+   "path": "moov/trak[5]/mdia/minf/stbl/stsc",
+   "size": 40
+  },
+  {
+   "path": "moov/trak[5]/mdia/minf/stbl/co64",
+   "size": 38440
+  },
+  {
+   "path": "moov/trak[6]",
+   "size": 38929
+  },
+  {
+   "path": "moov/trak[6]/tkhd",
+   "size": 92
+  },
+  {
+   "path": "moov/trak[6]/mdia",
+   "size": 38721
+  },
+  {
+   "path": "moov/trak[6]/mdia/mdhd",
+   "size": 32
+  },
+  {
+   "path": "moov/trak[6]/mdia/minf",
+   "size": 38620
+  },
+  {
+   "path": "moov/trak[6]/mdia/minf/stbl",
+   "size": 38564
+  },
+  {
+   "path": "moov/trak[6]/mdia/minf/stbl/stsc",
+   "size": 40
+  },
+  {
+   "path": "moov/trak[6]/mdia/minf/stbl/co64",
+   "size": 38440
+  }
+ ]
+}

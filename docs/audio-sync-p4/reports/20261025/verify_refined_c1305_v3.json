@@ -1,0 +1,187 @@
+{
+ "stem": "20260919_C1305",
+ "source": "F:\\1KeyTranscoder\\data\\align_4ch_proof\\20260919_C1305.MP4",
+ "refined": "E:\\1kt_work\\long_align\\deliver\\20260919_C1305_4ch_aligned_restored_v3.mp4",
+ "container": {
+  "brand": [
+   "XAVC",
+   "XAVC"
+  ],
+  "compat_equal": true,
+  "tracks_equal": true,
+  "uuid": {
+   "equal": true,
+   "missing": [],
+   "added": [],
+   "count_a": 9,
+   "count_b": 9
+  },
+  "nrtm": [
+   true,
+   true
+  ],
+  "tref": [
+   1,
+   1
+  ],
+  "audio_entries_equal": true,
+  "mvhd_equal": true,
+  "top_level": [
+   [
+    "ftyp",
+    "uuid",
+    "uuid",
+    "free",
+    "mdat",
+    "moov",
+    "meta"
+   ],
+   [
+    "ftyp",
+    "moov",
+    "mdat",
+    "free",
+    "uuid",
+    "uuid",
+    "meta"
+   ]
+  ]
+ },
+ "video_streamhash": {
+  "source_known": "0,v,SHA256=afdfc341e04e0c2cfdb874748d8195d5c537df0a22b2056b2c7f934e3ca88786",
+  "refined": "0,v,SHA256=afdfc341e04e0c2cfdb874748d8195d5c537df0a22b2056b2c7f934e3ca88786",
+  "equal": true
+ },
+ "rtmd_streamhash": {
+  "source_known": "0,d,SHA256=2e4c24e7dd3bcc8c3972c1a9b2532f55c58f445badb16e8c49da3faa93c064b0",
+  "refined": "0,d,SHA256=2e4c24e7dd3bcc8c3972c1a9b2532f55c58f445badb16e8c49da3faa93c064b0",
+  "equal": true
+ },
+ "audio_md5": [
+  {
+   "wav": "MD5=aaa773b6d97d1b9ad1b5186fa6b53d61",
+   "refined": "MD5=aaa773b6d97d1b9ad1b5186fa6b53d61",
+   "match": true
+  },
+  {
+   "wav": "MD5=323f50a43edf41c3ef8af3ade383f8a2",
+   "refined": "MD5=323f50a43edf41c3ef8af3ade383f8a2",
+   "match": true
+  },
+  {
+   "wav": "MD5=9604c972329c9fa4662d4fcad2718e20",
+   "refined": "MD5=9604c972329c9fa4662d4fcad2718e20",
+   "match": true
+  },
+  {
+   "wav": "MD5=fe4a79d231549663a764963c904b8af6",
+   "refined": "MD5=fe4a79d231549663a764963c904b8af6",
+   "match": true
+  }
+ ],
+ "box_diff": {
+  "box_count": [
+   119,
+   119
+  ],
+  "missing": [],
+  "added": [],
+  "size_diff_paths": [
+   "free",
+   "mdat",
+   "moov",
+   "moov/trak[1]",
+   "moov/trak[1]/mdia",
+   "moov/trak[1]/mdia/minf",
+   "moov/trak[1]/mdia/minf/stbl",
+   "moov/trak[1]/mdia/minf/stbl/stsc",
+   "moov/trak[1]/mdia/minf/stbl/co64",
+   "moov/trak[2]",
+   "moov/trak[2]/mdia",
+   "moov/trak[2]/mdia/minf",
+   "moov/trak[2]/mdia/minf/stbl",
+   "moov/trak[2]/mdia/minf/stbl/stsc",
+   "moov/trak[2]/mdia/minf/stbl/co64",
+   "moov/trak[3]",
+   "moov/trak[3]/mdia",
+   "moov/trak[3]/mdia/minf",
+   "moov/trak[3]/mdia/minf/stbl",
+   "moov/trak[3]/mdia/minf/stbl/stsc",
+   "moov/trak[3]/mdia/minf/stbl/co64",
+   "moov/trak[4]",
+   "moov/trak[4]/mdia",
+   "moov/trak[4]/mdia/minf",
+   "moov/trak[4]/mdia/minf/stbl",
+   "moov/trak[4]/mdia/minf/stbl/stsc",
+   "moov/trak[4]/mdia/minf/stbl/co64",
+   "moov/trak[5]",
+   "moov/trak[5]/mdia",
+   "moov/trak[5]/mdia/minf",
+   "moov/trak[5]/mdia/minf/stbl",
+   "moov/trak[5]/mdia/minf/stbl/stsc",
+   "moov/trak[5]/mdia/minf/stbl/co64",
+   "moov/trak[6]",
+   "moov/trak[6]/mdia",
+   "moov/trak[6]/mdia/minf",
+   "moov/trak[6]/mdia/minf/stbl",
+   "moov/trak[6]/mdia/minf/stbl/co64"
+  ],
+  "hash_diff_paths": [
+   "moov",
+   "moov/trak[1]",
+   "moov/trak[1]/mdia",
+   "moov/trak[1]/mdia/minf",
+   "moov/trak[1]/mdia/minf/stbl",
+   "moov/trak[1]/mdia/minf/stbl/stsc",
+   "moov/trak[1]/mdia/minf/stbl/co64",
+   "moov/trak[2]",
+   "moov/trak[2]/mdia",
+   "moov/trak[2]/mdia/minf",
+   "moov/trak[2]/mdia/minf/stbl",
+   "moov/trak[2]/mdia/minf/stbl/stsc",
+   "moov/trak[2]/mdia/minf/stbl/co64",
+   "moov/trak[3]",
+   "moov/trak[3]/mdia",
+   "moov/trak[3]/mdia/minf",
+   "moov/trak[3]/mdia/minf/stbl",
+   "moov/trak[3]/mdia/minf/stbl/stsc",
+   "moov/trak[3]/mdia/minf/stbl/co64",
+   "moov/trak[4]",
+   "moov/trak[4]/mdia",
+   "moov/trak[4]/mdia/minf",
+   "moov/trak[4]/mdia/minf/stbl",
+   "moov/trak[4]/mdia/minf/stbl/stsc",
+   "moov/trak[4]/mdia/minf/stbl/co64",
+   "moov/trak[5]",
+   "moov/trak[5]/mdia",
+   "moov/trak[5]/mdia/minf",
+   "moov/trak[5]/mdia/minf/stbl",
+   "moov/trak[5]/mdia/minf/stbl/stsc",
+   "moov/trak[5]/mdia/minf/stbl/co64",
+   "moov/trak[6]",
+   "moov/trak[6]/mdia",
+   "moov/trak[6]/mdia/minf",
+   "moov/trak[6]/mdia/minf/stbl",
+   "moov/trak[6]/mdia/minf/stbl/stsc",
+   "moov/trak[6]/mdia/minf/stbl/co64"
+  ]
+ },
+ "gyro": {
+  "refined": {
+   "frames": 288150,
+   "quat_varying": 288149,
+   "first_ts": 7.375976461433124,
+   "last_ts": 4807293.192643127
+  },
+  "source": {
+   "frames": 288150,
+   "quat_varying": 288149,
+   "first_ts": 7.375976461433124,
+   "last_ts": 4807293.192643127
+  },
+  "timestamp_diff_ms": {
+   "first": 0.0,
+   "last": 0.0
+  }
+ }
+}
