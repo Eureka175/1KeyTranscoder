@@ -60,6 +60,20 @@ SCRATCH = Path(os.environ.get("ARCHIVE_REPAIR_SCRATCH",
 #: 判定词汇。全部显式, 不允许"没报错就算过"。
 PASS, FAIL, SKIP, WARN, FIXED = "PASS", "FAIL", "SKIP", "WARN", "FIXED"
 UNMEASURABLE = "UNMEASURABLE"
+#: 新状态 (2026-10-25): 坏到无法解析 / 半成品中间文件。
+UNREADABLE = "UNREADABLE"
+PARTIAL = "PARTIAL"
+
+#: 线性 PCM fourcc。CTR-07/08 只对该集合做位深/包长一致性检查；
+#: AAC (mp4a)、Opus 等压缩条目的字段布局完全不同，套用 PCM 解析会误报。
+PCM_FOURCCS = frozenset({
+    "ipcm", "fpcm", "in24", "in32", "fl32", "fl64",
+    "sowt", "twos", "raw ", "lpcm",
+})
+
+#: 半成品中间文件命名 (例如 `xxx.part.mov`)。这类文件的 moov 常常在末尾，
+#: 不是归档成品，一键修复应显式跳过而不是判 FAIL。
+PARTIAL_MARKER = ".part."
 
 #: 轨间残差超过 1 个采样即认为该轨没对齐 (整数移位理论上应为 0)。
 RESIDUAL_TOL_SAMPLES = 1.0
@@ -206,9 +220,18 @@ def container_facts(path: Path) -> dict[str, Any]:
             elif b.type == "trak":
                 handler = _handler_of(f, b)
                 tkhd = find(boxes_in(f, b.data_start, b.end), "tkhd")
+                # 每条 trak 的 stsd 第一条 entry 的 fourcc。数据轨靠它区分
+                # Sony `rtmd`（需要 tref/cdsc）与 DJI `djmd/dbgi/tmcd`
+                # （不要求 cdsc）。只看 handler 会把两者混为一谈。
+                stsd = walk(f, b, "mdia", "minf", "stbl", "stsd")
+                entry = None
+                if stsd is not None:
+                    f.seek(stsd.data_start + 12)
+                    entry = f.read(4).decode("latin-1", "replace")
                 facts["tracks"].append({
                     "handler": handler,
                     "tkhd_size": tkhd.size if tkhd else None,
+                    "entry": entry,
                 })
                 for sub in boxes_in(f, b.data_start, b.end):
                     if sub.type == "uuid":
@@ -293,6 +316,18 @@ def _item(cid: str, verdict: str, detail: str = "",
     return {"id": cid, "verdict": verdict, "detail": detail, "data": data}
 
 
+def is_partial_name(path: Path) -> bool:
+    """`.part.mov` 之类的半成品中间文件 (不是归档成品)。"""
+    return PARTIAL_MARKER in path.name.lower()
+
+
+def _data_entries(facts: dict) -> list[str]:
+    """数据轨 (非 vide/soun) 的 stsd entry fourcc 列表。"""
+    return [str(t.get("entry") or "")
+            for t in facts.get("tracks", [])
+            if str(t.get("handler")) not in ("vide", "soun")]
+
+
 def check_container(path: Path, facts: dict, doc: dict) -> list[dict]:
     """元数据写入位置 / 结构规范。**只看文件自身**, 不需要源。"""
     out: list[dict] = []
@@ -302,16 +337,21 @@ def check_container(path: Path, facts: dict, doc: dict) -> list[dict]:
                      f"ftyp major={brand!r}",
                      {"major": brand, "compatible": facts["ftyp_compatible"]}))
 
-    handlers = [t["handler"] for t in facts["tracks"]]
-    has_data = any(h not in ("vide", "soun") for h in handlers)
+    data_entries = _data_entries(facts)
     cdsc = facts["tref_cdsc"]
-    if has_data:
-        ok = bool(cdsc)
-        out.append(_item("CTR-02", PASS if ok else FAIL,
-                         f"数据轨存在, tref/cdsc={'有' if ok else '缺失'}",
-                         cdsc))
-    else:
+    if not data_entries:
         out.append(_item("CTR-02", SKIP, "无数据轨, tref/cdsc 不适用", cdsc))
+    elif "rtmd" in data_entries:
+        # 只有 Sony rtmd 元数据轨通过 tref/cdsc 绑定到视频轨。
+        # DJI 的 djmd/dbgi/tmcd 是普通数据轨，不要求 cdsc —— 旧检查把两者
+        # 混为一谈，在 I: 的 221 个 DJI 文件上产生了误报 FAIL。
+        out.append(_item("CTR-02", PASS if cdsc else FAIL,
+                         f"rtmd 数据轨存在, tref/cdsc="
+                         f"{'有' if cdsc else '缺失'}", cdsc))
+    else:
+        out.append(_item("CTR-02", SKIP,
+                         f"非 Sony 数据轨 {sorted(set(data_entries))}, "
+                         "不要求 tref/cdsc", cdsc))
 
     meta_scopes = facts["meta_scopes"]
     if meta_scopes:
@@ -328,7 +368,11 @@ def check_container(path: Path, facts: dict, doc: dict) -> list[dict]:
                      f"{len(uuids)} 个 uuid, 作用域={ctxs}", uuids))
 
     mf = facts.get("moov_first")
-    if mf is None:
+    if is_partial_name(path):
+        out.append(_item("CTR-05", SKIP,
+                         "半成品中间文件 (.part.) — 不作为归档成品要求",
+                         {"moov_first": mf, "top_level": facts["top_level"]}))
+    elif mf is None:
         out.append(_item("CTR-05", FAIL, "缺 moov 或 mdat"))
     else:
         out.append(_item("CTR-05", PASS if mf else WARN,
@@ -350,14 +394,20 @@ def check_container(path: Path, facts: dict, doc: dict) -> list[dict]:
                           mvhd.get("timescale"), "delta_s": delta}))
 
     entries = [e for e in facts["audio_entries"] if e["handler"] == "soun"]
-    if entries:
-        fourccs = sorted({e["fourcc"] for e in entries})
+    pcm_entries = [e for e in entries
+                   if str(e.get("fourcc") or "") in PCM_FOURCCS]
+    if pcm_entries:
+        fourccs = sorted({e["fourcc"] for e in pcm_entries})
         # `in24` 是已知陷阱: Sony XAVC-S 的 LPCM 实际是 ipcm, 写成 in24 会让
         # 下游的 audio.tracks 关键项判 MODIFIED。
         bad = [c for c in fourccs if c == "in24"]
         out.append(_item("CTR-07", WARN if bad else PASS,
-                         f"音频 sample entry={fourccs}"
+                         f"PCM sample entry={fourccs}"
                          + (" — in24 是已知陷阱 (应为 ipcm)" if bad else ""),
+                         pcm_entries))
+    elif entries:
+        out.append(_item("CTR-07", SKIP,
+                         f"非 PCM 音频条目 {sorted({e['fourcc'] for e in entries})}",
                          entries))
     else:
         out.append(_item("CTR-07", SKIP, "无音频轨"))
@@ -375,8 +425,14 @@ def check_container(path: Path, facts: dict, doc: dict) -> list[dict]:
         )
 
         wentries = read_audio_entries(path)
+        # 只检查线性 PCM 条目；AAC/Opus 的 sample entry 字段布局不同，
+        # 用 PCM 的 packet-bytes 规则去读会报出 "包长 1702061171 字节" 这种噪声。
+        wentries = [e for e in wentries
+                    if e["bytes"][4:8].decode("latin-1", "replace")
+                    in PCM_FOURCCS]
         if not wentries:
-            out.append(_item("CTR-08", SKIP, "无音频 sample entry"))
+            out.append(_item("CTR-08", SKIP,
+                             "无 PCM 音频 sample entry (压缩音频不适用)"))
         else:
             bad = []
             for i, e in enumerate(wentries):
@@ -385,7 +441,7 @@ def check_container(path: Path, facts: dict, doc: dict) -> list[dict]:
                     bad.append({"track": i + 1, "detail": c})
             out.append(_item(
                 "CTR-08", WARN if bad else PASS,
-                f"{len(wentries)} 条音频条目, "
+                f"{len(wentries)} 条 PCM 条目, "
                 + ("全部自洽" if not bad else
                    f"{len(bad)} 条自相矛盾: " + "; ".join(
                        f"CH{b['track']} {b['detail']['problems']}"
@@ -393,6 +449,29 @@ def check_container(path: Path, facts: dict, doc: dict) -> list[dict]:
                 bad or None))
     except Exception as exc:                            # noqa: BLE001
         out.append(_item("CTR-08", SKIP,
+                         f"无法检查: {type(exc).__name__}: {exc}"))
+
+    # CTR-09: tkhd flags / alternate_group 规范。这是另一个真实事故:
+    # 多条音轨落在同一个 alternate_group 或 flags 缺 enabled/in_movie/in_preview
+    # 位时，Premiere 只显示一条音轨。生产路径现在会在交付前归一化
+    # (`preservation.isobmf.normalize_track_flags`)；归档成品也应有同样检查。
+    try:
+        from preservation.isobmf import track_flags
+
+        tf = track_flags(path)
+        bad_flags = [t for t in tf
+                     if (int(t.get("flags") or 0) & 0x7) != 0x7
+                     or int(t.get("alternate_group") or 0) != 0]
+        bad_alt = [t for t in tf if int(t.get("alternate_group") or 0) != 0]
+        out.append(_item(
+            "CTR-09", WARN if bad_flags else PASS,
+            "tkhd flags/alternate_group 已归一化"
+            if not bad_flags else
+            f"{len(bad_flags)} 条轨 flags!=7 或 alternate_group!=0 "
+            f"(其中 alt_group 非零 {len(bad_alt)} 条) — 多音轨在 Premiere "
+            f"可能只显示一条", bad_flags or None))
+    except Exception as exc:                            # noqa: BLE001
+        out.append(_item("CTR-09", SKIP,
                          f"无法检查: {type(exc).__name__}: {exc}"))
     return out
 
@@ -611,9 +690,89 @@ def restore_layout(path: Path, want_moov_first: bool,
     return True, "moov-first 已恢复"
 
 
+def container_fix_needed(path: Path, facts: dict, doc: dict,
+                         *, fix_layout: bool = False) -> bool:
+    """是否存在「不需要重封装音频、只修容器」就能修好的问题。"""
+    fixable = {"CTR-06", "CTR-08", "CTR-09"}
+    if fix_layout:
+        fixable.add("CTR-05")
+    items = check_container(path, facts, doc)
+    return any(i["id"] in fixable and i["verdict"] in (FAIL, WARN)
+               for i in items)
+
+
+def repair_container(path: Path, *, fix_layout: bool = False,
+                     log=lambda _m: None) -> dict[str, Any]:
+    """容器级一键修复（不重封装、不重新编码）。
+
+    覆盖 2026-10-25 在 I: 归档实际发现的几类可独立修复的问题：
+
+    * `CTR-09` tkhd flags / alternate_group ── 归一化为 enabled+in_movie+
+      in_preview 且 alternate_group=0（Premiere 多音轨可见性）；
+    * `CTR-08` PCM sample entry 自相矛盾 ── 以 `pcmC` 为准校正 samplesize/
+      每包字节数（`normalise_audio_entry_bit_depth`，不需要源文件）；
+    * `CTR-06`/时长时基 ── 按 stts 重建 tkhd/elst/mvhd 时长
+      (`repair_remux_timescale`)；
+    * 可选 `CTR-05` moov-first 布局 ── 仅当显式 `--fix-layout`（会触发
+      MP4Box -inter 整文件重交织，默认不开）。
+
+    所有步骤都是等长字段改写或显式 box 重排；失败只记录，不抛给调用方。
+    """
+    rep: dict[str, Any] = {"changes": [], "errors": [],
+                           "tkhd": [], "durations": [], "sample_entry": None,
+                           "layout": None, "ok": True}
+
+    try:
+        from preservation.isobmf import normalize_track_flags
+
+        descs = normalize_track_flags(path)
+        rep["tkhd"] = descs
+        rep["changes"] += descs
+        for d in descs:
+            log(d)
+    except Exception as exc:                            # noqa: BLE001
+        rep["errors"].append(f"tkhd: {type(exc).__name__}: {exc}")
+
+    try:
+        from preservation.sample_entry import normalise_audio_entry_bit_depth
+
+        ent = normalise_audio_entry_bit_depth(path, log=lambda _m: None)
+        rep["sample_entry"] = ent
+        if ent.get("patched"):
+            rep["changes"].append(
+                f"sample_entry: {ent.get('reason') or 'pcmC 校正'}")
+            log(f"sample_entry: {ent.get('reason')}")
+    except Exception as exc:                            # noqa: BLE001
+        rep["errors"].append(f"sample_entry: {type(exc).__name__}: {exc}")
+
+    try:
+        from core.channel_sync import repair_remux_timescale
+
+        dlogs: list[str] = []
+        repair_remux_timescale(path, log=lambda m: (dlogs.append(m), log(m))[1])
+        if dlogs:
+            rep["durations"] = dlogs
+            rep["changes"] += dlogs
+    except Exception as exc:                            # noqa: BLE001
+        rep["errors"].append(f"durations: {type(exc).__name__}: {exc}")
+
+    if fix_layout:
+        facts = container_facts(path)
+        if facts.get("moov_first") is False:
+            ok, detail = restore_layout(path, True, log)
+            rep["layout"] = {"ok": ok, "detail": detail}
+            if ok:
+                rep["changes"].append("layout: moov-first 已恢复")
+
+    rep["ok"] = not rep["errors"]
+    return rep
+
+
 def repair_one(src: Path, dst: Path, *, opts: dict | None,
-               want_moov_first: bool, log) -> dict[str, Any]:
-    """一次修复: 测 + 移 + 元数据恢复 + 布局恢复 + 校验。"""
+               want_moov_first: bool, log,
+               fix_container: bool = True,
+               fix_layout: bool = False) -> dict[str, Any]:
+    """一次修复: 音频对齐 + 元数据恢复 + 容器规范 + 校验（一键）。"""
     import numpy  # noqa: F401
 
     from core.channel_sync import run_channel_sync
@@ -659,8 +818,19 @@ def repair_one(src: Path, dst: Path, *, opts: dict | None,
     rec["elapsed_s"] = round(time.perf_counter() - t0, 1)
 
     if not dst.is_file():
-        rec["error"] = "输出文件未生成"
-        return rec
+        if rec.get("status") == "applied":
+            rec["error"] = "输出文件未生成"
+            return rec
+        # 非 applied（two_channel_only / measure_failed / not_eligible 等）
+        # 的透明路径不会落 dst。若容器还有可修问题，先复制源文件作为容器
+        # 修复的输入；否则直接 NOOP，避免为无需处理的 2CH 文件白拷一份。
+        if fix_container and container_fix_needed(
+                src, before, before_doc, fix_layout=fix_layout):
+            shutil.copy2(src, dst)
+            rec["file_copied"] = True
+        else:
+            rec["no_fix_needed"] = True
+            return rec
 
     # --- 布局恢复 (源是 moov-first 而我们重封装成了 moov-last 时才做) ---
     after = container_facts(dst)
@@ -705,12 +875,35 @@ def repair_one(src: Path, dst: Path, *, opts: dict | None,
                         f"{json.dumps(rec['metadata'], ensure_ascii=False)[:400]}")
         return rec
 
-    # --- 没有修复动作的文件不值得再验一遍 -------------------------------
+    # --- 容器级一键修复（不需要源文件） ----------------------------------
+    if fix_container and dst.is_file():
+        rec["container_fixes"] = repair_container(
+            dst, fix_layout=fix_layout, log=log)
+        after = container_facts(dst)
+
+    # --- 没有音频修复动作时，若容器有可修问题也产出成品 -----------------
     #
     # `already_aligned` / `measure_failed` 时透明路径产出的是**源文件字节级
-    # 拷贝**, 对它跑 validate/gyroflow/重新测量等于"拿源和源比", 既慢又没有
-    # 信息量。这类文件记为 NOOP, 由调用方决定是否保留拷贝 (--keep-all)。
+    # 拷贝**。旧实现直接 NOOP；现在先判断是否存在可独立修的容器问题
+    # (tkhd flags、sample entry 自洽、时长时基)，有就复制一份并修，
+    # 没有才真正 NOOP —— 不为了修容器把所有无需处理的大文件都拷一遍。
     if rec["status"] != "applied":
+        if fix_container and container_fix_needed(
+                src, before, before_doc, fix_layout=fix_layout):
+            if not dst.is_file():
+                shutil.copy2(src, dst)
+            fixes = rec.get("container_fixes") or repair_container(
+                dst, fix_layout=fix_layout, log=log)
+            rec["container_fixes"] = fixes
+            if fixes.get("changes"):
+                rec["status"] = "container_fixed"
+                rec["no_fix_needed"] = False
+                after = container_facts(dst)
+                after_doc = probe(dst)
+                rec["format_checks"] = check_format(dst, after, after_doc, 0.0)
+                rec["container_checks"] = check_container(dst, after, after_doc)
+                rec["top_level_after"] = after.get("top_level")
+                return rec
         rec["no_fix_needed"] = True
         return rec
 
@@ -921,6 +1114,118 @@ def parse_opt_overrides(items: list[str]) -> dict[str, Any]:
     return out
 
 
+def _worker_init(scratch_root: str) -> None:
+    """每个 worker 进程独立的临时目录，避免并行时互删音频中间文件。"""
+    global SCRATCH
+    SCRATCH = Path(scratch_root) / f"pid{os.getpid()}"
+    SCRATCH.mkdir(parents=True, exist_ok=True)
+
+
+def _parallel_map(func, payloads: list, jobs: int, scratch_root: Path,
+                  what: str) -> list[dict]:
+    """按文件并行执行 worker；jobs<=1 时在同一进程内串行。
+
+    worker 只返回记录（不共享文件句柄）；scratch 目录按 pid 隔离。
+    """
+    if not payloads:
+        return []
+    _worker_init(str(scratch_root))
+    if jobs <= 1:
+        out: list[dict] = []
+        for i, p in enumerate(payloads, 1):
+            try:
+                r = func(p)
+            except Exception as exc:                    # noqa: BLE001
+                r = {"overall": FAIL, "error": f"{type(exc).__name__}: {exc}",
+                     "path": str(p[0] if isinstance(p, tuple) else p)}
+            out.append(r)
+            name = Path(str(r.get("path") or r.get("src") or
+                          r.get("dst") or "?")).name
+            print(f"[{i}/{len(payloads)}] {r.get('overall', '?'):<11} "
+                  f"{name}", flush=True)
+        return out
+
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+
+    results: list[dict] = [{} for _ in payloads]
+    with ProcessPoolExecutor(max_workers=jobs,
+                             initializer=_worker_init,
+                             initargs=(str(scratch_root),)) as ex:
+        futures = {ex.submit(func, p): i for i, p in enumerate(payloads)}
+        done = 0
+        for fut in as_completed(futures):
+            i = futures[fut]
+            done += 1
+            try:
+                r = fut.result()
+            except Exception as exc:                    # noqa: BLE001
+                r = {"overall": FAIL,
+                     "error": f"{type(exc).__name__}: {exc}",
+                     "path": str(payloads[i][0]
+                                 if isinstance(payloads[i], tuple) else "")}
+            results[i] = r
+            name = Path(str(r.get("path") or r.get("src") or
+                          r.get("dst") or "?")).name
+            print(f"[{done}/{len(payloads)}] [{what}] "
+                  f"{r.get('overall', '?'):<11} {name}", flush=True)
+    return results
+
+
+def _check_worker(payload: tuple) -> dict:
+    path_str, opts = payload
+    p = Path(path_str)
+    try:
+        doc = probe(p)
+        if not doc.get("streams"):
+            return {"path": str(p), "overall": UNREADABLE,
+                    "checks": [_item("FMT-00", UNREADABLE,
+                                     "ffprobe 读不到流 (moov 缺失/零填充/损坏)")]}
+        if is_partial_name(p):
+            r = summarise_check(p, doc, opts)
+            r["overall"] = PARTIAL
+            r["partial"] = True
+            return r
+        return summarise_check(p, doc, opts)
+    except Exception as exc:                            # noqa: BLE001
+        return {"path": str(p), "overall": FAIL,
+                "checks": [_item("CHK-ERR", FAIL,
+                                 f"{type(exc).__name__}: {exc}")]}
+
+
+def _repair_worker(payload: tuple) -> dict:
+    src_str, dst_str, opts, want_moov_first, fix_container, fix_layout, \
+        keep_all = payload
+    src, dst = Path(src_str), Path(dst_str)
+    try:
+        doc = probe(src)
+        if not doc.get("streams"):
+            return {"src": str(src), "dst": str(dst),
+                    "status": "unreadable", "overall": UNREADABLE,
+                    "error": "ffprobe 读不到流 (moov 缺失/零填充/损坏), "
+                             "无法修复, 未做任何修改"}
+        if is_partial_name(src):
+            return {"src": str(src), "dst": str(dst),
+                    "status": "partial", "overall": PARTIAL,
+                    "error": "半成品中间文件 (.part.), 不是归档成品, 跳过"}
+        facts = container_facts(src)
+        rec = repair_one(
+            src, dst, opts=opts,
+            want_moov_first=bool(facts.get("moov_first")),
+            fix_container=fix_container, fix_layout=fix_layout,
+            log=lambda _m: None)
+        rec["overall"] = verdict_of(rec)
+        if rec["overall"] == "NOOP" and not keep_all:
+            dst.unlink(missing_ok=True)
+            rec["output_kept"] = False
+        else:
+            rec["output_kept"] = dst.is_file()
+        return rec
+    except Exception as exc:                            # noqa: BLE001
+        return {"src": str(src), "dst": str(dst), "status": "error",
+                "overall": "FAILED",
+                "error": f"{type(exc).__name__}: {exc}"}
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     root = Path(args.input)
     files = iter_media(root, args.ext)
@@ -934,38 +1239,38 @@ def cmd_check(args: argparse.Namespace) -> int:
     if args.accurate:
         opts["channel_sync_accurate"] = True
     opts.update(parse_opt_overrides(getattr(args, "opt", [])))
-    print(f"check: {len(files)} 个文件 (root={root}) "
+    jobs = int(getattr(args, "jobs", 1) or 1)
+    print(f"check: {len(files)} 个文件 (root={root}) jobs={jobs} "
           f"opts={opts or 'DEFAULTS'}", flush=True)
-    rows = []
-    n_fail = 0
-    for i, p in enumerate(files, 1):
-        doc = probe(p)
-        if not doc.get("streams"):
-            rows.append({"path": str(p), "overall": FAIL,
-                         "checks": [_item("FMT-00", FAIL, "ffprobe 读不到流")]})
-            n_fail += 1
-            print(f"[{i}/{len(files)}] FAIL probe {p.name}", flush=True)
-        else:
-            r = summarise_check(p, doc, opts or None)
-            rows.append(r)
-            if r["overall"] == FAIL:
-                n_fail += 1
-            print(f"[{i}/{len(files)}] {r['overall']:<12} {p.name}", flush=True)
+    rows = _parallel_map(_check_worker,
+                         [(str(p), opts or None) for p in files],
+                         jobs, SCRATCH, "check")
     md = write_report(rows, Path(args.json or "."), "归档规范检查")
     tally: dict[str, int] = {}
     for r in rows:
         tally[r["overall"]] = tally.get(r["overall"], 0) + 1
     print(f"\n{tally}\n-> {md}")
-    return 0 if n_fail == 0 else 1
+    return 0 if all(r["overall"] in (PASS, WARN, PARTIAL) for r in rows) else 1
 
 
 def verdict_of(rec: dict[str, Any]) -> str:
     """把一次修复的结果归到一个词上。**只有真正改过内容才算 REPAIRED。**"""
-    if rec.get("error") and rec.get("status") == "metadata_mismatch":
+    status = rec.get("status")
+    if status == "unreadable":
+        return UNREADABLE
+    if status == "partial":
+        return PARTIAL
+    if rec.get("error") and status in ("metadata_mismatch",
+                                       "sample_entry_mismatch"):
         return "FAILED"
     if rec.get("error") and not rec.get("no_fix_needed"):
         return "FAILED"
-    if rec.get("status") == "applied":
+    if status == "container_fixed":
+        checks = ((rec.get("container_checks") or [])
+                  + (rec.get("format_checks") or []))
+        return "FAILED" if any(c["verdict"] == FAIL for c in checks) \
+            else "REPAIRED"
+    if status == "applied":
         return "REPAIRED" if (rec.get("metadata") or {}).get("identical") \
             else "FAILED"
     if rec.get("no_fix_needed"):
@@ -979,7 +1284,11 @@ def cmd_repair(args: argparse.Namespace) -> int:
     files = iter_media(root, args.ext)
     if args.limit:
         files = files[: args.limit]
-    print(f"repair: {len(files)} 个候选文件 → {outp}", flush=True)
+    jobs = int(getattr(args, "jobs", 1) or 1)
+    fix_container = not bool(getattr(args, "no_container_fix", False))
+    fix_layout = bool(getattr(args, "fix_layout", False))
+    print(f"repair: {len(files)} 个候选文件 → {outp} jobs={jobs} "
+          f"container_fix={fix_container} layout_fix={fix_layout}", flush=True)
 
     from core.channel_sync import production_opts as _prod2
 
@@ -991,44 +1300,13 @@ def cmd_repair(args: argparse.Namespace) -> int:
     opts.update(parse_opt_overrides(getattr(args, "opt", [])))
     opts_or_none = opts or None
 
-    rows: list[dict] = []
-    applied = 0
-    for i, src in enumerate(files, 1):
-        doc = probe(src)
-        if not doc.get("streams"):
-            # 单个坏文件**不许中断整批**。这条记录必须带上 `overall`,
-            # 否则下面统计时 KeyError 会把 200 多个文件的批次整体打掉
-            # (真发生过: I:\20260901 有一个 ffprobe 读不了的文件)。
-            rec = {"src": str(src), "status": "probe_failed",
-                   "overall": "FAILED",
-                   "error": "ffprobe 读不到流, 无法判定, 未做任何修改"}
-            rows.append(rec)
-            print(f"[{i}/{len(files)}] FAILED    {src.name} "
-                  f"(ffprobe 读不到流)", flush=True)
-            continue
+    payloads = []
+    for src in files:
         dst = outp / _rel(src, root if root.is_dir() else root.parent)
-        facts = container_facts(src)
-        rec = repair_one(
-            src, dst, opts=opts_or_none,
-            want_moov_first=bool(facts.get("moov_first")),
-            log=lambda m: print(f"    {m}", flush=True))
-        rec["overall"] = verdict_of(rec)
-        if rec["overall"] == "NOOP" and not args.keep_all:
-            # 没有修复动作的文件不留在暂存目录里: 一个 667 件的归档里有 355 件
-            # 根本不可对齐、280 件已对齐, 把它们都拷一遍只是多占 90+ GiB。
-            dst.unlink(missing_ok=True)
-            rec["output_kept"] = False
-        else:
-            rec["output_kept"] = dst.is_file()
-        if rec["overall"] == "REPAIRED":
-            applied += 1
-        rows.append(rec)
-        print(f"[{i}/{len(files)}] {rec['overall']:<9} {src.name} "
-              f"shifts={rec.get('shifts')} layout={rec.get('layout_detail')} "
-              f"meta_ok={(rec.get('metadata') or {}).get('identical')} "
-              f"status={rec.get('status')}",
-              flush=True)
-
+        payloads.append((str(src), str(dst), opts_or_none, False,
+                         fix_container, fix_layout,
+                         bool(getattr(args, "keep_all", False))))
+    rows = _parallel_map(_repair_worker, payloads, jobs, SCRATCH, "repair")
     md = write_report(rows, Path(args.json or outp), "归档修复")
     tally: dict[str, int] = {}
     for r in rows:
@@ -1043,7 +1321,8 @@ def cmd_repair(args: argparse.Namespace) -> int:
             return 2
         n = apply_back(rows, Path(args.backup))
         print(f"in-place: 已替换 {n} 个文件 (备份在 {args.backup})")
-    return 0 if not any(r["overall"] == "FAILED" for r in rows) else 1
+    return 0 if all(r["overall"] in ("REPAIRED", "NOOP", PARTIAL)
+                    for r in rows) else 1
 
 
 def apply_back(rows: list[dict], backup: Path) -> int:
@@ -1066,7 +1345,7 @@ def apply_back(rows: list[dict], backup: Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
-        description="归档成品的延迟重修 / 元数据位置修复 / 规范检查",
+        description="归档成品一键修复：音频偏移 + 元数据位置 + 容器规范 + 规范检查",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__.split("用法：")[1] if "用法：" in __doc__ else None)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1077,6 +1356,10 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--limit", type=int, default=0)
         p.add_argument("--ext", default=".mp4,.MP4,.mov,.MOV",
                        help="扩展名过滤, 逗号分隔")
+        p.add_argument("--jobs", type=int,
+                       default=min(4, max(1, (os.cpu_count() or 2) // 2)),
+                       help="按文件并行的工作进程数 (默认 min(4, CPU/2))；"
+                            "1 = 串行")
 
     c = sub.add_parser("check", help="只检查, 不写任何文件 (源文件只读)")
     common(c)
@@ -1089,7 +1372,8 @@ def main(argv: list[str] | None = None) -> int:
                         "例如 --opt verify_max_rel=0.2 --opt verify_agree_samples=5")
     c.set_defaults(func=cmd_check)
 
-    r = sub.add_parser("repair", help="修复到暂存目录 (默认不改原件)")
+    r = sub.add_parser(
+        "repair", help="一键修复到暂存目录 (音频 + 容器；默认不改原件)")
     common(r)
     r.add_argument("--output", required=True, help="暂存目录 (必填)")
     r.add_argument("--groups", action="store_true",
@@ -1106,10 +1390,22 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--keep-all", action="store_true",
                    help="无需修复的文件也保留一份拷贝 (默认只在真正修过时"
                         "才产出文件)")
+    r.add_argument("--no-container-fix", action="store_true",
+                   help="只修音频/元数据，不做 tkhd/sample-entry/时长 等"
+                        "容器级修复")
+    r.add_argument("--fix-layout", action="store_true",
+                   help="额外把 moov-last 文件恢复为 moov-first "
+                        "(MP4Box -inter，整文件重交织，较慢)")
     r.set_defaults(func=cmd_repair)
 
     args = ap.parse_args(argv)
     SCRATCH.mkdir(parents=True, exist_ok=True)
+    if int(getattr(args, "jobs", 1) or 1) > 1:
+        # 并行进程各自再开 BLAS/OpenMP 线程会过度订阅；每个 worker 单线程，
+        # 总吞吐由文件级并行提供。用户显式设置的环境变量优先。
+        for key in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS",
+                    "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+            os.environ.setdefault(key, "1")
     return args.func(args)
 
 

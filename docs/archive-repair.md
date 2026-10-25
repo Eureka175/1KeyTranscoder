@@ -94,3 +94,62 @@ python archive_repair.py repair --input <文件或目录> --output <暂存目录
 `archive_repair.py` 是可复用的正式入口：自带测量、自带检查、自带布局修复，
 不需要先跑一遍 arm。两者共用同一套底层（`run_channel_sync` +
 `transparent_restore` + `validate.compare`）。
+
+## 8 2026-10-26 升级：一键 repair 各类错误 + 文件级并行
+
+### 8.1 一键修的范围
+
+`repair` 现在对每个文件按顺序尝试：
+
+1. **音频偏移重修**（原有）——多轨单声道 PCM 的整数样本移位，成品上重新测量复核。
+2. **元数据位置/布局恢复**（原有）——brand / `tref` / `nrtm` / uuid 逐项与输入比对。
+3. **容器级一键修复**（新增，不需要源文件）：
+   - `CTR-09` tkhd flags / alternate_group 归一化（Premiere 多音轨只显示一条的修复）；
+   - `CTR-08` PCM sample entry 自相矛盾时以 `pcmC` 为准校正 `samplesize`/每包字节数
+     (`normalise_audio_entry_bit_depth`)；
+   - `CTR-06`/时长时基：按 `stts` 重建 tkhd/elst/mvhd 时长
+     (`repair_remux_timescale`)；
+   - 可选 `--fix-layout`：moov-last → moov-first（`MP4Box -inter`，整文件重交织，默认关）。
+4. **无需音频修复但容器有可修问题**的文件也会产出成品（`status=container_fixed`），
+   只有真正无改动才 NOOP 且不落盘。
+
+新增/修正的检查：
+
+- `CTR-02` 只对 **Sony `rtmd`** 要求 `tref/cdsc`；DJI `djmd/dbgi/tmcd` 不再误报 FAIL。
+- `CTR-07/08` 只对线性 PCM 条目做位深/包长检查；AAC/Opus 条目记 SKIP。
+- 新增 `CTR-09` tkhd flags/alternate_group 检查。
+- `.part.mov` 等半成品：`CTR-05` 记 SKIP、整体 `PARTIAL`，repair 跳过。
+- 无 moov/零填充坏文件：整体 `UNREADABLE`，repair 如实报告、不中断批次。
+
+判定词汇新增：`PARTIAL`（半成品）、`UNREADABLE`（不可解析）；
+修复侧 `container_fixed` 只有在复检无 `FAIL` 时才算 `REPAIRED`。
+
+### 8.2 并行化
+
+`check` 与 `repair` 都新增 `--jobs N`（默认 `min(4, CPU/2)`；16 核机器默认 4）：
+
+- 按文件用 `ProcessPoolExecutor` 并行；
+- 每个 worker 独立 `scratch/pid<pid>` 目录，避免音频中间文件互删；
+- 并行时把 BLAS/OpenMP 线程固定为 1，避免进程×线程过度订阅；
+- 进度按完成顺序打印，报告仍按输入顺序汇总。
+
+实测（I:\20260830，前 12 文件）：`check` jobs=1 **143.2 s** → jobs=4 **52.9 s（2.7×）**；
+`repair` 8 文件 jobs=4 **44.0 s**。
+
+### 8.3 实测（I: 根目录 YYYYMMDD 文件）
+
+| 类 | 样例 | 结果 |
+|---|---|---|
+| DJI 容器类 | `I:\20260807` 7 文件 | 修复前 5 FAIL/2 WARN（CTR-02/08/09），一键修复后 7 个 **REPAIRED → 复检 7 PASS** |
+| 4CH 音频偏移 | `I:\20260904\20260904_C1179.MP4` | REPAIRED（CH1+1174/CH2+934），复检 **PASS** |
+| 2CH 有效 + 容器问题 | `I:\20260829` 4 文件 | 修复前 FAILED（无输出分支 bug）；修好后 **4 REPAIRED → 4 PASS** |
+| `.part` 半成品 | `I:\20260819\...fast100x.part.mov` | **PARTIAL**，跳过、不产出 |
+| 无 moov 坏文件 | `I:\20260901\20260901_C1033.MP4` | **UNREADABLE**，跳过、不中断批次 |
+| 全量批处理 | I: 18 个 YYYYMMDD 目录（669 文件） | 后台运行中；已完成目录 0 FAILED（详见总报告） |
+
+### 8.4 已知限制
+
+- 不可测的轨（静音 / no_valid_anchor / 非恒定）仍然不能修，AUD-04 记 WARN。
+- 无 moov 的零填充文件无法恢复，只能报 `UNREADABLE`。
+- `--fix-layout` 会触发整文件重交织，最慢，默认关闭。
+- 大批量仍建议把 `ARCHIVE_REPAIR_SCRATCH` 指到大容量盘；每个 worker 独立子目录。

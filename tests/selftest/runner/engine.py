@@ -42,10 +42,11 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
     from ..suites import (
         audio_encode, audio_external, audio_format, audio_integration,
         audio_2ch_policy, audio_mix, audio_model, audio_retention, audio_route,
-        audio_selection, audio_sync, audio_timeline, channel_sync, cli,
-        codecs, container_flags, core, dji_metadata, hardware, hardware_audio,
-        hwdecode_results, pipeline, production_output, native_decode,
-        source_contract, toolchain, workdir,
+        archive_repair, audio_selection, audio_sync, audio_timeline,
+        channel_sync, cli, codecs, container_flags, core, dji_metadata,
+        hardware, hardware_audio, hwdecode_results, pipeline,
+        production_output, native_decode, source_contract, toolchain,
+        workdir,
     )
 
     return {
@@ -64,6 +65,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
              dji_metadata.l1_dji_metadata_policy),
             ("2CH 有效默认跳过对齐 (4CH 中 2 静音)",
              audio_2ch_policy.l1_two_channel_only_policy),
+            ("归档修复检查器/一键状态机",
+             archive_repair.l1_archive_repair_checker),
             ("x265 P0", codecs.l1_x265),
             ("quality/versions", core.l1_quality),
             ("workdir lifecycle", workdir.l1_workdir),
