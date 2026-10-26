@@ -344,6 +344,15 @@ def l1_hardware_audio() -> None:
     # --preserve-metadata 是它的显式覆盖 (DJI Pocket/无人机默认不保留 metadata;
     # 需要保留时必须显式给出, 所以选项本身就属于策略契约的一部分)。
     THIS_PHASE_ADDED = {"--no-metadata", "--preserve-metadata"}
+    # v0.8.8 (2026-10-26): 归档修复模式合入主程序。修复不再是一个只能手工
+    # 跑的旁路脚本 —— 批处理只需要 `1kt.py --repair ...`。这组参数同样手写
+    # 登记, 理由与上面相同: 新增参数必须显式改到这里。
+    REPAIR_ADDED = {
+        "--repair", "--repair-dirs", "--repair-json", "--repair-scratch",
+        "--repair-resume", "--repair-retry-failed", "--repair-limit",
+        "--repair-fix-layout", "--repair-no-container-fix",
+        "--repair-no-groups", "--repair-accurate", "--repair-opt",
+    }
     V080_BASELINE = {
         "--version", "--input", "--output", "--preset", "--encoder", "--config",
         "--scaling-config", "--tool-nvencc", "--tool-qsvencc",
@@ -359,9 +368,14 @@ def l1_hardware_audio() -> None:
            f"missing: {sorted((V080_BASELINE - THIS_PHASE_ADDED) - args_now)}")
     record("v08hw.cli 除 P4.6/P4.12 的 opt-in 与本阶段新增外, 没有其它参数",
            args_now - P46_ADDED - P412_ADDED - THIS_PHASE_ADDED
-           <= V080_BASELINE,
+           - REPAIR_ADDED <= V080_BASELINE,
            f"unexpected: "
-           f"{sorted(args_now - P46_ADDED - P412_ADDED - THIS_PHASE_ADDED - V080_BASELINE)}")
+           f"{sorted(args_now - P46_ADDED - P412_ADDED - THIS_PHASE_ADDED - REPAIR_ADDED - V080_BASELINE)}")
+    record("v08hw.cli v0.8.8 归档修复模式已合入主程序 (--repair + 修复选项)",
+           REPAIR_ADDED <= args_now)
+    record("v08hw.cli --repair 实际分派到 archive_repair.run_repair (不是空开关)",
+           "archive_repair.run_repair" in entry
+           and 'getattr(args, "repair", False)' in entry)
     # The removals are asserted as *gone*, not merely absent from the list --
     # otherwise a future re-add would pass unnoticed.
     record("v08hw.cli 旧硬解开关已移除 (不是保留为别名)",

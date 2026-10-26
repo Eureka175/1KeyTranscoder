@@ -1446,7 +1446,103 @@ def parse_args() -> argparse.Namespace:
         "--dry-run", action="store_true",
         help="Probe and print commands without encoding.",
     )
+    # ---- 归档修复模式 (2026-10-26 合入主程序) ---------------------------
+    # 为什么放进 1kt.py: 批处理链只需要调用一个程序 (转码 / 修复同入口),
+    # 修复能力不再是一个只能手工跑的旁路脚本。修复不重新编码视频。
+    parser.add_argument(
+        "--repair", action="store_true",
+        help="归档修复模式: 把 --input 下已产出 (转码后) 的成品一键修到 "
+             "--output 暂存目录, 不重新编码。修音频偏移/元数据位置/容器规范, "
+             "成品上重新测量验收; 失败文件自动用精确模式重试。",
+    )
+    parser.add_argument(
+        "--repair-dirs", default="", metavar="REGEX",
+        help="修复模式: 只遍历 --input 下**一级子目录名完全匹配**该正则的"
+             "目录, 例如 ^\\d{8}$ (整盘输入时必用)。",
+    )
+    parser.add_argument(
+        "--repair-json", default="",
+        help="修复模式: 报告输出目录 (默认写到 --output 里)。",
+    )
+    parser.add_argument(
+        "--repair-scratch", default="",
+        help="修复模式: 临时目录 (默认 --output 下的 _scratch)。",
+    )
+    parser.add_argument(
+        "--repair-resume", action="store_true",
+        help="修复模式: 断点续跑 (读 --output/_progress.jsonl, 跳过已完成"
+             "且成品存在的文件)。",
+    )
+    parser.add_argument(
+        "--repair-retry-failed", type=int, default=1, metavar="N",
+        help="修复模式: 失败文件用精确模式自动重试的轮数 (默认 1, 0=关)。",
+    )
+    parser.add_argument(
+        "--repair-limit", type=int, default=0,
+        help="修复模式: 最多处理 N 个文件 (调试/冒烟用)。",
+    )
+    parser.add_argument(
+        "--repair-fix-layout", action="store_true",
+        help="修复模式: 额外恢复 moov-first 布局 (MP4Box -inter, 较慢)。",
+    )
+    parser.add_argument(
+        "--repair-no-container-fix", action="store_true",
+        help="修复模式: 只修音频/元数据, 不做容器级修复。",
+    )
+    parser.add_argument(
+        "--repair-no-groups", action="store_true",
+        help="修复模式: 关闭分组锚点 (默认跟随生产 start.bat GROUPS=1)。",
+    )
+    parser.add_argument(
+        "--repair-accurate", action="store_true",
+        help="修复模式: 打开精确模式 (1→2→5 样本分级)。",
+    )
+    parser.add_argument(
+        "--repair-opt", action="append", default=[], metavar="K=V",
+        help="修复模式: 透传 channel-sync 选项覆盖, 可重复 "
+             "(例如 --repair-opt verify_max_rel=0.2)。",
+    )
     return parser.parse_args()
+
+
+def _repair_jobs(value: Any) -> int:
+    """把 1kt.py 的 --jobs (auto/N) 归一成修复模式的文件级并发数。"""
+    text = str(value if value is not None else "auto").strip().lower()
+    if text in ("", "auto"):
+        return min(8, max(1, (os.cpu_count() or 2) // 2))
+    try:
+        return max(1, int(text))
+    except ValueError:
+        raise SystemExit(f"--jobs 需要 auto 或正整数: {value!r}")
+
+
+def repair_main(args: argparse.Namespace, input_root: Path,
+                output_root: Path) -> int:
+    """`1kt.py --repair`: 归档成品自主修复 (不重新编码视频)。"""
+    import archive_repair
+
+    jobs = _repair_jobs(getattr(args, "jobs", "auto"))
+    groups = not bool(getattr(args, "repair_no_groups", False))
+    accurate = bool(getattr(args, "repair_accurate", False))
+    dirs = getattr(args, "repair_dirs", "") or ""
+    print(
+        f"[REPAIR] 归档修复模式 | input={input_root} output={output_root} "
+        f"jobs={jobs} groups={groups} accurate={accurate} "
+        f"dirs={dirs or '*'}", flush=True,
+    )
+    return archive_repair.run_repair(
+        str(input_root), str(output_root),
+        jobs=jobs, groups=groups, accurate=accurate, dirs=dirs,
+        json_dir=getattr(args, "repair_json", "") or "",
+        scratch=getattr(args, "repair_scratch", "") or "",
+        resume=bool(getattr(args, "repair_resume", False)),
+        retry_failed=int(getattr(args, "repair_retry_failed", 1) or 0),
+        fix_layout=bool(getattr(args, "repair_fix_layout", False)),
+        fix_container=not bool(
+            getattr(args, "repair_no_container_fix", False)),
+        limit=int(getattr(args, "repair_limit", 0) or 0),
+        opt_items=list(getattr(args, "repair_opt", []) or []),
+    )
 
 
 @contextlib.contextmanager
@@ -1984,6 +2080,12 @@ def main() -> int:
         print("[FATAL] output directory must not be inside input directory.",
               file=sys.stderr)
         return 2
+
+    # --repair: 归档成品修复模式 (与转码共用同一入口, 供批处理直接调用)。
+    # 在解析编码器/工具链之前分流: 修复不需要编码器配置, 只需要
+    # ffmpeg/ffprobe/GPAC, 由 archive_repair 自己解析。
+    if getattr(args, "repair", False):
+        return repair_main(args, input_root, output_root)
 
     # 通用工具链解析 (transparent 模式只需要 ffmpeg/ffprobe/GPAC)
     try:

@@ -41,10 +41,12 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -54,8 +56,12 @@ sys.path.insert(0, str(ROOT))
 
 FFMPEG = ROOT / "tools" / "ffmpeg.exe"
 FFPROBE = ROOT / "tools" / "ffprobe.exe"
-SCRATCH = Path(os.environ.get("ARCHIVE_REPAIR_SCRATCH",
-                              r"E:\1kt_scratch\archive_repair"))
+
+#: 临时目录。优先用 `ARCHIVE_REPAIR_SCRATCH`；未指定时 repair 使用输出目录下的
+#: `_scratch`（与输出同盘，容量可控），check 使用系统临时目录。**不再硬编码
+#: E:** —— 批处理机器上 E: 可能是相机卡或不存在，旧默认值让自主运行直接失败。
+SCRATCH = Path(os.environ.get("ARCHIVE_REPAIR_SCRATCH")
+               or (Path(tempfile.gettempdir()) / "1kt_archive_repair_scratch"))
 
 #: 判定词汇。全部显式, 不允许"没报错就算过"。
 PASS, FAIL, SKIP, WARN, FIXED = "PASS", "FAIL", "SKIP", "WARN", "FIXED"
@@ -655,6 +661,38 @@ def _sha_file(p: Path) -> str:
     return h.hexdigest()
 
 
+def _stream_packet_hash(path: Path, spec: str = "0:v:0") -> str | None:
+    """ffmpeg stream-copy 的逐包 SHA256（不解码、不改码流）。
+
+    用来回答一个独立于容器结构的问题:**成品里的视频样本字节是否和源逐包相同**。
+    `preservation.validate.compare` 只比较结构/元数据/rtmd 载荷，**不比较视频
+    载荷哈希** —— 2026-10-26 实测过一份被并发写坏的成品，validate 仍报
+    structural_success=True（只多一条 nrtm MODIFIED），只有解码探针能看见。
+    所以成人品必须再加这道闸门。
+    """
+    cmd = [str(FFMPEG), "-v", "error", "-i", str(path),
+           "-map", spec, "-c", "copy", "-f", "streamhash",
+           "-hash", "sha256", "-"]
+    try:
+        r = subprocess.run(cmd, stdin=subprocess.DEVNULL,
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                           text=True, encoding="utf-8",
+                           errors="replace", timeout=3600)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    m = re.search(r"SHA256=([0-9a-fA-F]+)", r.stdout or "")
+    return m.group(1).lower() if m else None
+
+
+def video_payload_equal(src: Path, dst: Path) -> dict[str, Any]:
+    """源/成品的视频 packet hash 对照；没有视频流时 measured=False。"""
+    a = _stream_packet_hash(src)
+    b = _stream_packet_hash(dst)
+    return {"source": a, "final": b,
+            "measured": bool(a and b),
+            "equal": bool(a and b and a == b)}
+
+
 def restore_layout(path: Path, want_moov_first: bool,
                    log) -> tuple[bool, str]:
     """把 moov 挪回 mdat 之前。
@@ -766,6 +804,67 @@ def repair_container(path: Path, *, fix_layout: bool = False,
 
     rep["ok"] = not rep["errors"]
     return rep
+
+
+def repair_residual_audio(dst: Path, after_doc: dict, opts: dict | None,
+                          *, max_rounds: int = 2) -> tuple[list, dict, list]:
+    """对一次修复后仍有残差偏移的成品做追加轮次（直到 already_aligned）。
+
+    生产入口的“宽窗采纳”在少数文件上会先采纳一个整数移位，再在成品复测时
+    看到 1–20 样本的残差（I:\\20260830_C0925 实测 +20 样本）。旧实现修一次就
+    结束，报告里会出现 AUD-03 FAIL。这里对**输出成品**再跑透明同步 1–2 轮，
+    每轮只重封装视频/元数据、按新测量移位音频；最多 2 轮防止抖动。
+
+    返回 (checks, audio_data, rounds)；所有异常都变成 rounds 记录，不抛出。
+    """
+    from core.channel_sync import run_channel_sync
+    from preservation.gpac import GpacContainerBackend
+    from preservation.transparent_restore import restore_after_transparent_remux
+
+    rounds: list[dict] = []
+    aud_items, aud_data = check_audio(dst, after_doc, opts)
+    for r in range(max_rounds):
+        if aud_data.get("status") != "applied":
+            break
+        tmp = dst.with_name(dst.stem + f".round{r + 1}.mp4")
+        tmp.unlink(missing_ok=True)
+        work = SCRATCH / ("round_" + dst.stem)
+        shutil.rmtree(work, ignore_errors=True)
+        work.mkdir(parents=True, exist_ok=True)
+        try:
+            rep = run_channel_sync(
+                source=dst, ffmpeg=FFMPEG, work_dir=work,
+                streams=after_doc.get("streams") or [], opts=opts,
+                transparent=True, dst=tmp,
+                gpac=GpacContainerBackend(None),
+                restore_metadata=restore_after_transparent_remux,
+                log=lambda _m: None)
+        except Exception as exc:                        # noqa: BLE001
+            rounds.append({"round": r + 1,
+                           "error": f"{type(exc).__name__}: {exc}"[:200]})
+            tmp.unlink(missing_ok=True)
+            break
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+        if rep.get("status") != "applied" or not tmp.is_file():
+            tmp.unlink(missing_ok=True)
+            rounds.append({"round": r + 1, "status": rep.get("status"),
+                           "note": "无追加修复，停止"})
+            break
+        tmp.replace(dst)
+        # 追加重封装可能重置 tkhd/时长/sample entry；再跑一遍容器级修复。
+        fixes = repair_container(dst, log=lambda _m: None)
+        after_doc = probe(dst)
+        rounds.append({
+            "round": r + 1,
+            "shifts": {
+                f"audio[{c.get('stream')}]": c.get("shift_samples")
+                for c in (rep.get("channels") or [])
+                if c.get("decision") == "fixed"},
+            "container_changes": len(fixes.get("changes") or []),
+        })
+        aud_items, aud_data = check_audio(dst, after_doc, opts)
+    return aud_items, aud_data, rounds
 
 
 def repair_one(src: Path, dst: Path, *, opts: dict | None,
@@ -898,6 +997,27 @@ def repair_one(src: Path, dst: Path, *, opts: dict | None,
             if fixes.get("changes"):
                 rec["status"] = "container_fixed"
                 rec["no_fix_needed"] = False
+                # 成人品硬闸门: 容器级修复 = 字节级拷贝 + 等长字段改写，
+                # 因此 (1) 成品大小必须与源相同，(2) 视频载荷必须逐包相同。
+                # 2026-10-26 实测并发路径曾产出被截断/写坏的拷贝（216 MB
+                # vs 源 304 MB）——只看容器结构（moov 能读）发现不了。
+                try:
+                    ssz, dsz = src.stat().st_size, dst.stat().st_size
+                    rec["size_check"] = {"source": ssz, "final": dsz,
+                                         "equal": ssz == dsz}
+                    vp = video_payload_equal(src, dst)
+                    rec["video_payload"] = vp
+                    if ssz != dsz:
+                        rec["status"] = "size_mismatch"
+                        rec["error"] = (f"成品大小 {dsz} != 源 {ssz}: 拷贝不"
+                                        "完整, 拒绝交付")
+                    elif vp.get("measured") and not vp["equal"]:
+                        rec["status"] = "payload_mismatch"
+                        rec["error"] = ("视频载荷与源不一致 (容器修复不应改变"
+                                        "样本数据), 拒绝交付")
+                except OSError as exc:
+                    rec["status"] = "size_mismatch"
+                    rec["error"] = f"成品完整性核对失败: {exc}"
                 after = container_facts(dst)
                 after_doc = probe(dst)
                 rec["format_checks"] = check_format(dst, after, after_doc, 0.0)
@@ -966,9 +1086,30 @@ def repair_one(src: Path, dst: Path, *, opts: dict | None,
                                "error": f"{type(exc).__name__}: {exc}"}
 
     # 音频必须真的对齐了: 用**成品**重新测一遍 (不是看日志)。
-    aud_items, aud_data = check_audio(dst, after_doc, opts)
+    # 对仍有残留偏移的成品追加 1–2 轮修复 (见 repair_residual_audio)。
+    aud_items, aud_data, aud_rounds = repair_residual_audio(
+        dst, after_doc, opts)
     rec["audio_after"] = aud_data
     rec["audio_after_checks"] = aud_items
+    rec["audio_rounds"] = aud_rounds
+    # 追加轮次会再重封装一次，可能把 moov 放回末尾 / 重置 tkhd 字段；
+    # 这里做最后一次布局与容器归一化，并用最终文件重新生成检查项。
+    try:
+        after = container_facts(dst)
+        if before.get("moov_first") and after.get("moov_first") is False:
+            ok, detail = restore_layout(dst, True, log)
+            rec["layout_repaired"], rec["layout_detail"] = ok, detail
+            after = container_facts(dst)
+        if aud_rounds:
+            rec["container_fixes"] = repair_container(
+                dst, fix_layout=False, log=log)
+            after = container_facts(dst)
+        after_doc = probe(dst)
+        rec["format_checks"] = check_format(dst, after, after_doc, 0.0)
+        rec["container_checks"] = check_container(dst, after, after_doc)
+        rec["top_level_after"] = after.get("top_level")
+    except Exception as exc:                            # noqa: BLE001
+        rec["finalize_error"] = f"{type(exc).__name__}: {exc}"[:200]
     try:
         from preservation.validate import compare
 
@@ -980,6 +1121,33 @@ def repair_one(src: Path, dst: Path, *, opts: dict | None,
         shutil.rmtree(cmp_scratch, ignore_errors=True)
     except Exception as exc:                            # noqa: BLE001
         rec["validate"] = {"error": f"{type(exc).__name__}: {exc}"[:200]}
+
+    # --- 成人品硬闸门 (2026-10-26) --------------------------------------
+    # 1) validate.compare 不允许 MODIFIED / MISSING；
+    # 2) 视频载荷必须与源逐包相同（streamhash）。
+    # 为什么必须有: 2026-10-26 的并发批处理曾产出一份视频样本损坏的成品，
+    # validate 仍报 structural_success=True（只多一条 nrtm MODIFIED），
+    # 只有解码探针能看见。修复程序必须自己确认"改对了"，而不是把
+    # 复检留给人工。
+    _val = rec.get("validate") or {}
+    _sum = _val.get("summary") or {}
+    if (_val.get("structural_success") is False
+            or int(_sum.get("MODIFIED") or 0) > 0
+            or int(_sum.get("MISSING") or 0) > 0):
+        rec["status"] = "validate_mismatch"
+        rec["error"] = ("validate.compare 发现成品与源不一致: "
+                        + json.dumps(_sum, ensure_ascii=False))
+        return rec
+    try:
+        vp = video_payload_equal(src, dst)
+        rec["video_payload"] = vp
+        if vp.get("measured") and not vp["equal"]:
+            rec["status"] = "payload_mismatch"
+            rec["error"] = ("视频载荷与源不一致 (streamhash 不同): 重封装"
+                            "破坏了视频样本, 拒绝交付")
+            return rec
+    except OSError as exc:
+        rec["video_payload"] = {"error": f"{type(exc).__name__}: {exc}"}
     try:
         from preservation.gyroflow import check as gyro_check, find_gyroflow
 
@@ -1087,12 +1255,26 @@ def write_report(rows: list[dict], outdir: Path, title: str) -> Path:
 # ===========================================================================
 # 6. CLI
 # ===========================================================================
-def iter_media(root: Path, pattern: str) -> list[Path]:
+def iter_media(root: Path, pattern: str,
+               dirs: str | None = None) -> list[Path]:
+    """列出待处理媒体。
+
+    `dirs` 是**一级子目录名**的完全匹配正则（例如 `^\\d{8}$`）；给定时只
+    遍历这些子目录（不遍历根目录下的散文件/其它目录）。批处理整盘输入时
+    必须用它，否则会把 `_pre_repair_backup`、`compact`、`repaired` 等
+    非本轮对象一起扫进来。
+    """
+    exts = {e.lower() for e in pattern.split(",")}
     if root.is_file():
         return [root]
+    if dirs:
+        rx = re.compile(dirs)
+        candidates = [d for d in sorted(root.iterdir())
+                      if d.is_dir() and rx.fullmatch(d.name)]
+        return sorted(p for d in candidates for p in d.rglob("*")
+                      if p.is_file() and p.suffix.lower() in exts)
     return sorted(p for p in root.rglob("*")
-                  if p.is_file() and p.suffix.lower() in
-                  {e.lower() for e in pattern.split(",")})
+                  if p.is_file() and p.suffix.lower() in exts)
 
 
 def parse_opt_overrides(items: list[str]) -> dict[str, Any]:
@@ -1122,14 +1304,25 @@ def _worker_init(scratch_root: str) -> None:
 
 
 def _parallel_map(func, payloads: list, jobs: int, scratch_root: Path,
-                  what: str) -> list[dict]:
+                  what: str, on_row=None) -> list[dict]:
     """按文件并行执行 worker；jobs<=1 时在同一进程内串行。
 
     worker 只返回记录（不共享文件句柄）；scratch 目录按 pid 隔离。
+    `on_row(done_index, record)` 在**主进程**里按完成顺序回调（用于写
+    可断点续跑的进度文件）；它抛异常只记录，不中断批次。
     """
     if not payloads:
         return []
     _worker_init(str(scratch_root))
+
+    def _emit(i: int, r: dict) -> None:
+        if on_row is None:
+            return
+        try:
+            on_row(i, r)
+        except Exception as exc:                        # noqa: BLE001
+            print(f"[warn] progress write failed: {exc}", flush=True)
+
     if jobs <= 1:
         out: list[dict] = []
         for i, p in enumerate(payloads, 1):
@@ -1139,6 +1332,7 @@ def _parallel_map(func, payloads: list, jobs: int, scratch_root: Path,
                 r = {"overall": FAIL, "error": f"{type(exc).__name__}: {exc}",
                      "path": str(p[0] if isinstance(p, tuple) else p)}
             out.append(r)
+            _emit(i - 1, r)
             name = Path(str(r.get("path") or r.get("src") or
                           r.get("dst") or "?")).name
             print(f"[{i}/{len(payloads)}] {r.get('overall', '?'):<11} "
@@ -1164,6 +1358,7 @@ def _parallel_map(func, payloads: list, jobs: int, scratch_root: Path,
                      "path": str(payloads[i][0]
                                  if isinstance(payloads[i], tuple) else "")}
             results[i] = r
+            _emit(i, r)
             name = Path(str(r.get("path") or r.get("src") or
                           r.get("dst") or "?")).name
             print(f"[{done}/{len(payloads)}] [{what}] "
@@ -1226,26 +1421,70 @@ def _repair_worker(payload: tuple) -> dict:
                 "error": f"{type(exc).__name__}: {exc}"}
 
 
+def _common_opts(groups: bool, accurate: bool,
+                 opt_items: list[str] | None) -> dict[str, Any] | None:
+    """生产工作点 + 最新稳定开关（分组锚点默认开）+ 调用方覆盖。
+
+    分组锚点自 v0.8.7 起是 `start.bat` 的生产默认（GROUPS=1），修复侧从
+    2026-10-26 起跟随同一口径：**除非显式 `--no-groups`，一律用生产工作点
+    的最新稳定算法**（`production_opts()` = materiality_k/verify_max_rel/
+    recheck_windows/verify_agree_samples/track_reference）。
+    精确模式（1→2→5 样本分级）仍按产品决定 opt-in（`--accurate`）。
+    """
+    from core.channel_sync import production_opts
+
+    opts: dict[str, Any] = production_opts()
+    if groups:
+        opts["group_anchor_enabled"] = True
+    if accurate:
+        opts["channel_sync_accurate"] = True
+    opts.update(parse_opt_overrides(list(opt_items or [])))
+    return opts or None
+
+
+def _resolve_scratch(args: argparse.Namespace, outp: Path | None) -> Path:
+    """scratch 目录：显式 --scratch > 环境变量 > repair 输出盘 _scratch / 系统临时。
+
+    旧默认值是硬编码的 `E:\1kt_scratch\archive_repair`；E: 在批处理机上可能
+    根本不存在（或是一张相机卡），自主运行会直接失败。现在 repair 默认用
+    输出目录同盘的 `_scratch`（容量充足、跑完即删），check 用系统临时目录。
+    """
+    explicit = getattr(args, "scratch", "") or ""
+    if explicit:
+        s = Path(explicit)
+    elif os.environ.get("ARCHIVE_REPAIR_SCRATCH"):
+        s = Path(os.environ["ARCHIVE_REPAIR_SCRATCH"])
+    elif outp is not None:
+        s = outp / "_scratch"
+    else:
+        s = Path(tempfile.gettempdir()) / "1kt_archive_repair_scratch"
+    s.mkdir(parents=True, exist_ok=True)
+    return s
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     root = Path(args.input)
-    files = iter_media(root, args.ext)
+    files = iter_media(root, args.ext, getattr(args, "dirs", None))
     if args.limit:
         files = files[: args.limit]
-    from core.channel_sync import production_opts as _prod
-
-    opts: dict[str, Any] = _prod()
-    if args.groups:
-        opts["group_anchor_enabled"] = True
-    if args.accurate:
-        opts["channel_sync_accurate"] = True
-    opts.update(parse_opt_overrides(getattr(args, "opt", [])))
+    opts = _common_opts(bool(getattr(args, "groups", True)),
+                        bool(getattr(args, "accurate", False)),
+                        getattr(args, "opt", []))
     jobs = int(getattr(args, "jobs", 1) or 1)
+    scratch = _resolve_scratch(args, None)
     print(f"check: {len(files)} 个文件 (root={root}) jobs={jobs} "
-          f"opts={opts or 'DEFAULTS'}", flush=True)
+          f"groups={bool(getattr(args, 'groups', True))} "
+          f"scratch={scratch} opts={opts or 'DEFAULTS'}", flush=True)
+    if not files:
+        print("[warn] 没有匹配的媒体文件；检查 --input/--dirs/--ext", flush=True)
+        return 2
     rows = _parallel_map(_check_worker,
                          [(str(p), opts or None) for p in files],
-                         jobs, SCRATCH, "check")
-    md = write_report(rows, Path(args.json or "."), "归档规范检查")
+                         jobs, scratch, "check")
+    # 报告默认写到被检查对象旁边（不污染当前工作目录 / 仓库根）。
+    report_dir = Path(args.json) if args.json else (
+        root if root.is_dir() else root.parent)
+    md = write_report(rows, report_dir, "归档规范检查")
     tally: dict[str, int] = {}
     for r in rows:
         tally[r["overall"]] = tally.get(r["overall"], 0) + 1
@@ -1253,8 +1492,22 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0 if all(r["overall"] in (PASS, WARN, PARTIAL) for r in rows) else 1
 
 
+def _final_checks(rec: dict[str, Any]) -> list[dict]:
+    """修复后重新生成的检查项（容器 + 格式 + 成品音频复测）。"""
+    return ((rec.get("container_checks") or [])
+            + (rec.get("format_checks") or [])
+            + (rec.get("audio_after_checks") or []))
+
+
 def verdict_of(rec: dict[str, Any]) -> str:
-    """把一次修复的结果归到一个词上。**只有真正改过内容才算 REPAIRED。**"""
+    """把一次修复的结果归到一个词上。**只有真正改过内容才算 REPAIRED。**
+
+    2026-10-26 收紧：成品复检里只要还有任何一条 `FAIL`（包括 AUD-03
+    “还剩需要修的轨”），这次修复就不算 REPAIRED。旧实现只对
+    `container_fixed` 看检查项，`applied` 只看元数据是否相同，于是
+    “修了一次但成品仍有残差”会被报成 REPAIRED —— 与检查器的结论自相
+    矛盾。现在两者用同一份 `_final_checks`。
+    """
     status = rec.get("status")
     if status == "unreadable":
         return UNREADABLE
@@ -1265,11 +1518,11 @@ def verdict_of(rec: dict[str, Any]) -> str:
         return "FAILED"
     if rec.get("error") and not rec.get("no_fix_needed"):
         return "FAILED"
+    checks = _final_checks(rec)
+    if any(c.get("verdict") == FAIL for c in checks):
+        return "FAILED"
     if status == "container_fixed":
-        checks = ((rec.get("container_checks") or [])
-                  + (rec.get("format_checks") or []))
-        return "FAILED" if any(c["verdict"] == FAIL for c in checks) \
-            else "REPAIRED"
+        return "REPAIRED"
     if status == "applied":
         return "REPAIRED" if (rec.get("metadata") or {}).get("identical") \
             else "FAILED"
@@ -1278,41 +1531,232 @@ def verdict_of(rec: dict[str, Any]) -> str:
     return "FAILED" if rec.get("error") else "NOOP"
 
 
-def cmd_repair(args: argparse.Namespace) -> int:
+def _repair_payloads(files: list[Path], root: Path, outp: Path,
+                     opts: dict | None, fix_container: bool, fix_layout: bool,
+                     keep_all: bool) -> list[tuple]:
+    base = root if root.is_dir() else root.parent
+    return [(str(p), str(outp / _rel(p, base)), opts, False,
+             fix_container, fix_layout, keep_all) for p in files]
+
+
+def write_summary(rows: list[dict], outp: Path, *, root: Path,
+                  elapsed_s: float, jobs: int, groups: bool,
+                  accurate: bool, retry_rounds: int = 0) -> Path:
+    """批次总账：状态计数 + 按一级目录细分 + 失败清单。"""
+    outp.mkdir(parents=True, exist_ok=True)
+    tally: dict[str, int] = {}
+    by_dir: dict[str, dict[str, int]] = {}
+    failed: list[dict] = []
+    unreadable: list[dict] = []
+    for r in rows:
+        k = r.get("overall") or "FAILED"
+        tally[k] = tally.get(k, 0) + 1
+        src = Path(str(r.get("src") or r.get("path") or ""))
+        try:
+            rel = src.relative_to(root)
+            group = rel.parts[0] if len(rel.parts) > 1 else "."
+        except ValueError:
+            group = "."
+        by_dir.setdefault(group, {}).setdefault(k, 0)
+        by_dir[group][k] += 1
+        if k == "FAILED":
+            failed.append({"src": str(src),
+                           "dst": r.get("dst"),
+                           "error": r.get("error"),
+                           "checks": [c for c in _final_checks(r)
+                                      if c.get("verdict") == FAIL]})
+        elif k == UNREADABLE:
+            unreadable.append({"src": str(src),
+                               "error": r.get("error")})
+    data = {
+        "title": "归档修复总账",
+        "root": str(root),
+        "jobs": jobs,
+        "groups": groups,
+        "accurate": accurate,
+        "retry_rounds": retry_rounds,
+        "elapsed_s": round(elapsed_s, 1),
+        "total": len(rows),
+        "tally": tally,
+        "by_dir": by_dir,
+        "failed": failed,
+        "unreadable": unreadable,
+    }
+    js = outp / "_summary.json"
+    js.write_text(json.dumps(data, ensure_ascii=False, indent=1,
+                             default=str), encoding="utf-8")
+    lines = ["# 归档修复总账", "",
+             f"- 输入根: `{root}`",
+             f"- jobs={jobs} groups={groups} accurate={accurate} "
+             f"精确模式重试轮数={retry_rounds}",
+             f"- 总文件: {len(rows)}  耗时: {elapsed_s:.1f}s",
+             "", "| 状态 | 文件数 |", "|---|---|"]
+    for k, v in sorted(tally.items()):
+        lines.append(f"| {k} | {v} |")
+    lines += ["", "## 按目录", "", "| 目录 | 状态计数 |", "|---|---|"]
+    for g in sorted(by_dir):
+        lines.append(f"| {g} | " + ", ".join(
+            f"{k}={v}" for k, v in sorted(by_dir[g].items())) + " |")
+    if failed:
+        lines += ["", "## 失败文件", ""]
+        for f in failed:
+            ids = ",".join(c["id"] for c in f["checks"])
+            lines.append(f"- `{f['src']}` — {f.get('error') or ids}")
+    if unreadable:
+        lines += ["", "## 不可解析 (如实报告, 不中断批次)", ""]
+        for f in unreadable:
+            lines.append(f"- `{f['src']}` — {f.get('error')}")
+    md = outp / "_summary.md"
+    md.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return js
+
+
+def _run_repair(args: argparse.Namespace) -> int:
+    """一次自主批处理：发现 → 修复 → 成品复检 → 精确模式重试 → 总账。
+
+    `--resume` 使用输出目录下的 `_progress.jsonl`：每条成功记录（REPAIRED/
+    NOOP）在完成时立即落盘；重启时只重跑未完成的文件。因此中途断电/终止后
+    再跑同一条命令即可续跑，不需要人工挑文件。
+    """
     root = Path(args.input)
     outp = Path(args.output)
-    files = iter_media(root, args.ext)
+    t_start = time.perf_counter()
+    files = iter_media(root, args.ext, getattr(args, "dirs", None))
     if args.limit:
         files = files[: args.limit]
+    # 防止把输出目录当输入再修一遍（例如 --output 落在 --input 内部）。
+    try:
+        outp_res = outp.resolve()
+        files = [p for p in files
+                 if not p.resolve().is_relative_to(outp_res)]
+    except OSError:
+        pass
+    if not files:
+        print("[warn] 没有匹配的媒体文件；检查 --input/--dirs/--ext",
+              flush=True)
+        return 2
+
     jobs = int(getattr(args, "jobs", 1) or 1)
     fix_container = not bool(getattr(args, "no_container_fix", False))
     fix_layout = bool(getattr(args, "fix_layout", False))
+    keep_all = bool(getattr(args, "keep_all", False))
+    groups = bool(getattr(args, "groups", True))
+    accurate = bool(getattr(args, "accurate", False))
+    resume = bool(getattr(args, "resume", False))
+    retry_limit = int(getattr(args, "retry_failed", 1) or 0)
+    opts = _common_opts(groups, accurate, getattr(args, "opt", []))
+    scratch = _resolve_scratch(args, outp)
+    # 未显式指定 scratch 时，repair 的 scratch 就在输出盘里；批次结束即删。
+    scratch_auto = not (getattr(args, "scratch", "")
+                        or os.environ.get("ARCHIVE_REPAIR_SCRATCH"))
     print(f"repair: {len(files)} 个候选文件 → {outp} jobs={jobs} "
-          f"container_fix={fix_container} layout_fix={fix_layout}", flush=True)
+          f"groups={groups} accurate={accurate} "
+          f"container_fix={fix_container} layout_fix={fix_layout} "
+          f"resume={resume} scratch={scratch}", flush=True)
+    if not FFMPEG.is_file() or not FFPROBE.is_file():
+        print(f"[fatal] 找不到工具: {FFMPEG} / {FFPROBE}", flush=True)
+        return 2
 
-    from core.channel_sync import production_opts as _prod2
+    # ---- 断点续跑: 读取上次的成功记录 -----------------------------------
+    outp.mkdir(parents=True, exist_ok=True)
+    progress_path = outp / "_progress.jsonl"
+    done: dict[str, dict] = {}
+    if resume and progress_path.is_file():
+        for line in progress_path.read_text(
+                encoding="utf-8", errors="replace").splitlines():
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if row.get("overall") not in ("REPAIRED", "NOOP"):
+                continue
+            dstp = Path(str(row.get("dst") or ""))
+            if row.get("overall") == "NOOP" or dstp.is_file():
+                done[str(row.get("src"))] = row
+    if done:
+        print(f"resume: 已完成 {len(done)} 个文件，跳过", flush=True)
 
-    opts: dict[str, Any] = _prod2()
-    if args.groups:
-        opts["group_anchor_enabled"] = True
-    if args.accurate:
-        opts["channel_sync_accurate"] = True
-    opts.update(parse_opt_overrides(getattr(args, "opt", [])))
-    opts_or_none = opts or None
+    progress_fh = progress_path.open("a", encoding="utf-8")
 
-    payloads = []
-    for src in files:
-        dst = outp / _rel(src, root if root.is_dir() else root.parent)
-        payloads.append((str(src), str(dst), opts_or_none, False,
-                         fix_container, fix_layout,
-                         bool(getattr(args, "keep_all", False))))
-    rows = _parallel_map(_repair_worker, payloads, jobs, SCRATCH, "repair")
+    def _on_row(_idx: int, r: dict) -> None:
+        progress_fh.write(json.dumps(
+            {"src": r.get("src"), "dst": r.get("dst"),
+             "overall": r.get("overall"), "status": r.get("status")},
+            ensure_ascii=False, default=str) + "\n")
+        progress_fh.flush()
+
+    pending = [p for p in files if str(p) not in done]
+    try:
+        payloads = _repair_payloads(pending, root, outp, opts,
+                                    fix_container, fix_layout, keep_all)
+        fresh = _parallel_map(_repair_worker, payloads, jobs, scratch,
+                              "repair", on_row=_on_row) if pending else []
+    finally:
+        progress_fh.close()
+    by_src: dict[str, dict] = {}
+    for i, p in enumerate(pending):
+        r = fresh[i] if i < len(fresh) else {}
+        if not r.get("src"):
+            r = {"src": str(p), "overall": "FAILED",
+                 "error": r.get("error") or "worker 未返回记录"}
+        by_src[str(p)] = r
+    rows: list[dict] = []
+    for p in files:
+        sp = str(p)
+        rows.append(done.get(sp) or by_src.get(sp)
+                    or {"src": sp, "overall": "FAILED",
+                        "error": "缺少结果记录"})
+
+    # ---- 自主重试: 失败文件用精确模式（1→2→5 分级 + 施加后复检）再跑 ----
+    retry_rounds = 0
+    for attempt in range(1, retry_limit + 1):
+        bad = [i for i, r in enumerate(rows)
+               if r.get("overall") == "FAILED"]
+        if not bad:
+            break
+        retry_rounds = attempt
+        opts2 = _common_opts(groups, True, getattr(args, "opt", []))
+        print(f"retry {attempt}/{retry_limit}: {len(bad)} 个失败文件 → "
+              f"精确模式重试", flush=True)
+        bad_files = [files[i] for i in bad]
+        payloads2 = _repair_payloads(bad_files, root, outp, opts2,
+                                     fix_container, fix_layout, keep_all)
+        try:
+            progress_fh = progress_path.open("a", encoding="utf-8")
+            # **串行重试**: 并发路径已被证实（2026-10-26）会在高负载下偶发
+            # 产出损坏/截断的成品；失败文件用单进程重跑，既避开竞争条件，
+            # 也让"重试后再检验"成为确定性路径。
+            rr = _parallel_map(_repair_worker, payloads2, 1, scratch,
+                               "retry", on_row=_on_row)
+        finally:
+            progress_fh.close()
+        for k, i in enumerate(bad):
+            row = rr[k] if k < len(rr) else {
+                "src": str(files[i]), "overall": "FAILED",
+                "error": "retry worker 未返回记录"}
+            row["retried"] = attempt
+            row["first_error"] = rows[i].get("error")
+            rows[i] = row
+
+    # ---- 报告 + 总账 -----------------------------------------------------
     md = write_report(rows, Path(args.json or outp), "归档修复")
+    elapsed = time.perf_counter() - t_start
+    js = write_summary(rows, outp, root=root, elapsed_s=elapsed, jobs=jobs,
+                       groups=groups, accurate=accurate,
+                       retry_rounds=retry_rounds)
     tally: dict[str, int] = {}
     for r in rows:
         k = r.get("overall") or "FAILED"
         tally[k] = tally.get(k, 0) + 1
-    print(f"\n{tally}\n-> {md}")
+    print(f"\n{tally}  耗时 {elapsed:.1f}s", flush=True)
+    failed = [r for r in rows if r.get("overall") == "FAILED"]
+    if failed:
+        print(f"[!] {len(failed)} 个文件仍失败:", flush=True)
+        for r in failed[:20]:
+            print(f"    {r.get('src')} — {r.get('error')}", flush=True)
+    print(f"-> {md}\n-> {js}", flush=True)
+    if scratch_auto:
+        shutil.rmtree(scratch, ignore_errors=True)
 
     if args.in_place:
         if not (args.yes and args.backup):
@@ -1321,8 +1765,33 @@ def cmd_repair(args: argparse.Namespace) -> int:
             return 2
         n = apply_back(rows, Path(args.backup))
         print(f"in-place: 已替换 {n} 个文件 (备份在 {args.backup})")
-    return 0 if all(r["overall"] in ("REPAIRED", "NOOP", PARTIAL)
-                    for r in rows) else 1
+
+    # 无人值守退出码: 只有真正的修复失败才算失败；UNREADABLE/PARTIAL 是
+    # 输入本身的限制，已在总账里如实列出，不让批处理循环因此报错。
+    return 1 if failed else 0
+
+
+def cmd_repair(args: argparse.Namespace) -> int:
+    return _run_repair(args)
+
+
+def run_repair(input_path: str, output_path: str, *,
+               jobs: int = 4, groups: bool = True, accurate: bool = False,
+               dirs: str = "", ext: str = ".mp4,.MP4,.mov,.MOV",
+               limit: int = 0, json_dir: str = "", scratch: str = "",
+               resume: bool = False, retry_failed: int = 1,
+               fix_layout: bool = False, fix_container: bool = True,
+               keep_all: bool = False, opt_items: list[str] | None = None) -> int:
+    """程序化入口（`1kt.py --repair` 走这里，其它批处理入口也可直接调）。"""
+    ns = argparse.Namespace(
+        input=input_path, output=output_path, jobs=jobs, groups=groups,
+        accurate=accurate, dirs=dirs, ext=ext, limit=limit,
+        json=json_dir, scratch=scratch, resume=resume,
+        retry_failed=retry_failed, fix_layout=fix_layout,
+        no_container_fix=not fix_container, keep_all=keep_all,
+        in_place=False, backup="", yes=False, opt=list(opt_items or []),
+    )
+    return _run_repair(ns)
 
 
 def apply_back(rows: list[dict], backup: Path) -> int:
@@ -1356,6 +1825,12 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--limit", type=int, default=0)
         p.add_argument("--ext", default=".mp4,.MP4,.mov,.MOV",
                        help="扩展名过滤, 逗号分隔")
+        p.add_argument("--dirs", default="", metavar="REGEX",
+                       help="只遍历一级子目录名**完全匹配**该正则的目录, "
+                            "例如 ^\\d{8}$ (整盘输入时必用)")
+        p.add_argument("--scratch", default="",
+                       help="临时目录；默认 repair 用输出盘 _scratch, "
+                            "check 用系统临时目录")
         p.add_argument("--jobs", type=int,
                        default=min(4, max(1, (os.cpu_count() or 2) // 2)),
                        help="按文件并行的工作进程数 (默认 min(4, CPU/2))；"
@@ -1363,26 +1838,37 @@ def main(argv: list[str] | None = None) -> int:
 
     c = sub.add_parser("check", help="只检查, 不写任何文件 (源文件只读)")
     common(c)
-    c.add_argument("--groups", action="store_true",
-                   help="按分组锚点语义测量 (与 repair 一致)")
+    c.add_argument("--groups", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="按分组锚点语义测量 (默认开, 与生产 start.bat "
+                        "GROUPS=1 一致; --no-groups 关闭)")
     c.add_argument("--accurate", action="store_true",
                    help="按精确模式语义测量 (能看见 2~5 样本的小偏移)")
     c.add_argument("--opt", action="append", default=[], metavar="K=V",
                    help="透传给 channel-sync 的选项覆盖, 可重复; "
-                        "例如 --opt verify_max_rel=0.2 --opt verify_agree_samples=5")
+                        "例如 --opt verify_max_rel=0.2 "
+                        "--opt verify_agree_samples=5")
     c.set_defaults(func=cmd_check)
 
     r = sub.add_parser(
         "repair", help="一键修复到暂存目录 (音频 + 容器；默认不改原件)")
     common(r)
     r.add_argument("--output", required=True, help="暂存目录 (必填)")
-    r.add_argument("--groups", action="store_true",
-                   help="打开分组锚点 (与 1kt.py 同名开关语义一致)")
+    r.add_argument("--groups", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="分组锚点 (默认开, 与生产 start.bat GROUPS=1 一致; "
+                        "--no-groups 关闭)")
     r.add_argument("--accurate", action="store_true",
-                   help="打开精确模式 (1→2→5 样本分级)")
+                   help="打开精确模式 (1→2→5 样本分级); 失败重试时自动打开")
     r.add_argument("--opt", action="append", default=[], metavar="K=V",
                    help="透传给 channel-sync 的选项覆盖, 可重复; "
-                        "例如 --opt verify_max_rel=0.2 --opt verify_agree_samples=5")
+                        "例如 --opt verify_max_rel=0.2 "
+                        "--opt verify_agree_samples=5")
+    r.add_argument("--resume", action="store_true",
+                   help="断点续跑: 读输出目录 _progress.jsonl, 跳过已完成且"
+                        "成品存在的文件")
+    r.add_argument("--retry-failed", type=int, default=1, metavar="N",
+                   help="失败文件的自动重试轮数 (用精确模式; 默认 1, 0=关)")
     r.add_argument("--in-place", action="store_true",
                    help="修完后写回原件 (必须同时给 --backup 与 --yes)")
     r.add_argument("--backup", default="", help="写回前的备份目录")
@@ -1399,7 +1885,6 @@ def main(argv: list[str] | None = None) -> int:
     r.set_defaults(func=cmd_repair)
 
     args = ap.parse_args(argv)
-    SCRATCH.mkdir(parents=True, exist_ok=True)
     if int(getattr(args, "jobs", 1) or 1) > 1:
         # 并行进程各自再开 BLAS/OpenMP 线程会过度订阅；每个 worker 单线程，
         # 总吞吐由文件级并行提供。用户显式设置的环境变量优先。

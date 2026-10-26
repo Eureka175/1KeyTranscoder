@@ -153,3 +153,145 @@ python archive_repair.py repair --input <文件或目录> --output <暂存目录
 - 无 moov 的零填充文件无法恢复，只能报 `UNREADABLE`。
 - `--fix-layout` 会触发整文件重交织，最慢，默认关闭。
 - 大批量仍建议把 `ARCHIVE_REPAIR_SCRATCH` 指到大容量盘；每个 worker 独立子目录。
+
+---
+
+## 9 2026-10-26 第二次升级：自主批处理 + 合入主程序（v0.8.8）
+
+这一节回答一个问题：**修复程序能不能自己把一整批文件修完并证明修对了，不需要人守在旁边？**
+答案是能，但前提是把"修对"变成程序自己的判据，而不是操作者的肉眼复检。
+
+### 9.1 一条命令跑完全批（不再需要人工逐个目录调用）
+
+```bat
+python 1kt.py --repair --input I:\ --output G:\1kt_repair_v3_20261026 ^
+    --repair-dirs "^\d{8}$" --jobs 8
+```
+
+- `--repair-dirs REGEX`：只遍历输入根下的**一级子目录名完全匹配**的目录。
+  整盘输入时必须给，否则 `_pre_repair_backup`、`compact`、`repaired` 等
+  非本轮对象会被一起扫进来。
+- `--jobs N`：按文件并行（每个 worker 独立 `scratch/pid<pid>`；BLAS/OpenMP
+  固定单线程）。
+- `--repair-resume`：断点续跑。每条成功记录在完成时立刻追加到输出目录的
+  `_progress.jsonl`，重启后只重跑未完成/失败的文件（成品不存在或上次失败
+  的文件不会被跳过）。
+- 失败文件自动**串行**重试（精确模式，1→2→5 样本分级 + 施加后复检）；
+  一次性失败不再让整批中断。
+- 结束写三份总账：`_summary.json`（机器读）、`_summary.md`（人读）、
+  `archive-repair-report.json/md`（逐文件检查项与决策）。
+- 退出码：只有真正的 `FAILED` 返回 1；`PARTIAL`（`.part` 半成品）与
+  `UNREADABLE`（零填充/无 moov）是输入本身的限制，如实列进总账但不让
+  批处理循环报错。
+
+### 9.2 成人品硬闸门（"修对了"由程序自己证明）
+
+2026-10-26 的并发批处理实测暴露了一个必须正视的问题：**并行路径在高负载下
+偶发产出损坏的成品**。两份实测样本：
+
+| 现象 | 结构检查 | 只有哪个检查能发现 |
+|---|---|---|
+| `20260830_C0912` 视频样本被写坏（解码报 `Invalid NAL unit size`） | `moov`/时长/tkhd 全部正常；`validate.compare` 仍 `structural_success=True`，只多一条 `nrtm.lens_profile` MODIFIED | 逐流解码探针（`FMT-04`） |
+| `20260830_C0951` 拷贝不完整（成品 216 MB vs 源 304 MB） | 容器结构可读 | 文件大小 + 逐包载荷 |
+
+因此 `repair` 在交付前现在强制通过两道闸门（**不是可选项**）：
+
+1. **`validate.compare` 无 MODIFIED / MISSING**：brand、tref、nrtm、uuid、
+   rtmd 载荷等 43 项逐项与源相同；任一不同 → 判失败，不交成品。
+2. **视频载荷逐包相同（streamhash）**：`ffmpeg -map 0:v:0 -c copy
+   -f streamhash sha256` 对比源与成品。容器级修复只做字节级拷贝 + 等长
+   字段改写，所以还额外要求**成品文件大小 == 源文件大小**。
+
+闸门失败的文件进入串行重试；重试仍失败就如实报 `FAILED`（附错误），
+**绝不静默交出一个"看着像成品"的坏文件**。
+
+### 9.3 最新稳定算法 = 生产工作点 + 分组锚点（默认开）
+
+修复侧的默认参数现在与生产 `start.bat` 对齐：
+
+| 项 | 默认 | 依据 |
+|---|---|---|
+| `production_opts()`（materiality_k=3 / verify_max_rel=0.2 / recheck_windows=3 / verify_agree_samples=20 / track_reference=True） | 开 | v0.8.7 生产工作点 |
+| 分组锚点 `group_anchor_enabled` | **开**（`--no-groups` 可关） | `start.bat` 的 `GROUPS=1`；全语料/留出/归档三重验证只增不减 |
+| 精确模式 `channel_sync_accurate` | 关（失败重试时自动打开） | 产品决定：1→2→5 样本分级由施加后复检验收，属 opt-in |
+| 音频残留迭代（`repair_residual_audio`，最多 2 轮） | 开 | 首轮宽窗采纳后仍有 1–20 样本残差时自动再修（实测 C0925 +20、C1167 +1144、C1207 +1136） |
+| 容器级一键修复（tkhd/sample entry/时长） | 开 | 见 §8.1 |
+
+### 9.4 合入主程序 + 版本
+
+- `archive_repair.py` 的能力现在通过主程序入口暴露：
+  `1kt.py --repair ...`（同样的 `--input/--output`，新增 `--repair-*` 选项）。
+  批处理链只需要调用一个程序，不再依赖"记得去跑旁路脚本"。
+- `VERSION` **0.8.7 → 0.8.8**；`1kt.py --version` 输出 `1KeyTranscoder 0.8.8`。
+- 新增的自测（`tests/selftest/suites/hardware_audio.py`）把这组 CLI 参数
+  手工登记进白名单，并断言 `--repair` 真的分派到 `archive_repair.run_repair`，
+  防止将来变成空开关。
+
+### 9.5 一条真实编码测试（非长程）
+
+改主程序后跑了一次**短素材真实编码**（不跑长程测试）：
+
+| 项 | 值 |
+|---|---|
+| 输入 | `20260903_C1090.MP4`（3840×2160 10-bit 4:2:2，11.0 s，256.1 MB） |
+| 命令 | `1kt.py --input … --output … --encoder x265 --preset hq --jobs 1 --check basic --headless` |
+| 结果 | `done=1 skipped=0 failed=0`；`PRESERVED=37 MODIFIED=0 MISSING=0 structural_success=True`；耗时 384.6 s |
+| 成品 | 80.0 MB；再用最新 `check` 复检 **PASS**（容器/音频/格式全部通过） |
+
+### 9.6 全量批处理实测（I: 18 个 YYYYMMDD 目录，669 文件）
+
+运行命令（后台整批，运行期间只读日志、不打断）：
+
+```bat
+python 1kt.py --repair --input I:\ --output G:\1kt_repair_v3_20261026 ^
+    --repair-dirs "^\d{8}$" --jobs 8
+```
+
+| 指标 | 值 |
+|---|---|
+| 输入 | 18 个 `YYYYMMDD` 目录，669 个媒体文件，94.5 GB |
+| 结果 | **REPAIRED 661 / PARTIAL 2 / UNREADABLE 6 / FAILED 0** |
+| 实际改音频的文件 | 45（其余 616 只需容器修复） |
+| 耗时 | **1467.8 s（24.5 min）**，jobs=8，含成人品载荷校验 |
+| 成品 | 661 个文件，93.7 GB（暂存，未写回 `I:\`） |
+| 首轮失败 → 闸门发现 | **7 个**，全部由成人品闸门在交付前拦下：2 个 `validate.compare` 不一致（C0913 MODIFIED=16/MISSING=1、C0923 MODIFIED=1）、5 个 sample-entry 与源不一致；**串行精确重试 7/7 REPAIRED** |
+| 闸门覆盖 | applied 45/45 视频载荷相等；container_fixed 616/616 大小相等且视频载荷相等 |
+| 残差音频追加轮 | 3 个文件（C0925 1 轮、C1167 2 轮、C1204 1 轮）→ 最终全部 `already_aligned` |
+| 已知不可修 | 2 个 `.part` 半成品（PARTIAL，不产出）；6 个零填充/无 moov 文件（UNREADABLE，如实报告） |
+| 独立复检 | 结果见 §9.7 |
+
+**这次实测证明了两件事**：
+
+1. 并发路径确实会在高负载下偶发产出损坏成品（7/45 个需要音频重封装的文
+   件在首轮被闸门拦下），但**闸门 + 串行重试把它变成了可自动收敛的失败**，
+   最终 0 FAILED。
+2. 失败文件串行重试全部成功，说明"并发只做发现、串行负责收口"的分层是
+   有效的。**没有静默交付任何坏文件**。
+
+### 9.7 独立复检（成品上重新测量/解码，不复用修复记录）
+
+命令：`archive_repair.py check --input G:\1kt_repair_v3_20261026 --jobs 8`
+（661 个成品逐个重新 probe + 容器检查 + 音频重新测量 + 解码探针）。
+
+| 结果 | 数量 | 说明 |
+|---|---|---|
+| **PASS** | **640** | 容器/格式/音频/解码全部通过 |
+| **WARN** | **21** | 全部是 `AUD-04`：质量门拒绝且仍带 ≥5 样本偏移的轨（`non_constant` / `low_confidence`），属 §8.4 的已知不可修类；不是本次修复引入 |
+| FAIL / UNREADABLE | **0 / 0** | — |
+
+与修复前的账目交叉核对一致：输入 669 = 成品 661 + `.part` 2（不产出）+
+零填充 6（不可解析）；每个 `YYYYMMDD` 目录的输入/成品数逐目录相同
+（含 `A7M5` 等子目录，例如 20260901：229 产出 / 235 输入 = 6 不可解析）。
+
+### 9.8 已知限制（本次新增）
+
+- **并发路径仍会偶发损坏**：8 并发下实测 45 个需音频重封装的文件里有 7 个
+  首轮产出被闸门判坏（视频载荷/元数据/大小不一致）。程序会串行重试并
+  重新验收；本次 7/7 成功，没有 FAILED。若未来某批的重试也失败，该文件会
+  以 `FAILED` 明确列出，**不会静默交付**。
+- 因此大批量建议保留 `--jobs 8` 的吞吐，但把"串行收口"视为修复程序的
+  正式组成部分（它已内置，不需要人工介入）。
+- 成人品载荷校验（视频 streamhash）会让每文件多读一遍源与成品：
+  669 文件 / 94.5 GB 的实测耗时 24.5 min（不含复检）。
+
+
