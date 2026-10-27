@@ -4,225 +4,129 @@
   <img src="logos/Primary%20Logo.png" alt="1KeyTranscoder Primary Logo" width="360">
 </p>
 
-> Recursive, resumable Windows batch transcoder for camera archives, with Sony XAVC / DJI
-> metadata preservation and a structured PCM audio pipeline.
+> Recursive, resumable Windows batch transcoder for camera archives: Sony XAVC / DJI
+> metadata preservation, a structured PCM audio pipeline, channel-delay repair, and an
+> archive-repair mode that can verify and fix already-produced deliverables.
 
-[![Version](https://img.shields.io/badge/version-0.8.0-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.8.8-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![Release](https://img.shields.io/badge/release-v0.8.0-informational)](https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.8.0)
+
+## Contents
+
+- [Overview](#overview)
+- [What's new in 0.8.8](#whats-new-in-088)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Encoders and presets](#encoders-and-presets)
+- [Metadata preservation](#metadata-preservation)
+- [Audio](#audio)
+- [Archive repair](#archive-repair)
+- [Output, logs and verification](#output-logs-and-verification)
+- [Hardware decode](#hardware-decode)
+- [Testing](#testing)
+- [Project structure](#project-structure)
+- [Documentation](#documentation)
+- [Release](#release)
+- [Limitations](#limitations)
+- [Contributing](#contributing)
+- [Brand assets](#brand-assets)
+- [License](#license)
 
 ## Overview
 
-1KeyTranscoder is a command-line batch transcoder for Windows, built for archiving camera
-footage at scale. It walks an input tree, transcodes every clip with a hardware (NVEncC /
-QSVEncC) or software (x265 / SVT-AV1) backend, and writes a mirrored output tree as
-`.MP4` files. Batches are resumable: completed work is detected and skipped, failures are
-recorded per file and can be re-run selectively.
+1KeyTranscoder is a command-line batch transcoder for Windows built for archiving camera
+footage at scale. It walks an input tree, transcodes every clip with a hardware
+(NVEncC / QSVEncC) or software (x265 / SVT-AV1) backend, and writes a mirrored output tree
+of `.MP4` files. Batches are **resumable** — completed outputs are detected and skipped —
+and failures are recorded per file so they can be retried selectively.
 
-Its distinguishing feature is metadata preservation. Sony XAVC clips carry per-frame
+Its distinguishing feature is **metadata preservation**. Sony XAVC clips carry per-frame
 gyroscope and lens data (`rtmd`), lens profiles (`nrtm`) and vendor `uuid` boxes; DJI
-action-camera clips carry `djmd` motion quaternions, `dbgi` and `tmcd`. Both are copied
-through the transcode by a dedicated preservation pipeline and verified afterwards
-(payload checksums, structure checks, and optional Gyroflow consumer-side quaternion
-validation), instead of being silently dropped by a generic transcoder.
+action-camera clips carry `djmd` motion data, `dbgi` and `tmcd`. These are copied through
+the transcode by a dedicated preservation pipeline and verified afterwards (payload
+checksums, structure checks, optional Gyroflow consumer-side validation) instead of being
+silently dropped by a generic transcoder.
 
-It also ships a multi-channel audio delay compensation pass (`--channel-sync`) for
-multi-mic camera layouts, and — since v0.7.1 — an internal PCM audio pipeline
-(source/stream/track/channel modelling, routing, WAV export, and N→1 mixing with gain and
-clipping policy). v0.8.0 connects that pipeline to the production output: an explicit
-`--audio-plan` JSON can select/reorder channels, ask for format-aware alignment, and pull
-in external recordings found next to each clip. Without `--audio-plan` the default audio
-path is unchanged.
+On top of that the project ships:
+
+- a **multi-channel delay compensation** pass for multi-mic PCM layouts (`--channel-sync`,
+  `--channel-sync-transparent`, optional grouped anchors and precision mode);
+- a **structured PCM audio pipeline** with explicit `--audio-plan` output (selection,
+  mapping, format-aware alignment, external audio, AAC/Opus/PCM/FLAC encoding);
+- an **archive-repair mode** (`1kt.py --repair`, or the standalone `archive_repair.py`)
+  that checks and fixes deliverables that already exist — audio offsets, metadata
+  placement, container conformance — without re-encoding video.
 
 Target use case: a single workstation turning multi-hour Sony / DJI shoots into archive
-copies without losing the motion and lens metadata that post-processing tools
-(Gyroflow, editors) need.
+copies that keep the motion and lens metadata tools such as Gyroflow and NLEs need.
 
-## Features
+## What's new in 0.8.8
 
-### Video / transcoding
+- **Archive repair is now part of the main program**: `1kt.py --repair ...` runs a whole
+  batch (directory filter, resume file, serial retry of failures, machine-readable
+  summary) and is ready to be called by batch scripts. The standalone
+  `archive_repair.py check|repair` CLI remains available.
+- **Repair uses the latest stable algorithms by default**: the production work point
+  (`production_opts()`) plus grouped anchors, residual-audio rounds, and the container
+  fixes introduced in 0.8.7; precision mode stays opt-in and is enabled automatically
+  for retries.
+- **Hard integrity gates for repaired deliverables**: a repair is only accepted when the
+  independent `validate.compare` reports no MODIFIED/MISSING, the video packet streamhash
+  equals the source, and (container-only path) the output size equals the source.
+  Failing files are retried serially and reported as `FAILED` if still unresolved — never
+  silently delivered.
+- The 0.8.7 line already added the channel-sync production defaults (grouped anchors in
+  `start.bat`), the 2CH-silent skip policy, and the DJI default metadata policy.
 
-- Hardware backends: NVEncC (HEVC, AV1), QSVEncC (HEVC, AV1); software backends: SVT-AV1
-  and x265 (HEVC).
-- With no `--encoder`, the backend is auto-selected by capability probe:
-  NVENC → QSV → x265. `--no-hw-autoselect` pins x265.
-- A mismatch between `--config`'s `encoder` field and `--encoder` is a hard error, not a
-  silent override.
-- Presets `uhq` / `hq` / `small` / `fast` / `all`, defined in per-backend JSON profile
-  files; capability-based downgrade (4:2:2 → 10-bit 4:2:0 → 8-bit 4:2:0) with a loud
-  WARNING, or skipping with `--no-downgrade`.
-
-### Preservation / archival
-
-- Sony pipeline: `rtmd` / `nrtm` / vendor `uuid` payloads carried through re-encoding
-  with strength-parameterised post-checks.
-- DJI pipeline: `djmd` / `dbgi` / `tmcd` copied natively, payload `sha256` recorded,
-  optional Gyroflow per-frame quaternion validation.
-- Other sources: classic single-pass path (video + audio only), stated explicitly in the
-  log.
-- `--check basic|advanced|full` post-encode verification, plus PSNR/SSIM sampling at
-  `full` on short clips.
-
-### Audio
-
-- Default audio behaviour is unchanged from earlier releases: streams are copied through
-  (`-c:a copy`; the preservation pipelines copy audio inside the container).
-- `--channel-sync`: per-file GCC-PHAT delay measurement across independent mono PCM
-  tracks, corrected by integer sample shifts only.
-- `--channel-sync-transparent`: pre-editing mode that stream-copies video and all
-  non-audio streams and only re-generates audio tracks that need correction.
-- v0.7.1 adds an internal PCM pipeline: source/stream/track/channel model, channel
-  selection and mapping, unified timeline with EOF/offset handling, float32 PCM reading,
-  routing, WAV export, and N→1 mixing with linear gain and clipping policy. See
-  [Audio Processing](#audio-processing) for scope and boundaries.
-- v0.8.0 adds format-aware audio handling on top of that pipeline: PCM input is allowed
-  to enter alignment by default while compressed input is passed through untouched
-  (decode → PCM → align → re-encode only when alignment is asked for explicitly), output
-  codec/bitrate are inherited from the source unless overridden, and external
-  recordings named after the clip (`clip001.wav`, `clip001_01.aac`, …) are discovered
-  and appended as tracks that follow the same mapping rules.
-
-### Throughput / operations
-
-- `--jobs 1|N|auto` scheduling; `--dry-run` to probe and print commands without encoding.
-- `--retry-list failed_files.json` to re-run only failed items, optionally on another
-  backend.
-- `--experimental-multihw`: experimental NVENC + QSV dual-backend pool (video quality
-  consistency across backends is explicitly not guaranteed).
-- Logging to `error.log` / `warn.log` / `total.log` / `debug.log`, batch-scoped
-  environment version records, and `logs/failed_files.json` failure detail files.
-- Progress dashboard plus worker window for interactive runs, or `--headless` for
-  unattended operation; `watchfolder.py` / `start.bat` for polling batches.
-
-### Hardware decode
-
-- Two independent routes: `x265`/`svtav1` decode in **FFmpeg** (NVDEC/QSV →
-  `hwdownload` → `libx265`/`libsvtav1`); `nvenc`/`qsv` decode with their **own**
-  rigaya reader. No FFmpeg frame feed into the rigaya encoders.
-- The rigaya reader is chosen by **source**: Sony → `--avsw` before any attempt
-  (the hardware reader loses 3 frames of 30 on XAVC, silently, with `rc=0`);
-  non-Sony → `--avhw` on the deployed binary. The old codec allowlist is
-  evidence, not a gate.
-- Every `--avhw` result is gated on frame count plus reader identity. A failing
-  artifact is deleted and the rung is re-run once with `--avsw`; it is never
-  delivered.
-- The retired switches `--hw-decode`, `--hw-decode-verify` and
-  `--no-hw-autoselect` are gone and have no aliases.
-- **Research builds are not required.** `tools/avhw/` is excluded from the
-  release package and production does not consult it; those builds are used only
-  by the research line and the historical matrix. See
-  [Hardware Decode](#hardware-decode).
-
-### x265 encoding profiles
-
-The x265 backend is not one preset with a speed knob. It ships four profiles — `uhq`,
-`hq`, `small`, `fast` — that are four different production strategies, each calibrated
-against a different constrained resource:
-
-| Profile | Objective |
-|---|---|
-| `uhq` | Quality ceiling / extreme offline — the high-quality reference baseline |
-| `hq` | High-quality final output at a reduced, production-viable computation cost |
-| `small` | Storage efficiency — more computation spent deliberately to make files smaller |
-| `fast` | Production throughput — compression efficiency per unit of encoding time |
-
-They are not a quality ladder: `uhq → hq → small → fast` does **not** mean "better →
-worse". They were calibrated on real Sony XAVC HS 4K60 10-bit 4:2:0 150 Mbps LongGOP
-material plus a corpus of noisy/clean, handheld/stable, indoor/outdoor and long-form
-clips, and `fast` / `small` were tuned against NVENC UHQ as an external real-world anchor
-rather than against an abstract ideal.
-
-Design methodology — goals, computation pruning, the FAST ↔ SMALL relationship,
-marginal-value parameter decisions and the current parameter set:
-[docs/x265-profile-design.md](docs/x265-profile-design.md).
-
-## Current Status
-
-Current release: **v0.8.0** (`VERSION` = `0.8.0`, tag `v0.8.0`).
-
-| Area | Status |
-|---|---|
-| Core transcoding (NVENC / QSV / x265 / SVT-AV1, HEVC + AV1) | Available |
-| Sony `rtmd` / `nrtm` / `uuid` preservation | Available |
-| DJI `djmd` / `dbgi` / `tmcd` preservation | Available |
-| Post-encode verification (`--check basic\|advanced\|full`) | Available |
-| `--channel-sync` (integer-sample delay correction, P1) | Available |
-| `--channel-sync-transparent` (video stream copy) | Available |
-| Hardware decode (`x265`/`svtav1`: FFmpeg NVDEC/QSV) | Available |
-| Native rigaya decode (`nvenc`/`qsv`) | Available — Sony `--avsw` (preventive), non-Sony `--avhw` with the integrity gate |
-| Audio model (source / stream / track / channel) | Available (internal layer) |
-| Audio selection and channel mapping (`AudioMapSpec`, dry-run) | Available (internal layer, no CLI) |
-| PCM routing (1 output channel ← 1 source channel) | Available (internal layer, no CLI) |
-| WAV export (PCM16 / PCM24 / PCM32 / float32) | Available (internal API, no CLI) |
-| PCM mixing (N→1, linear gain, clipping detection) | Available (internal API, no CLI) |
-| Arbitrary-reference delay correction | Available as an internal API; reachable from the CLI through `--audio-plan`'s `sync.reference` |
-| Audio execution-path resolution (`NONE` / `STREAM_COPY` / `PCM_ROUTE` / `PCM_MIX`) | Available (Phase 4A; internal API) |
-| Selective MP4 audio retention (keep / drop / reorder original audio streams) | Available through the CLI (`--audio-plan`). Channel-filter and mixing outputs are **refused** rather than faked as stream copy |
-| Audio encoding (AAC / Opus / PCM / FLAC) of routed or mixed PCM | Available through the CLI (`--audio-plan`) |
-| Final output composition (video + encoded audio → MP4) | Wired into the production entry point for the classic software path (`1kt.py --encoder x265\|svtav1`) **and the hardware backends** (`nvenc` / `qsv` / `qsv-av1`), opt-in via `--audio-plan`. Sony and DJI preservation **reject** an audio plan per file rather than ignoring it |
-| Format-aware alignment (PCM default on, compressed default off, explicit compressed → decode/re-encode with warning) | Available through the CLI (`--audio-plan`: `alignment`, `sync.reference`) |
-| Codec / bitrate inheritance (`manual > source > encoder default`) | Available through the CLI (`--audio-plan`: `encode`) |
-| External audio discovery (`clip001.wav`, `clip001_01.aac`, …) and mapping-driven track layout | Available through the CLI (`--audio-plan`: `external`, `mapping`) |
-| Automatic cross-file synchronization (content matching) | Not implemented |
-| Drift correction / resampling / loudness | Not implemented |
-| Audio CLI flags beyond `--audio-plan` (`--audio-tracks`, `--audio-map`, `--audio-codec`) | Not implemented |
-
-The audio model, selection layer, timeline, retention, encoding, format policy and
-external-audio handling are unit- and integration-tested. v0.8.0 wires format-aware
-alignment, codec inheritance and external audio into the same production entry point,
-still opt-in through the single `--audio-plan` flag (no new CLI argument was added);
-the default path is not changed. The only audio surface reachable from `1kt.py` is
-`production.output`, and anything below that is an explicit API call such as
-`core.audio_process.run_audio_render()`,
-`core.audio_retention.build_audio_retention()`,
-`core.audio_encode.encode_audio_from_plan()` or
-`core.output_compose.OutputComposer.compose()`.
+See [v0.8.8 release notes](docs/release_notes_v0.8.8.md).
 
 ## Requirements
 
-- **Windows 10 / 11** (x64). Development and verification are performed on Windows;
-  no other platform is tested.
-- **Python 3.11+** — no `pip` dependencies are required for the core tool. `numpy`
-  (and `scipy`, for `--channel-sync`) is optional: if it is missing, the features that
-  need it are skipped with a WARNING and transcoding is unaffected.
-- **External tools**, called as separate executables:
-  - `ffmpeg` / `ffprobe` — 9.0.1 (bundled in the release package). The project requires
-    its bundled build; older PATH versions lack the AV1 features used.
-  - `NVEncC` 9.31 and/or `QSVEncC` 8.26 — for the hardware backends.
-  - GPAC / MP4Box — container rebuilding and metadata preservation. Behaviour is bound
-    to GPAC 26.02; upgrading requires a regression run.
-  - Gyroflow (optional) — consumer-side quaternion validation for `--check advanced|full`.
-- **GPU driver** matching the hardware backend in use (NVIDIA for NVENC, Intel for QSV).
+- **Windows 10 / 11 (x64)**. Development and verification are performed on Windows; no
+  other platform is tested.
+- **Python 3.11+**. No `pip` dependencies are required for the core tool. `numpy` and
+  `scipy` are optional and only needed by `--channel-sync` / audio analysis; when absent
+  the features that need them are skipped with a WARNING and transcoding is unaffected.
+- **External tools**, invoked as separate executables:
+  - `ffmpeg` / `ffprobe` — the bundled build is the supported one;
+  - `NVEncC` 9.31 and/or `QSVEncC` 8.26 for the hardware backends;
+  - `GPAC / MP4Box` 26.02 for container rebuilding and metadata preservation;
+  - Gyroflow (optional) for consumer-side quaternion validation at `--check advanced|full`.
+- A GPU driver matching the hardware backend in use (NVIDIA for NVENC, Intel for QSV).
 
-Every tool path can be overridden: `--tool-nvencc`, `--tool-qsvencc`, `--ffmpeg`,
-`--ffprobe`, `--gpac-dir`, `--gyroflow`.
-
-> The project's own `tools/` directory (ffmpeg / NVEncC / QSVEncC / GPAC) is
-> `.gitignore`d and is the single shared toolchain used by the build and test runs.
-> Keep it in one place and never copy, junction, or symlink it into other working trees;
-> pass explicit paths instead.
+Every tool path can be overridden with `--tool-nvencc`, `--tool-qsvencc`, `--ffmpeg`,
+`--ffprobe`, `--gpac-dir` and `--gyroflow`.
 
 ## Installation
 
 ### From the release package (self-contained)
 
-The self-contained package bundles ffmpeg/ffprobe 9.0.1, NVEncC 9.31, QSVEncC 8.26 and
-GPAC 26.02, so no separate toolchain setup is needed: unzip, install Python 3.11+ and a
-GPU driver, and run `1kt.py` from the extracted directory.
+The self-contained package bundles ffmpeg/ffprobe, NVEncC, QSVEncC and GPAC, so no separate
+toolchain setup is needed: unzip, install Python 3.11+ and a GPU driver, then run `1kt.py`
+from the extracted directory.
 
-The currently published package is **v0.6.1** — v0.7.0 and v0.7.1 are published as GitHub
-releases without a binary asset, and their features (hardware decode, the v0.7.1 audio
-pipeline) are source-only. To use v0.7.1, run from a git checkout:
+Build a package for the current source tree with:
 
-- [v0.6.1 package](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/1KeyTranscoder-v0.6.1-win64-selfcontained.zip)
-  ([SHA256](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/1KeyTranscoder-v0.6.1-win64-selfcontained.zip.sha256),
-  [release manifest](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/release-manifest.json))
-- All releases: <https://github.com/Eureka175/1KeyTranscoder/releases>
+```powershell
+python release\build_release.py --out-dir dist
+```
 
-The package allowlist is defined by `release/build_release.py`: runtime code plus the
-toolchain binaries, and no `docs/`, `testsets/`, `work/` or `dist/` content.
+The builder refuses to build from a dirty tree, from a branch other than `main`, or when
+`VERSION` disagrees with the `v<version>` tag. On a feature branch pass `--dev-build`; the
+manifest then records `development_build: true` so the artifact cannot be mistaken for an
+official release. Validate an archive with:
+
+```powershell
+python release\verify_package.py dist\1KeyTranscoder-v<version>-win64-selfcontained.zip `
+    --extract-dir "%TEMP%\1KT-clean"
+```
+
+GitHub releases with downloadable packages exist up to **v0.8.0**; no self-contained
+package is published for 0.8.1–0.8.8. Build one from the current source with the command
+above.
 
 ### From source
 
@@ -230,426 +134,290 @@ toolchain binaries, and no `docs/`, `testsets/`, `work/` or `dist/` content.
 git clone https://github.com/Eureka175/1KeyTranscoder.git
 cd 1KeyTranscoder
 
-# Place ffmpeg/ffprobe, NVEncC, QSVEncC and GPAC under tools/, or point at existing
-# installations with --ffmpeg / --ffprobe / --tool-nvencc / --tool-qsvencc / --gpac-dir.
-
+# Put ffmpeg/ffprobe, NVEncC, QSVEncC and GPAC under tools\, or pass explicit paths.
 python 1kt.py --version
 ```
 
-`python 1kt.py --version` prints the version from `VERSION`. No package installation step
-is required; the entry points are run directly from the checkout.
+No installation step is required: the entry points run directly from the checkout.
 
-## Usage
-
-Transcode a tree with the auto-selected hardware backend and the default `hq` preset:
+## Quick start
 
 ```powershell
+# Auto-select backend (NVENC -> QSV -> x265) at the default HQ preset
 python 1kt.py --input D:\footage --output D:\archive
-```
 
-Common variations:
+# Explicit backends / presets
+python 1kt.py --input D:\footage --output D:\archive --encoder nvenc --preset hq
+python 1kt.py --input D:\footage --output D:\archive --encoder x265  --preset uhq
+python 1kt.py --input D:\footage --output D:\archive --encoder svtav1 --preset small
 
-```powershell
-# Explicit backend and profile, quality aligned with the NVENC profile
-python 1kt.py --input D:\footage --output D:\archive --encoder qsv --config qsv_aligned.json --preset hq
-
-# Every preset (uhq / hq / small / fast)
-python 1kt.py --input D:\footage --output D:\archive --encoder nvenc --preset all
-
-# Software backends
-python 1kt.py --input D:\footage --output D:\archive --encoder x265 --preset hq
-python 1kt.py --input D:\footage --output D:\archive --encoder svtav1 --preset hq
-
-# Per-file multi-channel delay compensation
+# 4-channel mono PCM delay compensation (integer-sample shifts, video re-encoded)
 python 1kt.py --input D:\footage --output D:\archive --encoder nvenc --channel-sync
 
-# Pre-editing pass: stream-copy video, correct only the audio tracks that need it
+# Pre-editing pass: stream-copy video, rebuild only the audio tracks that need a shift
 python 1kt.py --input D:\footage --output D:\archive --channel-sync-transparent
+
+# Archive repair: fix already-produced deliverables into a staging directory
+python 1kt.py --repair --input D:\archive --output D:\repaired --jobs 8
+
+# Full-disk repair over date-named top-level folders (all YYYYMMDD directories)
+python 1kt.py --repair --input I:\ --output D:\repaired --repair-dirs "^\d{8}$" --jobs 8
 
 # Unattended run: no dashboard window, everything goes to logs
 python 1kt.py --input D:\footage --output D:\archive --headless
 ```
 
-Backends: `x265`, `svtav1`, `nvenc`, `qsv`, `nvenc-av1`, `qsv-av1`. `--help` lists every
-flag. Output files keep the source directory structure and are written with an `.MP4`
-extension.
+Long batches are resumable: re-running the same command skips completed outputs.
+`--dry-run` probes and prints the commands without encoding. `--retry-list
+logs\failed_files.json` re-runs only failed items, optionally on another backend.
 
-Source routing is automatic and is stated in the log for every file: Sony XAVC clips take
-the Sony preservation pipeline, DJI clips take the DJI pipeline, and everything else takes
-the classic single-pass path. AV1 backends preserve Sony `rtmd` / `nrtm` / `uuid` payloads
-but deliberately do not write the XAVC brand (`av01` instead), because XAVC defines only
-H.264 and HEVC.
-
-Long-running batches are resumable: re-running the same command skips completed outputs.
-`--dry-run` probes and prints the commands without encoding.
-
-## Audio Processing
-
-v0.7.1 introduces a structured PCM audio pipeline (`core/audio_*.py`). Its purpose is to
-make audio sources addressable as data — which channel of which stream of which source —
-so that selection, mapping, routing, mixing and export can be expressed and tested
-independently of any single ffmpeg invocation. v0.8.0 connects that pipeline to the
-production output so the same model decides what the delivered `.MP4` contains.
-
-### Model
-
-```text
-Source          one physical origin (a media file or an external WAV)
-  └── Stream    one audio stream inside that source
-        └── Channel   one physical channel position (0-based)
-
-Track           a logical input track = (stream, set of channels)
-Output track    a logical output unit, e.g. output 0 ← camera:s2:c2
-```
-
-A channel is identified by all three coordinates — `{source_id}:s{stream}:c{channel}` —
-so identically named channels from different sources never collide. A 4-channel stream
-becomes one track, but its four `AudioChannel` objects remain individually selectable; four
-mono streams become four tracks.
-
-### Supported
-
-- Audio source / stream / track / channel modelling, built from each source's existing
-  ffprobe result (no extra probing).
-- Selection (which source channels are kept) and channel mapping (output order), with a
-  dry-run execution spec and per-output traceability.
-- Audio timeline (`AudioTimeline`) as the single authority for duration, EOF and offsets,
-  with deterministic silence fill for short sources and no hidden resampling.
-- Float32 PCM reading via ffmpeg with an identity channel map, so channels are never
-  silently reordered or downmixed.
-- Routing: 1 output channel ← 1 source channel, no sample arithmetic.
-- WAV export in PCM16 / PCM24 / PCM32 / float32.
-- Mixing: N source channels → 1 output channel, linear gain (0 dB = 1.0), float32
-  accumulation, peak and clipping statistics, and an explicit clipping policy
-  (`detect` / `hard_clip` / `error`). Mixing does not normalise automatically:
-  `1.0 + 1.0 = 2.0` is preserved and counted as a clipping event.
-- Fixed integer sample offsets produced by `channel_sync` reports are applied along the
-  unified timeline; delays are not re-estimated here.
-
-### Input organisation covered by tests
-
-| Layout | Representation |
-|---|---|
-| Single 4-channel stream | 1 source / 1 stream / 1 track / 4 channels |
-| 2 × stereo | 1 source / 2 streams / 2 tracks |
-| 4 × mono | 1 source / 4 streams / 4 tracks |
-| External WAV (mono / stereo / 4CH) | separate source with its own timeline |
-| Mixed sources | e.g. camera 4CH + recorder stereo, or camera + external WAV |
-
-### Boundaries
-
-- The default production audio path is unchanged. Without `--audio-plan`, audio streams
-  are still copied (`-c:a copy`; container-level copy in the preservation pipelines).
-- The PCM chain runs only when the plan calls for it; nothing else on the production path
-  enters it.
-- Selection and mapping produce a dry-run spec only — no filtergraph is generated and no
-  ffmpeg command is executed by the planning layer.
-- `-map`-level specification of "N source channels → 1 output channel" is still rejected
-  as `audio_mix_not_supported`, because ffmpeg argv cannot express sample-level
-  summation. That rejection describes the `-map` path; the PCM path implements the same
-  semantics in `core/audio_mix.py`. The two coexist by design.
-- Not implemented in v0.8.0: resampling, drift correction, loudness normalisation / AGC /
-  limiter / EQ / noise reduction / time-stretch, automatic (content-based) cross-file
-  synchronisation, codec capability / quality-preset / VBR policy frameworks, rendering
-  multiple mix buses in one pass, and audio CLI flags beyond `--audio-plan`.
-- The 4-channel wireless-mic layout assumes independent mono tracks; stereo and mono
-  layouts are deliberately not aligned by `--channel-sync`.
-
-Implementation details — module responsibilities, invariants, reason codes, and the
-specific internal APIs that are not stable public interfaces — are documented in
-[Architecture](docs/design/architecture.md) §6.1 (v0.7.1) and §6.6 (v0.8.0), and in the
-[v0.7.1 release notes](docs/release_notes_v0.7.1.md) plus the
-[v0.8.0 release notes](docs/release_notes_v0.8.0.md).
-
-### Explicit audio output (`--audio-plan`)
-
-`--audio-plan <file.json>` is opt-in and the only audio CLI surface. Without it nothing
-below is reachable. An empty request (for example only an `encode` block) is treated as
-"not enabled", so the default path is structurally untouched.
-
-**Full user guide: [`docs/audio_plan.md`](docs/audio_plan.md)** — worked examples,
-per-backend support, external-audio naming rules and troubleshooting. The summary below
-is deliberately short.
-
-```json
-{
-  "version": 1,
-  "encode":    { "format": "opus", "bitrate": "96k" },
-  "channels":  { "select": ["source:s1:c0", "clip001.wav:s0:c0"] },
-  "alignment": "auto",
-  "sync":      { "reference": "source:s1:c0" },
-  "mapping":   { "mode": "grouped", "group_size": 2 },
-  "external":  {},
-  "note":      "wireless mic CH1 -> Opus, external recorder appended"
-}
-```
-
-| Key | Meaning | Default |
-|---|---|---|
-| `encode` | Output codec (`aac` / `opus` / `pcm` / `flac`) and `bitrate` (lossy only) | inherited from the source |
-| `channels.select` / `exclude` / `map` | Which channels are kept and in what output order | all, input order |
-| `alignment` | `auto` / `enabled` / `disabled`; `auto` enables alignment for PCM input and leaves compressed input untouched | `auto` |
-| `sync.reference` | The channel alignment is measured against. **Never guessed** — without it, alignment is permitted but nothing is shifted | none |
-| `mapping` | Output stream layout for external audio: `source` / `independent` / `grouped` (+`group_size`) | follow each input's own streams |
-| `external` | Discover audio files named after the clip in the same directory and append them | not enabled |
-
-Behaviour worth knowing:
-
-- **PCM input keeps PCM output**; compressed input keeps its own codec and bitrate. A
-  manual `encode` overrides that, per output stream.
-- **Compressed input is never decoded just to align it.** Asking for alignment explicitly
-  emits a warning and takes the decode → PCM → align → re-encode path.
-- **A bitrate on a lossless output is refused**, not ignored.
-- **Mapping is preserved**: alignment and re-encoding never reorder, merge or drop
-  channels. Multi-channel external files are split/grouped only as the `mapping` key asks,
-  and a partial group keeps its remaining channels (`3CH` + `group_size 2` → `2CH + 1CH`).
-- **Once alignment actually shifts samples, every output stream is rendered on one shared
-  window** — stream copying cannot express a shift, so it is dropped for that output.
-- External audio must be named after the clip: `clip001.wav`, `clip001_01.aac`,
-  `clip001-rec.wav` match `clip001.MP4`; `clip001abc.wav` and `random_clip001.wav` do not.
-  All matches are appended in a deterministic order (exact stem, then numeric index, then
-  other suffixes; numeric runs compare as numbers, so `clip001_2` precedes `clip001_10`).
-- `--audio-plan` is supported on the classic software path (`--encoder x265` / `svtav1`)
-  and on the hardware backends (`nvenc` / `qsv` / `qsv-av1`, and `nvenc-av1` where that
-  encoder can be created). On hardware backends the video is still encoded by NVENC/QSV
-  into a video-only artifact and the audio is produced by the independent audio backend;
-  hardware decode stays available. Sony/DJI preservation paths reject an audio plan
-  **per file** with an explicit error instead of ignoring it, and `--audio-plan` cannot be
-  combined with `--channel-sync` (exit code 2).
-- See [`docs/audio_plan.md`](docs/audio_plan.md) for the user guide.
-
-### Hardware decode
-
-Two **independent** decode architectures, one per encoder family. They are not
-interchangeable and neither is a fallback for the other:
-
-| Encoders | Decode route |
-|---|---|
-| `x265`, `svtav1` | FFmpeg native NVDEC/QSV (`-hwaccel … -c:v hevc_cuvid|hevc_qsv`), `hwdownload` + format conversion, then `libx265`/`libsvtav1` in the same process. No external pipe. |
-| `nvenc`, `qsv` | The encoder's **own** reader. `Sony` → `--avsw`; anything else → `--avhw`. Both open the source file directly (NVDEC/CUVID, or the QSV hardware decoder). |
-
-There is deliberately **no** FFmpeg frame feed into the rigaya encoders — no
-`hwdownload → y4m → NVEncC/QSVEncC stdin` path exists in the code.
-
-The rigaya reader is chosen by **where the material came from**, because the one
-measured defect is source-specific:
-
-| Source | Reader | Why |
-|---|---|---|
-| **Sony** (a data stream carrying the `rtmd` tag) | `--avsw` | The hardware reader loses leading pictures on XAVC open-GOP timelines, silently: `rc=0`, a playable file, and **27 frames of 30**. Decided *before* any encode — this is prevention, not a failed attempt or a fallback. A Sony title does not get hardware decode even if some short clip once passed. |
-| **non-Sony** | `--avhw` | The deployed NVEncC/QSVEncC binary decodes it and the integrity gate judges the result. No codec allowlist is required to *attempt* hardware. |
-| **unclassified** (probe returned nothing usable) | `--avhw`, recorded as `source_kind=unknown` | Nothing is inferred from filename, resolution or camera model. An absent provenance marker says nothing about the *reader*, so the measured-safe path is not withheld on no evidence — but the classification is recorded rather than silently treated as a positive non-Sony finding. |
-
-`--hw-decode` (and `--hw-decode-verify`, `--no-hw-autoselect`) were removed; the
-retired switches have no aliases. Routing is built in, and the decision is
-recorded per file.
-
-What still refuses hardware, and is **not** negotiable:
-
-- a requested time seek — the two rigaya readers are not seek-equivalent (same
-  count and PTS, different pictures);
-- a format the hardware is *known* to refuse on the machine (measured, e.g. QSV
-  H.264 4:2:2 10-bit: `unable to decode by qsv`, no reader constructed);
-- a device/format failure already seen in this run.
-
-Those are capability and semantics facts, not policy preferences. Dropping them
-would not make hardware "more available"; it would move a certain refusal to
-runtime, where it reads as a failure.
-
-Every `--avhw` run is gated on a frame-count integrity check plus a
-reader-identity assertion read from the tool log (never inferred from the
-command line, because QSVEncC silently constructs `avsw` when it cannot build
-the hardware one). A failing artifact is **deleted**, then the same format rung
-is re-run with `--avsw` at most once; if software decode also fails, the file is
-reported as failed. Nothing is padded, duplicated or trimmed to make counts
-agree, and a Sony source that was decoded in software up front is never recorded
-as a "hardware failure fallback".
-
-Each per-file log carries one `DECODE_DECISION` line answering *why this reader*:
-`source_kind`, `requested_encoder`, `actual_encoder`, `decode_reader`,
-`decode_policy`, `route_reason`, `hardware_integrity`, `software_fallback`,
-`fallback_reason`, `final_status`.
-
-Three boundaries matter when reading results:
-
-- **The deployed builds are used for `--avhw`, and they must not be pointed at
-  Sony material.** Measured here with `tools/NVEncC_9.31_x64/NVEncC64.exe`:
-  Sony XAVC HS 4:2:0 10-bit returns `rc=0`, a playable file and **27 frames of
-  30**; XAVC 4:2:2 10-bit likewise 27 of 30; `--avsw` returns 30 in both cases.
-  QSVEncC shows the same loss. That is what the source rule exists for.
-- **Not every non-Sony format works on every device.** Measured: QSV `--avhw`
-  fails to start on 6000×4000 H.264 (`MFXDEC: … undeveloped feature`), while
-  NVENC `--avhw` decodes it frame-exactly. The integrity gate turns that into a
-  deleted artifact plus a bounded `--avsw` retry rather than a delivered short
-  file.
-- **The research builds are not a production gate.** `tools/avhw/` is excluded
-  from the release package, and `encoders.hwdecode.resolve_decode_tool` (which
-  still resolves it by sha256) is confined to the research line and the
-  historical matrix. Production does not consult it. The research patches are
-  version-bound: the NVEncC patch is verified only on 9.31 (`2cb9d810`); the
-  QSVEncC patch is runtime-proven on the pinned 8.26 revision only
-  (8.27–8.30 untested).
-
-The correctness matrix for the rigaya hardware path is `tests/hwdecode/`
-(85 cases, classes A–K), with entry points in
-`docs/hardware-decode/README.md`. It is **not** part of
-`tests/full_autotest.py --level full`, and it now reports two separate gates:
-
-- **production** — everything that runs on the deployed binaries, i.e. the
-  behaviour a release actually has. Runnable without any research build.
-- **research** — the cases whose subject *is* the patched build (its identity
-  and provenance, and the stock-vs-patched defect comparisons). These are
-  **BLOCKED** here because `tools/avhw/` is absent, and they are reported as
-  blocked rather than failed: a missing binary cannot be examined and found
-  wrong. They are never counted as passing.
-
-On this installation much of the matrix also **skips** for want of the original
-research corpus, which the restored `testsets/` does not contain under the old
-names. `summary` reports those skip reasons, so a green count cannot hide a
-test that never ran. The source-aware policy itself is validated by
-`tests/selftest/suites/native_decode.py` (83 cases, no fixtures required) and by
-the real-material runs recorded in
-`docs/hardware-decode/final-report.md`.
-
-
-## Testing
-
-Three levels, run from the repository root:
+For a polling workflow, use `watchfolder.py` or double-click `start.bat`
+(edit its `INPUT` / `OUTPUT` / `ENCODER` / `PRESET` / `SYNC` variables first):
 
 ```powershell
-python tests\full_autotest.py --level unit        # L1: pure logic and deterministic logic (about 1-1.5 min)
-python tests\full_autotest.py --level toolchain   # L2: + tool versions, machine capabilities, flag allowlist (about 1 min, no encoding)
-python tests\full_autotest.py --level full        # L3: + real pipeline integration and fault injection (about 10-15 min)
-python tests\full_autotest.py --level all         # same as --level full
+python watchfolder.py --input D:\incoming --output D:\archive --encoder nvenc `
+    --interval 300 --channel-sync --channel-sync-groups --headless
 ```
 
-The frozen baseline recorded for the current release (v0.8.0) is:
+## Encoders and presets
 
-```text
-L1 unit           590 PASS / 0 FAIL
-L3 --level full   859 PASS / 0 FAIL   (unit 590 + toolchain 16 + full 253)
-```
+| Backend | Codec | Notes |
+|---|---|---|
+| `nvenc` | HEVC | NVIDIA NVENC via NVEncC |
+| `nvenc-av1` | AV1 | NVIDIA NVENC AV1 |
+| `qsv` | HEVC | Intel Quick Sync via QSVEncC |
+| `qsv-av1` | AV1 | Intel QSV AV1 |
+| `x265` | HEVC | Software, explicit manual option |
+| `svtav1` | AV1 | Software |
 
-These numbers are assertion counts from the automated regression suite at the release
-freeze. They are not a new full production transcoding benchmark: the release was cut
-without a fresh end-to-end encode/transcode campaign on production material.
+- With no `--encoder`, the backend is chosen by capability probe: **NVENC → QSV → x265**.
+  Hardware paths never fall back to software encoding.
+- Presets are `uhq`, `hq`, `small`, `fast` (default `hq`). They are four production
+  strategies — quality ceiling, production quality, storage efficiency, throughput — not
+  a single quality ladder. Values live in the per-backend `*.json` profiles; see
+  [x265 profile design](docs/x265-profile-design.md).
+- A mismatch between `--config`'s `encoder` field and `--encoder` is a hard error.
+- Capability-based downgrade (for example 4:2:2 → 10-bit 4:2:0 → 8-bit 4:2:0) logs a loud
+  WARNING; `--no-downgrade` skips instead.
+- AV1 output is always 4:2:0. Sony metadata is preserved but the XAVC brand is not written
+  (AV1 is outside the XAVC specification).
 
-Previous baselines, for comparison:
+## Metadata preservation
 
-```text
-v0.7.1 freeze                  unit 390 / full  509
-after v0.7.1 tag (Phase 4A/4B/4C)  unit 511 / full  728
-```
+Source routing is automatic and logged for every file:
 
-Any change must be re-checked for new failures.
+| Source | Pipeline |
+|---|---|
+| Sony XAVC (data track tagged `rtmd`) | Sony preservation: `rtmd` / `nrtm` / vendor `uuid` carried through re-encoding, verified afterwards |
+| DJI (Action series) | DJI preservation: `djmd` / `dbgi` / `tmcd` copied natively, payload `sha256` recorded, optional Gyroflow validation |
+| DJI Pocket / drone | By default metadata is **not** preserved (normal transcode path); `--preserve-metadata` overrides |
+| Everything else | Classic single-pass path (video + audio only) |
+
+- `--no-metadata` disables vendor metadata preservation for Sony and DJI. It is a policy
+  switch, not a decode switch: output validity, stream integrity and failure detection are
+  unchanged.
+- `--check basic|advanced|full` controls post-encode verification:
+  - `basic` — core metadata and stream facts (DJI: track manifest + payload sha256);
+  - `advanced` — full structure validation and Gyroflow quaternion comparison when
+    Gyroflow is installed;
+  - `full` — detailed self-check (64 items) including per-track timebase/duration and
+    payload head/tail checks.
+- Codec/pixel-format downgrades required by encoder capability are logged with a WARNING;
+  use `--no-downgrade` to skip such files, and verify the delivered format with `ffprobe`
+  when it matters for playback.
+
+## Audio
+
+**Default path:** audio streams are copied (`-c:a copy`; container-level copy in the
+preservation pipelines). Nothing below is active unless explicitly requested.
+
+### Channel delay compensation
+
+- `--channel-sync` — per-file GCC-PHAT delay measurement across independent mono PCM
+  tracks, corrected by **integer-sample shifts only**. Requires at least three independent
+  mono PCM tracks at 48 or 96 kHz; 44.1 kHz and compressed formats are refused; 2CH/1CH
+  layouts are not aligned. 4CH material with only two healthy tracks (the 2CH-silent case)
+  is skipped by default.
+- `--channel-sync-transparent` — pre-editing mode: video and all non-audio streams are
+  stream-copied; only audio tracks that need correction are rebuilt. Fully aligned input
+  produces a byte-identical output.
+- `--channel-sync-groups` — grouped anchors (opt-in). Handles 4-channel material where
+  CH1/CH2 and CH3/CH4 are two unrelated microphones. Additive only: no existing correction
+  is lost or changed. `start.bat` enables it by default.
+- `--channel-sync-accurate` — precision mode (opt-in): lowers the minimum correction from
+  5 samples toward 1–2 samples, each tier accepted only if the independent post-shift
+  residual proves it.
+- `--channel-sync-tv` — per-window time-varying correction (research/opt-in). It requires
+  explicit `--channel-sync-tv-policy` and `--channel-sync-tv-coordinate`; missing either
+  is a refusal, not a silent default.
 
 ### Explicit audio output (`--audio-plan`)
 
-The default audio path is unchanged: without `--audio-plan` the tool still does
-`-map 0` + `-c:a copy`. With an explicit plan (JSON) the classic software path
-(x265 / SVT-AV1) and the hardware backends (NVENC / QSV) encode or retain the audio
-you select and compose it with the video, which is stream-copied and therefore
-bit-identical to the default path.
+`--audio-plan <plan.json>` is the only audio-output CLI surface. Without it the default
+path is structurally untouched. It can select/exclude/reorder channels, choose the output
+codec (`aac` / `opus` / `pcm` / `flac`), request format-aware alignment with an explicit
+`sync.reference`, and discover external recordings named after the clip (`clip001.wav`,
+`clip001_01.aac`, …).
 
 ```json
 {
   "version": 1,
-  "encode": { "format": "opus", "bitrate": "96k" },
-  "channels": { "select": ["source:s1:c0", "source:s2:c0"] },
+  "encode":   { "format": "opus", "bitrate": "96k" },
+  "channels": { "select": ["source:s1:c0", "clip001.wav:s0:c0"] },
+  "alignment": "auto",
+  "sync":     { "reference": "source:s1:c0" },
   "external": {}
 }
 ```
 
-Channel ids use the existing audio identity (`<source>:s<stream>:c<channel>`); external
-files use their file name as the source id (`clip001.wav:s0:c0`). Leaving `channels` out
-(and not asking for `external`, `alignment` or `mapping`) means "select everything",
-which makes the plan a default plan: the execution path resolves to `NONE` and nothing
-changes. Unknown keys, unknown versions and unknown formats are errors, and hardware
-backends, Sony and DJI preservation reject an audio plan explicitly rather than ignoring
-it. See [Explicit audio output](#explicit-audio-output---audio-plan) above for the full
-key list and behaviour.
+PCM input keeps PCM output; compressed input keeps its own codec/bitrate unless overridden.
+Compressed input is never decoded just to align it — an explicit alignment request emits a
+warning and takes the decode → PCM → align → re-encode path. `--audio-plan` cannot be
+combined with `--channel-sync`. Full guide, worked examples and per-backend support:
+[docs/audio_plan.md](docs/audio_plan.md).
 
-`tests/full_autotest.py` is a thin compatibility entry point: the CLI, exit code and
-report format are unchanged, while the implementation lives in the `tests/selftest/`
-package, split by responsibility.
+## Archive repair
 
-```text
-tests/selftest/
-├── runner/          CLI (argparse), suite registry, executor
-├── fixtures/        reusable material: deterministic PCM, AudioPlan builders, real media
-├── assertions/      reusable audio observation primitives (impulse maps, hashes)
-├── suites/          the tests themselves, one module per area
-│   ├── core.py                  color / caps / hw planning / probe / classifier / GPAC
-│   ├── codecs.py                x265 P0, AV1
-│   ├── channel_sync.py          delay compensation (pure logic + algorithm)
-│   ├── audio_model.py           audio track / channel / plan model
-│   ├── audio_selection.py       sources, selection, channel mapping
-│   ├── audio_timeline.py        timeline, render policy, EOF, sync offset direction
-│   ├── audio_route.py           channel routing, WAV export, chunk invariance
-│   ├── audio_mix.py             PCM mixing, graph equivalence
-│   ├── audio_sync.py            arbitrary-reference delay correction
-│   ├── audio_retention.py       Phase 4A: execution path + selective MP4 retention
-│   ├── audio_encode.py          Phase 4B: PCM → encoded audio (EncodedAudioOutput)
-│   ├── production_output.py     Phase 4C: --audio-plan through the real 1kt.py entry
-│   ├── audio_format.py          v0.8.0: format policy, alignment, codec inheritance
-│   ├── audio_external.py        v0.8.0: external discovery rules + mapping matrix
-│   ├── audio_integration.py     L3 audio integration on real material
-│   ├── pipeline.py              L3 full pipeline + fault injection
-│   ├── hardware.py              L3 channel-sync end to end
-│   ├── toolchain.py             L2 tool / capability probing
-│   └── cli.py                   CLI contract
-├── reporting/       result aggregation and report writing
-└── (production coordination lives outside this package: `core/audio_request.py`,
-    `core/audio_format.py`, `core/audio_external.py`,
-    `core/audio_output_structure.py`, `production/output.py`)
-```
+Repair treats an **already-produced deliverable** as an independent object: it re-measures
+audio, restores metadata placement, fixes container conformance, and re-verifies the result
+— without re-encoding video.
 
-`paths` is the only module holding mutable test state (`RESULTS` / `CURRENT_LEVEL`).
-Legacy names (`full_autotest.SUITES`, `full_autotest.record`, …) still forward to the
-real implementation, and no suite display name changed, so report filtering by name
-keeps working.
-
-Scheduled hardware-decode verification is separate, and reports **two gates**:
+### Main-program batch mode (recommended)
 
 ```powershell
-python -m tests.hwdecode.harness provenance      # binary/patch identity; mismatch = FAIL
-python -m tests.hwdecode.harness check-matrix    # documentation vs matrix drift check
-python -m tests.hwdecode.harness run --phase 1   # A toolchain + B routing
-python -m tests.hwdecode.harness summary         # aggregate gate, plus per-gate split
+python 1kt.py --repair --input I:\ --output D:\repaired --repair-dirs "^\d{8}$" --jobs 8
 ```
 
-`summary` prints `gate production` and `gate research`. The split is by what each
-test needs, not by convenience:
+| Option | Meaning |
+|---|---|
+| `--repair-dirs REGEX` | Only traverse top-level directories whose name fully matches (e.g. `^\d{8}$`); required for whole-disk input |
+| `--repair-json DIR` | Report directory (default: inside `--output`) |
+| `--repair-scratch DIR` | Temporary directory (default: `--output\_scratch`) |
+| `--repair-resume` | Resume: read `_progress.jsonl`, skip completed files with a present output |
+| `--repair-retry-failed N` | Serial precision-mode retry rounds for failed files (default 1, 0 = off) |
+| `--repair-limit N` | Process at most N files (smoke tests) |
+| `--repair-fix-layout` | Also restore moov-first layout (MP4Box `-inter`, slower) |
+| `--repair-no-container-fix` | Skip container-level fixes (tkhd/sample-entry/durations) |
+| `--repair-no-groups` | Disable grouped anchors (on by default, matching `start.bat`) |
+| `--repair-accurate` | Enable precision mode (1→2→5 sample tiers) |
+| `--repair-opt K=V` | Override a channel-sync option, e.g. `--repair-opt verify_max_rel=0.2` |
 
-- **production** — everything that runs on the deployed binaries, i.e. the
-  behaviour a release actually has. Runnable with no research build present.
-- **research** — the cases whose subject *is* the patched build (identity,
-  provenance, and the stock-vs-patched defect comparison). These are **BLOCKED**
-  here because `tools/avhw/` is absent, and they are reported as blocked rather
-  than failed: a missing binary cannot be examined and found wrong.
+The command writes `_summary.json`, `_summary.md`, a per-file
+`archive-repair-report.json/md`, and a `_progress.jsonl` for resume. Exit code is 1 only
+when a file really failed; `PARTIAL`/`UNREADABLE` inputs are reported honestly without
+breaking the batch.
 
-Results written by an *earlier* invocation are excluded from both gates and
-listed as sat-out, so a `--phase 1` summary can no longer count a previous
-session's PASS as its own.
+**Acceptance gates.** A repaired file is accepted only when: `validate.compare` reports no
+MODIFIED/MISSING; the video packet streamhash equals the source; and, for the container-only
+path, the output size equals the source. Files that fail a gate are retried serially with
+precision mode; unresolved files are reported as `FAILED`.
 
-Targeted self-checks: `python tests\run_selfcheck.py --encoder nvenc|qsv|x265` and
-`python -m preservation.selfcheck <original> <final> <log_dir>`.
+**What is repaired:** per-track integer audio shifts (with residual re-measurement),
+metadata placement (`brand` / `tref` / `nrtm` / `uuid`), tkhd flags and alternate groups,
+inconsistent PCM sample entries (using `pcmC` as truth), duration/timebase consistency, and
+optionally moov-first layout.
 
-## Project Structure
+**Verdicts:** `REPAIRED`, `NOOP`, `FAILED`; check verdicts include `PASS`, `FAIL`, `WARN`,
+`SKIP`, `UNMEASURABLE`, `PARTIAL` (half-finished `.part.` intermediates) and `UNREADABLE`
+(missing moov / zero-filled). Only changed files are written to the staging directory.
+
+### Standalone CLI and write-back
+
+```powershell
+# Inspect only (source files are read-only; temporary audio goes to --scratch)
+python archive_repair.py check --input D:\archive --json D:\reports --jobs 8
+
+# Repair to a staging directory (default; originals untouched)
+python archive_repair.py repair --input D:\archive --output D:\repaired --jobs 8
+
+# Write repaired files back in place (requires all three flags)
+python archive_repair.py repair --input D:\archive --output D:\repaired `
+    --in-place --backup D:\backup --yes
+```
+
+Full check list, metadata comparison rules and known limitations:
+[docs/archive-repair.md](docs/archive-repair.md).
+
+## Output, logs and verification
+
+- Output mirrors the input tree with an `.MP4` extension. Existing outputs are skipped, so
+  a re-run resumes the batch.
+- Work scratch lives under `<output>\.1ktwork`; it is removed after each successful job
+  unless `--keep-work` is given.
+- Logs go to `logs/`: `error.log` and `warn.log` are always written; `total.log` is added at
+  `--log-level info` (default), `debug.log` at `debug`. `--fresh-log` clears
+  `total.log`/`debug.log` at startup.
+- `logs\failed_files.json` records per-file failures with detail. The progress dashboard is
+  shown in interactive runs; `--headless` disables it.
+- `--check basic|advanced|full` verifies the encode result; `--jobs auto|1|N` controls
+  scheduling; `--experimental-multihw` pools NVENC+QSV (quality consistency across
+  backends is explicitly not guaranteed).
+
+## Hardware decode
+
+Two independent decode routes, one per encoder family:
+
+| Encoders | Decode route |
+|---|---|
+| `x265`, `svtav1` | FFmpeg native NVDEC/QSV decode, `hwdownload` + format conversion, then `libx265`/`libsvtav1` in the same process |
+| `nvenc`, `qsv` | The encoder's own reader: Sony → `--avsw`; non-Sony → `--avhw` |
+
+Sony material deliberately uses software decoding on the rigaya path: the hardware reader
+was measured to lose leading pictures on XAVC open-GOP timelines silently (`rc=0`, a
+playable file, 27 of 30 frames). Every `--avhw` result is gated on frame count plus
+reader-identity checks; a failing artifact is deleted and the format rung is retried once
+with `--avsw` — never delivered short.
+
+The retired switches `--hw-decode`, `--hw-decode-verify` and `--no-hw-autoselect` no longer
+exist. Research builds under `tools/avhw/` are not required by production. The
+hardware-decode correctness matrix lives in `tests/hwdecode/`; its entry points and
+two-gate reporting (production vs research) are described in
+[docs/hardware-decode/README.md](docs/hardware-decode/README.md).
+
+## Testing
+
+```powershell
+python tests\full_autotest.py --level unit        # L1: logic and deterministic behaviour
+python tests\full_autotest.py --level toolchain   # L2: + tools, capabilities, flag allowlist
+python tests\full_autotest.py --level full        # L3: + real pipeline integration and fault injection
+```
+
+Targeted checks:
+
+```powershell
+python tests\run_selfcheck.py --encoder nvenc|qsv|x265
+python -m preservation.selfcheck <original> <final> <log_dir>
+```
+
+Scheduled hardware-decode verification is separate:
+
+```powershell
+python -m tests.hwdecode.harness provenance
+python -m tests.hwdecode.harness check-matrix
+python -m tests.hwdecode.harness run --phase 1
+python -m tests.hwdecode.harness summary
+```
+
+`summary` reports two gates: **production** (runs on the deployed binaries) and
+**research** (needs the patched research builds and is reported as blocked when they are
+absent). Missing material or tools are reported as skips, never counted as passes.
+
+## Project structure
 
 ```text
 1KeyTranscoder/
-├── 1kt.py                  Main CLI entry point (orchestration)
+├── 1kt.py                  Main CLI: transcode and repair orchestration
+├── archive_repair.py       Standalone archive check/repair CLI
 ├── watchfolder.py          Polling batch entry point
-├── start.bat               Double-click launcher
-├── VERSION                 Single source of the version number (0.8.0)
+├── start.bat               Double-click launcher (edit its variables)
+├── VERSION                 Single source of the version number
 ├── *.json                  Encoder profile / scaling configurations
 ├── core/                   Runtime core: pipeline, probing, planning, audio, dashboard
-├── encoders/               Encoder backends, capability probing, hardware decode, integrity gate
-├── preservation/           Sony / DJI metadata preservation, validation, quality sampling
+├── encoders/               Encoder backends, capability probing, hardware decode, gate
+├── preservation/           Sony / DJI metadata preservation, validation, quality
 ├── production/             Cross-domain orchestration: audio output → final container
-├── release/                Release packaging and package verification tools
-├── tests/                  Automated test suites (incl. tests/hwdecode/)
+├── release/                Release packaging and package verification
+├── tests/                  Automated suites (incl. tests/hwdecode/)
 ├── docs/                   Design, evaluation, release and reference documentation
 ├── logos/                  Brand assets
 ├── licenses/               GNU GPL v3 text (referenced by LGPL-3.0)
@@ -658,183 +426,101 @@ Targeted self-checks: `python tests\run_selfcheck.py --encoder nvenc|qsv|x265` a
 └── NOTICE                  Copyright and SPDX identifier
 ```
 
-| Path | Purpose |
-|---|---|
-| `1kt.py` | Command-line entry point; argument parsing and per-file orchestration. |
-| `core/` | Backend-agnostic runtime logic: configuration, probing, source classification, scaling, batching, channel sync, the v0.7.1 audio modules and the v0.8.0 format/external-audio policy modules, logging, dashboard. |
-| `encoders/` | Backend implementations (NVEncC, QSVEncC, x265, SVT-AV1), capability tables, hardware-decode routing, integrity gate. |
-| `preservation/` | Sony and DJI preservation pipelines, container/ISO-BMFF handling, validation checkers, quality sampling. |
-| `production/` | Cross-domain orchestration: turns a video artifact plus an audio plan into the final container. Belongs to neither the audio nor the video domain. |
-| `release/` | `build_release.py` (allowlist-based packaging) and `verify_package.py`. |
-| `tests/` | `full_autotest.py` (thin entry point: unit / toolchain / full), the `tests/selftest/` runner + fixtures + suites, targeted self-checks, fixtures, and the hardware-decode matrix in `tests/hwdecode/`. |
-| `docs/` | Design documents, evaluation reports, release notes, third-party reference archive. |
-| `logos/` | Primary logo, symbol mark and word mark. |
-| `licenses/` | GNU GPL v3 text incorporated by reference by LGPL-3.0. |
-| `olddocs/` | The project's single archive location for superseded documents and code snapshots. |
-
-Local-only directories (`tools/`, `testsets/`, `work/`, `logs/`, `dist/`) are not tracked
-by git; `dist/` holds release artifacts built locally.
+Local-only, untracked directories: `tools/` (shared toolchain), `testsets/` (test media),
+`work/` (scratch/reports), `logs/`, `dist/` (release artifacts), `data/` (local corpora).
 
 ## Documentation
 
 - [Documentation index](docs/README.md) — classified index of everything under `docs/`.
-- [x265 profile design](docs/x265-profile-design.md) — why there are four profiles, how each was derived, the FAST ↔ SMALL calibration, the NVENC anchor, and the current parameter set.
-- [Audio plan user guide](docs/audio_plan.md) — how to use `--audio-plan`: worked JSON examples, per-backend support, external-audio naming rules, limitations and troubleshooting.
-- [Architecture](docs/design/architecture.md) — end-to-end data flow, invariants, module map. Start here to understand how the code runs.
-- [v0.7.1 release notes](docs/release_notes_v0.7.1.md) — the audio model and PCM pipeline, phase by phase.
-- [v0.8.0 release notes](docs/release_notes_v0.8.0.md) — arbitrary-reference delay correction, Phase 4A/4B/4C output integration, and Phase 5 format-aware alignment + external audio. Published with tag `v0.8.0`.
-- [v0.6.1 release notes](docs/release_notes_v0.6.1.md) — channel-sync streaming memory fix and AV1 colour metadata fix.
-- [Channel-sync P1 design](docs/design/channel_sync_p1.md) — algorithm, thresholds, degradation rules, fixture calibration.
-- [Audio sync research (P3)](docs/audio-sync-p3/P3-RESEARCH-OVERVIEW.md) — the time-varying-delay research line: per-phase status, what is validated, what is deferred and what is not production-approved. Research only; P1 behaviour above is unchanged.
-- [Audio sync production policy (P4)](docs/audio-sync-p4/README.md) — the production phase: a per-window time-varying correction module (`core/audio_sync_tv.py`), **default OFF and imported by no production module**, which reproduces the P3.11 corrected PCM byte-for-byte on 30/30 real-corpus arms. Gap policy, coordinate contract and residual acceptance remain **deferred product decisions**.
-- [Audio sync evidence integrity fix (P4.2)](docs/audio-sync-p4/p4.2-evidence-integrity.md) — fixes a live defect found by the P4.1 audit: `core/channel_sync.py` adopted a wide-window re-measurement **without re-applying the coverage gate it had just failed**, so a track whose evidence covered 31.6 % of its frames was written `decision="fixed"` / `SyncStatus.SUCCESS` with an empty reason. The adoption gate now applies to the estimate actually chosen, plus a final gate before `fixed`; evidence (usable/total frames, coverage, confidence) is attached to every decision row. **No algorithm changed** — this fixes classification, not correction.
-- [Audio sync production semantics (P4.3)](docs/audio-sync-p4/p4.3-production-semantics.md) — turns the validated evidence semantics into a production contract. **D1 is decided and implemented**: `AudioSyncResult` now carries `total_frames`/`coverage` alongside `usable_frames`, and the evidence reaches `AudioTrack`, `AudioChannelRef` and `AlignmentOutcome`, so a consumer can no longer see `SUCCESS` without being able to learn how much of the timeline was measured. `None` means "not stated" and is never collapsed to `0`, so historical records and external input are unaffected (the frozen P1 137-corpus replays as **548 rows / 0 changed conclusions**). The same defect family was found a **second** time in `core/audio_sync.py`, whose quality gate never had a coverage term at all; before/after were both executed against the real production entry point. **Gap policy and coordinate contract remain `DEFERRED`**, with the implementation default and the semantic contract recorded as **separate** fields, and the time-varying module stays imported by **no** production module. **No algorithm changed.**
-- [Audio sync production enablement (P4.4)](docs/audio-sync-p4/p4.4-production-enablement.md) — puts the **validated fixed-delay** subset into production behind one eligibility contract. Before this, "may I correct this?" was answered by each consumer for itself and **none of them looked at the evidence**; now a single `correction_eligibility()` decides, and an ineligible verdict **carries no usable offset** at all — so requirement U1's `number exists == measurement exists` is unrepresentable rather than merely checked. Refusals are named per state (`low_confidence`, `non_constant`, `out_of_range`, `recheck_failed`, `failed`, `already_aligned`, …), evidence-stating results must clear the same production gate the producer used, and a refused correction is **bit-identical to the source**. The default path is measured, not asserted: with every PCM entry point instrumented, a no-opt-in production call makes **0** reader/timeline/correction calls. Verified on real A7M5 material with injected **+1200 / −600 / 0**-sample offsets across four channels, with the corrected PCM re-measured by an independent cross-correlation (residual **0** samples). **Gap policy (D2), residual acceptance (D3) and the coordinate contract (D5) all stay exactly where they were — `DEFERRED` / `NOT ESTABLISHED` / `DEFERRED`**; drift correction and resampling are not enabled, and the per-window module remains imported by nothing.
-- [Audio sync production contract (P4)](docs/audio-sync-p4/production-contract.md) — **the single normative entry for what Audio Sync may do in production**: which of the three sync paths is enabled and which is not, the real meaning of each `SyncStatus`, `correction_eligibility()` and its necessary conditions, `offset_samples` vs `raw_offset_samples`, how evidence propagates and where it safely terminates, the fail-closed behaviour, the untouched default path, and the decisions that are still open (`D2 DEFERRED`, `D3 NOT ESTABLISHED`, `D5 DEFERRED`). Open items and the non-green list: [known limitations](docs/audio-sync-p4/known-limitations.md).
-- [Hardware decode deliverables](docs/hardware-decode/README.md) — integration test matrix, final report, patches, toolchain provenance.
-- [Evaluation reports](docs/evaluation/) — per-backend production-readiness and AV1 calibration studies.
-- [Third-party reference archive](docs/reference/README.md) — archived vendor documentation and upstream sources.
-- [Archive status index](olddocs/README.md) — read the status banners before citing archived conclusions.
+- [Architecture](docs/design/architecture.md) — end-to-end data flow, invariants, module map.
+- [Archive repair](docs/archive-repair.md) — checks, one-click repair, batch mode, gates,
+  limitations.
+- [Audio plan guide](docs/audio_plan.md) — explicit audio output, worked examples,
+  external-audio naming, per-backend support.
+- [Channel-sync design](docs/design/channel_sync_p1.md) — algorithm, thresholds,
+  degradation rules.
+- [Audio-sync P4](docs/audio-sync-p4/README.md) — production policy, grouped anchors,
+  time-varying research and deferred decisions.
+- [Hardware decode deliverables](docs/hardware-decode/README.md) — integration matrix,
+  final report, patches, provenance.
+- [x265 profile design](docs/x265-profile-design.md) — why the four profiles exist and how
+  they were calibrated.
+- [v0.8.8 release notes](docs/release_notes_v0.8.8.md) — archive repair in the main
+  program, autonomous batches, integrity gates.
+- [v0.8.0 release notes](docs/release_notes_v0.8.0.md) — audio plan, format-aware
+  alignment, external audio.
 
 ## Release
 
-Current release: **v0.8.0**
+Current source version: **0.8.8** (`VERSION`, tag `v0.8.8`).
 
-- [GitHub release v0.8.0](https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.8.0)
-  — published with a self-contained Windows package.
-- [Release notes v0.8.0](docs/release_notes_v0.8.0.md) — frozen with the tag; the release
-  notes file is not rewritten after publication.
-- Self-contained Windows package:
-  [1KeyTranscoder-v0.8.0-win64-selfcontained.zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.8.0/1KeyTranscoder-v0.8.0-win64-selfcontained.zip)
-  (`sha256 7eb98a8077bda09f5c7e074198e83fc84aee0782204580923a52de5fe0f5c0ba`,
-  522 file records, verified by `release/verify_package.py` — 62/62 checks PASS).
-- v0.8.0 is published as a normal (non-pre-release) GitHub release, so it is the
-  repository's "Latest release". The entries before it were published with GitHub's
-  "pre-release" flag set; they are still the releases of their own versions and match
-  their `VERSION` files and tags.
-
-Older releases with downloadable self-contained packages:
-
-| Version | Download | Notes |
-|---|---|---|
-| v0.6.1 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.6.1/1KeyTranscoder-v0.6.1-win64-selfcontained.zip) | Channel-sync streaming memory fix; package still available. |
-| v0.5.1 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.5.1/1KeyTranscoder-v0.5.1-win64-selfcontained.zip) | AV1 line (software + hardware AV1). |
-| v0.4.2 | [zip](https://github.com/Eureka175/1KeyTranscoder/releases/download/v0.4.2/1KeyTranscoder-v0.4.2-win64-selfcontained.zip) | HEVC/265 line. |
-
-No package was published for v0.7.0 or v0.7.1; those features are available from a source
-checkout of `main`.
-
-## Roadmap
-
-Directions currently defined by the existing design and release documentation. No dates
-are assigned.
-
-| Stage | Item |
-|---|---|
-| Later | Automatic cross-file synchronization — deriving delays across files rather than per file. |
-| Later | Drift correction — correcting slowly varying offsets (currently detected as `non_constant` and refused) instead of constant integer shifts. |
-| Later | Resampling and loudness handling — deliberately absent; sample rates must match and no dynamics processing exists. |
-
-Selective MP4 audio retention (Phase 4A), audio encode/mux integration (Phase 4B),
-production integration (Phase 4C) and format-aware alignment plus external audio
-(Phase 5) are implemented and shipped in v0.8.0; see the
-[v0.8.0 release notes](docs/release_notes_v0.8.0.md).
+- Self-contained packages are produced by `release/build_release.py`; see
+  [Installation](#installation).
+- The most recent published GitHub package is
+  [v0.8.0](https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.8.0); all releases:
+  <https://github.com/Eureka175/1KeyTranscoder/releases>.
+- `VERSION`, the git tag and the builder must agree: the builder refuses mismatches unless
+  a development build is explicitly requested.
 
 ## Limitations
 
-- **Platform**: Windows only; no other platform is tested.
-- **Audio CLI**: `--audio-plan` is the only audio flag. Everything else in the audio
-  pipeline is reachable only through the internal API.
-- **Audio plan availability**: `--audio-plan` works on the classic software path
-  (`--encoder x265` / `svtav1`) and on the hardware backends (`nvenc` / `qsv` / `qsv-av1`,
-  and `nvenc-av1` where that encoder can be created). The Sony/DJI preservation pipelines
-  reject it **per file** rather than ignoring it, and it cannot be combined with
-  `--channel-sync`.
-- **Alignment**: only constant integer sample offsets exist. A reference channel must be
-  named explicitly — the tool never guesses one, so "alignment: auto" on PCM material only
-  makes the pipeline eligible to align. Compressed input requires an explicit request, is
-  decoded and re-encoded, and cannot be aligned by shifting packet timestamps.
-- **Output structure**: external audio follows the `mapping` key exactly. A group that is
-  not a whole input stream is rebuilt from PCM, and once alignment shifts samples every
-  output stream is rendered (stream copying cannot carry a shift).
-- **Offset model**: only constant integer sample offsets are supported. Drift correction,
-  resampling and time-stretch do not exist; a slow drift is detected and the track is left
-  untouched rather than corrected.
-- **Channel sync scope**: `--channel-sync` requires at least three independent mono PCM
-  tracks at 48 or 96 kHz with linear PCM sample formats; 44.1 kHz and compressed formats
-  are explicitly refused, and stereo/mono layouts are not aligned by default. The only
-  long-run validated configuration is 4 tracks / 48 kHz / single-threaded; `--jobs auto`,
-  10-minute Sony/DJI material and `--experimental-multihw` long runs are not validated.
-- **Hardware decode**: unavailable in release installations by design; the proven
-  allowlist is a closed set of three combinations; `--seek` is mutually exclusive with it;
-  the measured benefit is CPU headroom, not single-job speedup.
-- **AV1 output**: always 4:2:0; Sony sources keep their metadata but do not get an XAVC
-  brand; inputs below 1080p are not processed by default; the 4K60 UHQ preset is a
-  reference setting, not a practical production setting.
-- **Preservation**: non-Sony, non-DJI sources are transcoded without metadata (video and
-  audio only). For DJI, the MJPEG cover image and `udta` are dropped because GPAC 26.02
-  cannot address them; this is logged explicitly.
-- **Playback**: Sony 4:2:2 output is HEVC Rext, which only NVIDIA 50-series GPUs can
-  hardware-decode; distribute a 4:2:0 copy instead.
-- **Quality alignment**: the QSV profile aligned to the NVENC profile is calibrated, not
-  identical; high-motion material remains roughly 1 dB below NVENC, which is a hardware
-  ceiling rather than a configuration issue.
-- **Stability of internal interfaces**: several v0.7.1 audio objects are explicitly marked
-  internal or reserved and are not guaranteed to keep their current semantics; the
-  authoritative list is in
-  [architecture.md](docs/design/architecture.md) §6.1 and
-  [release_notes_v0.7.1.md](docs/release_notes_v0.7.1.md) §32.- **Encoder profile values**: the numbers in the `*.json` profiles are measured
-  calibrations. Changing them requires a test-set regression run.
+- **Platform**: Windows 10/11 x64 only.
+- **Channel sync**: constant integer sample offsets only; at least three independent mono
+  PCM tracks at 48/96 kHz; 2CH/1CH and compressed formats are not aligned. Drift correction
+  and resampling are not part of the production path; `--channel-sync-tv` is opt-in
+  research and requires explicit policy/coordinate decisions.
+- **Audio plan**: `--audio-plan` cannot be combined with `--channel-sync`; Sony/DJI
+  preservation rejects a plan per file instead of ignoring it. External audio must be named
+  after the clip.
+- **Metadata**: non-Sony/DJI sources keep no vendor metadata. DJI Pocket/drone sources are
+  not preserved by default (use `--preserve-metadata` to override; `--no-metadata` wins if
+  both are given). The MJPEG cover image and `udta` are dropped from DJI files because GPAC
+  26.02 cannot address them.
+- **AV1**: always 4:2:0; Sony metadata is preserved but no XAVC brand is written.
+- **Pixel format**: format downgrades required by encoder capability are logged with a
+  WARNING (for example 4:2:2 → 10-bit 4:2:0 → 8-bit 4:2:0); `--no-downgrade` skips such
+  files instead. Check the output's pixel format with `ffprobe` when a delivery format is
+  mandatory.
+- **Hardware decode**: Sony material always uses software decode on the rigaya path; some
+  formats are refused by the hardware (measured per machine); a time seek is not
+  seek-equivalent between readers. Research builds are not used in production.
+- **Repair**: silent / `non_constant` / `low_confidence` tracks that the quality gate
+  refuses cannot be fixed (`AUD-04` WARN); zero-filled files without a moov cannot be
+  recovered (`UNREADABLE`). Parallel repair can hit transient corruption; the integrity
+  gates catch it and the serial retry resolves it, otherwise the file is reported as
+  `FAILED`.
+- **Playback**: codec and pixel-format choices follow the selected backend and its
+  capability downgrade rules; verify the delivered format with `ffprobe` before assuming
+  broad hardware playback.
+- **QSV quality**: the profile aligned to NVENC is calibrated, not identical; high-motion
+  material remains roughly 1 dB below NVENC (hardware ceiling).
+- **Internal APIs**: several audio objects are explicitly internal/reserved and may change.
+- **Profiles**: the numbers in the `*.json` profiles are measured calibrations; changing
+  them requires a test regression run.
 
-## Contributions
+## Contributing
 
-Issues and pull requests are welcome. There is no contributor guide yet.
+Issues and pull requests are welcome.
 
-- Keep changes reproducible: run `python tests\full_autotest.py --level unit` at minimum,
-  and `--level full` before submitting anything that touches the pipeline. No pull request
-  may introduce a new FAIL.
-- Changes that touch preservation, container handling or encoder profiles must state the
+- Run `python tests\full_autotest.py --level unit` at minimum; run `--level full` before
+  submitting anything touching the pipeline. No pull request may introduce a new FAIL.
+- Changes touching preservation, container handling or encoder profiles must state the
   material and tool versions used for verification.
-- Do not modify the encoder profile JSON values or the brand/logo assets without an
-  explicit reason recorded in the change.
-- Documentation lives in `docs/` and follows the classification described in
-  [docs/README.md](docs/README.md); the root README stays user-facing.
+- Do not change the encoder profile JSON values or the brand/logo assets without an
+  explicit, recorded reason.
+- Documentation lives in `docs/`; the root README stays user-facing.
 
-## Brand Assets
+## Brand assets
 
-The repository provides three brand assets under `logos/`. They are used as-is; the files
-are not renamed or modified.
-
-### Primary Logo
-
-Symbol mark plus word mark. Used for the README header, project presentation, release
-pages and documentation covers.
+Three assets under `logos/`, used as-is:
 
 ```markdown
 <p align="center">
   <img src="logos/Primary%20Logo.png" alt="1KeyTranscoder Primary Logo" width="360">
 </p>
-```
-
-### Symbol Mark
-
-Mark only, without text. Intended for application icons, avatars, favicons and other
-small-size contexts.
-
-```markdown
 <img src="logos/Symbol%20Mark.png" alt="1KeyTranscoder Symbol Mark" width="120">
-```
-
-### Word Mark
-
-The `1KeyTranscoder` wordmark only. Intended for documentation, UI headers and
-horizontally constrained layouts.
-
-```markdown
 <img src="logos/Word%20Mark.png" alt="1KeyTranscoder Word Mark" width="280">
 ```
-
-No monochrome, app-icon, favicon, stacked or motion variants exist in this repository.
 
 ## License
 
