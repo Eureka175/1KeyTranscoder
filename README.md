@@ -240,16 +240,18 @@ preservation pipelines). Nothing below is active unless explicitly requested.
   is skipped by default.
 - `--channel-sync-transparent` — pre-editing mode: video and all non-audio streams are
   stream-copied; only audio tracks that need correction are rebuilt. Fully aligned input
-  produces a byte-identical output.
+  produces a byte-identical output. The other channel-sync flags (`--channel-sync-groups`,
+  `--channel-sync-accurate`, `--channel-sync-tv*`) apply in this mode too.
 - `--channel-sync-groups` — grouped anchors (opt-in). Handles 4-channel material where
   CH1/CH2 and CH3/CH4 are two unrelated microphones. Additive only: no existing correction
   is lost or changed. `start.bat` enables it by default.
 - `--channel-sync-accurate` — precision mode (opt-in): lowers the minimum correction from
   5 samples toward 1–2 samples, each tier accepted only if the independent post-shift
   residual proves it.
-- `--channel-sync-tv` — per-window time-varying correction (research/opt-in). It requires
-  explicit `--channel-sync-tv-policy` and `--channel-sync-tv-coordinate`; missing either
-  is a refusal, not a silent default.
+- `--channel-sync-tv` — per-window time-varying correction (research/opt-in; accepted by
+  both the encoded and the transparent path). It requires explicit
+  `--channel-sync-tv-policy` and `--channel-sync-tv-coordinate`; missing either is a
+  refusal, not a silent default.
 
 ### Explicit audio output (`--audio-plan`)
 

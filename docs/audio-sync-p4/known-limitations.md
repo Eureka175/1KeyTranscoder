@@ -203,6 +203,7 @@ enough".
 | `shift_stream` carries no guard of its own | **BY DESIGN** — the guard is at every caller. A static audit enumerates the callers and exercises each one; the finding is left visible in the audit output rather than filtered out |
 | `AudioSyncResult` has no field for the plan-window population | open, owner D8 — see `T5.4b` |
 | the C1306 ch3→ch2 instrument disagreement | recorded in P3.11, **not averaged** |
+| `--channel-sync-tv` on the **transparent** path | **KNOWN LIMITATION** — accepted since 2026-10-29 (before that the three flags were silently dropped in `transparent_main`; the encoded path always forwarded them). The TV applier writes the same per-track PCM and reuses the same remux stage, but the *combination* has **no dedicated video regression** (`p4.6-real-corpus.md` §7: "structural reasoning, not a measured video regression"). Production reachability on the C1305/C1306 long takes remains 0/6 whole files, so this limitation is about the mechanism, not a recovered fix |
 
 ---
 

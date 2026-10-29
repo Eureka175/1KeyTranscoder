@@ -76,9 +76,9 @@ python 1kt.py --repair --input I:\ --output G:\1kt_repair_v3_20261026 ^
 
 ### 5.3 自测
 
-- `python tests\full_autotest.py --level unit`：**966 PASS / 2 FAIL**，两个失败
-  均为素材已按要求移出 `F:` 导致的环境性失败（`cls.real` / 语料缺失），
-  与本次改动无关。
+- `python tests\full_autotest.py --level unit`：**979 PASS / 2 FAIL**（截至
+  2026-10-29，含 §8 新增的 13 条 `p12d.*` 断言），两个失败均为素材已按要求
+  移出 `F:` 导致的环境性失败（`cls.real` / 语料缺失），与本次改动无关。
 - 新增/更新自测：`tests/selftest/suites/hardware_audio.py` 手工登记全部
   `--repair-*` 参数并断言 `--repair` 真的分派到 `archive_repair.run_repair`；
   `tests/selftest/suites/archive_repair.py` 覆盖容器/音频/PARTIAL/UNREADABLE 判定。
@@ -100,3 +100,26 @@ VERSION        0.8.7 -> 0.8.8
 tag            v0.8.8
 1kt.py --version  ->  "1KeyTranscoder 0.8.8"
 ```
+
+## 8 Post-RC1 修复（2026-10-29）
+
+RC1（`v0.8.8-rc1`，`012662b`）之后主分支上的两处**透明模式**缺陷。默认转码
+路径、修复模式行为均未改变。
+
+| # | 缺陷 | 修复 |
+|---|---|---|
+| 1 | `--channel-sync-transparent` **静默忽略** `--channel-sync-tv` / `-tv-policy` / `-tv-coordinate`（覆盖逻辑只写在 `main()` 里；透明入口在 main 分流之前就 return） | 抽出 `_apply_time_varying_cli`，编码入口与透明入口共用；透明模式打印生效值 `CHANNEL-SYNC TIME-VARYING`；缺 policy/coordinate 现在按契约拒绝（此前会悄悄退回固定延迟） |
+| 2 | 透明批量汇总把 `measure_failed` 计入 `done`，一边打 `[SYNC-FAIL]` 一边写 `failed=0` | 新增 `sync_skipped` / `sync_failed` 计数与汇总字段；`failed` 只表示进程级失败；看板 `detail` 写明同步失败原因；退出码不变（文件级失败仍产出可用的源文件拷贝） |
+
+验证（2026-10-29）：
+
+- `--level unit`：**979 PASS / 2 FAIL**（两个环境性失败同 §5.3）；新增
+  `p12d.*` 13 条断言，覆盖覆盖函数行为、两个入口 AST 级共用、终态分类。
+- 6 s 合成 4CH 片段实测：只给 `--channel-sync-tv`（缺 policy/coordinate）→
+  `tv_not_configured` + `sync_failed=1`；`hold`/`latest-start` → 三条轨逐窗
+  执行（`windows=1, TRUSTED`），证明透明路径确实吃到了开关。
+- `docs/audio-sync-p4/known-limitations.md` 已登记"透明 + TV 无独立视频回归"
+  这一已知限制。
+
+若以 `v0.8.8` 正式发布，tag 必须在**包含本节提交**的 HEAD 上重打（当前本地
+tag `v0.8.8` = `3d3dcac`，不含本节修复）。

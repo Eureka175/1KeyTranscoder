@@ -1516,6 +1516,64 @@ def _repair_jobs(value: Any) -> int:
         raise SystemExit(f"--jobs 需要 auto 或正整数: {value!r}")
 
 
+def _apply_time_varying_cli(
+    args: argparse.Namespace,
+    opts: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """把 `--channel-sync-tv*` 三个开关覆写到 channel-sync 选项上。
+
+    经典编码入口 (`main`) 与透明批量入口 (`transparent_main`) 是两条独立的
+    调用链, 各自加载 config 并各自读 CLI, 所以这层覆盖必须**共用同一个
+    函数**。它以前只写在 `main` 里, 结果是:
+
+        --channel-sync-transparent --channel-sync-tv \
+        --channel-sync-tv-policy hold --channel-sync-tv-coordinate latest-start
+
+    在透明模式下完全按固定延迟执行 —— 三个开关被**静默丢弃**, 连"缺
+    policy/coordinate 就拒绝"的契约都不会触发。一个不生效的开关比一个会
+    拒绝的开关更糟, 因为用户以为时变已经开了。
+
+    只覆写调用方**真的给了值**的键 (None = 没说), 与 config / 生产工作点的
+    优先级保持一致; 一个没设置的 config 键不会把调用方的值擦掉。
+    """
+    tv = getattr(args, "channel_sync_tv", None)
+    policy = getattr(args, "channel_sync_tv_policy", None)
+    coordinate = getattr(args, "channel_sync_tv_coordinate", None)
+    if tv is None and policy is None and coordinate is None:
+        return opts
+    out = dict(opts or {})
+    if tv is not None:
+        out["time_varying"] = bool(tv)
+    if policy is not None:
+        out["tv_policy"] = str(policy)
+    if coordinate is not None:
+        out["tv_coordinate"] = str(coordinate)
+    return out
+
+
+def _transparent_sync_outcome(status: str) -> str:
+    """透明批量计数口径: `synced` / `skipped` / `failed`。
+
+    `run_channel_sync` 的终态不止"成功/失败"两种, 透明模式下**每一种终态
+    都会产出可用文件** (文件级失败 = 源文件原样拷贝), 所以不能只靠 `done`
+    计数判断"同步是否真的发生":
+
+    * `applied` / `already_aligned` -> `synced`;
+    * `not_eligible` / `tool_missing` -> `skipped` (按设计不处理该文件);
+    * 其余 (`measure_failed` / `verify_failed` / `tv_not_configured` …)
+      -> `failed` (同步没做成, 输出只是源拷贝)。
+
+    2026-10-29: 此前"其余"全部计进 `done` 而 `failed` 恒为 0, 于是两个长片
+    的日志一边打 `[SYNC-FAIL]`, 一边在汇总里写 `failed=0` —— 同一份输出给出
+    两个互相矛盾的事实。
+    """
+    if status in ("applied", "already_aligned"):
+        return "synced"
+    if status in ("not_eligible", "tool_missing"):
+        return "skipped"
+    return "failed"
+
+
 def repair_main(args: argparse.Namespace, input_root: Path,
                 output_root: Path) -> int:
     """`1kt.py --repair`: 归档成品自主修复 (不重新编码视频)。"""
@@ -1849,6 +1907,30 @@ def transparent_main(
             "yes" if _t_acc is not None else "no",
         )
 
+    # P4.6 — 时变同步在透明批量路径上同样要能吃命令行开关。与经典入口共用
+    # `_apply_time_varying_cli`, 避免两头各写一份、漏掉一头就静默失效 (P4.12
+    # 与 v0.8.7 都在这条路上出过同类事故)。这里打**生效值**, 而不是"覆写了
+    # 什么": 日志里 `policy=None` 会让人以为用了默认策略, 而实际生效的是
+    # DEFAULTS/config 里的值。
+    _t_tv = getattr(args, "channel_sync_tv", None)
+    _t_tv_policy = getattr(args, "channel_sync_tv_policy", None)
+    _t_tv_coord = getattr(args, "channel_sync_tv_coordinate", None)
+    if (_t_tv is not None or _t_tv_policy is not None
+            or _t_tv_coord is not None):
+        from core.channel_sync import effective_opts as _eff_tv_opts
+
+        channel_sync_opts = _apply_time_varying_cli(args, channel_sync_opts)
+        _tv_eff = _eff_tv_opts(channel_sync_opts)
+        logger.info(
+            "CHANNEL-SYNC TIME-VARYING | enabled=%s policy=%s "
+            "coordinate=%s (CLI override: flag=%s policy=%s coordinate=%s)",
+            _tv_eff["time_varying"], _tv_eff["tv_policy"],
+            _tv_eff["tv_coordinate"],
+            "yes" if _t_tv is not None else "no",
+            "yes" if _t_tv_policy is not None else "no",
+            "yes" if _t_tv_coord is not None else "no",
+        )
+
     if args.retry_list:
         retry_sources = load_retry_list(Path(args.retry_list))
         if not retry_sources:
@@ -1899,9 +1981,12 @@ def transparent_main(
     logger.info("============================================================")
 
     counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0,
-                "check_failed": 0}
+                "check_failed": 0, "sync_skipped": 0, "sync_failed": 0}
     for src in sources:
         dst = output_path_for(src, input_root, output_root, "SYNC", False)
+        #: 非空时写进看板 detail。`done` 只表示"输出文件可用", 不表示
+        #: "音频被同步过" —— 文件级失败同样产出源文件拷贝。
+        sync_detail = ""
         file_log = per_file_log_path(src, input_root, logs_root, "SYNC")
         file_logger = build_file_logger(file_log)
         if status is not None:
@@ -1936,9 +2021,11 @@ def transparent_main(
                 )
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
+                counters["sync_skipped"] += 1
                 counters["done"] += 1
                 if status is not None:
                     status.finish(src, "done")
+                    status.update(src, "done", "sync skipped: probe failed")
                 continue
             res = run_channel_sync(
                 source=src,
@@ -1959,7 +2046,8 @@ def transparent_main(
                 res["status"],
                 json.dumps(res.get("channels", []), ensure_ascii=False),
             )
-            if res["status"] in ("applied", "already_aligned"):
+            outcome = _transparent_sync_outcome(res["status"])
+            if outcome == "synced":
                 if res["status"] == "applied":
                     logger.info(
                         "[SYNC-OK] %s | transparent remux "
@@ -2019,13 +2107,17 @@ def transparent_main(
                         src.name, args.check,
                     )
                 counters["done"] += 1
-            elif res["status"] in ("not_eligible", "tool_missing"):
+            elif outcome == "skipped":
+                counters["sync_skipped"] += 1
+                sync_detail = f"sync skipped: {res['detail']}"
                 logger.warning(
                     "[SYNC-SKIP] %s | %s — 输出为源文件原样拷贝 | %s",
                     src.name, res["detail"], dst,
                 )
                 counters["done"] += 1
             else:
+                counters["sync_failed"] += 1
+                sync_detail = f"sync failed: {res['detail']}"
                 logger.warning(
                     "[SYNC-FAIL] %s | %s — 输出为源文件原样拷贝 | %s",
                     src.name, res["detail"], dst,
@@ -2037,15 +2129,31 @@ def transparent_main(
             counters["failed"] += 1
         if status is not None:
             status.finish(src, "done")
+            if sync_detail:
+                # finish() 会清空 detail。`done` 在透明模式下的含义是
+                # "输出文件可用" (文件级失败也会产出源拷贝), 所以"同步是否
+                # 真的发生"必须单独写出来; 否则看板显示 done, total.log 显示
+                # [SYNC-FAIL], 看起来像两个互相矛盾的事实。
+                status.update(src, "done", sync_detail[:160])
 
     status.mark_finished()
     logger.info("============================================================")
     logger.info(
         "Transparent finished | done=%d skipped=%d failed=%d dry-run=%d "
-        "check_failed=%d",
+        "check_failed=%d sync_skipped=%d sync_failed=%d",
         counters["done"], counters["skipped"], counters["failed"],
         counters["dry-run"], counters["check_failed"],
+        counters["sync_skipped"], counters["sync_failed"],
     )
+    if counters["sync_failed"]:
+        # `done` 里包含这些文件 —— 它们的输出是**可用的源文件拷贝**。这里
+        # 不把它们算成 `failed` (进程/文件失败), 而是单列, 否则汇总里的
+        # `failed=0` 会与上面的 `[SYNC-FAIL]` 警告互相矛盾。
+        logger.warning(
+            "SYNC FAILED %d 个文件: 音频未做任何修正, 输出为源文件原样拷贝 "
+            "(视频/容器无损); 详见上文 [SYNC-FAIL] 行",
+            counters["sync_failed"],
+        )
     if counters["check_failed"]:
         # 验证未通过**不是**文件失败: 透明模式不改已产出的文件, 这里只把
         # 数量与位置报出来, 由人决定要不要回退。
@@ -2056,6 +2164,9 @@ def transparent_main(
     logger.info("Total log: %s", total_log)
     logger.info("Dashboard data: %s", dashboard_json)
     logger.info("============================================================")
+    # 只有**进程级失败**进退出码: 透明模式的契约是"文件级失败 -> 输出源
+    # 拷贝", 产物仍可用; 把 sync_failed 也算失败会让批处理重试同一文件,
+    # 而重跑的结果不会不同。sync_failed 只出现在汇总与 warn.log 里。
     return 1 if counters["failed"] else 0
 
 
@@ -2258,19 +2369,14 @@ def main() -> int:
     # P4.6 — 时变同步: CLI 显式 opt-in。只覆写**调用方真的给了值**的键, 因此
     # 未指定时 config 块里的值保持不变 (与其它 CLI 覆盖同一手法)。
     #
+    # 覆盖逻辑在 `_apply_time_varying_cli`: 透明批量入口 (`transparent_main`)
+    # 与本处**共用同一份实现**。它曾经只写在这里, 于是透明模式把
+    # `--channel-sync-tv*` 静默丢掉 (见该函数注释)。
+    #
     # `_validate_tv_opts` 在 core.channel_sync 里做**必需参数**校验: policy 与
-    # coordinate 缺任何一个都拒绝执行, 且拒绝发生在打开/解码任何文件之前。
+    # coordinate 缺任何一个都拒绝执行 (逐文件, 不静默退回固定延迟)。
     _tv_flag = getattr(args, "channel_sync_tv", None)
-    _tv_policy = getattr(args, "channel_sync_tv_policy", None)
-    _tv_coord = getattr(args, "channel_sync_tv_coordinate", None)
-    if _tv_flag is not None or _tv_policy is not None or _tv_coord is not None:
-        channel_sync_opts = dict(channel_sync_opts or {})
-        if _tv_flag is not None:
-            channel_sync_opts["time_varying"] = bool(_tv_flag)
-        if _tv_policy is not None:
-            channel_sync_opts["tv_policy"] = str(_tv_policy)
-        if _tv_coord is not None:
-            channel_sync_opts["tv_coordinate"] = str(_tv_coord)
+    channel_sync_opts = _apply_time_varying_cli(args, channel_sync_opts)
     # --channel-sync-tv 隐含 --channel-sync (与 transparent 同一处理)
     if _tv_flag:
         channel_sync_enabled = True

@@ -931,6 +931,74 @@ def l1_transparent_contract() -> None:
     record("p12c.|shift|<=1 的候选在 tier 1 就被放弃 (门本来就不修它)",
            set(drop) == {0} and keep == {1}, f"{keep} {drop}")
 
+    # --- 9. 透明入口的 CLI 覆盖: 时变开关不得静默丢失 (2026-10-29) -------
+    #
+    # 事故形态: `--channel-sync-tv*` 三个开关只在 main() 里被读取; 透明批量
+    # 入口在调用 main() 的分流**之前**就 return 了, 于是
+    #   --channel-sync-transparent --channel-sync-tv \
+    #   --channel-sync-tv-policy hold --channel-sync-tv-coordinate latest-start
+    # 实际按固定延迟跑, 连"缺 policy/coordinate 就拒绝"的契约都不会触发。
+    # 一个不生效的开关比一个会拒绝的开关更糟, 只能靠断言入口来守。
+    import argparse
+    import ast
+
+    from core.channel_sync import effective_opts as _eff_tv
+
+    def tv_eff(**kw):
+        ns = argparse.Namespace(
+            channel_sync_tv=None, channel_sync_tv_policy=None,
+            channel_sync_tv_coordinate=None)
+        for k, v in kw.items():
+            setattr(ns, k, v)
+        return _eff_tv(mod._apply_time_varying_cli(ns, {}))
+
+    e = tv_eff(channel_sync_tv=True, channel_sync_tv_policy="hold",
+               channel_sync_tv_coordinate="latest-start")
+    record("p12d.透明入口的 TV 开关被覆写 (enabled/policy/coordinate)",
+           e["time_varying"] is True and e["tv_policy"] == "hold"
+           and e["tv_coordinate"] == "latest-start",
+           f"{e['time_varying']} {e['tv_policy']} {e['tv_coordinate']}")
+    e = tv_eff()
+    record("p12d.未给 TV 开关时 config/DEFAULTS 原样保留",
+           e["time_varying"] is False and e["tv_policy"] is None
+           and e["tv_coordinate"] is None)
+    e = tv_eff(channel_sync_tv_policy="nearest-centre")
+    record("p12d.只给 policy 不打开 time_varying (与经典入口同义)",
+           e["time_varying"] is False and e["tv_policy"] == "nearest-centre")
+    e = tv_eff(channel_sync_tv=False)
+    record("p12d.显式关闭 --channel-sync-tv 不会被当成 None",
+           e["time_varying"] is False)
+
+    tree = ast.parse((root / "1kt.py").read_text(encoding="utf-8"))
+    callers = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        for sub in ast.walk(node):
+            if (isinstance(sub, ast.Call)
+                    and isinstance(sub.func, ast.Name)
+                    and sub.func.id == "_apply_time_varying_cli"):
+                callers.add(node.name)
+    record("p12d.经典入口与透明入口共用同一份 TV 覆盖 (不再各写一份)",
+           {"main", "transparent_main"} <= callers,
+           f"callers={sorted(callers)}")
+
+    # --- 10. 汇总口径: 同步失败必须单列, 不能混进 failed=0 的 done ------
+    # 2026-10-29 实测: 两个长片一边打 [SYNC-FAIL], 一边在汇总写 failed=0。
+    for status, want in (
+        ("applied", "synced"), ("already_aligned", "synced"),
+        ("not_eligible", "skipped"), ("tool_missing", "skipped"),
+        ("measure_failed", "failed"), ("verify_failed", "failed"),
+        ("tv_not_configured", "failed"),
+    ):
+        got = mod._transparent_sync_outcome(status)
+        record(f"p12d.透明终态 {status} -> {want}", got == want,
+               f"got={got}")
+    src_kt = (root / "1kt.py").read_text(encoding="utf-8")
+    record("p12d.汇总行单列 sync_skipped/sync_failed",
+           "sync_skipped=%d" in src_kt and "sync_failed=%d" in src_kt
+           and 'counters["sync_failed"] += 1' in src_kt)
+
 
 # ==========================================================================
 def l1_recheck_knobs() -> None:
