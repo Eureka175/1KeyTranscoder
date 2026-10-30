@@ -353,84 +353,86 @@ Full per-artifact classification:
 
 ---
 
-## 14. Long-take default alignment (`docs/design/long_take_default_alignment.md`) — 2026-10-30
+## 14. Long-take default alignment (`docs/design/long_take_default_alignment.md`) — 2026-10-30, acceptance PASS 2026-10-31
 
-Implementation is complete for S1–S6 + S3/A6 + S5 partial; the acceptance
-judgement against the K deliverables is **not green** and has two independent
-causes. Numbers and reproduction commands live in
-`docs/design/long_take_impl_checkpoint.md`; this section states the status
-strictly.
+Implementation is complete for S1–S6 + S3/A6 + S5; **acceptance against the K
+deliverables is GREEN since 2026-10-31** after the reference round-3 algorithm
+was implemented in full. Numbers, oracle definition and reproduction commands
+live in `docs/design/long_take_acceptance_report.md`; this section states the
+status strictly.
 
-### 14.1 DONE (verified, not a pass claim for acceptance)
+### 14.1 DONE (verified)
 
 ```text
-status   : implemented + unit/integration green
+status   : implemented + unit/integration green + real-file acceptance PASS
 - default auto long-take path: constant-first, whole-file time-varying fallback,
   stereo group binding, round-2 residual, polarity, long-take report block;
+- reference round-3 algorithm fully implemented (2026-10-31):
+  * pass1 = drift_rebuild: 2-min weighted-median anchors -> 7-anchor (14 min)
+    median filter -> 30-sample/anchor (250 ppm) clamp (reference
+    plot_drift2.anchors_from; round-2 apply_tv 120-clamp kept only behind
+    curve_stabilize=False);
+  * application = reference fractional interp_write (curve sampled on the
+    10,000-sample grid, 5M-sample blocks, pos=k+s(k) clamped then block-local
+    linear interp, out-of-range zero) — core.long_take.reference_interp_write;
+  * final = pass1 + fine_delay residual (60 s windows / 20 s hop, 12k coarse
+    +-80, 48k +-8 refine, |CC|>=0.20, 5-min sliding median, |r|<=100) applied
+    as a second fractional interp (reference double-interp);
 - multichannel PCM layouts (stereo/quad/5.1/7.1 in one stream): per-channel
   decode via built-in AudioPCMReader, output re-interleaved per source stream
   with audio_wav.write_wav, structure preserved (T5/T6 in
   work/long_take/s3/multichannel_check.py);
-- S5 partial: residual windows and stereo-binding candidate pairs are measured
-  in parallel (thread pool, deterministic order); continuity tracker itself is
-  sequential by definition;
+- S5: residual windows and stereo-binding candidate pairs measured in parallel;
 - preservation/gpac.py: MP4Box temp files pinned to the media volume
   (`.gpactmp`) — without it a 50 GiB remux fails with ENOSPC on C:.
-Unit: 1008 PASS / 2 FAIL (both are environment-only: no real Sony corpus).
-Integration (synthetic): ALL PASS after the multichannel refactor.
+Unit: 1011 PASS / 2 FAIL (both are environment-only: no real Sony corpus).
+Integration (synthetic) + A6 multichannel E2E: ALL PASS.
 ```
 
-### 14.2 ACCEPTANCE — NOT MET (measured, real 80 min files; final 2026-10-30)
+### 14.2 ACCEPTANCE — MET (real 80 min files, 2026-10-31)
 
 ```text
-status   : FAIL against the task-book tolerances as written
-curve layer (median |Δ| ≤1 / p90 ≤5 / max ≤50 samples, vs K applytv+refine_curve)
-  C1306 CH3  1.77 / 8.23 / 13        CH4  2.81 / 12.48 / 22
-  C1305 CH3  4.80 / 12.14 / 46       CH4  7.00 / 35.22 / 47
-audio layer (median ≤2 / p90 ≤10 / ≥90% of 5 min blocks ≤5 samples,
-             ours vs rebuilt research-fine audio; CH1/CH2 exact 0/0 + known 4)
-  C1306 CH3  2 / 10 / 81% ≤5         CH4  3 / 12.5 / 77% ≤5
-  C1305 CH3  5 / 9 / 52% ≤5          CH4  6 / 34 / 42% ≤5
-reason   : K's own measured-vs-applied consistency (research doc §12.3) is
-           median 5–23 / p90 17–63 samples — the tolerances are below the
-           content-ambiguity noise floor of the materials themselves. Our
-           round-1 curve is bit-identical to K pass1 (0/0/0); after porting the
-           K fine-pass measurement verbatim (12k resample_poly + ±8 refine +
-           5-min sliding median) AND measuring the residual on a fractionally
-           reconstructed pass-1 (K interp_write conditions), the curve p90
-           improved from 15.2/15.6 to 8.2/12.5 (C1306) and 45/45 to 12.1/35.2
-           (C1305). Remaining difference is the round-2 residual only.
-decision : user asked to "make both long videos fully pass" but did not approve
-           a tolerance change. Strict pass is impossible against the measured
-           noise floor; needs a user call (revise tolerance vs accept K parity
-           as the criterion).
+status   : PASS for both C1305 and C1306.
+oracle   : (a) archived reference pipeline re-run unmodified on the real sources
+           (plot_drift2.py -> drift_rebuild.json; fine_delay.py ->
+           aligned_fine/*.wav + fine_delay.json); (b) K restore deliverables,
+           verified below to be that same round-3 final.
+curve layer (median |d| <=1 / p90 <=5 / max <=50 samples):
+  C1305 CH3 0.00 / 0.00 / 0.0      CH4 0.00 / 0.00 / 0.0   (4808 points)
+  C1306 CH3 0.00 / 0.00 / 0.0      CH4 0.00 / 0.00 / 0.0   (4165 points)
+audio layer (median <=2 / p90 <=10 / >=90% of 5-min blocks <=5 samples,
+             ours vs K delivered restored audio):
+  C1305 CH1 0/0/0 100%  CH2 4/4/4 100% (EXPECTED, stereo group decision)
+        CH3 0/0/0 100%  CH4 0/0/0 100%
+  C1306 identical.
+independence: re-run reference pipeline vs our output: CH1/3/4 med 0 / p90 0,
+  CH2 4/4 (stereo-group decision); reference vs K deliverable: all 0/0.
+note   : the previous NOT-MET verdict compared against the round-2
+         applytv+refine_curve intermediate (refine_curve_*.json comes from
+         refine_tv.py's 5-min-block refine), not the round-3 final that the
+         deliverables were built from. The reference implementation removes that
+         discrepancy entirely.
 ```
 
-### 14.3 K C1305 ORACLE — BLOCKED on missing research artefacts
+### 14.3 K DELIVERABLES — CORRECT (previous "wrong intermediate" retracted)
 
 ```text
-status   : BLOCKED on reference data, not in our code. User decision was
-           "re-export the correct C1305 restored".
-What is available : applytv_*, refine_curve_*, drift_*, track_*, restored MP4s.
-What is missing   : data/_scratch/drift_rebuild.json (round-3 pass-1 anchors)
-           and aligned_fine wav / fine f32 for C1305. K:/I: `1kt_moved_20261026`
-            `_from_E/_from_I` are empty shells; F: scratch was deleted.
-Reconstruction attempts (direct 5-min-block lag, med/p90 vs K restored):
-   applytv + refine_curve (research doc §12/§16 reading) : CH3 9/46, CH4 10/104
-   drift global-linear + refine_curve                   : CH3 6/22, CH4 27/386
-   applytv only (pass1)                                 : CH3 5.7/81, CH4 19/116
-   Method validated on C1306: rebuilt fine vs restored = CH1/2 0/0,
-   CH3 3.5/28.5, CH4 4.5/18.5.
-Also: rebuilding K pass-1 with the *exact blockwise* apply_tv interpolation and
-running the fine_delay algorithm reproduces the SAME residual difference
-(curve 4.8/12.14, 7/35.22) => refine_curve was measured on a pass-1 that is
-neither applytv nor drift (i.e. the missing drift_rebuild anchors).
-Conclusion: a "correct C1305 restored" cannot be rebuilt from what is on disk;
-the restored MP4 does not match any reconstructible research final.
-decision : user must provide one of:
-   1. aligned_fine/<C1305>/aligned_4ch_fine.wav (or fine f32);
-   2. data/_scratch/drift_rebuild.json;
-   3. a re-exported correct C1305 restored from the K side.
+status   : the two files in K:\1kt_work\long_align\deliver are the correct
+           research round-3 final (audio + container + metadata).
+evidence :
+- remux_final.py builds finals from data/_scratch/aligned_fine/<stem>/ch{i}_fine.f32;
+  fine_delay.py builds that fine audio as drift_rebuild pass1 + residual;
+  plot_drift2.anchors_from defines drift_rebuild = 2-min anchors -> median
+  filter (7 anchors) -> 30-sample/anchor clamp;
+- re-running those archived tools unmodified on the real sources reproduces the
+  delivered audio: 5-min-block lag med 0 / p90 0 per channel (compare_ref_vs_ours);
+- container audit: 1xHEVC hvc1 + 4xmono pcm_s24be/ipcm + rtmd data, durations
+  equal to source, major_brand XAVC, video first-10 s streamhash identical
+  (remux_final.json records full-file video bit-exact + packet-identical);
+  CH3/CH4 polarity flipped as intended.
+retracted: the earlier claim that C1305's restored audio "follows the old global
+  solution instead of the fine curve" was an artefact of comparing it with the
+  round-2 applytv curve; no re-export of C1305 is needed.
 ```
 
 ### 14.4 OTHER OPEN ITEMS
@@ -439,33 +441,34 @@ decision : user must provide one of:
 A1 regression corpus (226 clips / 584 tracks)     : NOT RUN / corpus not
    available on this machine; task book §8.2 allows a hold-out set with the
    gap stated — the 4 synthetic integration cases + real 80 min files are what
-   was actually run. The regression that WAS run and classified (2026-10-30):
+   was actually run. The regression that WAS run and classified (2026-10-30/31):
    unit 1011 PASS / 2 FAIL (both environment-only: real Sony corpus absent);
-   L3 full run — 13 environment-only FAILs (missing `testsets/` real media:
-   Sony/DJI/A7M5), the legacy C15–C32 channel-sync expectations updated for
-   the new defaults (anchor CH1→CH8, any-non-constant → whole-file TV, TV
-   failure → unaligned original; mechanism tests pin the old anchor order),
-   one pre-existing failure re-labelled (C32 sparse-speech evidence gate fails
-   identically on the HEAD baseline), and two real bugs found by the run were
-   fixed: `ref_of` UnboundLocalError on bound-group + fixed representative, and
+   L3 full run 1251 PASS / 12 FAIL — all 12 are missing `testsets/` real media
+   (Sony/DJI/A7M5/classic), no code/algorithm failures. Legacy C15–C32
+   channel-sync expectations updated for the new defaults (anchor CH1→CH8,
+   any-non-constant → whole-file TV, TV failure → unaligned original; mechanism
+   tests pin the old anchor order); C32 sparse-speech gate re-labelled
+   (fails identically on HEAD). Two real bugs found by the run were fixed:
+   `ref_of` UnboundLocalError on bound-group + fixed representative, and
    `fixed_files` empty for mono-multistream layouts. Also fixed a 16-bit `ipcm`
    sample-entry false positive that made transparent remux fall back to a byte
-   copy (C17).
-Transparent 50 GiB remux (container layer)        : KNOWN LIMITATION (pre-
-   existing). GPAC rewrites the whole file for every edit; `-ref` was measured
-   at 14 h without finishing on the 50 GiB C1305 stage, so the user's transparent
-   command cannot produce a finished container for these files. K avoided it
-   with a sequential fast_restore copy; porting that into production is a
-   container task, decision pending. Audio-domain acceptance was therefore run
-   through the same run_channel_sync (transparent=False).
+   copy (C17), and an AudioPCMReader thread-sharing bug in the multichannel
+   decoder (same-stream channels read concurrently -> zero-filled CH3/CH4;
+   4ch transparent E2E now passes).
+Transparent 50 GiB remux (container layer)        : DEFERRED by user decision
+   (2026-10-30 "透明重封装暂时置空"). GPAC rewrites the whole file for every
+   edit (`-ref` measured 14 h unfinished on the 50 GiB C1305 stage), so the
+   transparent command cannot produce a finished 50 GiB container yet; audio
+   domain acceptance uses the same run_channel_sync (transparent=False) and the
+   full multichannel transparent path is verified on synthetic 4 s material.
 Remux failure terminal status                     : DEFERRED. Remux failure +
    fallback copy still reports status=applied with file_copied=true (log says
    "byte copy"). Whether this must become verify_failed is a product decision.
-Boundary bias of the K-parity anchor convention   : KNOWN LIMITATION. Anchors
-   are placed at the 2-minute bin start (K pass1 convention) to keep round-1
-   bit-identical; under extreme linear drift this biases by ~slope×60 s
-   (synthetic T2 0.5 sample/s = 173 ppm shows ~8 samples residual; K real
-   material measures ≤0.04 ppm).
+Stabilization limits                              : KNOWN LIMITATION. The
+   reference drift_rebuild clamp (30 samples / 2 min = 250 ppm) is scaled to
+   1.5x measured drift when the real drift exceeds it (synthetic 0.5 sample/s
+   linear drift would otherwise be flattened into a staircase). Real material
+   measures <= 2 ppm so the reference clamp is used unchanged.
 >8 channels                                       : DEFERRED by decision — only
    via `--audio-plan alignment=enabled`.
 ```

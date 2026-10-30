@@ -491,11 +491,11 @@ esidual_min_median_samples 1.0 → **0.25**：K fine 即使残差中位 <1 也�
 | C1305 | 478.6 s / 197.8 s | 4.80 / 12.14 / 46 | 7.00 / 35.22 / 47 | 5 / 9 / 52% | 6 / 34 / 42% |
 | C1306 | 303.6 s / 164.9 s | **1.77 / 8.23 / 13** | 2.81 / 12.48 / 22 | 2 / 10 / 81% | 3 / 12.5 / 77% |
 
-（曲线 vs pplytv+refine_curve；音频 vs 重建的 research fine 音频；CH1/CH2
+（曲线 vs applytv+refine_curve；音频 vs 重建的 research fine 音频；CH1/CH2
 为 0/0 与已知 4。仍未达任务书字面容差，原因见 known-limitations §14.2。）
 
 **C1305 正确 restored 重建：BLOCKED**
-- pplytv+refine 重建 vs K restored：CH3 9/46、CH4 10/104；
+- applytv+refine 重建 vs K restored：CH3 9/46、CH4 10/104；
 - drift+refine 重建 vs K restored：CH3 6/22、CH4 27/386；
 - 用 K **块式插值**逐位重建 pass1 再跑 fine 算法，残差与分数 pass1 完全相同
   → 
@@ -503,10 +503,81 @@ efine_curve 的 pass1 既不是 applytv 也不是 drift（应是丢失的
   drift_rebuild.json）；
 - 方法在 C1306 上验证有效（重建 fine vs restored：CH1/2 0/0、CH3 3.5/28.5、
   CH4 4.5/18.5）。
-→ 需要用户提供 ligned_fine wav / drift_rebuild.json / K 侧重导成品之一。
+→ 需要用户提供 aligned_fine wav / drift_rebuild.json / K 侧重导成品之一。
 
 **用户决策落实**
 - --audio-plan 权限最高：1kt.py 透明入口与计划并存时 INFO + 计划接管
   （不再 FATAL）；L3 p4c T9 新增断言，production_output 子集 27 项 0 FAIL。
 - remux 失败 → 源文件拷贝：保持现状（status 语义未改）。
 - >8CH 保持现状；CH1/CH2 stereo 组关系保持（决策 C）；透明重封装置空。
+
+### K deliverable 复核（2026-10-31 凌晨）— 修正此前结论
+
+**结论：`K:\1kt_work\long_align\deliver` 下两个 restored 成品是正确的**
+（结构 + 音频口径都是研究 round-3 final）。此前"C1305 restored 用错中间
+产物"的结论**不成立**：那是拿 round-2 的 `applytv` 曲线去比，而成品用的是
+round-3 的 **drift_rebuild** pass1。
+
+证据链（归档研究脚本仍在 `tests/regression/long_align_tools/`）：
+- `remux_final.py`：成品音频来自 `data/_scratch/aligned_fine/<stem>/ch{i}_fine.f32`；
+- `fine_delay.py`：`fine = interp(pass1, k + refine_curve)`，其中
+  `pass1 = interp(src, k + s0)`、`s0` 来自 `drift_rebuild.json` 锚点；
+- `plot_drift2.py::anchors_from`：drift_rebuild 锚点 = 2 min 加权中位锚点 →
+  **7 个锚点（14 min）中值滤波** → **每锚点限幅 30 采样（250 ppm）**；
+  round-2 的 applytv 是 120 采样限幅、无中值滤波 —— 这就是两者在 tracker
+  跳变段的差异来源；
+- 用 K `track_*.json` 轨迹 + `refine_curve_*.json` 重建 drift_rebuild+refine，
+  与 deliver 音频直接互相关：C1305 CH3 med 5.5 / CH4 6.5，C1306 CH3 1.5 /
+  CH4 3.0 采样，|CC| ≥ 0.99（残差来自 drift_rebuild.json 缺失导致的锚点
+  重建差，不是口径错误）；
+- 容器：两文件均为 1×HEVC hvc1 + 4×mono pcm_s24be/ipcm + rtmd data，
+  duration_ts 与源一致，major_brand 保持 XAVC，`remux_final.json` 记录父成品
+  视频逐包 bit-exact、音频 md5 与 WAV 一致；restored 为 final 再恢复元数据。
+
+**对实现的含义**：要对齐这两个交付物，round-1 曲线应采用 round-3 的
+drift_rebuild 稳定化（中值滤波 7 + 限幅 30），而不是 round-2 的 applytv
+（120 限幅）；round-2 残差继续用 K fine-pass 同源算法。验收 oracle 改用
+deliver 里的 restored 音频（或重建的 drift_rebuild+refine）。
+下一步：在 `build_curve_from_windows` 加稳定化级、重跑两条长视频并用
+deliver 音频作 oracle 验收。
+
+### 参考算法完整实现 + 最终验收 PASS（2026-10-31）
+
+**实现（`core/long_take.py`）**
+- `build_curve_from_windows`：2 min 加权中位锚点 → 7 锚点中值滤波 →
+  30 采样/锚点限幅（参考 `plot_drift2.anchors_from`）；真实漂移超过限幅时
+  按 1.5×稳健斜率自适应放大（合成线性漂移测试需要；真实素材 ≤2 ppm 不触发）。
+- 新增 `reference_interp_write`：与参考 `fine_delay.interp_write` 逐行等价
+  （10,000 采样曲线网格、5M 采样块、clamp 后块内 `np.interp`、越界补零、
+  float32）。TV 路径 round-1 与 round-2 final 均改用它（`tv_apply_engine=
+  "reference"`，内置 `apply_curve` 作 fallback）。
+- round-2 残差直接在参考分数 pass1 上测量（不再需要单独重建 pass1），final 再
+  对 pass1 做一次残差插值（参考 double-interp）。
+- 报告新增 `curve_grid`（完整 1 s 施加曲线）、`curve_round1`、
+  `apply_engine`（验收/审计用）。
+
+**参考管线复算（独立 oracle，未修改归档研究脚本）**
+- `plot_drift2.py` → `data/_scratch/drift_rebuild.json`（pass1 锚点；
+  C1305 CH3 swing 26 / CH4 swing 506；C1306 CH3 131 / CH4 48）。
+- `fine_delay.py` → `data/_scratch/aligned_fine/<stem>/aligned_4ch_fine.wav` +
+  `fine_delay.json`（round-3 final 音频与残差）。
+- 复算 final 音频 vs K 交付 restored：CH1/2/3/4 **0/0/0/0**（p90 0）→
+  再次证明交付物是参考 round-3 final（此前"用错中间产物"结论已撤销）。
+- 复算 final 音频 vs 我们的输出：CH1/3/4 **0/0**，CH2 **4/4**（用户
+  stereo 组决策）。
+- 曲线层：我们的总曲线 vs 参考总曲线：C1305/C1306 两通道
+  **med 0 / p90 0 / max 0（4808/4165 点全 ≤5）**；round-1 vs 参考 pass1 有
+  少量差异（C1305 CH3 2/4、CH4 6/30；C1306 1/1–3.6），但残差补偿后总曲线
+  逐点一致。
+
+**最终验收（`work/long_take/s6/final_accept_v2.py` → OVERALL: PASS）**
+
+| 层 | 容差 | C1305 | C1306 |
+|---|---|---|---|
+| 曲线（vs 参考 final 曲线） | med≤1/p90≤5/max≤50 | **0/0/0** | **0/0/0** |
+| 音频（vs K 交付音频） | med≤2/p90≤10/≥90%≤5 | CH1/3/4 0/0/0 100%；CH2 4/4/4（决策 C） | 同左 |
+
+耗时：整文件音频域 C1305 689.9 s / C1306 389.1 s；long-take 附加
+231.0 s / 193.8 s。unit 1011/2（环境项）；integration/多声道 E2E 全 PASS。
+产物：`work/long_take/accept/final_accept_v2.json`、`reference_verification.json`、
+`deliver_audit.json`、`ref_pipeline_*.log`。

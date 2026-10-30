@@ -73,9 +73,25 @@ PROFILE: dict[str, Any] = {
     "tv_fallback_hop_seconds": 10.0,
     "tv_search_ms": 250.0,
     "tv_max_shift_samples": 4800,
-    # 曲线构造：2 min |CC| 加权中位锚点 + 120 采样跳变限幅
+    # TV 路径的施加引擎：reference = 研究 `interp_write` 分数插值（交付物口径，
+    # 2026-10-31 用户决策"完整实现参考算法"）；builtin = 内置 audio_sync_tv
+    # 整数执行器（保留 fallback / 对照用）。
+    "tv_apply_engine": "reference",
+    # 曲线构造（2026-10-31 起 = 研究 round-3 `drift_rebuild` 完整口径）:
+    #   2 min |CC| 加权中位锚点 -> 7 锚点(14 min)中值滤波去孤立跳变
+    #   -> 每锚点限幅 30 采样(250 ppm) -> 线性插值。
+    # `plot_drift2.py::anchors_from` 是参考实现；round-2 的 apply_tv 口径
+    # （无限幅/120 限幅、无中值滤波）只保留在 `curve_stabilize=False` 分支。
     "curve_anchor_seconds": 120.0,
-    "curve_jump_limit_samples": 120.0,
+    "curve_stabilize": True,
+    "curve_stabilize_median_anchors": 7,
+    "curve_jump_limit_samples": 30.0,
+    # 自适应限幅: 参考限幅 30 采样/2 min 隐含"真实漂移 ≤250 ppm"。合成/其它
+    # 素材若有更大的**真实**漂移（如 0.5 采样/s = 10.4 ppm 的线性漂移，
+    # 2 min 走 60 采样），绝对 30 会把人造阶梯当真实漂移压掉。检测到稳健
+    # 斜率超过限幅时把限幅放大到 1.5×实际漂移（真实 80 min 素材的漂移只有
+    # ~2 ppm，实际漂移 2 min ≤12 采样 < 30，因此不受影响、与参考逐位一致）。
+    "curve_jump_clamp_adaptive": True,
     # 建曲线/锚点的最低 |CC|：研究 apply_tv.build_curve 用 0.08（accepted and
     # cc >= 0.08）。安静段落追踪器会一致抖动（cc 0.004–0.09），必须丢弃这些
     # 窗，否则 2 min 加权中位锚点被垃圾窗带偏（C1305 实测 65–70 min 差 260 采样）。
@@ -171,6 +187,25 @@ def _weighted_median(values: np.ndarray, weights: np.ndarray) -> float:
 # ---------------------------------------------------------------------------
 # 曲线构造（研究 apply_tv.build_curve 的**口径**，不是实现复制）
 # ---------------------------------------------------------------------------
+def _theil_sen_slope(x: np.ndarray, y: np.ndarray,
+                     max_pairs: int = 20000) -> float:
+    """稳健斜率（采样/单位 x）：参考 `plot_drift2.theil_sen` 的简化版。"""
+    n = int(y.size)
+    if n < 2:
+        return 0.0
+    if n * (n - 1) // 2 <= max_pairs:
+        i, j = np.triu_indices(n, k=1)
+    else:
+        rng = np.random.default_rng(0)
+        i = rng.integers(0, n, max_pairs)
+        j = rng.integers(0, n, max_pairs)
+    dt = x[j] - x[i]
+    ok = np.abs(dt) > 1e-12
+    if not ok.any():
+        return 0.0
+    return float(np.median((y[j][ok] - y[i][ok]) / dt[ok]))
+
+
 def build_curve_from_windows(
     windows: Sequence[Mapping[str, Any]],
     *,
@@ -271,10 +306,32 @@ def build_curve_from_windows(
                 sample_rate, float(prof["tv_grid_hop_seconds"])),
         }
     ys = [a[1] for a in anchors]
-    for k in range(1, len(ys)):
-        delta = ys[k] - ys[k - 1]
-        if abs(delta) > jump:
-            ys[k] = ys[k - 1] + math.copysign(jump, delta)
+    stabilize = bool(prof.get("curve_stabilize", True))
+    if stabilize:
+        # 参考 `plot_drift2.py::anchors_from`（round-3 drift_rebuild 口径）:
+        # 1) 7 锚点（14 min）中值滤波 —— 去掉孤立的内容分支跳变；
+        # 2) 每锚点限幅（30 采样 = 250 ppm）；真实漂移超过该限幅时按
+        #    1.5×实测漂移自适应放大，避免把真实漂移压成阶梯（见 PROFILE）。
+        win = int(prof.get("curve_stabilize_median_anchors", 7))
+        if win >= 3 and len(ys) >= win:
+            pad = np.pad(np.asarray(ys, dtype=np.float64), win // 2,
+                         mode="edge")
+            ys = [float(np.median(pad[k:k + win])) for k in range(len(ys))]
+        lim = float(prof.get("curve_jump_limit_samples", 30.0))
+        if bool(prof.get("curve_jump_clamp_adaptive", True)) and len(ys) >= 3:
+            slope = _theil_sen_slope(np.arange(len(ys), dtype=np.float64),
+                                     np.asarray(ys, dtype=np.float64))
+            if math.isfinite(slope) and abs(slope) > lim:
+                lim = float(math.ceil(1.5 * abs(slope)))
+        for k in range(1, len(ys)):
+            delta = ys[k] - ys[k - 1]
+            if abs(delta) > lim:
+                ys[k] = ys[k - 1] + math.copysign(lim, delta)
+    else:
+        for k in range(1, len(ys)):
+            delta = ys[k] - ys[k - 1]
+            if abs(delta) > jump:
+                ys[k] = ys[k - 1] + math.copysign(jump, delta)
     for k, y in enumerate(ys):
         anchors[k][1] = y
     if max(abs(y) for y in ys) > float(prof["tv_max_shift_samples"]):
@@ -286,11 +343,10 @@ def build_curve_from_windows(
         sample_rate, float(prof["tv_grid_hop_seconds"])), dtype=np.float64)
     if grid.size == 0:
         return {"ok": False, "reason": "empty_grid"}
+    # 参考 `fine_delay.load_curves` 用 np.interp 在锚点间线性插值，
+    # 边界自然 hold（首锚点前/末锚点后取最近锚点值）。1 s 网格与参考的
+    # 10k 网格只差亚采样插值误差。
     s = np.interp(grid, t, y)
-    # 边界 hold（研究 apply_tv 口径）：首锚点之前/末锚点之后保持最近锚点值。
-    # （2026-10-30 曾改成线性外推以减小线性漂移的首尾偏差；但实盘 80 min 里
-    # 末尾安静段锚点稀疏且噪声大，外推 460 s 把 CH4 末尾推到 +884 采样，
-    # 与 K 成品（hold）差 839 —— 与 K 验收对齐优先，恢复 hold。）
     if float(np.max(np.abs(s))) > float(prof["tv_max_shift_samples"]):
         return {"ok": False, "reason": "shift_out_of_range",
                 "max_shift": float(np.max(np.abs(s)))}
@@ -304,6 +360,7 @@ def build_curve_from_windows(
         "n_anchors": len(anchors),
         "grid_hop_samples": _chunk_samples(
             sample_rate, float(prof["tv_grid_hop_seconds"])),
+        "stabilized": stabilize,
     }
 
 
@@ -381,6 +438,57 @@ def render_fractional_pass1(
             out[invalid] = 0.0
             fh.write(out.astype(np.float32).tobytes())
     return Path(dst_raw)
+
+
+def reference_interp_write(
+    src_raw: Path,
+    dst_raw: Path,
+    curve: Mapping[str, Any],
+    *,
+    sample_rate: int,
+    storage_dtype: str = "f32",
+    profile: Mapping[str, Any] | None = None,
+    grid_step: int = 10_000,
+    chunk_samples: int = 5_000_000,
+) -> dict[str, Any]:
+    """参考实现的分数插值施加（研究 `fine_delay.interp_write` 逐行等价）。
+
+    这是 K round-3 final 的真实施加方式：
+      * 曲线在 **10,000 采样网格** 上采样后逐块线性插值（块 5,000,000 采样，
+        块内 `np.interp(pos, arange(s0,s1), src[s0:s1])`）；
+      * `pos = k + s(k)`，先 clamp 到 [0,n-1] 再插值，越界样本写 0；
+      * 输出 float32。
+
+    为什么要改：交付物就是用它生成的（`fine_delay.py`）。此前生产用内置
+    `audio_sync_tv` 的 1 s hold 整数移位，虽然逐窗把曲线执行得"正确"，但
+    (a) 分数移位与整数移位存在亚采样差，(b) round-3 的 drift_rebuild 曲线
+    在跳变段被稳定化后仍需要线性插值才能与交付物逐样本一致。用户 2026-10-31
+    决策"使用参考的算法完整实现"后，TV 路径的 pass-1/final 都用本函数。
+    """
+    prof = dict(PROFILE if profile is None else profile)
+    n = _raw_length(Path(src_raw), storage_dtype)
+    if n <= 0:
+        return {"executed": False, "reason": "empty_source"}
+    grid_t = np.asarray(curve["grid_t"], dtype=np.float64)
+    grid_s = np.asarray(curve["grid_s"], dtype=np.float64)
+    grid = np.arange(0, n, int(grid_step), dtype=np.float64)
+    shift = np.interp(grid, grid_t, grid_s)
+    chunk = max(1, int(chunk_samples))
+    with Path(dst_raw).open("wb") as fh:
+        for s0 in range(0, n, chunk):
+            s1 = min(n, s0 + chunk)
+            idx = np.arange(s0, s1, dtype=np.float64)
+            vals = _read_raw(src_raw, storage_dtype, s0, s1 - s0
+                             ).astype(np.float64)
+            pos = idx + np.interp(idx, grid, shift)
+            invalid = (pos < 0.0) | (pos > n - 1.0)
+            np.clip(pos, 0.0, n - 1.0, out=pos)
+            block = np.interp(pos, np.arange(s0, s1, dtype=np.float64), vals)
+            block[invalid] = 0.0
+            fh.write(block.astype(np.float32).tobytes())
+    return {"executed": True, "engine": "reference_interp", "grid_step":
+            int(grid_step), "n_samples": n,
+            "output": str(dst_raw)}
 
 
 def apply_curve(
@@ -990,15 +1098,38 @@ def align_time_varying(
         log(f"long-take: CH{rep + 1} curve ok — windows "
             f"{curve['n_windows']}, anchors {curve['n_anchors']}, "
             f"max|shift| {curve['max_shift']:.1f} samples")
+        curve_round1 = {
+            "grid_t": curve.get("grid_t"),
+            "grid_s": curve.get("grid_s"),
+        }
 
         # 2) round-1 施加（每个成员用同一曲线；组内 delta 是源内容不动）
+        #
+        # 用户决策（2026-10-31）：TV 路径完整采用参考实现 —— 分数插值
+        # （reference_interp_write，研究 interp_write 等价），不再用内置
+        # 整数执行器；内置 apply_curve 保留作 fallback（异常时退回并在
+        # 报告里标 engine=builtin）。
         rounds = 0
         applied: dict[int, Path] = {}
+        apply_engine = str(prof.get("tv_apply_engine", "reference"))
         for m in members:
             dst = tgt_dir / f"round1_{m}.{storages[m]}"
-            stats = apply_curve(
-                decoded[m], dst, curve, sample_rate=sample_rate,
-                storage_dtype=storages[m], profile=prof)
+            stats: dict[str, Any]
+            if apply_engine == "reference":
+                try:
+                    stats = reference_interp_write(
+                        decoded[m], dst, curve, sample_rate=sample_rate,
+                        storage_dtype=storages[m], profile=prof)
+                except Exception as exc:               # noqa: BLE001
+                    log(f"long-take: CH{m + 1} reference apply failed "
+                        f"({type(exc).__name__}: {exc}) — 退回内置执行器")
+                    stats = apply_curve(
+                        decoded[m], dst, curve, sample_rate=sample_rate,
+                        storage_dtype=storages[m], profile=prof)
+            else:
+                stats = apply_curve(
+                    decoded[m], dst, curve, sample_rate=sample_rate,
+                    storage_dtype=storages[m], profile=prof)
             if not stats.get("executed"):
                 log(f"long-take: CH{m + 1} round-1 apply refused: "
                     f"{stats.get('reason')} {stats.get('detail')}")
@@ -1012,31 +1143,14 @@ def align_time_varying(
 
         # 3) 第二轮残差（只在代表上测，s_total 同施加到全组）
         #
-        # 残差在**分数插值重建的 pass-1** 上测（见 render_fractional_pass1：
-        # 与 K research fine pass 的测量条件一致），最终施加仍用内置整数
-        # 执行器。重建失败时退回整数 pass-1（保守回退，不改变语义）。
+        # round-1 输出已经是**分数插值 pass1**（与 K fine_delay 的 pass1 同
+        # 条件），残差直接在它上面测；final 再对 pass1 做一次分数插值
+        # （参考实现的双重插值），而不是把总曲线一次施加到源上。
         residual_stats: dict[str, Any] = {"used": False}
         if int(prof["max_rounds"]) > 1:
-            frac_raw = tgt_dir / f"round1_frac_{rep}.f32"
-            try:
-                render_fractional_pass1(
-                    decoded[rep], frac_raw, curve,
-                    sample_rate=sample_rate,
-                    storage_dtype=storages[rep], profile=prof)
-                res = measure_residual_curve(
-                    decoded[anchor], frac_raw, sample_rate=sample_rate,
-                    storage_dtype="f32", profile=prof)
-            except Exception as exc:                   # noqa: BLE001
-                log(f"long-take: CH{rep + 1} fractional pass-1 failed "
-                    f"({type(exc).__name__}: {exc}) — 退回整数 pass-1")
-                res = measure_residual_curve(
-                    decoded[anchor], applied[rep], sample_rate=sample_rate,
-                    storage_dtype=storages[rep], profile=prof)
-            finally:
-                try:
-                    frac_raw.unlink()
-                except OSError:
-                    pass
+            res = measure_residual_curve(
+                decoded[anchor], applied[rep], sample_rate=sample_rate,
+                storage_dtype=storages[rep], profile=prof)
             residual_stats = dict(res)
             if res.get("ok"):
                 total = add_curves(curve, res)
@@ -1045,10 +1159,25 @@ def align_time_varying(
                     settled = {}
                     for m in members:
                         dst = tgt_dir / f"round2_{m}.{storages[m]}"
-                        stats2 = apply_curve(
-                            decoded[m], dst, total,
-                            sample_rate=sample_rate,
-                            storage_dtype=storages[m], profile=prof)
+                        if apply_engine == "reference":
+                            try:
+                                stats2 = reference_interp_write(
+                                    applied[m], dst, res,
+                                    sample_rate=sample_rate,
+                                    storage_dtype=storages[m], profile=prof)
+                            except Exception as exc:   # noqa: BLE001
+                                log(f"long-take: CH{m + 1} reference round-2 "
+                                    f"failed ({type(exc).__name__}: {exc}) — "
+                                    "退回内置执行器(总曲线)")
+                                stats2 = apply_curve(
+                                    decoded[m], dst, total,
+                                    sample_rate=sample_rate,
+                                    storage_dtype=storages[m], profile=prof)
+                        else:
+                            stats2 = apply_curve(
+                                decoded[m], dst, total,
+                                sample_rate=sample_rate,
+                                storage_dtype=storages[m], profile=prof)
                         if stats2.get("executed"):
                             settled[m] = dst
                     if len(settled) == len(members):
@@ -1091,6 +1220,13 @@ def align_time_varying(
             "curve": {k: curve.get(k) for k in (
                 "n_windows", "n_anchors", "max_shift", "grid_hop_samples")},
             "curve_anchors": curve.get("anchors"),
+            # 完整施加曲线（验收/审计用；1 s 网格，~4800 点/轨）
+            "curve_grid": (
+                {"grid_t": curve.get("grid_t"),
+                 "grid_s": curve.get("grid_s")}
+                if curve.get("grid_t") else None),
+            "curve_round1": curve_round1,
+            "apply_engine": apply_engine,
             "residual": residual_stats,
             "polarity": pol,
         }

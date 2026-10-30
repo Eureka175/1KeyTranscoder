@@ -407,6 +407,15 @@ return fixed_result                # ← 其它文件级失败：现状安全语
    不过滤时 2 min 中位锚点被垃圾窗带偏 — 实测 65–70 min 与 K pass1 差 260 采样）；
 7. 输出每 target 一条 `{grid_t, grid_s, coverage, per_window_quality}` 与逐窗证据。
 
+**修订（2026-10-31，完整实现参考 round-3）**：2 min 加权中位锚点之后必须再加
+参考 `drift_rebuild` 的两道稳定化 —— **7 锚点（14 min）中值滤波** 去孤立跳变，
+**每锚点限幅 30 采样（250 ppm）**（round-2 的 apply_tv 为 120 限幅、无中值
+滤波，仅保留在 `curve_stabilize=False` 分支）。实测：不做这一步时，round-1
+仍与 round-2 的 `applytv` 一致，但 K 交付物用的是 round-3 的 `drift_rebuild`
+pass1，两者在 tracker 跳变段相差 100+ 采样。真实素材漂移很小、30 限幅不会
+生效；若检测到真实漂移超过限幅（合成线性漂移测试），限幅按 1.5×实测斜率
+自适应放大（见 `PROFILE["curve_jump_clamp_adaptive"]`）。
+
 **锚点**（时变后备路径）：沿用 `anchor_candidates`（默认 **CH1→CH2→…→CH8**，0-based 0..7）；
 **当前锚点置信度/可用帧数低于门即换下一个**（与固定路径同一判据；其它候选判据如
 “无任何可测 target/相关强度低”在 S1 实测比较后回填）。
@@ -434,9 +443,18 @@ return fixed_result                # ← 其它文件级失败：现状安全语
 5. **组绑定**：组代表执行一次；组内另一条用**同一 records/request** 再执行一次
    （其 `delta_ij` 已含在源样本里，因此整组同偏移即保持组内关系）。
 
-**为什么 1 s hop**：内置 plan 的移位是“每窗一个整数”，无法直接表达 1 s 线性
-插值；hop=1 s 时逐样本移位是 1 s 阶梯，慢漂移下与插值等价（<0.01 采样），
-从而不改执行器即可复用其施加/复测。
+**修订（2026-10-31，用户决策"完整实现参考算法"）**：TV 路径的施加引擎改为
+参考 `fine_delay.interp_write` 的**分数插值**（`reference_interp_write`）：
+曲线在 10,000 采样网格采样、5,000,000 采样/块、`pos = k + s(k)` 先 clamp 到
+[0,n-1] 再块内线性插值、越界样本写 0、输出 float32；round-1 pass1 与 round-2
+final 都走它（final 是对 pass1 再做一次残差插值 = 参考的 double-interp）。
+理由：K 交付物就是由此生成；内置 `audio_sync_tv` 的 1 s hold 整数移位会有
+亚采样差且无法表达参考插值。内置 `apply_curve` 保留为 fallback（异常时退回，
+报告 `apply_engine=builtin`）。
+
+**为什么原来的内置 1 s hop 方案**（历史记录）：内置 plan 的移位是“每窗一个
+整数”，无法直接表达 1 s 线性插值；hop=1 s 时逐样本移位是 1 s 阶梯，慢漂移下
+与插值近似（<0.01 采样）。参考实现接管 TV 施加后此段仅用于 fallback 说明。
 
 ### 4.5 第二轮残差精化（默认开启，最多 2 轮）
 
@@ -797,30 +815,42 @@ python 1kt.py --input <dir> --output <dir> --channel-sync-transparent
 
 ---
 
-## 13. 实施状态（2026-10-30）
+## 13. 实施状态（2026-10-30 初版，2026-10-31 更新为验收 PASS）
 
 > 本节是**实施后的状态回填**，不改变上面已批准的需求与决策；逐条证据、
 > 数字、复现命令与 open item 的完整记录在
-> `docs/design/long_take_impl_checkpoint.md`（问题与决策记录）和
+> `docs/design/long_take_impl_checkpoint.md`（问题与决策记录）、
+> `docs/design/long_take_acceptance_report.md`（最终验收）和
 > `docs/audio-sync-p4/known-limitations.md` §14。
 
 **已完成**：默认自动开启（恒定优先 → 整文件时变后备）、stereo 组绑定、
-时变计划/施加（全部走内置 `audio_sync_tv_exec`，hold + latest-start + 1 s 网格）、
-round-2 残差、极性、报告块（`stereo_groups` / `long_take`/ `channels[].source_*`）、
-`--audio-plan` 让位语义、多声道 PCM 布局（A6：逐声道拆、按源流重新交织、
-结构保持）、GPAC 临时目录重定向、S5 部分并行（残差窗 / 绑定候选对）。
+round-2 残差、极性、报告块（`stereo_groups` / `long_take` / `channels[].source_*`）、
+`--audio-plan` 权限最高（透明入口让位）、多声道 PCM 布局（A6：逐声道拆、
+按源流重新交织、结构保持）、GPAC 临时目录重定向、S5 并行
+（残差窗 / 绑定候选对）。
 
-**实施中对本文档口径的修订**（均已在上文对应小节就地标注）：
-- §4.3：建锚点前必须过滤 `|CC| < 0.08`（研究 `apply_tv` 口径），且锚点时间
-  用 2 min 箱起点（与 K pass1 逐位一致——round-1 与 K pass1 实测 0/0/0）。
-- §4.4：`policy=hold`、`coordinate=latest-start`、`window_samples == hop_samples`
-  （`linear` 为 offline-only；`nearest-centre` 的独立复测是 O(n×窗数)）。
-- §4.5：残差测量改为 60 s 窗 / 20 s 跳 / ±80 搜索 / |CC|≥0.20 / 5 min 加权
-  中位平滑 / 离局部中位 >30 采样丢弃 / |r|≤100（研究 round-3 口径）。
-- §4.6：极性翻转后，输出（成品音频）极性应与锚点一致；报告里
-  `targets[].polarity.flip=true` 表示已翻。
+**2026-10-31：参考 round-3 算法完整实现（用户决策）**：
+- §4.3 pass1 改为研究 round-3 `drift_rebuild`：2 min 加权中位锚点 →
+  **7 锚点（14 min）中值滤波** → **30 采样/锚点限幅（250 ppm）**；
+  round-2 的 apply_tv（120 限幅、无中值滤波）只在
+  `curve_stabilize=False` 保留；
+- §4.4/§4.5 施加改为参考 `fine_delay.interp_write` **分数插值**
+  （fractional interp：10,000 采样网格、5M 采样/块、clamp 后块内线性插值、
+  越界补零），round-1 与 round-2 都用它（参考的双重插值），不再使用内置
+  整数执行器作为 TV 路径的最终施加；内置 `apply_curve` 保留 fallback；
+- 残差继续用 K fine-pass 同源算法（60 s 窗 / 20 s 跳 / 12 kHz ±80 + ±8 /
+  |CC|≥0.20 / 5 min 滑动中位 / |r|≤100），并在**参考分数 pass1** 上测量。
 
-**未完成/待决**：K oracle 的 C1305 restored 与 K 研究 fine 曲线不一致（疑似
-旧全局解误封装，见 known-limitations §14.3）；任务书 §9 曲线/音频容差低于 K
-自身的内容歧义噪声地板（§14.2）；A1 回归语料不可用（§14.4）；透明模式在
-50 GiB 文件上的容器恢复受 GPAC 多轮整文件重写限制（§14.4）。
+**验收（2026-10-31，最终）**：
+- 曲线层 vs 重跑的归档参考管线 final 曲线：C1305/C1306 两通道
+  **med 0 / p90 0 / max 0**（4808/4165 点全 ≤5）→ 任务书 §9 PASS；
+- 音频层 vs K 交付 restored 音频（5 min 块）：CH1/CH3/CH4 **0/0/0，100%**；
+  CH2 **4/4/4**（用户决策：CH1/CH2 stereo 组关系不动，K 的 −4 会改变组内
+  关系，属预期差）→ PASS；
+- 独立复算：重跑参考管线 vs 我们的输出：CH1/3/4 med 0 / p90 0、CH2 4/4；
+  参考管线 vs K 交付：全 0/0。
+
+**未完成/待决**（不阻塞验收）：透明模式在 50 GiB 文件上的容器恢复受 GPAC
+多轮整文件重写限制（用户决策"暂时置空"，§14.4）；remux 失败终态
+`applied + file_copied` 的语义；A1 回归语料不可用（以全量回归 + 真实两文件
+替代）；发布/VERSION/push。
