@@ -83,6 +83,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
              channel_sync.l1_recheck_knobs),
             ("长镜头窗级漂移测量 (measure_window_delays)",
              long_take.l1_long_take_window_delays),
+            ("长镜头参考算法 (drift_rebuild + 分数插值)",
+             long_take.l1_long_take_reference_algorithm),
             ("audio model v0.7.1", audio_model.l1_audio_model),
             ("audio select/map v0.7.1", audio_selection.l1_audio_selection),
             ("audio timeline v0.7.1", audio_timeline.l1_audio_timeline),

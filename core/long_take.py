@@ -36,6 +36,7 @@ __all__ = [
     "curve_records",
     "detect_polarity",
     "measure_residual_curve",
+    "reference_interp_write",
 ]
 
 #: 长镜头后备的产品口径（任务书 §4.3–§4.6 / §7.1 D–F）。

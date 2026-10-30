@@ -243,3 +243,145 @@ def l1_long_take_window_delays() -> None:
            res_again["windows"] == res_p["windows"]
            and res_again["initial"] == res_p["initial"],
            f"n={len(res_again['windows'])}")
+
+
+def l1_long_take_reference_algorithm() -> None:
+    """L1: 参考 round-3 算法 (drift_rebuild 稳定化 + 分数插值施加)。
+
+    a) 锚点稳定化: 7 锚点中值滤波剔除孤立跳变; 30 采样/锚点限幅对真实
+       漂移自适应放大 (合成 0.5 采样/s 线性漂移不被压成阶梯);
+       `curve_stabilize=False` 保留 round-2 的 apply_tv 行为 (120 限幅,
+       无中值滤波) —— 用对照断言证明两条路径确实不同;
+    b) `reference_interp_write` 与参考 `fine_delay.interp_write` 同义:
+       常量整数移位逐样本精确、分数移位 = 全局线性插值、越界补零、
+       返回 executed/n_samples。
+    """
+    section("L1 长镜头参考算法 (drift_rebuild 稳定化 + 分数插值施加)")
+    try:
+        import numpy as np
+    except ImportError as exc:                 # 与其它套件一致: 缺依赖跳过
+        record("long_take.ref.numpy 可用", False,
+               f"{exc} — 本组跳过 (参考算法测试需 numpy)")
+        return
+    record("long_take.ref.numpy 可用", True)
+
+    from core import long_take
+
+    SR = 48_000
+    BIN = int(long_take.PROFILE["curve_anchor_seconds"] * SR)
+
+    def synth_windows(truth, duration_s: int, hop_s: float = 30.0,
+                      jump: float = 0.0, jump_bins: tuple = ()) -> tuple:
+        """合成窗记录: truth(样本位置)->延迟; jump_bins 内的窗加孤立跳变。"""
+        n = int(duration_s * SR)
+        hop = int(hop_s * SR)
+        rows = []
+        for s in range(0, max(1, n - 60 * SR), hop):
+            b = s // BIN
+            val = float(truth(s)) + (jump if b in jump_bins else 0.0)
+            rows.append({
+                "start_sample": float(s),
+                "center_sample": float(s + 30 * SR),
+                "delay_samples": val,
+                "confidence": 0.8,
+                "coarse_cc": 0.8,
+                "valid": True,
+            })
+        return rows, n
+
+    # ---- a1) 孤立跳变: 稳定化后曲线平坦 ------------------------------
+    rows, n = synth_windows(lambda s: 1000.0, 1600, jump=130.0,
+                            jump_bins=(7,))
+    curve = long_take.build_curve_from_windows(
+        rows, n_samples=n, sample_rate=SR)
+    dev = np.max(np.abs(np.asarray(curve["grid_s"]) - 1000.0))
+    record("long_take.ref 中值滤波剔除孤立 130 采样跳变",
+           curve["ok"] and dev <= 1.0 and curve.get("stabilized") is True,
+           f"ok={curve.get('ok')} max|dev|={dev:.2f}")
+    legacy = long_take.build_curve_from_windows(
+        rows, n_samples=n, sample_rate=SR,
+        profile={**long_take.PROFILE,
+                 "curve_stabilize": False,
+                 "curve_jump_limit_samples": 120.0})
+    dev_legacy = np.max(np.abs(np.asarray(legacy["grid_s"]) - 1000.0))
+    record("long_take.ref 对照: round-2 口径保留跳变 (≥100)",
+           dev_legacy >= 100.0,
+           f"legacy max|dev|={dev_legacy:.1f}")
+
+    # ---- a2) 真实线性漂移: 自适应限幅不压成阶梯 ----------------------
+    def drift_truth(s: float) -> float:
+        return 1000.0 + 0.5 * s / SR
+
+    rows_d, n_d = synth_windows(drift_truth, 1600)
+    curve_d = long_take.build_curve_from_windows(
+        rows_d, n_samples=n_d, sample_rate=SR)
+    grid = np.asarray(curve_d["grid_t"])
+    truth = 1000.0 + 0.5 * grid / SR + 15.0     # 锚点取箱内窗中位 = +30 s 处
+    # 末锚点之后是 hold 边界 (参考口径), 不属于漂移跟踪区 -> 只比较锚点覆盖区
+    last_anchor = float(curve_d["anchors"][-1][0]) * SR
+    mask = grid <= last_anchor
+    err = np.max(np.abs((np.asarray(curve_d["grid_s"]) - truth)[mask]))
+    record("long_take.ref 自适应限幅跟住 0.5 采样/s 真实漂移",
+           curve_d["ok"] and err <= 2.0,
+           f"ok={curve_d.get('ok')} max|err|={err:.2f}")
+    fixed = long_take.build_curve_from_windows(
+        rows_d, n_samples=n_d, sample_rate=SR,
+        profile={**long_take.PROFILE, "curve_jump_clamp_adaptive": False})
+    err_fixed = np.max(np.abs(
+        (np.asarray(fixed["grid_s"]) - truth)[mask]))
+    record("long_take.ref 对照: 固定 30 限幅会压出阶梯 (误差>50)",
+           err_fixed > 50.0,
+           f"fixed max|err|={err_fixed:.1f}")
+
+    # ---- b) reference_interp_write 语义 ------------------------------
+    import tempfile
+    from pathlib import Path
+
+    tmpdir = Path(tempfile.mkdtemp(prefix="long_take_ref_"))
+    try:
+        n_ref = 4 * SR
+        rng = np.random.default_rng(7)
+        src = (rng.standard_normal(n_ref) * 0.3).astype(np.float32)
+        src_p = tmpdir / "src.f32"
+        src.tofile(src_p)
+
+        def curve_const(value: float) -> dict:
+            return {"grid_t": [0.0, float(n_ref)], "grid_s": [value, value]}
+
+        def run(value: float, name: str) -> tuple:
+            dst = tmpdir / f"{name}.f32"
+            stats = long_take.reference_interp_write(
+                src_p, dst, curve_const(value), sample_rate=SR)
+            out = np.fromfile(dst, dtype="<f4")
+            return stats, out
+
+        stats5, out5 = run(5.0, "int5")
+        expect5 = np.zeros(n_ref, dtype=np.float32)
+        expect5[: n_ref - 5] = src[5:]
+        exact5 = int(np.max(np.abs(out5 - expect5)) == 0) if out5.size else False
+        record("long_take.ref 整数移位 +5 逐样本精确/越界补零",
+               bool(stats5.get("executed")) and out5.size == n_ref
+               and exact5,
+               f"executed={stats5.get('executed')} n={out5.size} "
+               f"exact={exact5}")
+
+        k = np.arange(n_ref, dtype=np.float64)
+        frac = 2.5
+        expect_f = np.interp(
+            k + frac, k, src.astype(np.float64),
+            left=0.0, right=0.0)
+        stats_f, out_f = run(frac, "frac25")
+        max_df = float(np.max(np.abs(out_f.astype(np.float64) - expect_f)))
+        record("long_take.ref 分数移位 +2.5 = 全局线性插值",
+               bool(stats_f.get("executed")) and max_df <= 1e-6,
+               f"max|diff|={max_df:.2e}")
+
+        stats_n, out_n = run(-5.0, "neg5")
+        zero_ok = bool(np.all(out_n[:5] == 0.0))
+        rest_ok = bool(np.all(out_n[5:] == src[: n_ref - 5]))
+        record("long_take.ref 负移位 -5: 开头补零且其余精确",
+               bool(stats_n.get("executed")) and zero_ok and rest_ok,
+               f"zero_ok={zero_ok} rest_ok={rest_ok}")
+    finally:
+        import shutil
+        shutil.rmtree(tmpdir, ignore_errors=True)
