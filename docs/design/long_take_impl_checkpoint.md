@@ -581,3 +581,23 @@ deliver 音频作 oracle 验收。
 231.0 s / 193.8 s。unit 1011/2（环境项）；integration/多声道 E2E 全 PASS。
 产物：`work/long_take/accept/final_accept_v2.json`、`reference_verification.json`、
 `deliver_audit.json`、`ref_pipeline_*.log`。
+
+### 收尾（2026-10-31 凌晨）：全量回归 + 参考算法测试 + 发布草稿
+
+- **新增 L1 测试** `l1_long_take_reference_algorithm`（8 条，纯 numpy）：
+  7 锚点中值滤波剔除孤立跳变（与 round-2 口径对照 ≥100 采样差）、
+  自适应限幅跟住 0.5 采样/s 真实漂移（固定 30 限幅会压出 >50 采样阶梯）、
+  `reference_interp_write` 的整数/分数/负移位/越界补零语义。
+- **最终全量回归**（含新套件）：**1260 PASS / 12 FAIL**（1306.1 s）；
+  12 条 FAIL 全部为 `testsets/` 真实媒体缺失的环境项（Sony/DJI/A7M5/
+  classic），**无代码/算法失败**。unit 单独跑：**1019 PASS / 2 FAIL**。
+- **提交链**（本地 main，未 push）：
+  `6103d78` 默认长镜头对齐 → `d972e32` 多声道线程安全修复 →
+  `afde8f0` K fine-pass 残差 + 计划权限最高 →
+  `a4799cb` 参考 round-3 算法完整实现 + 验收 PASS →
+  `d3191cf` 参考算法 L1 测试。
+- **发布草稿**：`docs/release_notes_long_take.md`（VERSION/push/release 待用户
+  决定）。
+- **机器休眠**：已注册 Windows 计划任务 `1kt_hibernate_0745`（07:45）、
+  `1kt_hibernate_0752`、`1kt_hibernate_0758`（备份，`shutdown /h`，
+  WakeToRun），并关闭 AC/DC 自动睡眠；按用户要求 08:00 前进入休眠。
