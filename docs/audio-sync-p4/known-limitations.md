@@ -350,3 +350,106 @@ requires the local tree. Where a document cites a `work/` path, that path is
 
 Full per-artifact classification:
 `work/p3-p4-doc-consolidation/inventory.json`.
+
+---
+
+## 14. Long-take default alignment (`docs/design/long_take_default_alignment.md`) — 2026-10-30
+
+Implementation is complete for S1–S6 + S3/A6 + S5 partial; the acceptance
+judgement against the K deliverables is **not green** and has two independent
+causes. Numbers and reproduction commands live in
+`docs/design/long_take_impl_checkpoint.md`; this section states the status
+strictly.
+
+### 14.1 DONE (verified, not a pass claim for acceptance)
+
+```text
+status   : implemented + unit/integration green
+- default auto long-take path: constant-first, whole-file time-varying fallback,
+  stereo group binding, round-2 residual, polarity, long-take report block;
+- multichannel PCM layouts (stereo/quad/5.1/7.1 in one stream): per-channel
+  decode via built-in AudioPCMReader, output re-interleaved per source stream
+  with audio_wav.write_wav, structure preserved (T5/T6 in
+  work/long_take/s3/multichannel_check.py);
+- S5 partial: residual windows and stereo-binding candidate pairs are measured
+  in parallel (thread pool, deterministic order); continuity tracker itself is
+  sequential by definition;
+- preservation/gpac.py: MP4Box temp files pinned to the media volume
+  (`.gpactmp`) — without it a 50 GiB remux fails with ENOSPC on C:.
+Unit: 1008 PASS / 2 FAIL (both are environment-only: no real Sony corpus).
+Integration (synthetic): ALL PASS after the multichannel refactor.
+```
+
+### 14.2 ACCEPTANCE — NOT MET (measured, real 80 min files)
+
+```text
+status   : FAIL against the task-book tolerances as written
+curve layer (median |Δ| ≤1 / p90 ≤5 / max ≤50 samples, vs K research fine curve)
+  C1306 CH3  1.81 / 15.2 / 54        CH4  2.00 / 15.6 / 27
+  C1305 CH3  5.88 / 45.1 / 62        CH4 11.00 / 45.0 / 88
+audio layer (median ≤2 / p90 ≤10 / ≥90% of 5 min blocks ≤5 samples, ours vs K)
+  C1306 CH3  3 / 9 / 77% ≤5          CH4  3 / 6.5 / 77% ≤5
+  C1305 CH3  5 / 28 / 55% ≤5         CH4  8 / 116 / 35% ≤5
+reason   : K's own measured-vs-applied consistency (research doc §12.3) is
+           median 5–23 / p90 17–63 samples — the tolerances are below the
+           content-ambiguity noise floor of the materials themselves. Our
+           round-1 curve is bit-identical to K pass1 (0/0/0 over 4808 points);
+           all remaining difference is round-2 residual on ambiguous content.
+decision : pending user (tighten residual replication vs relax tolerance to the
+           measured noise floor).
+```
+
+### 14.3 K ORACLE INCONSISTENCY — blocks the C1305 acceptance verdict
+
+```text
+status   : BLOCKED on a defect in the reference data, not in our code
+C1306 restored deliverable (2026-10-25) matches K's research fine curve
+   (measured-vs-pass1: median 2.7 / p90 18–43).
+C1305 restored deliverable (2026-10-29, four days later) instead matches the
+   old GLOBAL LINEAR solution: solve/drift a=1015.09, b=-0.012 ppm
+   (measured-vs-drift median 3.1 / p90 18.9 / max 37.9), while measured-vs-pass1
+   is median 5.7–10 / p90 79–81.
+=> the C1305 restored audio was almost certainly rebuilt from the wrong
+   intermediate (old global-aligned audio) during a late restore; it is not the
+   fine audio described by K research doc §12/§16.
+decision : pending user — either re-export the C1305 restored deliverable from
+           the fine audio, or accept the research fine curve JSON as the C1305
+           oracle (recorded here so this is never silently "passed").
+```
+
+### 14.4 OTHER OPEN ITEMS
+
+```text
+A1 regression corpus (226 clips / 584 tracks)     : NOT RUN / corpus not
+   available on this machine; task book §8.2 allows a hold-out set with the
+   gap stated — the 4 synthetic integration cases + real 80 min files are what
+   was actually run. The regression that WAS run and classified (2026-10-30):
+   unit 1011 PASS / 2 FAIL (both environment-only: real Sony corpus absent);
+   L3 full run — 13 environment-only FAILs (missing `testsets/` real media:
+   Sony/DJI/A7M5), the legacy C15–C32 channel-sync expectations updated for
+   the new defaults (anchor CH1→CH8, any-non-constant → whole-file TV, TV
+   failure → unaligned original; mechanism tests pin the old anchor order),
+   one pre-existing failure re-labelled (C32 sparse-speech evidence gate fails
+   identically on the HEAD baseline), and two real bugs found by the run were
+   fixed: `ref_of` UnboundLocalError on bound-group + fixed representative, and
+   `fixed_files` empty for mono-multistream layouts. Also fixed a 16-bit `ipcm`
+   sample-entry false positive that made transparent remux fall back to a byte
+   copy (C17).
+Transparent 50 GiB remux (container layer)        : KNOWN LIMITATION (pre-
+   existing). GPAC rewrites the whole file for every edit; `-ref` was measured
+   at 14 h without finishing on the 50 GiB C1305 stage, so the user's transparent
+   command cannot produce a finished container for these files. K avoided it
+   with a sequential fast_restore copy; porting that into production is a
+   container task, decision pending. Audio-domain acceptance was therefore run
+   through the same run_channel_sync (transparent=False).
+Remux failure terminal status                     : DEFERRED. Remux failure +
+   fallback copy still reports status=applied with file_copied=true (log says
+   "byte copy"). Whether this must become verify_failed is a product decision.
+Boundary bias of the K-parity anchor convention   : KNOWN LIMITATION. Anchors
+   are placed at the 2-minute bin start (K pass1 convention) to keep round-1
+   bit-identical; under extreme linear drift this biases by ~slope×60 s
+   (synthetic T2 0.5 sample/s = 173 ppm shows ~8 samples residual; K real
+   material measures ≤0.04 ppm).
+>8 channels                                       : DEFERRED by decision — only
+   via `--audio-plan alignment=enabled`.
+```

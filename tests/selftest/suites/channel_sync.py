@@ -30,29 +30,32 @@ def l1_channel_sync() -> None:
         verify_channels,
     )
 
-    # --- 布局判定: 2ch/1ch 默认不做对齐 ---
+    # --- 布局判定 (2026-10-29 用户决策 A: 按独立 PCM 声道数 3–8 自动) ---
     ok, why = eligible_audio(
         [{"codec_type": "audio", "codec_name": "pcm_s16le",
           "channels": 2, "sample_rate": "48000"}]
     )
-    record("channel_sync.2ch 默认不对齐", not ok and "2ch" in why, why)
+    record("channel_sync.2ch 默认不对齐",
+           not ok and "channel_count_out_of_range" in why, why)
     ok, why = eligible_audio(
         [{"codec_type": "audio", "codec_name": "pcm_s16le",
           "channels": 1, "sample_rate": "48000"}]
     )
-    record("channel_sync.1ch 默认不对齐", not ok and "1ch" in why, why)
+    record("channel_sync.1ch 默认不对齐",
+           not ok and "channel_count_out_of_range" in why, why)
     ok, why = eligible_audio(
         [{"codec_type": "audio", "codec_name": "aac", "channels": 1,
           "sample_rate": "48000"}] * 4
     )
-    record("channel_sync.非 PCM 不对齐", not ok, why)
+    record("channel_sync.非 PCM 不对齐",
+           not ok and "non_pcm_audio" in why, why)
     ok, _ = eligible_audio(
         [{"codec_type": "audio", "codec_name": "pcm_s24le",
           "channels": 1, "sample_rate": "48000"}] * 4
     )
     record("channel_sync.4xmono PCM 对齐", ok)
     record("channel_sync.opts 默认值",
-           effective_opts(None)["anchor_candidates"] == [2, 3, 0, 1]
+           effective_opts(None)["anchor_candidates"] == list(range(8))
            and effective_opts(None)["algo_version"] == "2.3.0-p1")
 
     # --- 算法包核心断言 (与手交付包 selftest 同源, 合成信号) ---
@@ -142,6 +145,32 @@ def l1_channel_sync() -> None:
            math.isnan(rs5[0].delay_samples)
            and np.array_equal(fixed5[0], silence[: fixed5.shape[1]]))
 
+    # S3/A6 多声道结构支持（纯逻辑部分）
+    from core.audio_wav import WavFormat
+    from core.channel_sync import alignment_scope, _wav_format_for_codec
+
+    def _pcm(n_ch: int, tag: str = "in24") -> list[dict]:
+        return [{
+            "codec_type": "audio", "codec_name": "pcm_s24be",
+            "codec_tag_string": tag, "channels": n_ch,
+            "sample_rate": "48000", "channel_layout": "4.0",
+        }]
+
+    scope4, why4 = alignment_scope(_pcm(4))
+    record("channel_sync.单流 4ch 展开为 4 个独立声道 (A6)",
+           why4 == "" and scope4 is not None and len(scope4) == 4
+           and {c.stream for c in scope4} == {0}
+           and [c.channel for c in scope4] == [0, 1, 2, 3]
+           and all(c.stream_channels == 4 for c in scope4)
+           and all(c.storage == "f32" for c in scope4), f"{why4}")
+    scope2, why2 = alignment_scope(_pcm(2))
+    record("channel_sync.单条 stereo (2ch) 不自动对齐",
+           scope2 is None and "channel_count_out_of_range: 2" in why2, why2)
+    record("channel_sync.多声道中间 WAV 用源精度",
+           _wav_format_for_codec("pcm_s24be") is WavFormat.PCM24
+           and _wav_format_for_codec("pcm_s32le") is WavFormat.PCM32
+           and _wav_format_for_codec("pcm_f32be") is WavFormat.FLOAT32)
+
 
 def l1_channel_sync_p1() -> None:
     section("L1 延时补偿 P1 (sync_estimate/sync_fix 纯逻辑)")
@@ -162,8 +191,8 @@ def l1_channel_sync_p1() -> None:
     # --- DEFAULTS (v3) ---
     record("p1.algo_version 2.3.0-p1", DEFAULTS["algo_version"] == "2.3.0-p1")
     record("p1.默认纯整数移位 (无 sinc 键)", "sinc" not in DEFAULTS)
-    record("p1.锚点候选回退 CH3>CH4>CH1>CH2",
-           DEFAULTS["anchor_candidates"] == [2, 3, 0, 1])
+    record("p1.锚点候选回退 CH1>CH2>…>CH8 (2026-10-29 A4)",
+           DEFAULTS["anchor_candidates"] == list(range(8)))
     record("p1.transparent 默认关",
            DEFAULTS["channel_sync_transparent"] is False)
     o = effective_opts({"max_lag_seconds": 0.5})
@@ -171,7 +200,7 @@ def l1_channel_sync_p1() -> None:
            o["search_window_ms"] == 500.0)
     o2 = effective_opts({"reference_stream": 0})
     record("p1.废弃键 reference_stream 忽略",
-           o2["anchor_candidates"] == [2, 3, 0, 1]
+           o2["anchor_candidates"] == list(range(8))
            and "reference_stream" not in o2)
 
     # --- eligible_audio 输入边界 ---

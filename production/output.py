@@ -64,6 +64,7 @@ from core.audio_execution import (
     resolve_audio_execution_path,
 )
 from core.audio_format import (
+    REASON_ALIGNMENT_REJECTED_NON_PCM,
     AlignmentDecision,
     ExplicitFormat,
     OutputFormatDecision,
@@ -93,6 +94,7 @@ from core.output_compose import (
 )
 
 __all__ = [
+    "REASON_ALIGNMENT_REJECTED_NON_PCM",
     "REASON_PRODUCTION_ALIGNMENT_FAILED",
     "REASON_PRODUCTION_AUDIO_PLAN_INVALID",
     "REASON_PRODUCTION_AUDIO_RETAIN_INVALID",
@@ -403,15 +405,19 @@ def apply_alignment(
 
     流程与 §42 完全一致 —— 每一步都用既有实现:
 
-        resolve_alignment()            格式分类 -> 允许/不允许 + warning
+        resolve_alignment()            格式分类 + PCM-only 准入 (participating)
         plan_from_plan()               显式 reference -> SyncPlan
         estimate_sync()                既有 arbitrary-reference 估计
         apply_sync_result()            写 AudioChannel.sync (唯一 offset 入口)
         resolve_timeline()             (由 render 阶段读取, 本层不碰)
 
-    ⚠️ **不猜 reference**: `reference` 必须显式给出 (§40)。compressed 参与
-    时只做两件额外的事: 记录 warning, 并照常走 PCM 图 (解码 -> 对齐 ->
-    重编码) —— 绝不用"改压缩包时间戳"冒充样本级对齐。
+    ⚠️ **不猜 reference**: `reference` 必须显式给出 (§40)。
+
+    ⚠️ **participating-only PCM 准入 (§4.9 / A3)**: `requested="enabled"` 时,
+    参与输出的流只要有一条不是 PCM -> `resolve_alignment()` 返回
+    `refused=True`; 本函数在**打开/解码任何音频之前**就返回一条稳定错误
+    (`REASON_ALIGNMENT_REJECTED_NON_PCM`), **不** warning, **不**解码 +
+    重编码。调用方据此明确失败 (非零退出), 绝不产出半成品。
     """
     from core.audio_sync import (
         FixedDelayPlan,
@@ -424,6 +430,35 @@ def apply_alignment(
     log = log or (lambda _msg: None)
     decision = resolve_alignment(plan, requested)
     out = AlignmentOutcome(decision=decision)
+
+    if decision.refused:
+        # 拒绝发生在**任何解码/估计之前**: 这里直接返回, 不调用
+        # plan_from_plan / estimate_sync (§4.9 的"打开/解码任何音频前完成
+        # 校验并退出"; 上面的 import 不触发任何音频 IO)。
+        streams = ", ".join(
+            f"{str(item.get('stream') or '?')} "
+            f"({str(item.get('codec_name') or 'unknown')})"
+            for item in decision.non_pcm_streams
+        ) or "(unknown streams)"
+        out.errors.append({
+            "reason": REASON_ALIGNMENT_REJECTED_NON_PCM,
+            "detail": (
+                "AUDIO PLAN REJECTED: alignment=enabled is PCM-only "
+                "(participating streams), but these participating stream(s) "
+                f"are not PCM: {streams}. No audio was decoded or re-encoded; "
+                "use alignment=auto for the legacy layered behaviour or "
+                "remove the non-PCM streams from the plan"
+            ),
+            "location": (
+                str(decision.non_pcm_streams[0].get("stream") or "")
+                if decision.non_pcm_streams else ""
+            ),
+        })
+        out.notes.append(
+            "alignment refused during admission: no stream is opened or "
+            "decoded for alignment and no output is produced"
+        )
+        return out
 
     if not decision.enabled:
         out.notes.append(

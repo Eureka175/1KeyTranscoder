@@ -579,6 +579,25 @@ def l1_gpac_paths() -> None:
            _rel_base(deep) == Path("Z:\\") and _rel_base("x.mov") == Path.cwd(),
            f"base={_rel_base(deep)}")
 
+    # GPAC 的**临时文件**必须在媒体/工作卷上（2026-10-30 真实事故）：GPAC
+    # 26.02 把 -new/-add 的导入暂存写到 %TEMP%（默认 C:），50 GiB 透明重封装
+    # 需要 C: 上数十 GiB，于是报 "No space left on device" 并回退成"源文件
+    # 拷贝"—— 即使输出卷还有 300+ GiB。断言 TMP/TEMP/TMPDIR 被重定向到
+    # cwd 下的 .gpactmp；无 cwd 时不得改写系统环境。
+    from preservation.gpac import _gpac_env
+    import shutil as _shutil
+
+    probe_dir = WORK / "gpac_temp_probe"
+    probe_dir.mkdir(parents=True, exist_ok=True)
+    env = _gpac_env(probe_dir)
+    vals = {k: env.get(k) for k in ("TMP", "TEMP", "TMPDIR")}
+    record("gpac 临时目录重定向到媒体卷 (TMP/TEMP/TMPDIR)",
+           all(v == str(probe_dir / ".gpactmp") for v in vals.values()),
+           f"{vals}")
+    record("gpac 无 cwd 时不改写系统 TMP",
+           _gpac_env(None).get("TMP") == os.environ.get("TMP"))
+    _shutil.rmtree(probe_dir, ignore_errors=True)
+
     # 结构守卫: gpac.py 里每一处 _opt/_opt_spec 都必须显式传 base,
     # 且用了它们的每次 _run 必须钉住 cwd —— 否则跨卷故障会复活。
     src = (Path(__file__).resolve().parents[2].parent

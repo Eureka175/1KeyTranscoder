@@ -1569,7 +1569,7 @@ def _transparent_sync_outcome(status: str) -> str:
     """
     if status in ("applied", "already_aligned"):
         return "synced"
-    if status in ("not_eligible", "tool_missing"):
+    if status in ("not_eligible", "tool_missing", "mixed_audio_skip"):
         return "skipped"
     return "failed"
 
@@ -2217,6 +2217,17 @@ def main() -> int:
     # --channel-sync-transparent: 剪辑前预处理独立流程 (跳过视频编码,
     # 不依赖编码器配置)
     if args.channel_sync_transparent:
+        if getattr(args, "audio_plan", None):
+            # S0 审计发现: 透明入口在 --audio-plan 解析之前分流, 计划会被
+            # **静默忽略**。按用户决策 A3 "计划存在时自动逻辑让位", 这里不能
+            # 假装执行计划; 明确失败比静默忽略诚实。
+            print(
+                "[FATAL] --channel-sync-transparent does not support "
+                "--audio-plan (the plan would be silently ignored); use "
+                "the classic transcode path for an explicit audio plan.",
+                file=sys.stderr,
+            )
+            return 2
         return transparent_main(
             args=args,
             script_dir=script_dir,
@@ -2361,10 +2372,12 @@ def main() -> int:
     channel_sync_opts = _prod_opts2(
         config.get("channel_sync") if isinstance(config, dict) else None
     )
-    channel_sync_enabled = bool(
-        getattr(args, "channel_sync", False)
-        or getattr(args, "channel_sync_transparent", False)
-    )
+    # 2026-10-29 用户决策 A: 3–8 个 PCM 声道**默认自动对齐** (不再要求
+    # --channel-sync)。入口只负责把 "是否调用 channel-sync" 传下去; 具体的
+    # 参与集合判定 (声道数/混合 PCM+压缩/采样率) 全部由 `run_channel_sync`
+    # 在解码前完成 —— 1kt.py 不写算法。`--channel-sync` 保留为兼容参数;
+    # `--audio-plan` 存在时自动逻辑完全让位 (见下方 plan 解析处)。
+    channel_sync_enabled = True
 
     # P4.6 — 时变同步: CLI 显式 opt-in。只覆写**调用方真的给了值**的键, 因此
     # 未指定时 config 块里的值保持不变 (与其它 CLI 覆盖同一手法)。
@@ -2418,12 +2431,15 @@ def main() -> int:
             print(f"[FATAL] --audio-plan: {exc}", file=sys.stderr)
             return 2
         if channel_sync_enabled:
+            # 2026-10-29 用户决策 A3: `--audio-plan` 存在时自动开启**完全
+            # 让位** —— plan 的 alignment 才是最终决定; 不再 FATAL 拒绝两种
+            # 入口同时出现 (用户显式给 --channel-sync 时按 plan 执行)。
+            channel_sync_enabled = False
             print(
-                "[FATAL] --audio-plan and --channel-sync/--channel-sync-"
-                "transparent both decide the final audio; use one of them.",
+                "[INFO] --audio-plan present: automatic channel-sync "
+                "auto-enable yields to the plan's alignment decision",
                 file=sys.stderr,
             )
-            return 2
         if audio_plan_request.is_empty:
             # 只有编码格式、没有任何选择意图 -> 计划解析出来就是**默认计划**,
             # 执行图会是 NONE。此时直接当"未启用", 从而连"视频专用命令派生"

@@ -74,9 +74,16 @@ def l3_audio_probe() -> None:
                trk4[0].select_channels([2]).source_ids
                == [f"default:s{trk4[0].source_stream_index}:c2"]
                and trk4[0].select_channels([2]).channel_count == 1)
-        record("l3.audio.4CH 立体声/4ch 流仍被 channel_sync 拒绝 (判定不变)",
-               eligible_audio(raw4)[0] is False,
-               eligible_audio(raw4)[1])
+        record("l3.audio.4CH 单流按 4 个独立声道参与自动对齐 (决策 A)",
+               eligible_audio(raw4) == (True, ""), eligible_audio(raw4)[1])
+        from core.channel_sync import alignment_scope
+
+        scope4, _why4 = alignment_scope(raw4)
+        record("l3.audio.4CH 单流展开为 4 个 ChannelRef (同一 stream)",
+               scope4 is not None and len(scope4) == 4
+               and {c.stream for c in scope4} == {0}
+               and [c.channel for c in scope4] == [0, 1, 2, 3]
+               and all(c.stream_channels == 4 for c in scope4))
         record("l3.audio.4CH plan 默认全选 + 保留原始",
                probe4.plan().is_default
                and probe4.plan().output_channel_count == 4)
@@ -166,8 +173,11 @@ def l3_audio_probe() -> None:
                all(s.layout_source in ("layout", "channel_count")
                    for s in probe_s.streams),
                f"{[s.layout_source for s in probe_s.streams]}")
-        record("l3.audio.2×stereo 2ch 流仍被 channel_sync 拒绝 (判定不变)",
-               eligible_audio(raw_s)[0] is False)
+        record("l3.audio.2×stereo 共 4 声道 -> 自动对齐 (决策 A)",
+               eligible_audio(raw_s) == (True, ""), eligible_audio(raw_s)[1])
+        record("l3.audio.单条 stereo 流 (2 声道) 不自动对齐 (决策 A)",
+               eligible_audio(raw_s[:1])[0] is False,
+               eligible_audio(raw_s[:1])[1])
     else:
         record("l3.audio.2×stereo 真实探测 2 stream / 4 channel", False,
                "合成 2×stereo 素材失败")

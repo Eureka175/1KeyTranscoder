@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -813,15 +814,25 @@ def l3_production_output() -> None:
            and not (hw_dir / "quad.MP4").is_file(),
            f"rc={hardware_run.returncode}")
 
+    # 让位语义用**单文件输入目录**验证: src_dir 后来还包含 quad.mp4 (1×4CH,
+    # 供 T3/T6 用), 而 keep_two 计划按 clip.mp4 的 4×mono 声道身份写成;
+    # 把二者放同一批会让 quad 逐文件计划不适用 (audio_stream_not_found) →
+    # 整个批次 rc=1, 把"让位语义"与"计划不适用该文件"两种语义混在一起。
+    conflict_in = d / "conflict_in"
+    conflict_in.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, conflict_in / src.name)
     sync_conflict = sh(
         __import__("sys").executable, ROOT / "1kt.py",
-        "--input", src_dir, "--output", d / "out_conflict2",
+        "--input", str(conflict_in), "--output", str(d / "out_conflict2"),
         "--encoder", "x265",
         "--channel-sync", "--audio-plan", str(keep_two),
         "--headless", timeout=600,
     )
     combined2 = (sync_conflict.stdout or "") + (sync_conflict.stderr or "")
-    record("l3.p4c.T9 --audio-plan 与 --channel-sync 同时给出 -> 明确报错",
-           sync_conflict.returncode != 0
-           and "both decide the final audio" in combined2,
+    # 2026-10-29 用户决策 A3: --audio-plan 存在时自动 channel-sync 完全让位,
+    # 不再 FATAL 拒绝两个入口同时出现 —— 计划是最终决定。
+    record("l3.p4c.T9 --audio-plan + --channel-sync -> 计划让位 (A3, rc=0)",
+           sync_conflict.returncode == 0
+           and "yields to the plan's alignment decision" in combined2
+           and (d / "out_conflict2" / "clip.MP4").is_file(),
            f"rc={sync_conflict.returncode}")

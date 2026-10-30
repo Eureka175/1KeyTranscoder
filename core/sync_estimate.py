@@ -14,7 +14,12 @@
     不产生延迟值, 只回答"两条轨是不是在录同一个声场" —— 单锚点模型无法
     表达"4 声道其实是两支互不相干的麦克风", 建组层需要这个量;
   * 底层件 open_source / read_f64 / gcc_phat_int / phase_slope_fine 公开,
-    供 sync_fix 修后复检复用.
+    供 sync_fix 修后复检复用;
+  * coarse_decimate(): 长素材的 12 kHz 分块抽取缓存 (窗级测量的只读输入,
+    内存只与 coarse 数组成正比, 不触碰全速率整文件);
+  * measure_window_delays(): 长镜头**窗级连续性漂移测量** (12 kHz 池化粗扫
+    + 全速率局部精化 + 连续性约束), 供时变后备路径直接测窗 —— 生产帧几何
+    在 30 s 窗内只有约 0.048 个可用帧, 帧级聚合测不出逐窗延迟.
 
 定位说明 (P1): 相位斜率精估只用于**测量稳定性、诊断读数与修后复检**,
 不驱动任何分数 sinc 修正 — 默认修正路径是纯整数样本移位 (§6.1/§10)。
@@ -63,6 +68,8 @@ __all__ = [
     "peak_noise_ratio",
     "sample_pair_snr",
     "phase_slope_fine",
+    "coarse_decimate",
+    "measure_window_delays",
 ]
 
 # PHAT 正则化 (沿用 vendored 1.x 判据)
@@ -1152,3 +1159,433 @@ def boundary_pileup(frames: list[FrameDelay], search_samples: float) -> float:
         return 0.0
     edge = sum(1 for v in good if abs(v) >= search_samples - 0.5)
     return edge / len(good)
+
+
+# ------------------------------------------------- 长镜头窗级漂移测量 (S1)
+#
+# 为什么需要它: 生产帧几何 (200 ms 帧 / 100 ms 跳) 在 30 s 计划窗里平均只有
+# 0.048 个可用帧, 长素材 (80 min) 上帧级聚合测不出逐窗延迟; 研究口径是
+# **直接对窗做相关**。本节只移植口径, 不 import 研究脚本
+# (tests/regression/long_align_tools/track_drift.py / long_align.py):
+#
+#   * 12 kHz 分块抽取缓存 (coarse_decimate): 内存只与 coarse 数组成正比
+#     (80 min / 48 kHz / 12 kHz ≈ 231 MB/轨), 不触碰全速率整文件;
+#   * 窗级 12 kHz 归一化线性互相关: 首窗 ±search_window_ms 全搜索, 之后每窗
+#     只在前一**有效** lag 的 ±(96 + 8×t_min) 采样内找峰 (连续性约束 ——
+#     逐窗独立测量会因内容分支切换跳变 ±130 采样, 已在 C1305/C1306 实测);
+#   * 全速率 refine_segment_seconds 段上 ±refine_radius_samples 逐整数点积
+#     精化, 取 |CC| 最大的整数 lag;
+#   * 弱峰 (coarse |CC| < min_cc) 不采纳, 且**不更新**连续性预测;
+#   * 每窗记录带符号峰方向 (polarity); 极性不影响滞后 (始终取 |CC| 峰).
+#
+# 数据约定与本模块一致: delay > 0 = 目标轨比参考**晚到** (修正 = 整体前移;
+# out[n] = in[n + delay])。合成校准: 注入 +123 -> 123.0, 注入 −200 -> −200.0。
+
+# 分块粗率抽取: 块长 (coarse 样本) 与两侧丢弃余量 (coarse 样本)。
+# decimate(ftype="fir", zero_phase=True) 的 FIR 半长为 10*q 输入样本
+# (q <= 12 时为 120 采样), 32 个 coarse 样本的余量大于它, 因此分块结果与
+# "整文件一次 decimate" 数值一致 (单测钉住; 余量内的暂态全部丢弃)。
+_COARSE_CHUNK_SECONDS = 100.0
+_COARSE_MARGIN = 32
+# 首窗全搜索后的全速率精化半径 (研究口径 ±12, 比窗内连续性精化 ±8 略宽):
+# 12 kHz 粗峰量化误差最大 q 个全速率样本, 首窗没有连续性约束兜底。
+_INITIAL_REFINE_RADIUS = 12
+# 首窗失败后继续尝试的窗数 (研究: 首窗 |CC| 不足可退化用第二窗).
+_INITIAL_ATTEMPTS = 2
+
+
+def coarse_decimate(
+    src: Any,
+    *,
+    sample_rate: int,
+    coarse_rate: int = 12000,
+    storage_dtype: str = "f32",
+    chunk_seconds: float = _COARSE_CHUNK_SECONDS,
+) -> np.ndarray:
+    """把 1-D 源 (raw 路径或 ndarray) 分块抽取到 coarse_rate, 返回 float32。
+
+    用途: 长素材窗级测量只需要 12 kHz 粗扫缓存 —— 一次生成、多次复用
+    (`measure_window_delays(ref_decimated=..., tgt_decimated=...)`),
+    避免每个 target 重算。路径输入走 `RawStream` 有界窗口读取, **不映射
+    全速率整文件**; 内存峰值 ≈ 一个输入分块 (float64) + 输出 coarse 数组
+    (80 min / 48 kHz / 12 kHz = 57.7 M 样本 ≈ 231 MB/轨)。
+
+    分块边界: 每块两侧多读 `_COARSE_MARGIN` 个 coarse 样本再丢弃,
+    因此与"整文件一次 decimate(ftype='fir', zero_phase=True)"数值一致
+    (暂态全部落在丢弃区; 单测 `long_take.分块抽取 == 整文件` 钉住)。
+    输出样本 j 对应输入位置 j*q (q = sample_rate // coarse_rate)。
+
+    ndarray 输入不做拷贝以外的 I/O; raw 路径的存储精度由 storage_dtype 指定
+    (与 `decode_stream` 的中间文件约定一致: f32 / f64)。
+    """
+    if sample_rate <= 0 or coarse_rate <= 0:
+        raise ValueError("sample_rate / coarse_rate 必须为正")
+    if sample_rate % coarse_rate != 0:
+        raise ValueError(
+            f"sample_rate {sample_rate} 不能被 coarse_rate {coarse_rate} 整除"
+        )
+    q = sample_rate // coarse_rate
+    stream = open_source(src, storage_dtype)
+    opened = isinstance(src, (str, Path))
+    try:
+        n = int(stream.shape[0])
+        n_out = (n + q - 1) // q
+        out = np.zeros(n_out, dtype=np.float32)
+        chunk = max(1, int(chunk_seconds * coarse_rate))
+        margin = _COARSE_MARGIN
+        for c0 in range(0, n_out, chunk):
+            cnt = min(chunk, n_out - c0)
+            in_lo = (c0 - margin) * q
+            in_hi = (c0 + cnt + margin) * q
+            buf = np.zeros(in_hi - in_lo, dtype=np.float64)
+            lo = max(0, in_lo)
+            hi = min(n, in_hi)
+            if hi > lo:
+                buf[lo - in_lo: lo - in_lo + (hi - lo)] = np.asarray(
+                    stream[lo:hi], dtype=np.float64
+                )
+            dec = signal.decimate(buf, q, ftype="fir", zero_phase=True)
+            seg = dec[margin: margin + cnt]
+            if seg.size:
+                out[c0: c0 + seg.size] = np.asarray(seg, dtype=np.float32)
+        return out
+    finally:
+        if opened:
+            stream.close()
+
+
+def _check_decimated(arr: Any, n_full: int, q: int, name: str) -> np.ndarray:
+    """校验调用方传入的 coarse 缓存: 1-D 且长度 == ceil(n_full/q)。
+
+    长度不符说明缓存不是本流/不是同一几何生成的 —— 显式报错, 不静默截断
+    (静默会把滞后整体平移到错误分支)。
+    """
+    out = np.asarray(arr)
+    if out.ndim != 1:
+        raise ValueError(f"{name}: 期望 1-D coarse 缓存, 得到 shape {out.shape}")
+    expected = (int(n_full) + q - 1) // q
+    if out.shape[0] != expected:
+        raise ValueError(
+            f"{name}: coarse 缓存长度 {out.shape[0]} != 期望 {expected} "
+            f"(n={int(n_full)}, q={q})"
+        )
+    return out
+
+
+def _coarse_cc_peak(
+    a12: np.ndarray,
+    b12: np.ndarray,
+    start_c: int,
+    count_c: int,
+    lag_lo: int,
+    lag_hi: int,
+    q: int,
+) -> tuple[int, float, float] | None:
+    """12 kHz 窗级归一化线性互相关: 在 [lag_lo, lag_hi] 内取 |CC| 最大峰。
+
+    a12/b12: 全片 coarse 缓存 (a = 参考, b = 目标); start_c/count_c: 窗在
+    coarse 坐标的起点/长度。相关面 surf[m] = Σ a[n]·b[n-m] 的峰位于
+    m = -delay, 因此 lag = -m*q —— 与模块数据约定一致 (delay > 0 = 目标晚到)。
+    返回 (lag48, signed_cc, abs_cc); 退化 (静音/窗太短/无有效 lag) 返回 None。
+
+    signed_cc 归一化到 [-1, 1] (Cauchy-Schwarz): 其符号就是该窗的极性关系
+    (负 = 目标反相), 取峰一律用 |CC| (极性不改变滞后)。
+    """
+    a = np.asarray(a12[start_c: start_c + count_c], dtype=np.float64)
+    b = np.asarray(b12[start_c: start_c + count_c], dtype=np.float64)
+    n = min(a.size, b.size)
+    if n < 16:
+        return None
+    a = a[:n] - a[:n].mean()
+    b = b[:n] - b[:n].mean()
+    na = float(np.linalg.norm(a))
+    nb = float(np.linalg.norm(b))
+    if na < _RMS_GATE or nb < _RMS_GATE:
+        return None
+    nfft = fft.next_fast_len(2 * n - 1, real=True)
+    prod = fft.rfft(a, nfft) * np.conj(fft.rfft(b, nfft))
+    surf = fft.irfft(prod, nfft)
+    # lag = -m*q; 线性相关有效范围 |m| <= n-1 (nfft >= 2n-1, 不回绕)
+    m_lo = max(-(n - 1), int(math.ceil(-lag_hi / q)))
+    m_hi = min(n - 1, int(math.floor(-lag_lo / q)))
+    if m_lo > m_hi:
+        return None
+    idx = np.arange(m_lo, m_hi + 1, dtype=np.int64)
+    vals = surf[idx]                     # 负索引 = 回绕点, 即 m < 0
+    k = int(np.argmax(np.abs(vals)))
+    den = na * nb
+    signed = float(vals[k]) / den
+    return float(-int(idx[k]) * q), signed, abs(signed)
+
+
+def _refine_window_peak(
+    ref: Any,
+    tgt: Any,
+    *,
+    start_sample: int,
+    window_samples: int,
+    coarse_lag: int,
+    radius: int,
+    segment_samples: int,
+) -> tuple[int, float]:
+    """窗中心段上的全速率整数 lag 精化 (研究 refine_48k 口径)。
+
+    在 coarse_lag ± radius 内逐整数 lag m, 取 |corr(ref[k], tgt[k+m])| 最大
+    的 m —— 与模块约定一致: tgt[k+m] ≈ ref[k] 时 m 就是目标相对参考的延迟
+    (目标晚到 m, 修正 = 前移 m)。段 = 窗中心 segment_samples (研究 2 s),
+    研究口径下段必须完整落在窗内 (越界候选跳过)。
+
+    返回 (lag, |cc|); 精化退化 (静音/段比窗长) 时保留粗值并返回质量 0.0
+    (研究口径: 精化失败不换 lag)。
+    """
+    seg = int(segment_samples)
+    if seg < 8 or window_samples < seg:
+        return int(coarse_lag), 0.0
+    c0 = start_sample + window_samples // 2 - seg // 2
+    if c0 < 0:
+        c0 = 0
+    ref_seg = read_f64(ref, c0, seg)          # 越界补零 (边界窗)
+    av = ref_seg - ref_seg.mean()
+    na = float(np.linalg.norm(av))
+    if na < _RMS_GATE:
+        return int(coarse_lag), 0.0
+    # 一次有界读取覆盖全部候选偏移 (以粗略 lag 为中心 ±radius):
+    # tgt_span[j] 对应该流绝对位置 c0 + coarse_lag - radius + j
+    center = int(coarse_lag)
+    tgt_span = read_f64(tgt, c0 + center - radius, seg + 2 * radius)
+    win_end = int(start_sample) + int(window_samples)
+    best_m: int | None = None
+    best_val = 0.0
+    for m in range(center - radius, center + radius + 1):
+        b0 = c0 + m
+        if b0 < 0 or b0 + seg > win_end:
+            continue                          # 研究口径: 段必须完整落在窗内
+        j = radius + (m - center)
+        bv = tgt_span[j: j + seg]
+        bv = bv - bv.mean()
+        den = na * float(np.linalg.norm(bv))
+        if den < 1e-12:
+            continue
+        val = float(np.dot(av, bv) / den)
+        if best_m is None or abs(val) > abs(best_val):
+            best_m = m
+            best_val = val
+    if best_m is None:
+        return int(coarse_lag), 0.0
+    return int(best_m), abs(float(best_val))
+
+
+def measure_window_delays(
+    ref_src: Any,
+    tgt_src: Any,
+    *,
+    sample_rate: int,
+    window_seconds: float = 60.0,
+    hop_seconds: float = 10.0,
+    coarse_rate: int = 12000,
+    search_window_ms: float = 250.0,
+    continuity_radius_samples: int = 96,
+    continuity_radius_per_minute: int = 8,
+    min_cc: float = 0.06,
+    refine_radius_samples: int = 8,
+    refine_segment_seconds: float = 2.0,
+    initial_seconds: float = 120.0,
+    ref_decimated: Any | None = None,
+    tgt_decimated: Any | None = None,
+    workers: int = 1,
+    storage_dtype: str = "f32",
+) -> dict[str, Any]:
+    """长镜头**窗级连续性漂移测量** (S1 测量原语; 只测量, 不构造曲线/不施加)。
+
+    参考实现口径 (tests/regression 的研究脚本, 已在 C1305/C1306 上验证):
+    12 kHz 池化粗扫 + 48 kHz 局部精化 + 连续性约束跟踪。生产帧几何在 30 s
+    窗内只有约 0.048 个可用帧, 因此长镜头时变路径必须直接对窗相关。
+
+    流程:
+      1. 建 12 kHz coarse 缓存 (`coarse_decimate`; 也可由调用方传入
+         `ref_decimated`/`tgt_decimated` 复用);
+      2. 首窗 (前 `initial_seconds` 或整条取小) 做 ±`search_window_ms` 全
+         搜索 + 全速率精化; coarse |CC| < `min_cc` 时退化用第二窗; 两窗都
+         不足则 `initial.valid=False`, 全部窗口 valid=False;
+      3. 逐窗: 只在前一**有效** lag 的 ±(`continuity_radius_samples` +
+         `continuity_radius_per_minute`×t_min) 采样内找 |CC| 最大峰; 弱峰
+         (< `min_cc`) 记 valid=False 且**不更新**预测 (连续性靠上一有效值);
+      4. 采纳窗在窗中心 `refine_segment_seconds` 段上 ±`refine_radius_samples`
+         逐整数点积精化, `delay_samples` = 该整数 lag;
+         `confidence` = min(coarse|CC|,1) × max(refine|CC|,0) (研究口径)。
+
+    数据约定: delay > 0 = 目标轨比参考**晚到**, 与 `estimate_pair` /
+    `shift_stream` 同向 (`out[n] = in[n + delay]`)。极性只记录在
+    `polarity` (±1, 带符号峰方向), 不改变滞后。
+
+    确定性: 固定 FFT 尺寸 + 整数窗位, 无 RNG; 同一输入两次运行结果逐位一致。
+    `workers` 只为调用面稳定保留: 本函数**顺序执行**（每窗的搜索半径依赖
+    前一有效 lag，连续性就是顺序语义），结果与 worker 数无关。S5 的并行
+    落在**调用层**: 绑定候选对互相独立用线程池并测；round-2 残差窗互相独立
+    用线程池并测（`core.long_take.measure_residual_curve`）。
+    路径输入不整文件载入: 全速率只用于窗中心段的 `read_f64` 有界读取。
+
+    返回::
+
+        {"sample_rate": int, "window_samples": int, "hop_samples": int,
+         "n_samples": int, "n_windows": int,
+         "initial": {"lag": int|None, "cc": float, "coarse_cc": float,
+                     "refine_quality": float, "valid": bool, "polarity": int,
+                     "start_sample": int, "attempts": [...]},
+         "windows": [{"start_sample": int, "center_sample": int,
+                      "delay_samples": float|None, "confidence": float,
+                      "valid": bool, "coarse_cc": float, "polarity": int,
+                      "search_radius_samples": int}, ...],
+         "decimated_rate": int, "rejected_windows": int,
+         "workers_effective": 1}
+    """
+    if sample_rate <= 0:
+        raise ValueError("sample_rate 必须为正")
+    if sample_rate % coarse_rate != 0:
+        raise ValueError(
+            f"sample_rate {sample_rate} 不能被 coarse_rate {coarse_rate} 整除"
+        )
+    if window_seconds <= 0 or hop_seconds <= 0:
+        raise ValueError("window_seconds / hop_seconds 必须为正")
+    q = sample_rate // coarse_rate
+    win = int(round(window_seconds * sample_rate))
+    hop = int(round(hop_seconds * sample_rate))
+    seg_samples = int(round(refine_segment_seconds * sample_rate))
+    search_samples = int(round(search_window_ms * sample_rate / 1000.0))
+    radius0 = max(0, int(continuity_radius_samples))
+    radius_per_min = max(0, int(continuity_radius_per_minute))
+    min_cc = float(min_cc)
+
+    opened: list[Any] = []
+    try:
+        ref = open_source(ref_src, storage_dtype)
+        if isinstance(ref_src, (str, Path)):
+            opened.append(ref)
+        tgt = open_source(tgt_src, storage_dtype)
+        if isinstance(tgt_src, (str, Path)):
+            opened.append(tgt)
+        n = min(int(ref.shape[0]), int(tgt.shape[0]))
+
+        if ref_decimated is None:
+            ref12 = coarse_decimate(
+                ref, sample_rate=sample_rate, coarse_rate=coarse_rate,
+                storage_dtype=storage_dtype,
+            )
+        else:
+            ref12 = _check_decimated(ref_decimated, int(ref.shape[0]), q,
+                                     "ref_decimated")
+        if tgt_decimated is None:
+            tgt12 = coarse_decimate(
+                tgt, sample_rate=sample_rate, coarse_rate=coarse_rate,
+                storage_dtype=storage_dtype,
+            )
+        else:
+            tgt12 = _check_decimated(tgt_decimated, int(tgt.shape[0]), q,
+                                     "tgt_decimated")
+
+        n_windows = 0 if n < win else (n - win) // hop + 1
+        initial: dict[str, Any] = {
+            "lag": None, "cc": 0.0, "coarse_cc": 0.0, "refine_quality": 0.0,
+            "valid": False, "polarity": 1, "start_sample": 0, "attempts": [],
+        }
+        prev: int | None = None
+
+        # ---- 首窗: 全搜索定位初始 lag (研究: 前 initial_seconds 全带搜索)
+        for attempt in range(_INITIAL_ATTEMPTS):
+            start = attempt * hop
+            avail = n - start
+            if avail <= 0:
+                break
+            span = min(int(round(initial_seconds * sample_rate)), avail)
+            span_c = int(round(span / q))
+            if span_c < 16:
+                break
+            peak = _coarse_cc_peak(
+                ref12, tgt12, int(round(start / q)), span_c,
+                -search_samples, search_samples, q,
+            )
+            if peak is None:
+                continue
+            lag_c, signed, abs_cc = peak
+            initial["attempts"].append({
+                "start_sample": int(start), "lag": int(lag_c),
+                "coarse_cc": round(float(abs_cc), 6),
+                "search_samples": int(search_samples),
+            })
+            if abs_cc < min_cc:
+                continue
+            win_eff = min(win, avail)
+            lag, quality = _refine_window_peak(
+                ref, tgt, start_sample=start, window_samples=win_eff,
+                coarse_lag=lag_c, radius=_INITIAL_REFINE_RADIUS,
+                segment_samples=seg_samples,
+            )
+            initial.update({
+                "lag": int(lag),
+                "cc": float(min(abs_cc, 1.0) * max(quality, 0.0)),
+                "coarse_cc": float(abs_cc),
+                "refine_quality": float(quality),
+                "valid": True,
+                "polarity": 1 if signed >= 0 else -1,
+                "start_sample": int(start),
+            })
+            prev = int(lag)
+            break
+
+        # ---- 逐窗: 连续性约束搜索 + 全速率精化
+        windows: list[dict[str, Any]] = []
+        for w in range(n_windows):
+            start = w * hop
+            t_min = start / sample_rate / 60.0
+            radius = radius0 + int(round(radius_per_min * t_min))
+            row: dict[str, Any] = {
+                "start_sample": int(start),
+                "center_sample": int(start + win // 2),
+                "delay_samples": None,
+                "confidence": 0.0,
+                "valid": False,
+                "coarse_cc": 0.0,
+                "polarity": 1,
+                "search_radius_samples": int(radius),
+            }
+            if prev is not None:
+                peak = _coarse_cc_peak(
+                    ref12, tgt12, int(round(start / q)),
+                    int(round(win / q)), prev - radius, prev + radius, q,
+                )
+                if peak is not None:
+                    lag_c, signed, abs_cc = peak
+                    row["coarse_cc"] = round(float(abs_cc), 6)
+                    row["polarity"] = 1 if signed >= 0 else -1
+                    if abs_cc >= min_cc:
+                        lag, quality = _refine_window_peak(
+                            ref, tgt, start_sample=start, window_samples=win,
+                            coarse_lag=lag_c, radius=int(refine_radius_samples),
+                            segment_samples=seg_samples,
+                        )
+                        row["delay_samples"] = float(lag)
+                        row["confidence"] = round(
+                            float(min(abs_cc, 1.0) * max(quality, 0.0)), 6
+                        )
+                        row["valid"] = True
+                        prev = int(lag)
+            windows.append(row)
+
+        rejected = sum(1 for r in windows if not r["valid"])
+        return {
+            "sample_rate": int(sample_rate),
+            "window_samples": int(win),
+            "hop_samples": int(hop),
+            "n_samples": int(n),
+            "n_windows": int(n_windows),
+            "initial": initial,
+            "windows": windows,
+            "decimated_rate": int(coarse_rate),
+            "rejected_windows": int(rejected),
+            "workers_effective": 1,
+        }
+    finally:
+        for stream in reversed(opened):
+            close = getattr(stream, "close", None)
+            if callable(close):
+                close()

@@ -44,7 +44,7 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
         audio_2ch_policy, audio_mix, audio_model, audio_retention, audio_route,
         archive_repair, audio_selection, audio_sync, audio_timeline,
         channel_sync, cli, codecs, container_flags, core, dji_metadata,
-        hardware, hardware_audio, hwdecode_results, pipeline,
+        hardware, hardware_audio, hwdecode_results, long_take, pipeline,
         production_output, native_decode, source_contract, toolchain,
         workdir,
     )
@@ -81,6 +81,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
              channel_sync.l1_transparent_contract),
             ("复检双维 (相对容差 / 全片多窗)",
              channel_sync.l1_recheck_knobs),
+            ("长镜头窗级漂移测量 (measure_window_delays)",
+             long_take.l1_long_take_window_delays),
             ("audio model v0.7.1", audio_model.l1_audio_model),
             ("audio select/map v0.7.1", audio_selection.l1_audio_selection),
             ("audio timeline v0.7.1", audio_timeline.l1_audio_timeline),

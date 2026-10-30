@@ -572,23 +572,32 @@ def l3_hardware_audio() -> None:
                and abs(hz[1] - 700) < 20,
                f"rc={result.returncode} {sig} hz={[round(h, 1) for h in hz]}")
 
-        # --- compressed + 显式 alignment -----------------------------
+        # --- compressed + 显式 alignment: PCM-only 准入 -> 显式拒绝 ---------
+        # S3b / §4.9 / §8.2 `class audio_plan_enabled_reject`: `alignment=enabled`
+        # 是 **participating-only PCM 准入**。本计划的外挂 Opus 目标参与输出,
+        # 因此必须**显式拒绝**: 稳定 reason + 非零退出 + 无半成品; 不再
+        # warning -> 解码 -> 重编码 (旧断言 `alignment_enabled_compressed` /
+        # `applied=1` / 输出 [pcm, opus] 已按新口径删除)。
         result, produced, text = _run_case(
             align_dir, d / f"align_{encoder}", encoder, align)
-        sig = _audio_signature(produced) if produced.is_file() else []
         detail = _per_file_logs(align_dir)
-        record(f"v08hw.{encoder}+compressed 显式 alignment -> 解码后重编码",
-               result.returncode == 0
-               and "alignment_enabled_compressed" in detail
-               and "applied=1" in text
-               and sig == [("pcm_s16le", 1, "48000"),
-                           ("opus", 1, "48000")],
-               f"rc={result.returncode} {sig} "
-               f"compressed_alignment="
-               f"{'alignment_enabled_compressed' in detail}")
-        record(f"v08hw.{encoder}+alignment 估计出的 offset = 480",
-               "'clip_tgt.opus:s0:c0': 480.0" in text,
-               [ln for ln in text.splitlines() if "offset" in ln][:1])
+        rejected_files = sorted((d / f"align_{encoder}").rglob("*.MP4"))
+        record(f"v08hw.{encoder}+compressed 显式 alignment -> 显式拒绝 (非零退出)",
+               result.returncode != 0
+               and "alignment_enabled_rejected_non_pcm" in text
+               and "alignment_enabled_rejected_non_pcm" in detail
+               and "[AUDIO-FAIL]" in text,
+               f"rc={result.returncode} reason="
+               f"{'alignment_enabled_rejected_non_pcm' in text}")
+        record(f"v08hw.{encoder}+拒绝点名非 PCM 流 (Opus) + 解码前拒绝 + 无半成品",
+               "AUDIO PLAN REJECTED" in text
+               and "clip_tgt.opus:s0" in text
+               and "(opus)" in text
+               # estimate 日志只在真的跑过估计后出现 -> 拒绝发生在解码前
+               and "alignment: reference=" not in text
+               and not produced.is_file()
+               and not rejected_files,
+               f"rejected={[p.name for p in rejected_files]}")
 
         # --- 硬件解码 + 硬件编码 + 计划 ------------------------------
         # The `--hw-decode auto` switch is gone; hardware decode is the
@@ -688,12 +697,17 @@ def l3_hardware_audio() -> None:
         record("v08hw.sony 真实 Sony 素材可用", False,
                f"missing {sony_file}")
 
-    # ------------------------------------------------- CLI 冲突仍然明确
-    _, _, text = _run_case(quad_dir, d / "conflict_sync", "nvenc",
-                           subset_pcm, "--channel-sync")
-    record("v08hw.cli --audio-plan + --channel-sync -> 仍然明确报错 (rc=2)",
-           "both decide the final audio" in text,
-           [ln for ln in text.splitlines() if "FATAL" in ln][:1])
+    # ------------------------------------------------- CLI 让位语义 (A3)
+    # 2026-10-29 用户决策 A3: --audio-plan 存在时自动 channel-sync 让位;
+    # 不再 FATAL 拒绝两个入口同时出现 (计划是最终决定)。
+    result_sync, produced_sync, text_sync = _run_case(
+        quad_dir, d / "conflict_sync", "nvenc", subset_pcm,
+        "--channel-sync")
+    record("v08hw.cli --audio-plan + --channel-sync -> 计划让位 (rc=0, INFO)",
+           result_sync.returncode == 0
+           and "yields to the plan's alignment decision" in text_sync
+           and produced_sync.is_file(),
+           [ln for ln in text_sync.splitlines() if "audio-plan" in ln][:2])
     bad_plan = _write_plan(plans, "bad", {
         "version": 1, "channels": {"select": ["source:s9:c0"]},
     })

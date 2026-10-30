@@ -4,14 +4,16 @@
 
 两个 suite:
 
-  * `l1_audio_format()` —— 纯策略层: 格式分类表、alignment 决策表 (含
-    compressed warning)、输出 codec/bitrate 的优先级链 (manual > source >
-    encoder default)、PCM + bitrate 的明确拒绝、以及 v0.8.0 的架构审计。
-    不运行 ffmpeg。
+  * `l1_audio_format()` —— 纯策略层: 格式分类表、alignment 决策表、S3b 的
+    **participating-only PCM 准入** (`alignment=enabled` 拒绝非 PCM 参与流,
+    `auto`/`disabled` 旧行为逐字节不变)、拒绝发生在解码前的执行层证据、
+    输出 codec/bitrate 的优先级链 (manual > source > encoder default)、
+    PCM + bitrate 的明确拒绝、以及 v0.8.0 的架构审计。不运行 ffmpeg。
   * `l3_audio_format()` —— **真实 ffmpeg/ffprobe**: PCM 默认允许 alignment、
-    compressed 默认原样保留 (不解码不重编码)、compressed 显式 alignment
-    走 decode -> PCM -> align -> re-encode 并给出 warning、AAC/Opus 手动
-    bitrate、以及"视频基本流 sha256 在每种音频处理下都不变"。
+    compressed 默认原样保留 (不解码不重编码)、`enabled` 参与者含 AAC/Opus
+    -> **显式拒绝且无产物** (A3/S3b, 不再 warning + 重编码)、未参与输出的
+    压缩流不否决、AAC/Opus 手动 bitrate、以及"视频基本流 sha256 在每种音频
+    处理下都不变"。
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ from ..fixtures.audio import (
     _video_elementary_hash,
 )
 from ..paths import (
-    FFPROBE, FFMPEG, IN_DIR, ROOT, ffprobe_json, record, section, sh,
+    FFPROBE, FFMPEG, IN_DIR, ROOT, WORK, ffprobe_json, record, section, sh,
 )
 
 
@@ -155,14 +157,15 @@ def l1_audio_format() -> None:
     section("L1 格式感知 / alignment / 编码继承 (v0.8.0)")
     from core.audio_encode import AudioEncodeFormat, AudioFormatSpec
     from core.audio_format import (
+        REASON_ALIGNMENT_REJECTED_NON_PCM,
         REASON_FORMAT_BITRATE_NOT_APPLICABLE,
-        WARNING_ALIGNMENT_COMPRESSED,
         AudioAlignmentPolicy,
         AudioInputFormat,
         ExplicitFormat,
         classify_codec,
         format_bitrate,
         is_pcm_codec,
+        participating_formats,
         resolve_alignment,
         resolve_output_format,
     )
@@ -225,7 +228,7 @@ def l1_audio_format() -> None:
            == {"rec": AudioInputFormat.COMPRESSED},
            f"{plan_formats(mixed_plan, channel_ids=['cam:s1:c0'])}")
 
-    # --- 2. alignment 决策表 (§4/§5) ------------------------------------
+    # --- 2. alignment 决策表 (§4/§5; S3b = participating-only PCM 准入) --
     d = resolve_alignment(pcm_plan, AudioAlignmentPolicy.AUTO)
     record("v08.align PCM + auto -> 默认 ENABLED (§4)",
            d.enabled and d.reason == "alignment_default_pcm",
@@ -244,25 +247,63 @@ def l1_audio_format() -> None:
     record("v08.align compressed 默认路径不重编码 (无 warning, 走原流)",
            d.warnings == [] and not d.requires_decode)
 
-    d = resolve_alignment(opus_plan, AudioAlignmentPolicy.ENABLED)
-    record("v08.align Opus + enabled -> ENABLED 且必须重编码",
-           d.enabled and d.requires_decode
-           and d.reason == "alignment_enabled_compressed",
-           f"{d.reason}")
-    record("v08.align compressed 显式 alignment 给出 §5 的 warning 原文",
-           WARNING_ALIGNMENT_COMPRESSED in d.warnings
-           and "Audio alignment requested for compressed input." in
-           WARNING_ALIGNMENT_COMPRESSED
-           and "must be decoded to PCM and re-encoded" in
-           WARNING_ALIGNMENT_COMPRESSED,
-           f"{d.warnings}")
-    record("v08.align 不走'伪造时间戳平移'的假对齐 (note 明确写出真实链路)",
-           any("decode -> PCM -> align -> re-encode" in n for n in d.notes),
-           f"{d.notes}")
+    # --- 2a. enabled 的 PCM-only 准入: 任意 CH 数 (1/2/4/8/>8) 全 PCM 允许 --
+    ch_plans = {
+        1: _plan_with(_stream("pcm_s16le", index=1)),
+        2: _plan_with(_stream("pcm_s16le", channels=2, index=1)),
+        4: _plan_with(*[_stream("pcm_s24le", index=i)
+                       for i in range(1, 5)]),
+        8: _plan_with(*[_stream("pcm_s24le", index=i)
+                       for i in range(1, 9)]),
+        12: _plan_with(*[_stream("pcm_s24le", index=i)
+                        for i in range(1, 13)]),
+    }
+    ch_decisions = {
+        ch: resolve_alignment(plan, AudioAlignmentPolicy.ENABLED)
+        for ch, plan in ch_plans.items()
+    }
+    record("v08.align enabled + 全 PCM 1CH/2CH/4CH/8CH/12CH -> 允许 (任意 CH 数)",
+           all(
+               dec.enabled and not dec.refused
+               and dec.reason == "alignment_enabled_pcm"
+               and not dec.requires_decode and dec.warnings == []
+               for dec in ch_decisions.values()
+           ),
+           f"{[(ch, dec.enabled, dec.reason) for ch, dec in ch_decisions.items()]}")
 
-    d = resolve_alignment(aac_plan, AudioAlignmentPolicy.ENABLED)
-    record("v08.align AAC + enabled 与 Opus 走同一条规则",
-           d.enabled and d.requires_decode and d.warnings)
+    # --- 2b. enabled + 参与流含 AAC/Opus -> 显式拒绝 (不再 warning+重编码) --
+    decisions = {
+        codec: resolve_alignment(plan, AudioAlignmentPolicy.ENABLED)
+        for codec, plan in (("aac", aac_plan), ("opus", opus_plan))
+    }
+    record("v08.align enabled + 参与的 AAC/Opus -> 显式拒绝 (稳定 reason)",
+           all(
+               not dec.enabled and dec.refused
+               and dec.reason == REASON_ALIGNMENT_REJECTED_NON_PCM
+               and not dec.requires_decode and dec.warnings == []
+               and not dec.reference_required
+               for dec in decisions.values()
+           ),
+           f"{[(codec, dec.reason, dec.refused) for codec, dec in decisions.items()]}")
+    record("v08.align enabled 拒绝时点名非 PCM 流 (stream + codec_name)",
+           all(
+               dec.non_pcm_streams == [{
+                   "stream": "s:s1",
+                   "channel_id": "s:s1:c0",
+                   "codec_name": codec,
+               }]
+               for codec, dec in decisions.items()
+           ),
+           f"{[(codec, dec.non_pcm_streams) for codec, dec in decisions.items()]}")
+    record("v08.align enabled 拒绝不再走'解码 -> 重编码'链路 (A3: 只允许 PCM)",
+           all(
+               not dec.requires_decode
+               and any("refusing instead of warning" in n for n in dec.notes)
+               and any("no audio is opened, decoded or re-encoded" in n
+                       for n in dec.notes)
+               for dec in decisions.values()
+           ),
+           f"{[dec.notes for dec in decisions.values()]}")
 
     d = resolve_alignment(mixed_plan, AudioAlignmentPolicy.AUTO)
     record("v08.align PCM + compressed 混合 + auto -> DISABLED (compressed 否决)",
@@ -270,10 +311,71 @@ def l1_audio_format() -> None:
            and d.compressed_sources == ["rec"],
            f"{d.reason} {d.formats}")
     d = resolve_alignment(mixed_plan, AudioAlignmentPolicy.ENABLED)
-    record("v08.align 混合 + enabled 仍然 warning (§41)",
-           d.enabled and d.requires_decode
-           and WARNING_ALIGNMENT_COMPRESSED in d.warnings,
-           f"{d.warnings}")
+    record("v08.align 混合 + enabled -> 显式拒绝 (participating-only 点名压缩源)",
+           d.refused and not d.enabled
+           and d.reason == REASON_ALIGNMENT_REJECTED_NON_PCM
+           and d.compressed_sources == ["rec"]
+           and d.non_pcm_streams
+           and d.non_pcm_streams[0]["stream"] == "rec:s1"
+           and d.non_pcm_streams[0]["codec_name"] == "aac"
+           and d.warnings == [],
+           f"{d.to_dict()}")
+
+    # --- 2c. participating-only: 文件里未参与输出的压缩流**不**否决 --------
+    selected_pcm_only = _plan_with(
+        _stream("pcm_s16le", index=1),
+        _stream("aac", bit_rate=192000, index=2),
+    )
+    AudioPlanner(selected_pcm_only).select_channels("s:s1:c0")
+    d = resolve_alignment(selected_pcm_only, AudioAlignmentPolicy.ENABLED)
+    record("v08.align enabled + 未参与的压缩流 -> 不拒绝 (participating-only 关键)",
+           d.enabled and not d.refused and d.reason == "alignment_enabled_pcm"
+           and d.formats == {"s": "pcm"} and d.compressed_sources == [],
+           f"{d.to_dict()}")
+    record("v08.align participating_formats 只统计参与声道引用的流",
+           participating_formats(selected_pcm_only)
+           == {"s": AudioInputFormat.PCM}
+           and plan_formats(selected_pcm_only)
+           == {"s": AudioInputFormat.COMPRESSED},
+           f"{participating_formats(selected_pcm_only)} vs "
+           f"{plan_formats(selected_pcm_only)}")
+    d = resolve_alignment(selected_pcm_only, AudioAlignmentPolicy.AUTO)
+    record("v08.align auto 旧口径不变 (来源级保守: 未参与压缩流仍否决 auto)",
+           not d.enabled and d.reason == "alignment_default_compressed",
+           f"{d.reason}")
+    d = resolve_alignment(
+        mixed_plan, AudioAlignmentPolicy.ENABLED,
+        channel_ids=["cam:s1:c0"],
+    )
+    record("v08.align enabled 显式 channel_ids 也只检查参与的声道",
+           d.enabled and not d.refused
+           and d.reason == "alignment_enabled_pcm"
+           and d.formats == {"cam": "pcm"},
+           f"{d.to_dict()}")
+
+    # --- 2d. auto/disabled 决策字典不新增字段 (旧报告逐字节兼容) ----------
+    auto_dict = resolve_alignment(aac_plan, AudioAlignmentPolicy.AUTO).to_dict()
+    expected_auto = {
+        "requested": "auto",
+        "enabled": False,
+        "reason": "alignment_default_compressed",
+        "formats": {"s": "compressed"},
+        "requires_decode": False,
+        "reference_required": False,
+        "compressed_sources": ["s"],
+    }
+    record("v08.align auto 决策字典字段/取值与旧版一致 (无 refused 新字段)",
+           {key: auto_dict[key] for key in expected_auto} == expected_auto
+           and "refused" not in auto_dict
+           and "non_pcm_streams" not in auto_dict,
+           f"{auto_dict}")
+    disabled_dict = resolve_alignment(
+        pcm_plan, AudioAlignmentPolicy.DISABLED).to_dict()
+    record("v08.align disabled 决策字典字段/取值与旧版一致",
+           disabled_dict["reason"] == "alignment_disabled_by_request"
+           and "refused" not in disabled_dict
+           and "non_pcm_streams" not in disabled_dict,
+           f"{disabled_dict}")
 
     d = resolve_alignment(pcm_plan, AudioAlignmentPolicy.DISABLED)
     record("v08.align disabled -> 不估计不应用 (显式关闭优先)",
@@ -288,6 +390,82 @@ def l1_audio_format() -> None:
     d = resolve_alignment(AudioPlan(), AudioAlignmentPolicy.AUTO)
     record("v08.align 空计划 -> 无事可做 (不是错误)",
            not d.enabled and d.reason == "audio_alignment_no_channels")
+    d = resolve_alignment(AudioPlan(), AudioAlignmentPolicy.ENABLED)
+    record("v08.align enabled + 空计划同样不是拒绝 (没有参与流)",
+           not d.enabled and not d.refused
+           and d.reason == "audio_alignment_no_channels")
+
+    # --- 2e. 执行层: 拒绝发生在任何解码/estimate 之前 (§4.9) --------------
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    from core.output_compose import VideoOutputArtifact
+    from production.output import apply_alignment, produce_audio_output
+
+    calls: list[str] = []
+
+    def _forbidden(*_args: Any, **_kwargs: Any) -> Any:
+        calls.append("estimate_sync")
+        raise AssertionError(
+            "admission refusal must happen before estimate/decode"
+        )
+
+    refusal_plan = _plan_with(_stream("aac", bit_rate=192000, index=1))
+    with patch("core.audio_sync.estimate_sync", side_effect=_forbidden):
+        refused = apply_alignment(
+            refusal_plan, "s:s1:c0", ffmpeg=FFMPEG, requested="enabled")
+        no_ref = apply_alignment(
+            refusal_plan, "", ffmpeg=FFMPEG, requested="enabled")
+        auto_out = apply_alignment(
+            refusal_plan, "s:s1:c0", ffmpeg=FFMPEG, requested="auto")
+    record("v08.align 执行层 enabled + AAC -> outcome 明确失败 + 稳定错误码",
+           (not refused.ok)
+           and [str(e.get("reason")) for e in refused.errors]
+           == [REASON_ALIGNMENT_REJECTED_NON_PCM]
+           and refused.applied == 0
+           and refused.decision.refused
+           and "AUDIO PLAN REJECTED"
+           in str(refused.errors[0].get("detail")),
+           f"{refused.errors}")
+    record("v08.align 拒绝发生在 estimate/decode 之前 (estimate_sync 未被调用)",
+           calls == [] and refused.decision.requires_decode is False
+           and refused.plan is None and refused.statuses == {}
+           and refused.offsets == {},
+           f"estimate_calls={calls} plan={refused.plan}")
+    record("v08.align 拒绝先于 reference 检查 (缺 reference 也先报非 PCM)",
+           [str(e.get("reason")) for e in no_ref.errors]
+           == [REASON_ALIGNMENT_REJECTED_NON_PCM],
+           f"{no_ref.errors}")
+    record("v08.align auto + compressed 执行层旧行为不变 (跳过不是报错)",
+           auto_out.ok and not auto_out.decision.enabled
+           and auto_out.decision.reason == "alignment_default_compressed"
+           and calls == [],
+           f"{auto_out.to_dict()}")
+
+    # 生产编排 (1kt.py `_apply_audio_plan` 消费的就是这一层):
+    # outcome.ok=False 才会让调用方返回 False -> 非零退出, 不产出半成品。
+    rejection_request = SimpleNamespace(
+        alignment="enabled", sync_reference="s:s1:c0")
+    rejected_path = WORK / "s3b_plan_rejected.mp4"
+    try:
+        rejected_path.unlink()
+    except OSError:
+        pass
+    oc = produce_audio_output(
+        plan=refusal_plan,
+        video=VideoOutputArtifact(path="not-used.mp4"),
+        output_path=rejected_path,
+        ffmpeg=FFMPEG,
+        request=rejection_request,
+    )
+    record("v08.align 生产编排: 拒绝 -> outcome.ok=False + 同一稳定错误码",
+           (not oc.ok) and oc.reasons == [REASON_ALIGNMENT_REJECTED_NON_PCM]
+           and not oc.applied
+           and oc.alignment is not None and oc.alignment.refused,
+           f"{oc.summary()}")
+    record("v08.align 生产编排: 拒绝不产出半成品 (目标文件未创建)",
+           not rejected_path.exists(),
+           f"exists={rejected_path.exists()}")
 
     # --- 3. 输出编码: manual > source-derived > encoder default (§8) -----
     record("v08.codec PCM 输入默认输出 PCM (§6: 不自动 PCM -> AAC)",
@@ -485,7 +663,10 @@ def l3_audio_format() -> None:
     from core.audio_plan import AudioPlanner
     from core.audio_probe import audio_probe_external, audio_probe_from_file
     from core.audio_request import parse_audio_request
-    from core.audio_format import format_bitrate
+    from core.audio_format import (
+        REASON_ALIGNMENT_REJECTED_NON_PCM,
+        format_bitrate,
+    )
     from core.output_compose import VideoOutputArtifact
     from production.output import produce_audio_output, resolve_source_audio_plan
 
@@ -642,70 +823,77 @@ def l3_audio_format() -> None:
         return outcome, dest, ref_id, tgt_id
 
     oc3, out3, ref_id, tgt_aac_id = _external_case("aac", tgt_aac)
-    record("p5.fmt.T3 AAC + 显式 alignment -> 输出 §5 的 warning (§41)",
-           oc3.ok and oc3.applied
-           and oc3.alignment.reason == "alignment_enabled_compressed"
-           and any("Audio alignment requested for compressed input" in w
-                   for w in oc3.alignment.warnings),
-           f"{oc3.alignment.reason} {oc3.alignment.warnings}")
-    record("p5.fmt.T3 已应用的 offset -> 每条输出流都走 render (共用 window)",
-           oc3.path.value == "pcm_route"
-           and [g["strategy"] for g in oc3.groups] == ["encode", "encode"]
-           and any("shared window" in w for w in oc3.warnings),
-           f"{oc3.path.value} {[g['strategy'] for g in oc3.groups]}")
-    record("p5.fmt.T3 输出 codec = 各自 source codec (AAC 目标保持 AAC, §7)",
-           len(oc3.formats) == 2
-           and oc3.formats[1].codec == "aac"
-           and oc3.formats[1].codec_origin == "source"
-           and [a["codec_name"] for a in _audio_of(out3)][0].startswith("pcm_")
-           and [a["codec_name"] for a in _audio_of(out3)][1] == "aac",
-           f"{[f.summary() for f in oc3.formats]} "
-           f"{[a['codec_name'] for a in _audio_of(out3)]}")
-    record("p5.fmt.T3 视频基本流 sha256 未变 (音频重编码不动视频)",
-           _video_elementary_hash(out3) == baseline_hash,
-           f"{_video_elementary_hash(out3)[:16]}")
-    record("p5.fmt.T3 mapping 未因 decode/re-encode 改变 (§14)",
-           [g["channels"] for g in oc3.groups] == [[ref_id], [tgt_aac_id]],
-           f"{[g['channels'] for g in oc3.groups]}")
-    offset_aac = float(oc3.alignment_offsets.get(tgt_aac_id, 0.0))
-    record("p5.fmt.T3 AAC 目标: offset 在**解码样本域**测得 (≥ 注入的 480)",
-           oc3.alignment_applied == 1 and offset_aac >= 479.0,
-           f"offset={offset_aac} (注入 480; AAC 解码还有编码器 priming)")
-    left = _decode_mono(out3, 0, tag="p5f")
-    right = _decode_mono(out3, 1, tag="p5f")
-    lag = _best_lag(left, right)
-    record("p5.fmt.T3 对齐后两路样本互相关滞后 = 0 (±2) —— 真的对齐了样本",
-           lag is not None and abs(lag) <= 2, f"lag={lag}")
+    record("p5.fmt.T3 参与的 AAC + enabled -> 显式拒绝 (A3: 不再 warning+重编码)",
+           (not oc3.ok) and not oc3.applied
+           and oc3.reasons == [REASON_ALIGNMENT_REJECTED_NON_PCM]
+           and oc3.alignment is not None
+           and oc3.alignment.refused and not oc3.alignment.enabled
+           and not oc3.alignment.requires_decode
+           and oc3.alignment.warnings == [],
+           f"{oc3.summary()}")
+    record("p5.fmt.T3 拒绝发生在解码前: 无 offset / 无编码 / 无产物",
+           oc3.alignment_applied == 0 and oc3.alignment_offsets == {}
+           and not oc3.encoded and not oc3.groups
+           and oc3.composition is None and oc3.execution is None
+           and not out3.is_file(),
+           f"applied={oc3.alignment_applied} encoded={len(oc3.encoded)} "
+           f"groups={len(oc3.groups)} exists={out3.is_file()}")
+    record("p5.fmt.T3 错误条目点名非 PCM 流 (AAC) + 稳定错误码",
+           any(str(e.get("reason")) == REASON_ALIGNMENT_REJECTED_NON_PCM
+               and f"{tgt_aac.name}:s0" in str(e.get("detail"))
+               and "aac" in str(e.get("detail"))
+               for e in oc3.errors),
+           f"{oc3.errors}")
 
-    # --- T4: Opus 目标 (同一条链路, 另一种 compressed codec) -------------
+    # --- T4: Opus 目标 (同一条准入规则, 另一种 compressed codec) ----------
     oc4, out4, ref4_id, tgt_opus_id = _external_case("opus", tgt_opus)
-    record("p5.fmt.T4 PCM + compressed 混合参与 alignment -> warning (§41)",
-           oc4.ok and oc4.applied and oc4.alignment.enabled
-           and any("Audio alignment requested for compressed input" in w
-                   for w in oc4.alignment.warnings),
-           f"{oc4.alignment.warnings}")
-    record("p5.fmt.T4 Opus 目标 offset = 注入的 480 样本 (误差 ≤ 1)",
-           oc4.alignment_applied == 1 and tgt_opus_id in oc4.alignment_offsets
-           and abs(float(oc4.alignment_offsets[tgt_opus_id]) - 480.0) <= 1.0,
-           f"{oc4.alignment_offsets}")
-    record("p5.fmt.T4 同一个注入延迟在 PCM 域与压缩域测得不同 -> 必须解码对齐",
-           abs(offset_aac - float(oc4.alignment_offsets[tgt_opus_id])) > 100.0,
-           f"aac={offset_aac} opus="
-           f"{oc4.alignment_offsets.get(tgt_opus_id)} (注入都是 480)")
-    record("p5.fmt.T4 Opus 目标重编码后仍是 Opus (逐来源继承 codec, §35)",
-           len(oc4.formats) == 2 and oc4.formats[1].codec == "opus"
-           and [a["codec_name"] for a in _audio_of(out4)]
-           == ["pcm_s16le", "opus"],
-           f"{[f.summary() for f in oc4.formats]} "
-           f"{[a['codec_name'] for a in _audio_of(out4)]}")
-    record("p5.fmt.T4 视频基本流 sha256 未变",
-           _video_elementary_hash(out4) == baseline_hash,
-           f"{_video_elementary_hash(out4)[:16]}")
-    left = _decode_mono(out4, 0, tag="p5o")
-    right = _decode_mono(out4, 1, tag="p5o")
-    lag = _best_lag(left, right)
-    record("p5.fmt.T4 对齐后两路样本互相关滞后 = 0 (±2)",
-           lag is not None and abs(lag) <= 2, f"lag={lag}")
+    record("p5.fmt.T4 参与的 Opus + enabled -> 显式拒绝 (与 AAC 同一规则)",
+           (not oc4.ok) and not oc4.applied
+           and oc4.reasons == [REASON_ALIGNMENT_REJECTED_NON_PCM]
+           and oc4.alignment is not None and oc4.alignment.refused
+           and oc4.alignment.non_pcm_streams
+           and oc4.alignment.non_pcm_streams[0]["codec_name"] == "opus"
+           and not out4.is_file(),
+           f"{oc4.summary()} {oc4.errors} {oc4.alignment.non_pcm_streams}")
+
+    # --- T4b: participating-only —— 未参与输出的压缩流不否决 enabled ------
+    # 计划里保留一条**未被选中**的 AAC 外挂来源; 参与输出的只有 pcm_src 的
+    # 2 条 PCM 声道 -> enabled 必须放行 (与 T3/T4 同一份代码, 区别只在参与集)。
+    po_plan = audio_probe_from_file(FFPROBE, pcm_src, source_id="source").plan()
+    append_external_sources(po_plan, [
+        audio_probe_external(
+            FFPROBE, tgt_aac, source_id=tgt_aac.name).to_source(),
+    ])
+    po_request = parse_audio_request({
+        "channels": {"select": channels[:2]},
+        "alignment": "enabled",
+        "sync": {"reference": channels[0]},
+    })
+    from core.audio_request import build_audio_plan
+    po_plan = build_audio_plan(po_request, po_plan)
+    po_out = d / "t4b_participating_only.mp4"
+    po = produce_audio_output(
+        plan=po_plan, video=VideoOutputArtifact(path=str(video_only)),
+        output_path=po_out, ffmpeg=FFMPEG, ffprobe=FFPROBE,
+        work_dir=d / "t4b_work", audio_source=pcm_src, request=po_request,
+    )
+    record("p5.fmt.T4b 未参与的压缩流不否决 enabled (participating-only §4.9)",
+           po.ok and po.applied
+           and po.alignment is not None
+           and po.alignment.enabled and not po.alignment.refused
+           and po.alignment.reason == "alignment_enabled_pcm"
+           and REASON_ALIGNMENT_REJECTED_NON_PCM not in po.reasons,
+           f"{po.summary()} {po.errors}")
+    po_audio = _audio_of(po_out)
+    record("p5.fmt.T4b 未参与压缩流仍在计划里但未进产物 (证明是 participating 判定)",
+           any(s.source_id == tgt_aac.name for s in po_plan.sources)
+           and bool(po_audio)
+           and all(a["codec_name"].startswith("pcm_") for a in po_audio),
+           f"plan_sources={[s.source_id for s in po_plan.sources]} "
+           f"out={[a['codec_name'] for a in po_audio]}")
+    record("p5.fmt.T4b 视频基本流 sha256 未变 (参与对齐不动视频)",
+           _video_elementary_hash(po_out) == baseline_hash,
+           f"{_video_elementary_hash(po_out)[:16]}")
 
     # --- T5: 手动 codec + bitrate (外挂立体声 -> 独立流 -> 必须重编码) ----
     t5_dir = d / "t5"
@@ -821,3 +1009,31 @@ def l3_audio_format() -> None:
            ok_cli and len(cli_audio) == 1
            and cli_audio[0]["codec_name"] == "aac",
            f"rc={r.returncode} {[a['codec_name'] for a in cli_audio]}")
+
+    # --- T8: 真实 1kt.py 上 enabled 的非 PCM 显式拒绝 + 非零退出 ----------
+    # 这是 §4.9 的完整链路证据: production.output 的 ok=False ->
+    # 1kt.py `_apply_audio_plan` 返回 False -> 进程非零退出且不产出半成品。
+    rej_src = cli_dir / "rej_src"
+    rej_src.mkdir(parents=True, exist_ok=True)
+    _shutil.copy2(aac_src, rej_src / "aac.mp4")
+    reject_plan = plans / "enabled_reject.json"
+    reject_plan.write_text(json.dumps({
+        "version": 1,
+        "channels": {"select": [aac_channel]},
+        "alignment": "enabled",
+        "sync": {"reference": aac_channel},
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    rej_out = d / "cli_reject_out"
+    rej_out.mkdir(parents=True, exist_ok=True)
+    r_rej = _run_1kt(rej_src, "--output", str(rej_out), "--encoder", "x265",
+                     "--audio-plan", str(reject_plan))
+    rej_text = (r_rej.stdout or "") + (r_rej.stderr or "")
+    rej_produced = sorted(rej_out.rglob("*.MP4"))
+    record("p5.fmt.T8 真实 1kt.py: enabled + 参与 AAC -> 非零退出 + 稳定错误码",
+           r_rej.returncode != 0
+           and REASON_ALIGNMENT_REJECTED_NON_PCM in rej_text
+           and "[AUDIO-FAIL]" in rej_text
+           and "AUDIO PLAN REJECTED" in rej_text,
+           f"rc={r_rej.returncode}")
+    record("p5.fmt.T8 显式拒绝不产出半成品 (CLI 输出目录为空)",
+           not rej_produced, f"{[p.name for p in rej_produced]}")

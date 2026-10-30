@@ -135,24 +135,61 @@ class GpacError(RuntimeError):
     pass
 
 
+def _gpac_env(cwd: Path | None) -> dict[str, str]:
+    """MP4Box 子进程环境：把它的**临时文件**从系统盘重定向到媒体卷。
+
+    为什么必须这么做（2026-10-30 真实事故）: GPAC 26.02 在大文件 `-new/-add`
+    时会把导入暂存写到 **%TEMP%**（默认 C:）。C1305 的 50 GiB 透明重封装需要
+    在 C: 上写数十 GiB，于是报 `Error writing data (No space left on device)`
+    并回退成"源文件拷贝"——即使输出卷还有 300+ GiB。实测 mp4box 进程当时
+    打开着 `C:\\Users\\...\\AppData\\Local\\Temp\\txj0.0`。
+    把 TMP/TEMP/TMPDIR 指向 MP4Box 的 cwd（调用方已保证它在媒体/工作卷上）
+    即可让暂存文件落在同一块大容量磁盘；`_run` 在该次调用结束后清理。
+    """
+    env = dict(os.environ)
+    if cwd is None:
+        return env
+    try:
+        tmp = Path(cwd) / ".gpactmp"
+        tmp.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # 目录不可写时不要改变 GPAC 行为（退回系统默认并让真实错误暴露）。
+        return env
+    for key in ("TMP", "TEMP", "TMPDIR"):
+        env[key] = str(tmp)
+    return env
+
+
 def _run(
     cmd: list[str],
     what: str,
     cwd: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run MP4Box. `cwd` must agree with the base `_opt` used (see
-    _rel_base): relative paths in `cmd` are resolved against it."""
-    proc = subprocess.run(
-        cmd,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-        cwd=str(cwd) if cwd else None,
-    )
+    _rel_base): relative paths in `cmd` are resolved against it.
+
+    临时目录（`_gpac_env`）在该次调用结束后删除：每次 `_run` 都是独立
+    MP4Box 进程，不跨调用复用暂存。
+    """
+    env = _gpac_env(cwd)
+    tmp_dir = Path(env["TMP"]) if cwd is not None and env.get("TMP") \
+        and Path(env["TMP"]).name == ".gpactmp" else None
+    try:
+        proc = subprocess.run(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            cwd=str(cwd) if cwd else None,
+            env=env,
+        )
+    finally:
+        if tmp_dir is not None:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
     if proc.returncode != 0:
         tail = (proc.stdout or "")[-2000:]
         raise GpacError(f"{what} failed (rc={proc.returncode}):\n{tail}")
@@ -606,7 +643,8 @@ class GpacContainerBackend:
                 f"{source.name}: bundle records an nrtm meta box but the "
                 f"source carries none — cannot restore it"
             )
-        with tempfile.TemporaryDirectory(prefix="1kt_meta_") as tmp:
+        with tempfile.TemporaryDirectory(
+                prefix="1kt_meta_", dir=str(dst.parent)) as tmp:
             work = Path(tmp)
             xml = work / "meta.xml"
             has_xml = self.dump_meta_xml(source, xml)
@@ -673,7 +711,8 @@ class GpacContainerBackend:
                 f"{o_info.get('handler_type')!r} != source "
                 f"{s_info.get('handler_type')!r}"
             )
-        with tempfile.TemporaryDirectory(prefix="1kt_metav_") as tmp:
+        with tempfile.TemporaryDirectory(
+                prefix="1kt_metav_", dir=str(dst.parent)) as tmp:
             work = Path(tmp)
             s_xml = work / "s.xml"
             o_xml = work / "o.xml"

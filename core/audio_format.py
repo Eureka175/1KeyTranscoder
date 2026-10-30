@@ -62,12 +62,14 @@ __all__ = [
     "ExplicitFormat",
     "OutputFormatDecision",
     "REASON_ALIGNMENT_NO_CHANNELS",
+    "REASON_ALIGNMENT_REJECTED_NON_PCM",
     "REASON_FORMAT_BITRATE_NOT_APPLICABLE",
     "WARNING_ALIGNMENT_COMPRESSED",
     "WARNING_FORMAT_INHERIT_UNAVAILABLE",
     "classify_codec",
     "format_of_stream",
     "is_pcm_codec",
+    "participating_formats",
     "plan_formats",
     "resolve_alignment",
     "resolve_output_format",
@@ -157,7 +159,11 @@ def source_format_of(source: Any) -> AudioInputFormat:
 def _participating_channels(
     plan: AudioPlan, channel_ids: Sequence[str] | None,
 ) -> list[Any]:
-    """参与判定的声道: 显式给出优先, 否则用**有效映射** (输出顺序)。"""
+    """参与判定的声道: 显式给出优先, 否则用**有效映射** (输出顺序)。
+
+    这就是 "participating" 的唯一定义: 计划里**真的参与输出**的声道。
+    选择/映射之外的声道 (以及它们引用的流) 不参与格式判定。
+    """
     from .audio_plan import effective_mapping
 
     if channel_ids is not None:
@@ -235,6 +241,10 @@ def plan_formats(
     一个来源内部混装 PCM 与 compressed 时, 该来源整体判为 `COMPRESSED` ——
     与 `source_format_of()` 同一个保守方向 (compressed 是有否决权的那侧),
     因此不会因为"先看到 PCM 流"就把整个来源当成未压缩。
+
+    ⚠️ 这是 v0.8.0 的**来源级**分类, `auto` / `disabled` 的判定必须保持它
+    (行为逐字节兼容)。`enabled` 的 PCM-only 准入是**流级**判定: 只看参与
+    声道实际引用的那些流, 见 `participating_formats()`。
     """
     out: dict[str, AudioInputFormat] = {}
     for channel in _participating_channels(plan, channel_ids):
@@ -249,6 +259,68 @@ def plan_formats(
     return out
 
 
+def _participating_stream_facts(
+    plan: AudioPlan, channel_ids: Sequence[str] | None,
+) -> list[tuple[Any, _StreamFacts]]:
+    """参与输出的**流** + 其格式事实 (按流去重, 顺序 = 输出顺序)。
+
+    声道是 "source + stream + channel" 三元身份; 同一 (source, stream) 被
+    多个声道引用时只出现一次 —— 格式是流的属性, 与声道数无关。
+    """
+    out: list[tuple[Any, _StreamFacts]] = []
+    seen: set[tuple[str, int]] = set()
+    for channel in _participating_channels(plan, channel_ids):
+        key = (str(channel.source_id), int(channel.stream_index))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((channel, _stream_facts(plan, channel)))
+    return out
+
+
+def participating_formats(
+    plan: AudioPlan, *, channel_ids: Sequence[str] | None = None,
+) -> dict[str, AudioInputFormat]:
+    """参与输出的**流** -> 格式类别 (顺序 = 输出顺序首次出现)。
+
+    v0.8.0+ S3b 的 participating-only 口径 (§4.9): 与 `plan_formats()` 的
+    区别是**只检查参与声道真正引用的流**, 而不是把整个来源的每一流都算进来。
+    因此"文件里另有一条未被选中的压缩流"不会否决计划。
+
+    同一来源内的多条参与流混装 PCM 与 compressed 时, 该来源仍整体判为
+    `COMPRESSED` (compressed 是否决侧, 与 `plan_formats()` 同向)。
+    """
+    out: dict[str, AudioInputFormat] = {}
+    for channel, facts in _participating_stream_facts(plan, channel_ids):
+        source_id = str(channel.source_id)
+        found = classify_codec(facts.codec_name)
+        if found is AudioInputFormat.COMPRESSED:
+            out[source_id] = found
+        elif out.get(source_id) is not AudioInputFormat.COMPRESSED:
+            out[source_id] = found
+    return out
+
+
+def _non_pcm_streams(
+    plan: AudioPlan, channel_ids: Sequence[str] | None,
+) -> list[dict[str, Any]]:
+    """参与输出、但**不是 PCM** 的流 (拒绝依据; 顺序 = 输出顺序)。
+
+    每条记录点名 `stream` ("source:sN") 与 `codec_name` —— 错误信息必须能
+    指出到底哪条流不是 PCM (§4.9), 不能只说"有压缩流"。
+    """
+    out: list[dict[str, Any]] = []
+    for channel, facts in _participating_stream_facts(plan, channel_ids):
+        if classify_codec(facts.codec_name) is AudioInputFormat.PCM:
+            continue
+        out.append({
+            "stream": f"{channel.source_id}:s{int(channel.stream_index)}",
+            "channel_id": str(getattr(channel, "id", "") or ""),
+            "codec_name": str(facts.codec_name or "") or "unknown",
+        })
+    return out
+
+
 # ---------------------------------------------------------------------------
 # 2. 默认 alignment 策略 (§4/§5/§40/§41)
 # ---------------------------------------------------------------------------
@@ -258,7 +330,9 @@ class AudioAlignmentPolicy(str, Enum):
     """用户对 alignment 的**意图** (不是执行图, 也不是 reference 选择)。
 
     * `AUTO`     —— 默认: 按输入格式决定 (PCM 允许, compressed 不允许);
-    * `ENABLED`  —— 显式要求 alignment (compressed 会 warning + 解码重编码);
+    * `ENABLED`  —— 显式要求 alignment: **participating-only PCM 准入**。
+      参与输出的流必须全部是 PCM, 任一条不是 PCM -> 显式拒绝 (稳定 reason
+      `alignment_enabled_rejected_non_pcm`, 不解码、不重编码、不 warning);
     * `DISABLED` —— 显式关闭。
 
     ⚠️ `ENABLED`/`AUTO` 只说"**允许进入** alignment pipeline", **不代表**
@@ -284,7 +358,12 @@ class AudioAlignmentPolicy(str, Enum):
             return default
 
 
-#: §5 要求的 warning 原文 (compressed 输入被显式要求 alignment 时)。
+#: §5 时代的 warning 原文 (compressed 输入被显式要求 alignment 时)。
+#:
+#: **v0.8.0+ S3b 起不再由 `resolve_alignment()` 发出**: `--audio-plan` 的
+#: `alignment=enabled` 对参与输出的非 PCM 流改为**显式拒绝**
+#: (`REASON_ALIGNMENT_REJECTED_NON_PCM`), 绝不解码 + 重编码。常量保留是为了
+#: 不打断既有 import (报告/工具可能仍引用这段稳定文案)。
 WARNING_ALIGNMENT_COMPRESSED = (
     "Audio alignment requested for compressed input. "
     "The stream must be decoded to PCM and re-encoded afterward."
@@ -298,11 +377,16 @@ NOTE_ALIGNMENT_SKIPPED_COMPRESSED = (
 
 REASON_ALIGNMENT_NO_CHANNELS = "audio_alignment_no_channels"
 
+#: `alignment=enabled` 的 PCM-only 准入被拒绝时的**稳定 reason code** (§4.9)。
+#:
+#: 拒绝 = 显式失败 (调用方返回非零退出), 不是"跳过": 参与输出的流里有任意
+#: 一条不是 PCM, 就不能在样本域对齐, 而解码 + 重编码降级已按 A3 取消。
+REASON_ALIGNMENT_REJECTED_NON_PCM = "alignment_enabled_rejected_non_pcm"
+
 _REASON_PCM_DEFAULT = "alignment_default_pcm"
 _REASON_COMPRESSED_DEFAULT = "alignment_default_compressed"
 _REASON_PCM_MIXED_DEFAULT = "alignment_default_mixed"
 _REASON_PCM_EXPLICIT = "alignment_enabled_pcm"
-_REASON_COMPRESSED_EXPLICIT = "alignment_enabled_compressed"
 _REASON_DISABLED = "alignment_disabled_by_request"
 _REASON_NO_CHANNELS = REASON_ALIGNMENT_NO_CHANNELS
 
@@ -314,6 +398,10 @@ class AlignmentDecision:
     `enabled=True` 只表示**允许进入** alignment pipeline; 是否真的产生
     offset 取决于 `SyncPlan.reference_channel_id` 是否被显式给出
     (见 `core.audio_sync`)。本结构因此额外报告 `reference_required`。
+
+    `refused=True` (同时 `enabled=False`) 表示 `enabled` 的 PCM-only 准入
+    被**显式拒绝**: 拒绝理由在 `reason`, 被拒的流在 `non_pcm_streams`。
+    调用方必须把它当失败处理 (非零退出), 不允许"warning 后继续"。
     """
 
     requested: str = AudioAlignmentPolicy.AUTO.value
@@ -322,6 +410,11 @@ class AlignmentDecision:
     formats: dict[str, str] = field(default_factory=dict)
     compressed_sources: list[str] = field(default_factory=list)
     requires_decode: bool = False
+    #: `enabled` 的 PCM-only 准入被显式拒绝 (§4.9)。
+    refused: bool = False
+    #: 拒绝依据: 参与输出、但不是 PCM 的流
+    #: `[{"stream": "source:sN", "channel_id": ..., "codec_name": ...}]`。
+    non_pcm_streams: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
@@ -348,6 +441,14 @@ class AlignmentDecision:
             data["warnings"] = list(self.warnings)
         if self.notes:
             data["notes"] = list(self.notes)
+        # 新字段只在真的拒绝时出现: auto/disabled/普通 enabled 的决策字典
+        # 与旧版**逐字节一致** (A5 的兼容要求)。
+        if self.refused:
+            data["refused"] = True
+        if self.non_pcm_streams:
+            data["non_pcm_streams"] = [
+                dict(item) for item in self.non_pcm_streams
+            ]
         return data
 
     def summary(self) -> dict[str, Any]:
@@ -366,26 +467,38 @@ def resolve_alignment(
     *,
     channel_ids: Sequence[str] | None = None,
 ) -> AlignmentDecision:
-    """格式感知的 alignment 决议 (§4/§5)。
+    """格式感知的 alignment 决议 (§4/§5/§4.9/§41)。
 
     判定是**穷举的**, 没有"其它情况":
 
-    | requested | 参与来源格式 | enabled | reason |
+    | requested | 参与输出的流格式 | enabled | reason |
     |---|---|---|---|
     | `disabled` | 任意 | False | `alignment_disabled_by_request` |
     | `enabled`  | 全 PCM | True | `alignment_enabled_pcm` |
-    | `enabled`  | 含 compressed (含混合) | True + warning | `alignment_enabled_compressed` |
+    | `enabled`  | 含非 PCM (participating-only) | False + refused | `alignment_enabled_rejected_non_pcm` |
     | `auto`     | 全 PCM | True | `alignment_default_pcm` |
     | `auto`     | 含 compressed | False | `alignment_default_compressed` |
 
-    混合 (PCM + compressed) 在 `auto` 下是 **disabled**: compressed 一侧有
-    否决权, 因为启用它就意味着"必须解码 + 重编码", 而默认路径不做这件事。
-    `enabled` 下混合同样 warning (§41)。
+    `enabled` 的准入是 **participating-only PCM** (§4.9 / A3): 只检查**真的
+    参与输出**的流; 其中任意一条不是 PCM -> **显式拒绝** (`refused=True`,
+    `non_pcm_streams` 点名是哪条流), **不** warning、**不**解码/重编码。
+    未参与输出的压缩流不否决计划。
+
+    `auto` / `disabled` 保持 v0.8.0 的既有语义与决策字典 (source 级保守
+    分类, 见 `plan_formats()`), 行为与旧版逐字节一致。
     """
     policy = AudioAlignmentPolicy.coerce(
         requested, AudioAlignmentPolicy.AUTO
     ) or AudioAlignmentPolicy.AUTO
-    formats = plan_formats(plan, channel_ids=channel_ids) if plan else {}
+    if policy is AudioAlignmentPolicy.ENABLED:
+        # A3/S3b: 准入只看参与输出的流 (participating-only)。
+        formats = (
+            participating_formats(plan, channel_ids=channel_ids)
+            if plan else {}
+        )
+    else:
+        # AUTO/DISABLED: 保持 v0.8.0 的来源级保守分类 (逐字节兼容)。
+        formats = plan_formats(plan, channel_ids=channel_ids) if plan else {}
     rendered = {sid: fmt.value for sid, fmt in formats.items()}
     compressed = sorted(
         sid for sid, fmt in formats.items() if fmt is AudioInputFormat.COMPRESSED
@@ -415,22 +528,29 @@ def resolve_alignment(
         return decision
 
     if policy is AudioAlignmentPolicy.ENABLED:
-        decision.enabled = True
         if compressed:
-            decision.reason = _REASON_COMPRESSED_EXPLICIT
-            decision.requires_decode = True
-            decision.warnings.append(WARNING_ALIGNMENT_COMPRESSED)
+            # §4.9 / A3: 显式拒绝。绝不 warning 后继续, 绝不解码 + 重编码。
+            decision.enabled = False
+            decision.refused = True
+            decision.reason = REASON_ALIGNMENT_REJECTED_NON_PCM
+            decision.non_pcm_streams = _non_pcm_streams(plan, channel_ids)
             decision.notes.append(
-                "compressed source(s) "
-                f"{compressed} take the decode -> PCM -> align -> re-encode "
-                "path (never a fake timestamp shift on the compressed packets)"
+                "alignment=enabled is PCM-only: participating stream(s) "
+                f"{compressed} are not PCM -> refusing instead of warning and "
+                "decoding/re-encoding (alignment=auto keeps the legacy "
+                "layered behaviour)"
             )
-        else:
-            decision.reason = _REASON_PCM_EXPLICIT
             decision.notes.append(
-                "PCM source(s): alignment runs on the sample timeline, "
-                "no re-encode is required by the alignment itself"
+                "rejected during admission: no audio is opened, decoded or "
+                "re-encoded for alignment"
             )
+            return decision
+        decision.enabled = True
+        decision.reason = _REASON_PCM_EXPLICIT
+        decision.notes.append(
+            "PCM source(s): alignment runs on the sample timeline, "
+            "no re-encode is required by the alignment itself"
+        )
         decision.notes.append(
             "an explicit reference channel is still required: alignment "
             "never guesses one"

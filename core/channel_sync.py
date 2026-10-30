@@ -77,8 +77,14 @@ DEFAULTS: dict[str, Any] = {
     # —— 模式 ——
     "channel_sync_transparent": False,   # 视频/非音频 stream copy + 轨道级音频同步
 
-    # —— 输入边界 ——
-    "min_audio_streams": 3,              # 至少 3 条独立单声道 PCM 流才启用
+    # —— 输入边界 (2026-10-29, 用户决策 A) ——
+    # 所有布局一视同仁拆成**独立声道**再计数: mono/stereo/5.1/7.1 都按声道数
+    # 参与判定。3–8 个 PCM 声道默认自动对齐 (不要求 --channel-sync);
+    # <3 (如单个 stereo 的 2 声道) 不自动; >8 只允许 --audio-plan
+    # alignment=enabled 显式开启。`min_audio_streams` 仅保留兼容 (旧键)。
+    "min_audio_streams": 3,              # 旧键: 兼容读取, 判定改用 min_auto_channels
+    "min_auto_channels": 3,              # 自动开启对齐的最小 PCM 声道数
+    "max_auto_channels": 8,              # 自动开启对齐的最大 PCM 声道数
     "supported_sample_rates": [48000, 96000],  # 仅 48k/96k (44.1k 显式拒绝)
     "supported_codecs": [
         # 用户决定: 大小端无所谓, 都支持; 需要排除的是 44.1kHz 采样率
@@ -214,7 +220,11 @@ DEFAULTS: dict[str, Any] = {
     "fix_chunk_seconds": 60.0,           # 初值, 待真实素材标定 (移位分块大小)
 
     # —— 锚点 (P1: 候选顺序 + 健康门; 完整打分属二期) ——
-    "anchor_candidates": [2, 3, 0, 1],   # CH3 > CH4 > CH1 > CH2 (0-based); CH3 非"真值基准"
+    # 2026-10-29 用户决策 A4: 默认锚点改为 CH1→CH2→…→CH8 (0-based 0..7),
+    # 当前锚点置信度/帧数低于门即换下一个。旧默认 [2,3,0,1] 由 config 显式
+    # 覆盖时仍然生效 (兼容)。所有依赖锚点的数值都会变 —— 回归单列
+    # `anchor_effect` (docs/design/long_take_default_alignment.md §8.2)。
+    "anchor_candidates": [0, 1, 2, 3, 4, 5, 6, 7],
 
     # —— 分组锚点 (opt-in, **默认关闭**) ——
     #
@@ -265,13 +275,18 @@ DEFAULTS: dict[str, Any] = {
     #: 关闭轨), 对剩余 2 条做纠正在用户口径里没有意义, 还会让透明模式白白
     #: 重封装整个文件。保持为可覆盖项 (False 可恢复旧行为)。
     "skip_two_channel_only": True,
+    # —— stereo 组绑定 (2026-10-29 用户决策 C; 默认开启) ——
+    # 内部键 (不是 CLI 开关): 供 config/回归的 off 臂与单元测试使用;
+    # 默认行为 = 高相关刚性双轨绑定为整组同偏移。
+    "stereo_bind_enabled": True,
 
     # —— 兼容 ——
     "max_lag_seconds": None,             # 旧键: 读取时映射为 search_window_ms
     "algo_version": "2.3.0-p1",
 }
 
-_INT_KEYS = ("min_audio_streams", "coarse_rate", "min_usable_frames",
+_INT_KEYS = ("min_audio_streams", "min_auto_channels", "max_auto_channels",
+             "coarse_rate", "min_usable_frames",
              "group_snr_samples", "group_snr_min_samples",
              "min_shift_samples", "recheck_windows", "verify_agree_samples")
 #: **可为 None** 的整数键 (P4.6): None 是"未指定, 用上游具名默认常量", 与 0
@@ -337,7 +352,8 @@ def production_opts(
 
 _BOOL_KEYS = ("channel_sync_transparent", "time_varying", "group_anchor_enabled",
               "channel_sync_accurate", "verify_agree_veto",
-              "track_reference", "skip_two_channel_only")
+              "track_reference", "skip_two_channel_only",
+              "stereo_bind_enabled")
 
 # 参与"全部健康 target 均失败 -> 文件级 measure_failed" 判定的轨道级原因
 _ESTIMATION_FAIL_REASONS = frozenset({
@@ -393,51 +409,154 @@ def effective_opts(cfg: dict[str, Any] | None) -> dict[str, Any]:
     return opts
 
 
-def eligible_audio(streams: list[dict[str, Any]]) -> tuple[bool, str]:
-    """文件级资格判定 (P1, 保持名称与返回结构兼容)。
+# ---------------------------------------------------------------------------
+# 参与集合 / 声道模型 (2026-10-29, 用户决策 A/A5)
+#
+# 所有布局一视同仁: 一条 mono 流 = 1 个独立声道; 一条 5.1 流 = 6 个独立声道。
+# "3–8 个 PCM 声道自动对齐" 按**声道数**而不是流条数判定; 输出时再按源流/声道
+# 顺序重新交织回源结构 (全通道参与时承诺结构不变, 见 A6)。
+# ---------------------------------------------------------------------------
 
-    对齐规则 (用户决定): 仅针对多流单声道 PCM 布局 (无线麦 CH1/CH2 +
-    有线参考 CH3/CH4, >=3 条独立 mono PCM 流); **2ch (立体声) / 1ch
-    (单声道) 布局默认不做对齐** — 立体声流内部相位关系不应被通道间
-    重排破坏, 单流无从对齐。
 
-    P1 起采样率限定 48k/96k (**44.1k 等一律显式拒绝**并 WARNING — 有意的
-    范围收窄, 不再 silently 跑旧算法), codec 支持线性 PCM 八类
-    (s16/s24/s32/f32 × 小端/大端 — 用户决定: 大小端无所谓, 都支持),
-    压缩/非线性格式 (aac/alaw 等) 一律拒, 各流采样率须一致。
+@dataclasses.dataclass(frozen=True)
+class ChannelRef:
+    """参与对齐的一个**独立声道** (源结构的定位信息随行)。
+
+    `index` 是全局声道序号 (与报告里的 CH1..CHn 一致); `stream`/`channel` 是它
+    在源容器音频流/流内声道的位置 —— 输出阶段按这两个字段重组, 不靠猜。
     """
-    audio = [s for s in streams if s.get("codec_type") == "audio"]
-    if len(audio) < DEFAULTS["min_audio_streams"]:
-        return False, (
-            f"仅 {len(audio)} 条音频流: 1ch/2ch 布局默认不做对齐 "
-            f"(需 >= {DEFAULTS['min_audio_streams']} 条独立单声道 PCM 流)"
-        )
-    for i, st in enumerate(audio):
+
+    index: int
+    stream: int
+    channel: int
+    stream_channels: int
+    codec: str
+    entry: str
+    storage: str
+    layout: str = ""
+
+    @property
+    def channel_id(self) -> str:
+        return f"CH{self.index + 1}"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "channel_id": self.channel_id,
+            "index": self.index,
+            "stream": self.stream,
+            "channel": self.channel,
+            "stream_channels": self.stream_channels,
+            "codec": self.codec,
+            "layout": self.layout,
+        }
+
+
+def _audio_streams(streams: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [s for s in streams if s.get("codec_type") == "audio"]
+
+
+def _stream_int(stream: Mapping[str, Any], key: str) -> int:
+    """稳妥读取 probe 的整数字段 (缺失/非法一律 0, 由调用方判定)。"""
+    try:
+        return int(stream.get(key) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def alignment_scope(
+    streams: list[dict[str, Any]],
+    eff: Mapping[str, Any] | None = None,
+) -> tuple[list[ChannelRef] | None, str]:
+    """判定一个文件的**参与集合**是否可自动对齐。
+
+    返回 `(channels, reason)`:
+
+    * `channels` 非 None = 可对齐; 列表是按**源顺序**展开的全部独立声道。
+    * `channels` 为 None 时 `reason` 是稳定原因码 (可被报告/日志/测试断言):
+        - `no_audio_streams`
+        - `non_pcm_audio: codec=...`             — 没有 PCM 流 (不在自动范围)
+        - `mixed_pcm_compressed_not_aligned: ...` — 混有 PCM + 压缩 (A5: 整文件
+          不自动对齐, 音频原样输出, 进程不退出)
+        - `mixed_sample_rates: [...]`
+        - `unsupported_sample_rate: N`
+        - `channel_count_out_of_range: N`        — <3 或 >8
+        - `stream N: unknown channel layout`
+
+    `eff` 缺省时用生产 DEFAULTS; 生产路径传 `effective_opts(...)` 以便 config
+    覆盖生效。**只做判定, 不解码**。
+    """
+    opts = dict(DEFAULTS) if eff is None else dict(eff)
+    min_ch = int(opts.get("min_auto_channels", DEFAULTS["min_auto_channels"]))
+    max_ch = int(opts.get("max_auto_channels", DEFAULTS["max_auto_channels"]))
+    supported = set(opts.get("supported_codecs") or DEFAULTS["supported_codecs"])
+    rates_supported = set(
+        opts.get("supported_sample_rates") or DEFAULTS["supported_sample_rates"]
+    )
+    audio = _audio_streams(streams)
+    if not audio:
+        return None, "no_audio_streams"
+    pcm, non_pcm = [], []
+    for st in audio:
         codec = str(st.get("codec_name", ""))
-        channels = st.get("channels")
-        if codec not in DEFAULTS["supported_codecs"]:
-            return False, (
-                f"stream {i}: codec {codec!r} is not supported PCM"
-            )
-        try:
-            if int(channels) != 1:
-                return False, (
-                    f"stream {i}: {channels} 声道 — 2ch/多声道布局默认"
-                    "不做对齐 (仅单声道 PCM 流参与)"
-                )
-        except (TypeError, ValueError):
-            return False, f"stream {i}: unknown channel layout"
-        raw_rate = st.get("sample_rate")
-        try:
-            rate = int(raw_rate)
-        except (TypeError, ValueError):
-            return False, f"unsupported_sample_rate: {raw_rate}"
-        if rate not in DEFAULTS["supported_sample_rates"]:
-            return False, f"unsupported_sample_rate: {rate}"
-    rates = {int(st.get("sample_rate")) for st in audio}
+        (pcm if codec in supported else non_pcm).append(st)
+    if not pcm:
+        codes = sorted({str(s.get("codec_name", "")) for s in non_pcm})
+        return None, "non_pcm_audio: codec=" + ",".join(codes)
+    if non_pcm:
+        # A5: 未指定 --audio-plan 时参与集合 = 全部输入音频流; 混有压缩即
+        # 整文件不对齐。这里**不是**错误 —— 进程不退出, 音频原样输出。
+        detail = ", ".join(
+            f"stream {i} {s.get('codec_name')}"
+            for i, s in enumerate(audio)
+            if s in non_pcm
+        )
+        return None, "mixed_pcm_compressed_not_aligned: " + detail
+    rates = {_stream_int(s, "sample_rate") for s in audio}
     if len(rates) != 1:
-        return False, f"mixed sample rates: {sorted(rates)}"
-    return True, ""
+        return None, f"mixed_sample_rates: {sorted(rates)}"
+    rate = rates.pop()
+    if rate not in rates_supported:
+        return None, f"unsupported_sample_rate: {rate}"
+    channels: list[ChannelRef] = []
+    for si, st in enumerate(audio):
+        count = _stream_int(st, "channels")
+        if count <= 0:
+            return None, f"stream {si}: unknown channel layout"
+        codec = str(st.get("codec_name", ""))
+        entry = str(st.get("codec_tag_string", "") or "")
+        layout = str(st.get("channel_layout", "") or "")
+        for ci in range(count):
+            # 多声道流经 AudioPCMReader 解码为 canonical f32 (其存储精度);
+            # 单声道流沿用原路径, s32 源保持 f64 解码。
+            storage = (
+                "f32" if count > 1
+                else ("f64" if codec in ("pcm_s32le", "pcm_s32be") else "f32")
+            )
+            channels.append(ChannelRef(
+                index=len(channels), stream=si, channel=ci,
+                stream_channels=count, codec=codec, entry=entry,
+                storage=storage, layout=layout,
+            ))
+    n = len(channels)
+    if n < min_ch or n > max_ch:
+        extra = (
+            " (>max: 仅 --audio-plan alignment=enabled 可显式开启)"
+            if n > max_ch else " (<min: 默认不做对齐)"
+        )
+        return None, f"channel_count_out_of_range: {n}{extra}"
+    return channels, ""
+
+
+def eligible_audio(streams: list[dict[str, Any]]) -> tuple[bool, str]:
+    """文件级资格判定 (保持名称/返回结构兼容; 语义见 `alignment_scope`)。
+
+    2026-10-29 用户决策 A: **按独立 PCM 声道数**判定 (3–8 自动), 不再要求
+    "每条流都是 mono"; 多声道 PCM (stereo/5.1/7.1) 与多流 mono 一视同仁。
+    混合 PCM+压缩一律不自动对齐 (A5, 原因码 `mixed_pcm_compressed_not_aligned`)。
+    44.1 kHz 等非 48k/96k 一律拒绝; 压缩/非线性格式不参与自动对齐。
+    """
+    channels, reason = alignment_scope(streams, None)
+    return (channels is not None), reason
 
 
 def _decode_stream(
@@ -448,7 +567,12 @@ def _decode_stream(
     out_raw: Path,
     storage_dtype: str,
 ) -> tuple[bool, str]:
-    """单流解码为 raw mono (写文件避免大数组走管道; f32/f64 按存储精度)。"""
+    """单流解码为 raw mono (写文件避免大数组走管道; f32/f64 按存储精度)。
+
+    ⚠️ `-ac 1` 是**下混**, 仅适用于源流本身就是 mono 的既有路径。多声道源流
+    的逐声道提取走 `_decode_multichannel_streams()`（内置 `AudioPCMReader`，
+    逐声道跨步读取），不在这里用 downmix 假装"拆声道"。
+    """
     fmt = "f32le" if storage_dtype == "f32" else "f64le"
     proc = subprocess.run(
         [
@@ -469,6 +593,166 @@ def _decode_stream(
         and out_raw.stat().st_size > 0
     )
     return ok, (proc.stderr or "")[-300:]
+
+
+def _wav_format_for_codec(codec: str) -> Any:
+    """源 PCM codec -> 中间 WAV 的采样格式（同精度，避免二次量化）。"""
+    from .audio_wav import WavFormat
+
+    return {
+        "pcm_s16le": WavFormat.PCM16, "pcm_s16be": WavFormat.PCM16,
+        "pcm_s24le": WavFormat.PCM24, "pcm_s24be": WavFormat.PCM24,
+        "pcm_s32le": WavFormat.PCM32, "pcm_s32be": WavFormat.PCM32,
+        "pcm_f32le": WavFormat.FLOAT32, "pcm_f32be": WavFormat.FLOAT32,
+    }.get(str(codec), WavFormat.PCM24)
+
+
+def _decode_multichannel_streams(
+    ffmpeg: Path,
+    source: Path,
+    audio_streams: list[dict[str, Any]],
+    audio_indices: list[int],
+    scope: Sequence["ChannelRef"],
+    work_dir: Path,
+) -> dict[int, str]:
+    """多声道 PCM 流的**逐声道解码**（A6 结构支持；绝不下混）。
+
+    走内置 `AudioSourceBuilder` + `AudioPCMReader`（用户要求优先复用内置
+    API）：reader 对每条流只解码一次到 canonical f32 交错缓存（内部用
+    identity channelmap，不重排/不混音/不插值），再按
+    `read(channel_index=…)` 跨步取出每声道写 `decoded_{channel}.{storage}`。
+
+    `audio_streams` 是**全部音频流**的 ffprobe dict（保持 audio_position
+    推导正确）；`audio_indices` 是需要逐声道解码的 audio-order 下标。
+
+    返回 `{channel_index: error}`；空 dict = 全部成功。失败语义与
+    `_decode_stream` 一致：任一声道失败即文件级 measure_failed。
+    """
+    import numpy as np
+
+    from .audio_models import AudioSourceBuilder
+    from .audio_pcm import AudioPCMReader
+
+    errors: dict[int, str] = {}
+    if not audio_indices:
+        return errors
+    builder = AudioSourceBuilder()
+    builder.add("camera", list(audio_streams), path=str(source))
+    by_container = {int(s.stream_index): s.id for s in builder.streams()}
+    wanted: dict[int, str] = {}
+    for ai in audio_indices:
+        cidx = int(audio_streams[ai].get("index", ai))
+        sid = by_container.get(cidx)
+        if sid is None:
+            for c in scope:
+                if c.stream == ai:
+                    errors[c.index] = (
+                        f"no reader stream id for container stream {cidx}")
+            continue
+        wanted[ai] = sid
+    if not wanted:
+        return errors
+    reader = AudioPCMReader(
+        builder.plan(), ffmpeg=ffmpeg, work_dir=work_dir / "pcm_layout")
+    try:
+        try:
+            reader.prepare(list(wanted.values()))
+        except Exception as exc:                       # noqa: BLE001
+            for c in scope:
+                if c.stream in wanted:
+                    errors.setdefault(
+                        c.index, f"{type(exc).__name__}: {exc}")
+            return errors
+        targets = [c for c in scope if c.stream in wanted]
+
+        def write_one(c: "ChannelRef") -> tuple[int, str | None]:
+            sid = wanted[int(c.stream)]
+            dst = work_dir / f"decoded_{c.index}.{c.storage}"
+            try:
+                total = int(reader.eof_sample(sid))
+                chunk = 1_000_000
+                start = 0
+                with dst.open("wb") as fh:
+                    while start < total:
+                        n = min(chunk, total - start)
+                        block, got = reader.read(
+                            sid, channel_index=int(c.channel),
+                            start=start, count=n)
+                        if got <= 0:
+                            return c.index, "short read before EOF"
+                        fh.write(np.asarray(block, dtype=np.float32).tobytes())
+                        start += int(block.size)
+            except Exception as exc:                   # noqa: BLE001
+                return c.index, f"{type(exc).__name__}: {exc}"
+            if not dst.is_file() or dst.stat().st_size == 0:
+                return c.index, "empty raw"
+            return c.index, None
+
+        with ThreadPoolExecutor(
+                max_workers=min(4, max(1, len(targets)))) as ex:
+            for idx, err in ex.map(write_one, targets):
+                if err:
+                    errors[int(idx)] = str(err)
+    finally:
+        reader.close()
+    return errors
+
+
+def _interleave_stream_raw(
+    channel_raws: Sequence[Path],
+    storages: Sequence[str],
+    *,
+    sample_rate: int,
+    channel_count: int,
+    layout: str,
+    wav_format: Any,
+    dst_wav: Path,
+) -> int:
+    """把同一条多声道流的各声道 raw 交汇成 WAV（A6 结构保持）。
+
+    走内置 `audio_wav.write_wav`（PCM 精度与源码流一致）。分块读取，避免
+    整条 80 min 多声道 raw 常驻内存；返回写入帧数（取各声道最短）。
+    """
+    import numpy as np
+
+    from .audio_wav import write_wav
+
+    raws = [Path(p) for p in channel_raws]
+    items = [4 if str(sd) == "f32" else 8 for sd in storages]
+    lengths = [p.stat().st_size // it for p, it in zip(raws, items)]
+    frames = int(min(lengths)) if lengths else 0
+    if frames <= 0:
+        raise RuntimeError("interleave: empty channel raw")
+    chunk = 1_000_000
+
+    def blocks() -> Any:
+        handles = [p.open("rb") for p in raws]
+        try:
+            done = 0
+            while done < frames:
+                n = min(chunk, frames - done)
+                cols = []
+                for fh, it in zip(handles, items):
+                    dtype = np.dtype("<f4") if it == 4 else np.dtype("<f8")
+                    raw = fh.read(n * it)
+                    cols.append(np.frombuffer(raw, dtype=dtype)
+                                .astype(np.float32))
+                yield np.stack(cols, axis=1)
+                done += n
+        finally:
+            for fh in handles:
+                fh.close()
+
+    write_wav(
+        dst_wav, blocks(), sample_rate=int(sample_rate),
+        channel_count=int(channel_count),
+        sample_format=wav_format,
+        frame_count=frames,
+        layout=str(layout or ""),
+        overwrite=True,
+    )
+    return frames
+
 
 
 # ffmpeg 的 MOV muxer 写 QuickTime PCM 条目 (in24/sowt/twos/in32/fl32),
@@ -659,6 +943,211 @@ def group_anchor_of(members: Iterable[int], candidates: Iterable[int]) -> int:
     order = {int(c): k for k, c in enumerate(candidates)}
     return min((int(m) for m in members),
                key=lambda m: (order.get(m, len(order)), m))
+
+
+def _detect_stereo_groups(
+    *,
+    streams: Sequence[Any],
+    decoded: Sequence[Path],
+    storages: Sequence[str],
+    healthy: Sequence[int],
+    sample_rate: int,
+    eff: Mapping[str, Any],
+    log: Callable[[str], None],
+) -> tuple[list[list[int]], dict[str, Any]]:
+    """默认 stereo 组绑定检测（2026-10-29 用户决策 C，任务书 §4.2）。
+
+    复用既有实现，不新造聚类:
+      1. `sync_estimate.sample_pair_snr` 给**所有健康对**抽帧相关强度；
+      2. `group_by_snr`（并查集）按生产阈值 1.3 建连通分量；
+      3. 只有**恰好 2 成员**的候选组才做刚性确认，判据全部来自既有探索文档:
+         * 60 s 窗 / 10 s 跳的带符号相关中位 |CC| ≥ 0.90
+           （long-take-alignment-final.md §13: 同源对 +0.982，跨组 0.43–0.61）；
+         * 全片 lag span（p90−p10）≤ 5 采样
+           （audio-sync-p2/investigation.md: CH1↔CH2 是唯一刚性对，span 0.021–0.104 ms）；
+         * 同号窗比例 ≥ 0.95；
+      4. 不满足任一条 → 不绑定（仍可同组共享锚点，但各自独立测量）。
+
+    返回 `(bound_groups, report)`。检测开销: 抽帧强度 ~秒级, 只有候选对才做
+    一次 60 s/10 s 连续性跟踪（80 min 约 40 s/对）—— 在绑定预算内。
+    """
+    from .long_take import PROFILE as LP
+    from . import sync_estimate
+    import numpy as np
+
+    report: dict[str, Any] = {
+        "enabled": True,
+        "threshold": float(eff["group_snr_threshold"]),
+        "samples_per_pair": int(eff["group_snr_samples"]),
+        "min_samples": int(eff["group_snr_min_samples"]),
+        "candidates": {},
+        "groups": [],
+        "bound_groups": [],
+    }
+    if len(healthy) < 2:
+        return [], report
+    snr_pairs: dict[tuple[int, int], Mapping[str, float]] = {}
+    for a, b in itertools.combinations(sorted(healthy), 2):
+        try:
+            snr_pairs[(a, b)] = sync_estimate.sample_pair_snr(
+                streams[a], streams[b],
+                sample_rate=sample_rate,
+                frame_ms=float(eff["frame_ms"]),
+                hop_ms=float(eff["hop_ms"]),
+                search_window_ms=float(eff["search_window_ms"]),
+                coarse_rate=int(eff["coarse_rate"]),
+                frame_min_rms_dbfs=float(eff["frame_min_rms_dbfs"]),
+                samples=int(eff["group_snr_samples"]),
+            )
+        except Exception as exc:                       # noqa: BLE001
+            log(f"channel-sync: stereo-bind 强度测量失败 "
+                f"CH{a + 1}/CH{b + 1}: {type(exc).__name__}: {exc}")
+    groups = group_by_snr(
+        snr_pairs, healthy,
+        threshold=float(eff["group_snr_threshold"]),
+        min_samples=int(eff["group_snr_min_samples"]),
+    )
+    report["groups"] = [[m + 1 for m in g] for g in groups]
+    report["snr"] = {f"{a + 1}-{b + 1}": {
+        "median": d.get("median"), "samples": d.get("samples"),
+    } for (a, b), d in snr_pairs.items()}
+    # 绑定候选 = 强相关对（比建组门更高；见 long_take.PROFILE 注释）。不直接
+    # 用 group_by_snr 的分量，是因为单链接会把 C1305 四轨并成一组，那样
+    # "恰好 2 成员"永远不成立，真实 stereo 对就永远绑不上。
+    cand_snr = float(LP["bind_candidate_snr"])
+    ranked = sorted(
+        (
+            (float(d.get("median") or 0.0), a, b)
+            for (a, b), d in snr_pairs.items()
+            if d.get("median") == d.get("median")
+            and float(d.get("median") or 0.0) >= cand_snr
+            and float(d.get("samples") or 0.0)
+            >= float(eff["group_snr_min_samples"])
+        ),
+        reverse=True,
+    )
+    bound: list[list[int]] = []
+    used: set[int] = set()
+
+    def evaluate(a: int, b: int) -> dict[str, Any]:
+        """跑一次 60 s/10 s 连续性跟踪，返回候选证据（不决策、不打日志）。
+
+        纯计算 + 只读 decoded raw，因此可以在线程池里对多个候选并行执行；
+        决策（先到先得、按 SNR 排名）仍然在下面顺序进行，保证确定性。
+        """
+        info: dict[str, Any] = {
+            "members": [a + 1, b + 1],
+            "bound": False,
+            "thresholds": {
+                "min_abs_cc": float(LP["bind_min_abs_cc"]),
+                "lag_span_samples": float(LP["bind_lag_span_samples"]),
+                "same_sign_ratio": float(LP["bind_same_sign_ratio"]),
+            },
+        }
+        if storages[a] != storages[b]:
+            info["reason"] = "storage_dtype_mismatch"
+            return info
+        try:
+            windows = sync_estimate.measure_window_delays(
+                decoded[a], decoded[b],
+                sample_rate=sample_rate,
+                window_seconds=float(LP["track_window_seconds"]),
+                hop_seconds=float(LP["track_hop_seconds"]),
+                coarse_rate=int(LP["track_coarse_rate"]),
+                min_cc=float(LP["track_min_cc"]),
+                storage_dtype=str(storages[a]),
+            )
+        except Exception as exc:                       # noqa: BLE001
+            info["reason"] = f"measure_failed: {type(exc).__name__}"
+            return info
+        rows = [w for w in (windows.get("windows") or [])
+                if w.get("valid") and w.get("delay_samples") is not None]
+        total = len(windows.get("windows") or [])
+        info["windows"] = total
+        info["valid_windows"] = len(rows)
+        if len(rows) < max(8, int(0.5 * max(1, total))):
+            info["reason"] = "too_few_valid_windows"
+            return info
+        signed = np.asarray(
+            [float(w["coarse_cc"]) * int(w.get("polarity") or 1)
+             for w in rows], dtype=np.float64)
+        lags = np.asarray([float(w["delay_samples"]) for w in rows],
+                          dtype=np.float64)
+        abs_cc = float(np.median(np.abs(signed)))
+        span = float(np.percentile(lags, 90) - np.percentile(lags, 10))
+        pos_frac = float(np.mean(signed > 0))
+        same_sign = max(pos_frac, 1.0 - pos_frac)
+        info.update({
+            "median_abs_cc": round(abs_cc, 4),
+            "lag_span_samples": round(span, 3),
+            "same_sign_ratio": round(same_sign, 4),
+        })
+        info["_gate"] = (
+            abs_cc >= float(LP["bind_min_abs_cc"])
+            and span <= float(LP["bind_lag_span_samples"])
+            and same_sign >= float(LP["bind_same_sign_ratio"])
+        )
+        return info
+
+    # S5: 候选对的 80 min 跟踪互相独立 → 并行测量（每对只读各自 decoded
+    # raw，无共享写）。归并后按 SNR 排名顺序做决策，与串行实现的
+    # "先到先得" 语义逐位一致；实测 2 候选从 ~2×T 降到 ~T（线程 FFT 释放 GIL）。
+    pair_results: dict[tuple[int, int], dict[str, Any]] = {}
+    pairs = [(a, b) for _score, a, b in ranked]
+    if len(pairs) > 1:
+        with ThreadPoolExecutor(max_workers=min(4, len(pairs))) as ex:
+            futs = {ex.submit(evaluate, a, b): (a, b) for a, b in pairs}
+            for fut, key in list(futs.items()):
+                try:
+                    pair_results[key] = fut.result()
+                except Exception as exc:               # noqa: BLE001
+                    pair_results[key] = {
+                        "members": [key[0] + 1, key[1] + 1],
+                        "bound": False,
+                        "reason": f"measure_failed: {type(exc).__name__}",
+                    }
+    else:
+        for a, b in pairs:
+            pair_results[(a, b)] = evaluate(a, b)
+
+    for _score, a, b in ranked:
+        key = (a, b)
+        info = pair_results.get(key)
+        if info is None:
+            continue
+        report["candidates"][f"{a + 1}-{b + 1}"] = info
+        if a in used or b in used:
+            # 与串行一致: 已被更高分候选占用的轨不再尝试（结果已测，仅不记
+            # 绑定）。保留候选记录便于诊断，不写 reason（它是重叠而非失败）。
+            info["overlapped"] = True
+            continue
+        gate = info.pop("_gate", None)
+        if gate is None:
+            continue
+        if gate:
+            info["bound"] = True
+            bound.append([a, b])
+            used.update((a, b))
+            log(
+                f"channel-sync: stereo group bound CH{a + 1}+CH{b + 1} "
+                f"(|CC| {info['median_abs_cc']:.3f}, "
+                f"lag span {info['lag_span_samples']:.2f} samples, "
+                f"same-sign {info['same_sign_ratio']:.0%})"
+            )
+        else:
+            log(
+                f"channel-sync: stereo pair CH{a + 1}/CH{b + 1} NOT bound "
+                f"(|CC| {info['median_abs_cc']:.3f}, "
+                f"span {info['lag_span_samples']:.2f}, "
+                f"same-sign {info['same_sign_ratio']:.0%})"
+            )
+    report["bound_groups"] = [[m + 1 for m in g] for g in bound]
+    if not bound:
+        report["note"] = (
+            "no rigid 2-member group met the binding gates; every channel is "
+            "measured independently (grouping still may share an anchor)"
+        )
+    return bound, report
 
 
 def _annotate_eligibility(rep: dict[str, Any]) -> None:
@@ -1100,6 +1589,198 @@ def effective_agree_tolerance(
             "window_spread_ms": sd_ms}
 
 
+def remux_transparent_audio(
+    *,
+    source: Path,
+    dst: Path,
+    audio_files: list[Path],
+    work_dir: Path,
+    gpac: Any,
+    restore_metadata: MetadataRestoreHook | None,
+    streams: list[dict[str, Any]],
+    log: Callable[[str], None],
+) -> tuple[Path | None, bool]:
+    """透明重封装: 视频/非音频 stream copy + 调用方给定的音频轨。
+
+    本函数从 `run_channel_sync` 的透明输出步骤**原样抽出**, 唯一区别是音频
+    轨由调用方给出 (普通 channel-sync 给的是"被修正轨 + 源轨 copy", 长素材
+    对齐流程给的是"逐窗对齐后的 4 条轨")。容器处理完全共用: GPAC `mux_new`
+    + Sony 元数据恢复钩子 + mvhd timescale 修复 + PCM sample entry 校正 +
+    tkhd flags/alternate_group 归一; 任何一步失败都回退"源文件原样拷贝",
+    不交半成品。
+
+    返回 ``(output_file, file_copied)``; ``file_copied=True`` 表示走了回退
+    拷贝。只有连回退拷贝都失败时才抛 `RuntimeError`。
+    """
+    if gpac is None:
+        log("channel-sync: transparent remux needs GPAC — 回退原样拷贝")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, dst)
+        return dst, True
+    try:
+        from preservation.dji import track_manifest
+
+        movie_ts, tracks = track_manifest(gpac, source)
+        video_any = any(
+            t["handler"] == "vide" for t in tracks
+        )
+        if not video_any:
+            raise RuntimeError(
+                f"no video track in {source} for transparent remux"
+            )
+        gpac.movie_timescale = movie_ts
+        # 按**源容器里的轨道顺序**重建 `-add` 列表, 而不是把
+        # "视频 -> 非音频 -> 全部音频" 这个固定搭配写死。
+        #
+        # 为什么顺序重要: 它属于容器语义。实测 20260904_C1214 的
+        # 源是 [video, a0..a3, rtmd], 而旧实现产出
+        # [video, rtmd, a0..a3] —— 六条流的 packet md5 全部相同
+        # (内容无损), 但**按流序号定位**的下游 (脚本 / NLE /
+        # 部分校验工具) 会因此读错轨。`mux_new` 严格按 `-add` 的
+        # 先后建轨, 所以顺序只能在这里定。
+        soun_ids = [t["id"] for t in tracks
+                    if t["handler"] == "soun"]
+        if len(soun_ids) != len(audio_files):
+            # 轨道清单与音频文件数对不上: **不猜**。静默按新顺序
+            # 拼会张冠李戴, 那比"顺序变了"严重得多, 因此退回旧
+            # 顺序并把原因写进日志。
+            log(
+                f"channel-sync: transparent remux — 源 soun 轨 "
+                f"{len(soun_ids)} 条, 音频文件 "
+                f"{len(audio_files)} 条, 无法保序 — 退回 "
+                f"\"视频+数据+音频\" 顺序"
+            )
+            adds = [f"{source}#video"]
+            for t in tracks:
+                if t["handler"] in ("vide", "soun"):
+                    continue
+                adds.append(f"{source}#{t['id']}")
+            for af in audio_files:
+                adds.append(f"{af}#audio")
+        else:
+            adds = []
+            k = 0
+            for t in sorted(tracks,
+                            key=lambda x: x.get("number", 0)):
+                h = t["handler"]
+                if h == "vide":
+                    adds.append(f"{source}#video")
+                elif h == "soun":
+                    # 音频轨用重生成/拷贝后的独立文件替换, 但
+                    # **占回它原来的位置**。
+                    adds.append(f"{audio_files[k]}#audio")
+                    k += 1
+                else:
+                    adds.append(f"{source}#{t['id']}")
+            log("channel-sync: transparent remux — 按源轨顺序 ["
+                + ", ".join(
+                    "vide" if a.endswith("#video")
+                    else "soun" if a.endswith("#audio")
+                    else "data"
+                    for a in adds) + "]")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.exists():
+            dst.unlink()
+        log("channel-sync: transparent remux (video/non-audio "
+            "stream copy + fixed audio) with MP4Box...")
+        # Sony 源必须走**与保留管线相同的恢复步骤**, 否则重封装
+        # 会把容器层元数据全部丢掉。实测 20260904_C1214:
+        #   ftyp      XAVC -> isom
+        #   rtmd      tref/cdsc 关联丢失 (track payload 本身逐字节相同)
+        #   nrtm      镜头档案 meta item 整项缺失
+        #   uuid      PROF/UNKNOWN/USMT = 1/1/7 -> 0/0/2
+        #   后果: Gyroflow 从成品读到 0/146146 IMU 帧、认不出相机
+        # 也就是说"6 条流 packet md5 全同"只在**流**层面成立,
+        # 容器层该保的一样都没保住。
+        sony_meta = (
+            any(st.get("codec_type") == "data"
+                and st.get("codec_tag_string") == "rtmd"
+                for st in streams)
+        )
+        stage: Path | None = None
+        if sony_meta:
+            # `restore_metadata` 在 run_channel_sync 入口已保证非 None;
+            # 其它调用方若绕过该契约, 这里会失败并回退源拷贝。
+            stage = restore_metadata(
+                source, adds, dst, work_dir, gpac, log
+            )
+        if stage is None:
+            gpac.mux_new(dst, adds)
+        # GPAC 输出 mvhd timescale 与源不一致: 按实际 timescale
+        # 修复 tkhd/elst 时长 (同 classic 路径修正辅助)
+        repair_remux_timescale(dst, log=log)
+        # 音频 sample entry 被 GPAC 从 ffmpeg 的 QuickTime `in24`
+        # 翻译成 MP4 `ipcm` 时把位深写错 (24 bit -> 16 bit), 条目
+        # 自相矛盾: `pcmC` 说 24, `samplesize` 说 16。ffmpeg 采信
+        # `pcmC` 所以解码正确, 但 Premiere/VLC 采信 `samplesize`,
+        # 四轨全成白噪音。这里用源的条目覆盖 (去掉 btrt 保持等长,
+        # 因此不需要动任何偏移)。失败只记 WARNING, 不影响已产出文件。
+        try:
+            from preservation.sample_entry import (
+                audio_entry_consistency,
+                patch_audio_sample_entries,
+                read_audio_entries,
+            )
+
+            # 先给**源**做同一判据: 补丁的语义是"用源覆盖成品", 因此只有
+            # 源本身自洽时, "成品补丁后不自洽"才证明是 GPAC 写坏。16-bit
+            # ipcm 等布局的 packet-size 字段位置与本解析器假设不同 (实测源
+            # 自己的 entry 就报"包长=0x70636D43"), 那种情况不能拿解析器的
+            # 未知当成品缺陷 — 记 WARNING 继续, 否则透明模式会无谓回退成
+            # 源文件拷贝 (实测 C17 的 pcm_s16le 输入)。
+            src_entries = read_audio_entries(source)
+            src_consistent = bool(src_entries) and all(
+                audio_entry_consistency(e["bytes"])["consistent"]
+                for e in src_entries
+            )
+            sdp = patch_audio_sample_entries(
+                source, dst, log=log)
+            if sdp.get("consistent_after") is False and src_consistent:
+                # 条目自相矛盾 (pcmC 说 24 / samplesize 说 16) 是
+                # 无条件错误: ffmpeg 解码正确, 但 Premiere/VLC
+                # 会按 samplesize 读成白噪音。宁可退回源文件拷贝,
+                # 也不交一个"能解码但播不对"的成品。
+                raise RuntimeError(
+                    "音频 sample entry 补丁后仍自相矛盾: "
+                    + str(sdp.get("reason")))
+            if not sdp.get("ok"):
+                log("channel-sync: WARNING 音频 sample entry 未能"
+                    f"与源一致 — {sdp.get('reason')}")
+            elif sdp.get("consistent_after") is False:
+                log("channel-sync: WARNING 源音频 sample entry 不被本校验器"
+                    "支持 — 跳过一致性硬门 (已用源条目覆盖, 等长)")
+        except RuntimeError:
+            raise
+        except Exception as exc:      # noqa: BLE001
+            log(f"channel-sync: WARNING sample entry 补丁异常: "
+                f"{exc}")
+        # tkhd 轨道启用标志 / alternate group 归一 (最后一道容器补丁)。
+        # ffmpeg/硬件 wrapper 会给第二条及之后的音轨写 flags=2 并把
+        # 所有音轨放进 alternate_group=1..N; ISO/IEC 14496-12 把该组
+        # 定义为"同一轨的备选版本", NLE 因此只显示一条音轨 (媒体信息
+        # 仍列四条)。源文件是每轨 flags=7/alternate_group=0, 这里把
+        # 容器事实恢复回来。失败只记 WARNING, 不阻断交付。
+        try:
+            from preservation.isobmf import normalize_track_flags
+
+            for desc in normalize_track_flags(dst):
+                log(f"channel-sync: {desc}")
+        except Exception as exc:      # noqa: BLE001
+            log("channel-sync: WARNING tkhd 轨道标志归一失败: "
+                f"{exc}")
+        return dst, False
+    except Exception as exc:      # noqa: BLE001
+        log(f"channel-sync: transparent remux failed: {exc} — "
+            "回退原样拷贝")
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, dst)
+            return dst, True
+        except OSError as exc2:
+            raise RuntimeError(
+                f"transparent fallback copy failed: {exc2}") from exc2
+
+
 def run_channel_sync(
     *,
     source: Path,
@@ -1198,6 +1879,12 @@ def run_channel_sync(
         # 逐字节相同 —— 下游按字段读取的地方不会因为多一个键而改变行为。
         if ctx.get("grouping") is not None:
             rep["grouping"] = ctx["grouping"]
+        # 2026-10-29 长镜头默认对齐: 可选的 stereo 组与 long_take 块。只有
+        # 真的发生/判定过才出现 —— 旧路径的报告字段集合不变。
+        if ctx.get("stereo_groups") is not None:
+            rep["stereo_groups"] = ctx["stereo_groups"]
+        if ctx.get("long_take") is not None:
+            rep["long_take"] = ctx["long_take"]
         # 精确模式同理: 只有真的打开才出现, 而且必须有内容可报 ——
         # 一个"enabled: true 但没有任何候选"的块本身也是信息 (开关没起
         # 作用), 所以开着的就写。
@@ -1233,10 +1920,20 @@ def run_channel_sync(
                 detail = f"transparent copy failed: {exc}"
         return report(status, detail, **kw)
 
-    ok, reason = eligible_audio(streams)
-    if not ok:
-        log(f"channel-sync: not eligible — {reason}")
-        return finish("not_eligible", reason)
+    # 参与集合判定 (2026-10-29 用户决策 A/A5): 按**独立 PCM 声道**计数,
+    # 3–8 自动; 混合 PCM+压缩 -> 整文件不对齐 (进程不退出)。多声道 PCM 流
+    # (stereo/5.1/7.1/quad…) 是 S3/A6 结构支持：拆成独立声道参与估计，
+    # 输出时按源流重新交织（同一 stream 的全部声道一起重编码 / 未修时整流
+    # stream copy），声道结构、顺序、采样数与源保持一致。
+    scope, scope_reason = alignment_scope(streams, eff)
+    if scope is None:
+        status = (
+            "mixed_audio_skip"
+            if scope_reason.startswith("mixed_pcm_compressed_not_aligned")
+            else "not_eligible"
+        )
+        log(f"channel-sync: {status} — {scope_reason}")
+        return finish(status, scope_reason)
 
     try:
         import numpy as np
@@ -1250,18 +1947,33 @@ def run_channel_sync(
 
     audio = [s for s in streams if s.get("codec_type") == "audio"]
     sample_rate = int(audio[0].get("sample_rate", 0) or 0)
-    codecs = [str(st.get("codec_name", "")) for st in audio]
+    n_streams = len(audio)
+    # 引擎的每个 "track" = **一个独立声道**（ChannelRef）。单声道多流素材
+    # 上 channel index 与 stream index 一一对应，行为与旧实现逐位相同；
+    # 多声道流则展开成多个 channel，最后按 stream 汇聚输出。
+    n_tracks = len(scope)
+    codecs = [str(c.codec) for c in scope]
     # 源轨 sample entry (ipcm / in24 / sowt / ...), 决定中间文件 muxer
-    entries = [str(st.get("codec_tag_string", "") or "") for st in audio]
-    storage = [
-        "f64" if c in ("pcm_s32le", "pcm_s32be") else "f32"
-        for c in codecs
-    ]
-    n_tracks = len(audio)
+    entries = [str(c.entry or "") for c in scope]
+    storage = [str(c.storage) for c in scope]
+    stream_of = [int(c.stream) for c in scope]
+    channel_of = [int(c.channel) for c in scope]
+    stream_channels = [int(c.stream_channels) for c in scope]
+    layout_of = [str(c.layout or "") for c in scope]
+    multichannel = any(n > 1 for n in stream_channels)
     min_samples = max(1, int(round(eff["min_audio_seconds"] * sample_rate)))
 
     def j(x: float, nd: int) -> float | None:
         return None if x != x else round(x, nd)   # NaN 判定沿用 x != x 惯例
+
+    def _source_fields(row: dict[str, Any], i: int) -> dict[str, Any]:
+        """声道 -> 源结构定位（A6 报告字段；单声道流时与旧字段一致）。"""
+        row["source_stream"] = stream_of[i]
+        row["source_channel"] = channel_of[i]
+        if multichannel:
+            row["source_stream_channels"] = stream_channels[i]
+            row["source_layout"] = layout_of[i]
+        return row
 
     def plain_row(i: int, decision: str, reason_: str | None) -> dict[str, Any]:
         row = {
@@ -1287,7 +1999,12 @@ def run_channel_sync(
         }
         if codecs[i] in ("pcm_s32le", "pcm_s32be"):
             row["precision_note"] = "s32 source processed via f64 pipeline"
-        return row
+        elif stream_channels[i] > 1:
+            row["precision_note"] = (
+                "multichannel stream decoded per channel via AudioPCMReader "
+                "(f32 canonical); no downmix"
+            )
+        return _source_fields(row, i)
 
     def est_row(i: int, e: Any, stats: Any, decision: str,
                 reason_: str | None, shift: int | None = None) -> dict[str, Any]:
@@ -1342,7 +2059,12 @@ def run_channel_sync(
         }
         if codecs[i] in ("pcm_s32le", "pcm_s32be"):
             row["precision_note"] = "s32 source processed via f64 pipeline"
-        return row
+        elif stream_channels[i] > 1:
+            row["precision_note"] = (
+                "multichannel stream decoded per channel via AudioPCMReader "
+                "(f32 canonical); no downmix"
+            )
+        return _source_fields(row, i)
 
     decoded = [work_dir / f"decoded_{i}.{storage[i]}" for i in range(n_tracks)]
     fixed_raw = [work_dir / f"fixed_{i}.{storage[i]}" for i in range(n_tracks)]
@@ -1350,39 +2072,62 @@ def run_channel_sync(
     arrs: list[Any] = []
 
     try:
-        # 1. 逐流解码 raw (§6.2 存储精度表)
+        # 1. 逐**声道**解码 raw (§6.2 存储精度表 + A6 结构支持)
         #
-        # 长片段并行 (P-1): 各轨解码互不依赖 (每条流一个独立 ffmpeg 进程、
-        # 写各自的 raw 文件), 顺序解码是纯粹的浪费。80 min / 4 轨实测:
-        # 顺序 101.6 s vs 4 路并行 32.5 s (3.13x)。
+        # 长片段并行 (P-1): 各声道解码互不依赖, 顺序解码是纯粹的浪费。
+        # 80 min / 4 轨实测: 顺序 101.6 s vs 4 路并行 32.5 s (3.13x)。
         # 这是**音频内部**并行, 与 `--jobs` 无关 —— `--jobs` 只并行独立
         # 文件, 不干预媒体内部的并发度。
-        # 失败语义保持不变: 仍按流序号顺序报告**第一个**失败的流。
+        # 失败语义保持不变: 仍按声道序号顺序报告**第一个**失败的。
         dec_err: dict[int, str] = {}
-        if n_tracks <= 1:
-            for i in range(n_tracks):
-                ok, err = _decode_stream(
-                    ffmpeg, source, i, sample_rate, decoded[i], storage[i]
-                )
-                if not ok:
-                    dec_err[i] = err
-        else:
-            with ThreadPoolExecutor(max_workers=n_tracks) as ex:
-                futs = {
-                    ex.submit(_decode_stream, ffmpeg, source, i, sample_rate,
-                              decoded[i], storage[i]): i
-                    for i in range(n_tracks)
-                }
-                for fut, i in list(futs.items()):
-                    ok, err = fut.result()
+        if not multichannel:
+            # 单声道多流快路径（与旧实现逐位相同）: stream index == channel
+            # index，`_decode_stream` 的 `-ac 1` 不是下混而是原样(1ch)。
+            if n_tracks <= 1:
+                for i in range(n_tracks):
+                    ok, err = _decode_stream(
+                        ffmpeg, source, i, sample_rate, decoded[i], storage[i]
+                    )
                     if not ok:
                         dec_err[i] = err
+            else:
+                with ThreadPoolExecutor(max_workers=n_tracks) as ex:
+                    futs = {
+                        ex.submit(_decode_stream, ffmpeg, source, i,
+                                  sample_rate, decoded[i], storage[i]): i
+                        for i in range(n_tracks)
+                    }
+                    for fut, i in list(futs.items()):
+                        ok, err = fut.result()
+                        if not ok:
+                            dec_err[i] = err
+        else:
+            mono_idx = [i for i in range(n_tracks) if stream_channels[i] == 1]
+            multi_audio_idx = sorted(
+                {stream_of[i] for i in range(n_tracks)
+                 if stream_channels[i] > 1}
+            )
+            if mono_idx:
+                with ThreadPoolExecutor(
+                        max_workers=min(len(mono_idx), 8)) as ex:
+                    futs = {
+                        ex.submit(_decode_stream, ffmpeg, source,
+                                  stream_of[i], sample_rate,
+                                  decoded[i], storage[i]): i
+                        for i in mono_idx
+                    }
+                    for fut, i in list(futs.items()):
+                        ok, err = fut.result()
+                        if not ok:
+                            dec_err[i] = err
+            dec_err.update(_decode_multichannel_streams(
+                ffmpeg, source, audio, multi_audio_idx, scope, work_dir))
         if dec_err:
-            i = min(dec_err)            # 与顺序实现一致: 报最先失败的那条
-            log(f"channel-sync: WARNING stream {i} decode failed")
+            i = min(dec_err)            # 与顺序实现一致: 报最先失败的
+            log(f"channel-sync: WARNING channel {i} decode failed")
             return finish(
                 "measure_failed",
-                f"audio stream {i} decode failed: {dec_err[i][-200:]}",
+                f"audio channel {i} decode failed: {dec_err[i][-200:]}",
             )
         arrs = [
             sync_estimate.open_source(decoded[i], storage[i])
@@ -1424,28 +2169,58 @@ def run_channel_sync(
                 )
         healthy = [i for i in range(n_tracks) if health[i][0]]
 
+        #: stereo 绑定组（成员为声道下标；S3 绑定检测填写）。常量路径与长镜头
+        #: 时变路径共用同一份分组，保证"整组同偏移"在两个后备路径上语义一致。
+        bound_groups: list[list[int]] = []
+        group_of_member: dict[int, list[int]] = {}
+
         # 2026-10-25 用户策略: 音频流 >= 3 但只有 2 条健康 → 默认整文件跳过
         # 对齐 (two_channel_only)。放在锚点选择**之前**: 一旦进入估计/修正,
         # 透明模式就会产生整文件重封装, 而这两条有效轨本来就是一对, 没有
         # 需要纠正的相对关系。
-        if skip_two_channel_only(n_tracks, len(healthy),
-                                 eff["skip_two_channel_only"]):
+        # A6 说明: 该策略按"音频流"计数，只对单声道多流布局有意义；多声道
+        # 流（一个 stream 多个声道）不套用（否则 5.1 流的 2 条健康声道会被
+        # 误判成 two_channel_only）。
+        if (not multichannel
+                and skip_two_channel_only(n_streams, len(healthy),
+                                          eff["skip_two_channel_only"])):
             for i in range(n_tracks):
                 rows[i]["decision"] = "untouched"
                 if not rows[i].get("reason"):
                     rows[i]["reason"] = "two_channel_only"
             log(
-                f"channel-sync: {n_tracks} 条音频流中仅 {len(healthy)} 条健康"
+                f"channel-sync: {n_streams} 条音频流中仅 {len(healthy)} 条健康"
                 " — two_channel_only, 默认整文件跳过对齐")
             return report(
                 "two_channel_only",
-                f"{n_tracks} 条音频流中仅 {len(healthy)} 条有效 (其余静音/"
+                f"{n_streams} 条音频流中仅 {len(healthy)} 条有效 (其余静音/"
                 f"不可测); 按默认策略整文件跳过对齐 "
                 f"(可用 skip_two_channel_only=false 覆盖)",
                 channels=rows,
             )
 
-        # 3. 锚点候选回退: [CH3, CH4, CH1, CH2], 仅健康轨可当选
+        # 2b. stereo 组绑定检测 (2026-10-29 用户决策 C)
+        #
+        # 相关性极高、整片 lag 刚性的**双轨**默认绑定为一组: 整组用同一个
+        # 偏移/曲线, 组内相对偏移保持源样。检测机制全部复用既有实现
+        # (sample_pair_snr -> group_by_snr -> 一次连续性跟踪确认), 不新造聚类。
+        bound_groups: list[list[int]] = []
+        stereo_report: dict[str, Any] = {"enabled": False}
+        if eff["stereo_bind_enabled"]:
+            bound_groups, stereo_report = _detect_stereo_groups(
+                streams=arrs,
+                decoded=decoded,
+                storages=storage,
+                healthy=healthy,
+                sample_rate=sample_rate,
+                eff=eff,
+                log=log,
+            )
+            if stereo_report.get("candidates") or stereo_report.get("groups"):
+                ctx["stereo_groups"] = stereo_report
+
+        # 3. 锚点候选回退: [CH1, CH2, ..., CH8] (用户决策 A4; 旧默认由 config
+        #    覆盖时仍生效), 仅健康轨可当选
         order = [c for c in eff["anchor_candidates"]
                  if 0 <= c < n_tracks and health[c][0]]
         anchor: int | None = None
@@ -1562,6 +2337,12 @@ def run_channel_sync(
         rows[anchor] = anchor_row
         to_fix: list[int] = []
         used_est: dict[int, Any] = {}   # 每轨最终采用的估计 (窄窗或宽窗)
+        #: 长镜头后备触发证据 (用户决策 B): **任一条健康 target 实测不恒定**
+        #: (含被材料性判据放行的) 或整数修正后复检不通过 -> 整文件转时变。
+        #: 与 `rows[i]["reason"]` 分开记录: 材料性放行的轨最终 decision=fixed、
+        #: reason=None, 但"实测不恒定"这个事实必须仍然能触发时变后备。
+        non_constant_flags: set[int] = set()
+        recheck_failed_flags: set[int] = set()
 
         def evidence_of_est(e: Any) -> dict[str, Any]:
             """一次估计的**完整证据**: 帧数 / 置信度 / 覆盖率。
@@ -1745,6 +2526,9 @@ def run_channel_sync(
                         drift_min_ms=eff["drift_min_ms"],
                         displacement_ms=disp_ms,
                     ):
+                        # B: 实测不恒定是**文件级**事实, 先记下 (即使材料性
+                        # 判据稍后放行该轨, 整文件仍应转时变)。
+                        non_constant_flags.add(i)
                         # 恒定性不通过。**材料性判据**可以替它放行:
                         # 如果修正能去掉的偏差 >= k × 修正后仍然存在的变化,
                         # 那么"不恒定"就不是拒绝的理由 —— 拒绝等于为了
@@ -1848,6 +2632,78 @@ def run_channel_sync(
             if decision == "fixed":
                 to_fix.append(i)
 
+        # 4c. stereo 组刚性绑定: 整组共用**组代表相对主锚点**的偏移 (决策 C)。
+        #
+        # 组内相对偏移是源内容的一部分, 因此这里只改"整组该移动多少", 不逐条
+        # 重测成员; 成员自己的测量值保留在报告里 (用于核对刚性假设)。
+        # 与锚点同组的成员跟随锚点 (锚点 shift=0) -> already_aligned。
+        #
+        # `ref_of`（轨 -> 复检参考轨）必须**在组处理之前初始化**：绑定组取
+        # "整组代表偏移" 时就要写它（`ref_of[m] = anchor`），而 4a/4b 阶段
+        # 共用同一份。此前它在 4a 前才定义，导致"绑定组 + 组代表被 fixed"
+        # 的组合直接 UnboundLocalError（全量 L3 hardware suite 实测到）。
+        ref_of: dict[int, int] = {}
+        group_shift_override: dict[int, int] = {}
+        if bound_groups:
+            for g in bound_groups:
+                members = [int(m) for m in g]
+                rep = group_anchor_of(members, eff["anchor_candidates"])
+                note = {"members": [m + 1 for m in members],
+                        "rep": rep + 1}
+                if rep == anchor:
+                    for m in members:
+                        if m == anchor:
+                            continue
+                        row = plain_row(m, "already_aligned", None)
+                        row["stereo_group"] = dict(
+                            note, bound_to_anchor=True)
+                        rows[m] = row
+                        if m in to_fix:
+                            to_fix.remove(m)
+                    log(
+                        "channel-sync: stereo group ["
+                        + ",".join(f"CH{m + 1}" for m in members)
+                        + f"] follows anchor CH{anchor + 1} — no relative "
+                        "shift (源内相对偏移保持)")
+                    continue
+                dec_rep = rows[rep].get("decision")
+                if dec_rep not in ("fixed", "already_aligned"):
+                    log(
+                        "channel-sync: stereo group ["
+                        + ",".join(f"CH{m + 1}" for m in members)
+                        + f"] not applied — rep CH{rep + 1} is "
+                        f"{dec_rep} ({rows[rep].get('reason')})"
+                    )
+                    continue
+                rep_shift = int(rows[rep].get("shift_samples") or 0)
+                for m in members:
+                    if m in to_fix:
+                        to_fix.remove(m)
+                if dec_rep == "fixed":
+                    for m in members:
+                        row = dict(rows[m]) if m != rep else dict(rows[rep])
+                        row["decision"] = "fixed"
+                        row["shift_samples"] = rep_shift
+                        row["stereo_group"] = dict(note)
+                        rows[m] = row
+                        to_fix.append(m)
+                        group_shift_override[m] = rep_shift
+                        ref_of[m] = anchor
+                    log(
+                        "channel-sync: stereo group ["
+                        + ",".join(f"CH{m + 1}" for m in members)
+                        + f"] -> whole-group shift {rep_shift:+d} samples "
+                        f"(rep CH{rep + 1})"
+                    )
+                else:
+                    for m in members:
+                        row = dict(rows[m]) if m != rep else dict(rows[rep])
+                        row.setdefault("decision", "already_aligned")
+                        row["decision"] = "already_aligned"
+                        row["shift_samples"] = None
+                        row["stereo_group"] = dict(note)
+                        rows[m] = row
+
         # 4a. 逐轨参考选择 (opt-in, 默认关闭) —— **只对主锚点下没修成的轨**
         #
         # 4 声道素材常是两支互不相干的麦克风: CH1/CH2 近场一对, CH3/CH4 另一对。
@@ -1863,9 +2719,8 @@ def run_channel_sync(
         #       以**主锚点**为参照 (ref_of[i] = anchor) —— 合成算术的正确性由
         #       修后残差独立核验, 不靠这道算术自证。
         reference_notes: dict[int, dict[str, Any]] = {}
-        #: 轨 -> 复检用的参考轨。**在 4a 之前初始化**: 换参考阶段就要写它
-        #: (复检以主锚点为参照), 而 4b 的分组层也共用这一份。
-        ref_of: dict[int, int] = {}
+        #: 轨 -> 复检用的参考轨。**在 4c 组处理之前就已初始化**（见上），
+        #: 换参考阶段与 4b 分组层共用这一份；这里不再重复赋值。
 
         def _absolute_shift_of(r: int) -> int | None:
             """已定位轨相对主锚点的整数移位 (与 step 5 的 rint 同口径)。"""
@@ -2182,7 +3037,9 @@ def run_channel_sync(
         accurate_extras: dict[int, tuple[int, float]] = {}
         for i in to_fix:
             e = used_est.get(i, ests[i])   # 宽窗采纳轨用采纳估计 (窄窗 delay 可能为 NaN)
-            shift = int(np.rint(e.delay_samples))
+            # stereo 组绑定: 整组使用组代表的偏移 (组内相对偏移保持源样)
+            shift = int(group_shift_override.get(
+                i, int(np.rint(e.delay_samples))))
             if eff["time_varying"]:
                 tv_res, tv_detail = _apply_time_varying_track(
                     i, e, arrs[i], fixed_raw[i], sample_rate, storage[i],
@@ -2240,7 +3097,8 @@ def run_channel_sync(
                 try:
                     sync_fix.shift_stream(
                         arrs[i], fixed_raw[i],
-                        delay_samples=e.delay_samples,
+                        delay_samples=group_shift_override.get(
+                            i, e.delay_samples),
                         sample_rate=sample_rate,
                         storage_dtype=storage[i],
                         chunk_seconds=eff["fix_chunk_seconds"],
@@ -2265,10 +3123,11 @@ def run_channel_sync(
                 # "decoded 4 份 + fixed 累积" 不再同时达到峰值。
                 if i != anchor:
                     _close_map(arrs[i])
-                    try:
-                        decoded[i].unlink()
-                    except OSError:
-                        pass            # finally 会重试; 此处失败不致命
+                    # 2026-10-29: 不再逐轨删除 decoded —— 长镜头时变后备
+                    # (任一轨 non_constant/recheck_residual -> 整文件时变)
+                    # 需要**全部声道**的原始 PCM。省下的 0.8 GB/轨 与
+                    # "无法退回无对齐原始音频"的风险相比不值得; 句柄关闭后
+                    # 内存占用已释放, 磁盘由 finally 统一清理。
             try:
                 # 复检门: 绝对门 + 可选相对门。相对门只在**这条轨的偏移本身**
                 # 远大于残余时放行 —— 即"修正带来了数量级改善"。小于
@@ -2343,6 +3202,8 @@ def run_channel_sync(
                 win_note = ""
                 log(f"channel-sync: WARNING CH{i + 1} recheck error: {exc}")
             if residual != residual or abs(residual) >= limit:
+                # B: 复检残差否定 = "全片不是常数"的证据, 记下来触发整文件时变。
+                recheck_failed_flags.add(i)
                 rows[i]["decision"] = "untouched"
                 rows[i]["reason"] = "recheck_residual"
                 rows[i]["shift_samples"] = None
@@ -2405,6 +3266,135 @@ def run_channel_sync(
                     f"放弃 {len(dropped)})")
             ctx["accurate"] = accurate_report
 
+        # 5c. 长镜头整文件时变后备 (用户决策 B, 2026-10-29)
+        #
+        # 恒定路径已经先跑过 (决策/施加/复检), 因此这里只做"是否需要整文件
+        # 转时变"的判定。触发条件: 任一**健康** target 实测不恒定
+        # (`non_constant_flags`, 含被材料性判据放行的) 或复检残差否定
+        # (`recheck_failed_flags`) —— 后者说明整数修正后残差仍超门。
+        #
+        # 触发后: 丢弃恒定路径的所有整数修正 (B 要求"不保留部分整数修正"),
+        # 整文件走 core.long_take 的时变编排; 失败则回退**无对齐原始音频**。
+        # 显式 `--channel-sync-tv*` (eff["time_varying"]) 的用户路径不受影响。
+        if not eff["time_varying"]:
+            tv_trigger: dict[int, str] = {}
+            for i in healthy:
+                if i == anchor:
+                    continue
+                if i in non_constant_flags:
+                    tv_trigger[i] = "non_constant"
+                elif i in recheck_failed_flags:
+                    tv_trigger[i] = "recheck_residual"
+            if tv_trigger:
+                from . import long_take as lt
+
+                log(
+                    "channel-sync: long-take fallback -> whole-file "
+                    "time-varying ("
+                    + ", ".join(f"CH{i + 1} {why}"
+                                for i, why in tv_trigger.items())
+                    + ")"
+                )
+                for i in list(to_fix):
+                    try:
+                        fixed_raw[i].unlink()
+                    except OSError:
+                        pass
+                lt_res = lt.align_time_varying(
+                    work_dir=work_dir / "long_take",
+                    anchor=anchor,
+                    decoded=decoded,
+                    storages=storage,
+                    sample_rate=sample_rate,
+                    groups=bound_groups,
+                    log=log,
+                )
+                lt_block: dict[str, Any] = {
+                    "enabled": True,
+                    "path": (
+                        "time_varying" if lt_res.get("applied")
+                        else "unaligned"
+                    ),
+                    "reason": lt_res.get("reason"),
+                    "trigger": {f"CH{i + 1}": why
+                                for i, why in tv_trigger.items()},
+                    "policy": lt.PROFILE["tv_policy"],
+                    "coordinate": lt.PROFILE["tv_coordinate"],
+                    "grid_hop_seconds": lt.PROFILE["tv_grid_hop_seconds"],
+                    "measure_window_seconds":
+                        lt.PROFILE["track_window_seconds"],
+                    "rounds": lt_res.get("rounds"),
+                    "max_shift": lt_res.get("max_shift"),
+                    "flipped": lt_res.get("flipped"),
+                    "followed_anchor": lt_res.get("followed_anchor"),
+                    "targets": lt_res.get("targets"),
+                    "timings": lt_res.get("timings"),
+                }
+                ctx["long_take"] = lt_block
+                if not lt_res.get("applied"):
+                    # B: 时变失败 -> 回退**无对齐原始音频** (不保留任何整数
+                    # 修正)。透明模式的 finish 会输出源文件拷贝; 经典模式
+                    # 不替换音频。进程继续, 不抛文件级异常。
+                    for i in range(n_tracks):
+                        rows[i]["decision"] = "untouched"
+                        rows[i]["reason"] = (
+                            rows[i].get("reason") or "time_varying_failed"
+                        )
+                    detail = ("time-varying fallback failed: "
+                              + str(lt_res.get("reason")))
+                    log(f"channel-sync: WARNING {detail} — 回退无对齐原始音频")
+                    return finish("time_varying_failed", detail,
+                                  channels=rows)
+                # 时变成功: 用最终 raw 覆盖恒定路径的结果
+                tv_storage = str(lt_res.get("storage") or "f32")
+                final = lt_res.get("fixed_raw") or {}
+                for key, path in final.items():
+                    i = int(key)
+                    fixed_raw[i] = Path(path)
+                    storage[i] = tv_storage
+                followed = {
+                    int(m) - 1 for m in (lt_res.get("followed_anchor") or [])
+                }
+                targets = lt_res.get("targets") or {}
+                rep_of: dict[int, str] = {}
+                for rep_key, info in targets.items():
+                    for m in info.get("members", []):
+                        rep_of[int(m) - 1] = rep_key
+                member_group: dict[int, list[int]] = {}
+                for g in bound_groups:
+                    for m in g:
+                        member_group[int(m)] = [int(x) for x in g]
+                fixed_ok = sorted(int(k) for k in final)
+                for i in fixed_ok:
+                    rep_key = rep_of.get(i)
+                    info = targets.get(rep_key, {}) if rep_key else {}
+                    row = plain_row(i, "fixed", None)
+                    row.update({
+                        "long_take": True,
+                        "stereo_group": (
+                            {"members": [m + 1 for m in member_group[i]]}
+                            if i in member_group else None
+                        ),
+                        "time_varying": {
+                            "policy": lt.PROFILE["tv_policy"],
+                            "coordinate": lt.PROFILE["tv_coordinate"],
+                            "rounds": info.get("rounds"),
+                            "curve": info.get("curve"),
+                            "residual": info.get("residual"),
+                            "polarity": info.get("polarity"),
+                        },
+                    })
+                    rows[i] = row
+                for i in sorted(followed):
+                    row = plain_row(i, "already_aligned", None)
+                    row["long_take"] = True
+                    row["stereo_group"] = {
+                        "members": [m + 1 for m in member_group.get(i, [i])],
+                        "bound_to_anchor": True,
+                    }
+                    rows[i] = row
+                to_fix = list(fixed_ok)
+
         # 6. 结果范围判定
         failed_est = [
             i for i in healthy if i != anchor
@@ -2433,234 +3423,156 @@ def run_channel_sync(
                           "no track requires a fix", scope=scope,
                           channels=rows)
 
-        # 7. per-stream 输出: fixed 轨回编码 (源 codec), 其余轨 stream copy
+        # 7. per-**stream** 输出 (A6 结构保持):
+        #    * 单声道流: fixed -> 回编码(源 codec); untouched -> 源 stream copy
+        #      （与旧实现逐位相同）;
+        #    * 多声道流: 任一声道需要修正 -> 把该 stream 的全部声道
+        #      （fixed + untouched 原样）按源顺序交织成 WAV（内置
+        #      `audio_wav.write_wav`）再按源 codec/入口编码为一条流；
+        #      没有声道需要修正 -> 整条流 stream copy（逐位保持）。
         #
-        # 落盘最小化 (M1): 到这里测量/移位/复检都已经结束, `decoded_*` 不再
-        # 需要 —— 先关句柄再删, 避免它们与 per-track 编码产物和最终输出同时
-        # 存在。以 80 min / 4 轨为例, decoded 是 4 x 799.6 MB = 3.20 GB,
-        # 与 46 GB 的透明输出叠加时是纯浪费。
-        # 句柄必须先关 (Windows): RawStream.close() 是幂等的, 尾部 finally
-        # 会再关一次, 因此这里提前关是安全的。
+        # 落盘最小化 (M1): 到这里测量/移位/复检都已经结束, 不再需要的
+        # `decoded_*` 先关句柄再删。多声道流里**未修正声道**的 decoded raw
+        # 还要用于交织，必须留到该流写完。
         for a in arrs:
             _close_map(a)
         arrs = []
-        for p in decoded:
-            try:
-                p.unlink()
-            except OSError:
-                pass                    # finally 会重试; 这里失败不致命
-
-        audio_files: list[Path] = []
         for i in range(n_tracks):
-            out = work_dir / f"audio_{i}.mov"
-            if i in fixed_ok:
-                src_raw = fixed_raw[i]
-                fmt = "f32le" if storage[i] == "f32" else "f64le"
-                proc = subprocess.run(
-                    [
-                        str(ffmpeg), "-v", "error", "-nostdin", "-y",
-                        "-f", fmt, "-ar", str(sample_rate), "-ac", "1",
-                        "-i", str(src_raw),
-                        "-c:a", codecs[i],
-                        "-f", _muxer_for_entry(entries[i]), str(out),
-                    ],
-                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE, text=True, encoding="utf-8",
-                    errors="replace", timeout=1800,
-                )
-                if proc.returncode != 0 or not out.is_file():
-                    return finish(
-                        "verify_failed",
-                        f"re-encode stream {i} failed: "
-                        f"{(proc.stderr or '')[-200:]}",
-                        channels=rows,
-                    )
-            else:
-                ok_c, err_c = _copy_stream(
-                    ffmpeg, source, i, out, _muxer_for_entry(entries[i])
-                )
-                if not ok_c:
-                    return finish(
-                        "verify_failed",
-                        f"stream copy {i} failed: {err_c[-200:]}",
-                        channels=rows,
-                    )
-            audio_files.append(out)
-            # 落盘最小化 (M1): 该轨的 per-track 产物已经写出来了, 它的
-            # `fixed_{i}` 到此再无消费者 (复检已在上面完成)。立即释放,
-            # 这样重封装阶段只保留 audio_*.mov 而不是再叠一份 raw。
+            if stream_channels[i] > 1 and i not in fixed_ok:
+                continue                    # 交织时还要读原始声道
             try:
-                fixed_raw[i].unlink()
+                decoded[i].unlink()
+            except OSError:
+                pass                        # finally 会重试; 失败不致命
+
+        def _encode_mono_channel(i: int, out: Path) -> str | None:
+            src_raw = fixed_raw[i]
+            fmt = "f32le" if storage[i] == "f32" else "f64le"
+            proc = subprocess.run(
+                [
+                    str(ffmpeg), "-v", "error", "-nostdin", "-y",
+                    "-f", fmt, "-ar", str(sample_rate), "-ac", "1",
+                    "-i", str(src_raw),
+                    "-c:a", codecs[i],
+                    "-f", _muxer_for_entry(entries[i]), str(out),
+                ],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                errors="replace", timeout=1800,
+            )
+            if proc.returncode != 0 or not out.is_file():
+                return (proc.stderr or "")[-200:]
+            return None
+
+        def _encode_interleaved_stream(si: int, ch_idx: list[int],
+                                       out: Path) -> str | None:
+            # 交织源顺序 = 该 stream 在源里的声道顺序（scope 已按 stream/
+            # channel 升序展开）。fixed 声道用 fixed_raw，其余用 decoded。
+            raws = [
+                fixed_raw[i] if i in fixed_ok else decoded[i]
+                for i in ch_idx
+            ]
+            wav = work_dir / f"audio_{si}_interleaved.wav"
+            try:
+                frames = _interleave_stream_raw(
+                    raws, [storage[i] for i in ch_idx],
+                    sample_rate=sample_rate,
+                    channel_count=len(ch_idx),
+                    layout=layout_of[ch_idx[0]],
+                    wav_format=_wav_format_for_codec(codecs[ch_idx[0]]),
+                    dst_wav=wav,
+                )
+            except Exception as exc:                   # noqa: BLE001
+                return f"interleave failed: {type(exc).__name__}: {exc}"
+            proc = subprocess.run(
+                [
+                    str(ffmpeg), "-v", "error", "-nostdin", "-y",
+                    "-i", str(wav),
+                    "-c:a", codecs[ch_idx[0]],
+                    "-f", _muxer_for_entry(entries[ch_idx[0]]),
+                    str(out),
+                ],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                errors="replace", timeout=1800,
+            )
+            try:
+                wav.unlink()
             except OSError:
                 pass
+            if proc.returncode != 0 or not out.is_file():
+                return (proc.stderr or "")[-200:]
+            if frames <= 0:
+                return "interleaved output has 0 frames"
+            return None
+
+        audio_files: list[Path] = []
+        streams_with_fixes: list[int] = []
+        for si in range(n_streams):
+            ch_idx = [i for i in range(n_tracks) if stream_of[i] == si]
+            out = work_dir / f"audio_{si}.mov"
+            muxer = _muxer_for_entry(entries[ch_idx[0]])
+            err: str | None = None
+            if stream_channels[ch_idx[0]] == 1:
+                i = ch_idx[0]
+                if i in fixed_ok:
+                    err = _encode_mono_channel(i, out)
+                    if err is None:
+                        streams_with_fixes.append(si)
+                else:
+                    ok_c, c_err = _copy_stream(ffmpeg, source, si, out, muxer)
+                    err = None if ok_c else c_err
+            else:
+                fixed_here = [i for i in ch_idx if i in fixed_ok]
+                if fixed_here:
+                    err = _encode_interleaved_stream(si, ch_idx, out)
+                    if err is None:
+                        streams_with_fixes.append(si)
+                else:
+                    ok_c, c_err = _copy_stream(ffmpeg, source, si, out, muxer)
+                    err = None if ok_c else c_err
+            if err is not None:
+                return finish(
+                    "verify_failed",
+                    f"audio stream {si} output failed: {err[-200:]}",
+                    channels=rows,
+                )
+            audio_files.append(out)
+            # 落盘最小化 (M1): 该 stream 的 per-track 产物已经写出来了,
+            # `fixed_*` 到此再无消费者（复检已在上面完成）。
+            for i in ch_idx:
+                try:
+                    fixed_raw[i].unlink()
+                except OSError:
+                    pass
+                try:
+                    decoded[i].unlink()
+                except OSError:
+                    pass
 
         scope = "partial" if any(
             r["decision"] == "untouched" for r in rows
         ) else "file"
         log(
-            f"channel-sync: applied ({len(fixed_ok)}/{n_tracks} tracks "
+            f"channel-sync: applied ({len(fixed_ok)}/{n_tracks} channels "
             f"fixed, scope={scope})"
         )
 
-        # 8. transparent: 视频/非音频 stream copy + 音频轨替换重封装
+        # 8. transparent: 视频/非音频 stream copy + 音频轨替换重封装。
+        # 容器处理已抽成 `remux_transparent_audio`, 与长素材对齐等其它
+        # "音频轨已经算好"的流程共用同一份实现。
         output_file: Path | None = None
         file_copied = False
         if t_mode and dst is not None:
-            if gpac is None:
-                log("channel-sync: transparent remux needs GPAC — 回退原样拷贝")
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source, dst)
-                output_file, file_copied = dst, True
-            else:
-                try:
-                    from preservation.dji import track_manifest
-
-                    movie_ts, tracks = track_manifest(gpac, source)
-                    video_any = any(
-                        t["handler"] == "vide" for t in tracks
-                    )
-                    if not video_any:
-                        raise RuntimeError(
-                            f"no video track in {source} for transparent remux"
-                        )
-                    gpac.movie_timescale = movie_ts
-                    # 按**源容器里的轨道顺序**重建 `-add` 列表, 而不是把
-                    # "视频 -> 非音频 -> 全部音频" 这个固定搭配写死。
-                    #
-                    # 为什么顺序重要: 它属于容器语义。实测 20260904_C1214 的
-                    # 源是 [video, a0..a3, rtmd], 而旧实现产出
-                    # [video, rtmd, a0..a3] —— 六条流的 packet md5 全部相同
-                    # (内容无损), 但**按流序号定位**的下游 (脚本 / NLE /
-                    # 部分校验工具) 会因此读错轨。`mux_new` 严格按 `-add` 的
-                    # 先后建轨, 所以顺序只能在这里定。
-                    soun_ids = [t["id"] for t in tracks
-                                if t["handler"] == "soun"]
-                    if len(soun_ids) != len(audio_files):
-                        # 轨道清单与音频文件数对不上: **不猜**。静默按新顺序
-                        # 拼会张冠李戴, 那比"顺序变了"严重得多, 因此退回旧
-                        # 顺序并把原因写进日志。
-                        log(
-                            f"channel-sync: transparent remux — 源 soun 轨 "
-                            f"{len(soun_ids)} 条, 音频文件 "
-                            f"{len(audio_files)} 条, 无法保序 — 退回 "
-                            f"\"视频+数据+音频\" 顺序"
-                        )
-                        adds = [f"{source}#video"]
-                        for t in tracks:
-                            if t["handler"] in ("vide", "soun"):
-                                continue
-                            adds.append(f"{source}#{t['id']}")
-                        for af in audio_files:
-                            adds.append(f"{af}#audio")
-                    else:
-                        adds = []
-                        k = 0
-                        for t in sorted(tracks,
-                                        key=lambda x: x.get("number", 0)):
-                            h = t["handler"]
-                            if h == "vide":
-                                adds.append(f"{source}#video")
-                            elif h == "soun":
-                                # 音频轨用重生成/拷贝后的独立文件替换, 但
-                                # **占回它原来的位置**。
-                                adds.append(f"{audio_files[k]}#audio")
-                                k += 1
-                            else:
-                                adds.append(f"{source}#{t['id']}")
-                        log("channel-sync: transparent remux — 按源轨顺序 ["
-                            + ", ".join(
-                                "vide" if a.endswith("#video")
-                                else "soun" if a.endswith("#audio")
-                                else "data"
-                                for a in adds) + "]")
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    if dst.exists():
-                        dst.unlink()
-                    log("channel-sync: transparent remux (video/non-audio "
-                        "stream copy + fixed audio) with MP4Box...")
-                    # Sony 源必须走**与保留管线相同的恢复步骤**, 否则重封装
-                    # 会把容器层元数据全部丢掉。实测 20260904_C1214:
-                    #   ftyp      XAVC -> isom
-                    #   rtmd      tref/cdsc 关联丢失 (track payload 本身逐字节相同)
-                    #   nrtm      镜头档案 meta item 整项缺失
-                    #   uuid      PROF/UNKNOWN/USMT = 1/1/7 -> 0/0/2
-                    #   后果: Gyroflow 从成品读到 0/146146 IMU 帧、认不出相机
-                    # 也就是说"6 条流 packet md5 全同"只在**流**层面成立,
-                    # 容器层该保的一样都没保住。
-                    sony_meta = (
-                        any(st.get("codec_type") == "data"
-                            and st.get("codec_tag_string") == "rtmd"
-                            for st in streams)
-                    )
-                    stage: Path | None = None
-                    if sony_meta:
-                        # `restore_metadata` 在函数入口已保证非 None (见上面的
-                        # 契约检查), 这里只负责调用; 具体步骤全在容器层。
-                        stage = restore_metadata(
-                            source, adds, dst, work_dir, gpac, log
-                        )
-                    if stage is None:
-                        gpac.mux_new(dst, adds)
-                    # GPAC 输出 mvhd timescale 与源不一致: 按实际 timescale
-                    # 修复 tkhd/elst 时长 (同 classic 路径修正辅助)
-                    repair_remux_timescale(dst, log=log)
-                    # 音频 sample entry 被 GPAC 从 ffmpeg 的 QuickTime `in24`
-                    # 翻译成 MP4 `ipcm` 时把位深写错 (24 bit -> 16 bit), 条目
-                    # 自相矛盾: `pcmC` 说 24, `samplesize` 说 16。ffmpeg 采信
-                    # `pcmC` 所以解码正确, 但 Premiere/VLC 采信 `samplesize`,
-                    # 四轨全成白噪音。这里用源的条目覆盖 (去掉 btrt 保持等长,
-                    # 因此不需要动任何偏移)。失败只记 WARNING, 不影响已产出文件。
-                    try:
-                        from preservation.sample_entry import (
-                            patch_audio_sample_entries,
-                        )
-
-                        sdp = patch_audio_sample_entries(
-                            source, dst, log=log)
-                        if sdp.get("consistent_after") is False:
-                            # 条目自相矛盾 (pcmC 说 24 / samplesize 说 16) 是
-                            # 无条件错误: ffmpeg 解码正确, 但 Premiere/VLC
-                            # 会按 samplesize 读成白噪音。宁可退回源文件拷贝,
-                            # 也不交一个"能解码但播不对"的成品。
-                            raise RuntimeError(
-                                "音频 sample entry 补丁后仍自相矛盾: "
-                                + str(sdp.get("reason")))
-                        if not sdp.get("ok"):
-                            log("channel-sync: WARNING 音频 sample entry 未能"
-                                f"与源一致 — {sdp.get('reason')}")
-                    except RuntimeError:
-                        raise
-                    except Exception as exc:      # noqa: BLE001
-                        log(f"channel-sync: WARNING sample entry 补丁异常: "
-                            f"{exc}")
-                    # tkhd 轨道启用标志 / alternate group 归一 (最后一道容器补丁)。
-                    # ffmpeg/硬件 wrapper 会给第二条及之后的音轨写 flags=2 并把
-                    # 所有音轨放进 alternate_group=1..N; ISO/IEC 14496-12 把该组
-                    # 定义为"同一轨的备选版本", NLE 因此只显示一条音轨 (媒体信息
-                    # 仍列四条)。源文件是每轨 flags=7/alternate_group=0, 这里把
-                    # 容器事实恢复回来。失败只记 WARNING, 不阻断交付。
-                    try:
-                        from preservation.isobmf import normalize_track_flags
-
-                        for desc in normalize_track_flags(dst):
-                            log(f"channel-sync: {desc}")
-                    except Exception as exc:      # noqa: BLE001
-                        log("channel-sync: WARNING tkhd 轨道标志归一失败: "
-                            f"{exc}")
-                    output_file = dst
-                except Exception as exc:      # noqa: BLE001
-                    log(f"channel-sync: transparent remux failed: {exc} — "
-                        "回退原样拷贝")
-                    try:
-                        dst.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(source, dst)
-                        output_file, file_copied = dst, True
-                    except OSError as exc2:
-                        return finish(
-                            "verify_failed",
-                            f"transparent fallback copy failed: {exc2}",
-                            channels=rows,
-                        )
+            try:
+                output_file, file_copied = remux_transparent_audio(
+                    source=source, dst=dst, audio_files=audio_files,
+                    work_dir=work_dir, gpac=gpac,
+                    restore_metadata=restore_metadata, streams=streams,
+                    log=log,
+                )
+            except RuntimeError as exc:
+                return finish("verify_failed", str(exc), channels=rows)
 
         return report(
             "applied",
@@ -2668,7 +3580,7 @@ def run_channel_sync(
             scope=scope,
             channels=rows,
             audio_files=audio_files,
-            fixed_files=[work_dir / f"audio_{i}.mov" for i in fixed_ok],
+            fixed_files=[audio_files[si] for si in streams_with_fixes],
             output_file=output_file,
             file_copied=file_copied,
         )
