@@ -91,10 +91,15 @@ PROFILE: dict[str, Any] = {
     "residual_search_samples": 80,
     "residual_min_cc": 0.20,
     "residual_smooth_span_seconds": 300.0,
+    "residual_smooth_hop_seconds": 60.0,
     "residual_outlier_samples": 30.0,
     "residual_max_abs_samples": 100.0,
     "residual_min_blocks": 3,
-    "residual_min_median_samples": 1.0,
+    # 残差"可忽略"门：研究 fine pass 即使残差中位 <1 采样也会施加（K 的
+    # `aligned_fine` 就是 pass1+r）；若按 1 采样丢弃，C1306 CH4（中位 0.87）
+    # 会少一道 K 有的修正，实测音频层 p90 变差（12.5 → 22.5 采样）。
+    # 取 0.25 保留"有证据就施加"，同时仍能过滤纯噪声。
+    "residual_min_median_samples": 0.25,
     "max_rounds": 2,
     # 极性（E）: 60 s 窗 / 30 s 跳, 零延迟 ±16 采样带符号峰
     "polarity_window_seconds": 60.0,
@@ -331,6 +336,53 @@ def curve_records(
 # ---------------------------------------------------------------------------
 # 施加（全部走内置 audio_sync_tv_exec）
 # ---------------------------------------------------------------------------
+def render_fractional_pass1(
+    src_raw: Path,
+    dst_raw: Path,
+    curve: Mapping[str, Any],
+    *,
+    sample_rate: int,
+    storage_dtype: str = "f32",
+    profile: Mapping[str, Any] | None = None,
+    chunk_samples: int = 2_000_000,
+) -> Path:
+    """把曲线以**分数插值**重建一版 pass-1 音频（只用于残差测量）。
+
+    为什么需要它：round-2 残差口径与 K research `refine_curve` 同源；K 的
+    pass-1 音频是 `interp_write`（逐样本 `np.interp`，分数移位）生成的，而
+    生产 round-1 施加用内置 `audio_sync_tv_exec`（每 1 s 窗一个整数移位 =
+    hold 阶梯）。在弱内容窗，两者的亚采样差会翻转相关峰分支，导致同一
+    fine-pass 算法在"我们的整数 pass1"和"K 的分数 pass1"上测出不同残差
+    （实测 C1305 曲线差 median 4.8–7 / p90 12–35）。
+    这里按**同一曲线**用分数插值重建一份仅用于残差测量的 pass-1（不替换
+    生产产物：最终施加仍走内置整数执行器），使残差测量条件与 K 一致。
+    边界与 `interp_write` 相同：越界输出 0（不夹到边缘）。
+    """
+    prof = dict(PROFILE if profile is None else profile)
+    n = _raw_length(Path(src_raw), storage_dtype)
+    grid_t = np.asarray(curve["grid_t"], dtype=np.float64)
+    grid_s = np.asarray(curve["grid_s"], dtype=np.float64)
+    halo = int(float(prof["tv_max_shift_samples"])) + 4
+    chunk = max(1, int(chunk_samples))
+    with Path(dst_raw).open("wb") as fh:
+        for k0 in range(0, max(1, n), chunk):
+            k1 = min(n, k0 + chunk)
+            if k1 <= k0:
+                continue
+            idx = np.arange(k0, k1, dtype=np.float64)
+            pos = idx + np.interp(idx, grid_t, grid_s)
+            lo = max(0, k0 - halo)
+            hi = min(n, k1 + halo)
+            vals = _read_raw(src_raw, storage_dtype, lo, hi - lo
+                             ).astype(np.float64)
+            base = np.arange(lo, hi, dtype=np.float64)
+            out = np.interp(pos, base, vals)
+            invalid = (pos < 0.0) | (pos > n - 1.0)
+            out[invalid] = 0.0
+            fh.write(out.astype(np.float32).tobytes())
+    return Path(dst_raw)
+
+
 def apply_curve(
     src_raw: Path,
     dst_raw: Path,
@@ -512,21 +564,34 @@ def measure_residual_curve(
 ) -> dict[str, Any]:
     """在 round-1 输出上测残差（target vs anchor），返回 1 s 网格残差曲线。
 
-    口径 = 研究 round-3 fine pass（`long-take-alignment-final.md` §12）：
-    * 60 s 窗 / 20 s 跳，±80 采样搜索，|CC|≥0.20 才采纳；
-    * 5 min 加权中位平滑（权重 |CC|），|r|≤100 硬门；
-    * 离**局部中位** >30 采样的窗口丢弃（研究口径的离群拒绝）——这一步是
-      关键: 5 min 长块/宽搜索在音乐基底上会选到 ±200 采样的伪峰（实测
-      C1305 块残差 −236/−220/−208，CC 仅 0.26–0.51），中位平滑会把它淘汰。
-    * 有效窗 <3 / 平滑后残差中位 <1 采样 → `ok=False`（不把噪声写回）。
+    口径 = 研究 round-3 fine pass（`long-take-alignment-final.md` §12，
+    与 `tests/regression/long_align_tools/fine_delay.py` 同一算法）：
+
+    1. 60 s 窗 / 20 s 跳；12 kHz 粗扫（`resample_poly` 1/4）+ FFT 相关峰，
+       搜索 `±search48` 采样（默认 ±80），coarse = -peak*DEC；
+    2. 48 kHz 精化：窗中心 2 s 段在 coarse ±8 采样内逐整数点积取 |CC| 最大；
+    3. 只保留 |CC| ≥ 0.20 的窗；离**局部中位**（±2 窗）>30 采样的窗丢弃；
+    4. 5 min 滑动**中位**平滑（1 min 跳，窗口覆盖 t0±300 s），插值到 1 s
+       网格，`|r| ≤ 100` 硬门；
+    5. 有效窗 <3 / 平滑后残差中位 <1 采样 → `ok=False`（不把噪声写回）。
+
+    为什么不用 5 min 长块 + 宽搜索：实测 C1305 上会选到 ±200 采样的伪峰
+    （块残差 −236/−220/−208，CC 仅 0.26–0.51），把正确曲线拉坏。
+    为什么用 `resample_poly` 而不是盒式抽取：这是研究 fine pass 的实现，
+    与被比较的 K `refine_curve` JSON 同源；盒式抽取在非整数倍 coarse 网格
+    上对弱内容窗会翻转相关峰，实测与 K refine 的差更大。
     """
+    from scipy import signal
+
     prof = dict(PROFILE if profile is None else profile)
     n = min(_raw_length(Path(anchor_raw), storage_dtype),
             _raw_length(Path(target_raw), storage_dtype))
     win = _chunk_samples(sample_rate, float(prof["residual_window_seconds"]))
     hop = _chunk_samples(sample_rate, float(prof["residual_hop_seconds"]))
-    search = int(prof["residual_search_samples"])
+    search48 = int(prof["residual_search_samples"])
     min_cc = float(prof["residual_min_cc"])
+    dec = max(1, int(round(sample_rate / 12000.0)))
+    seg_samples = _chunk_samples(sample_rate, 2.0)
     starts = [
         s for s in range(0, max(1, n - win), hop)
         if min(win, n - s) >= win // 2
@@ -534,87 +599,127 @@ def measure_residual_curve(
 
     def measure_one(s: int) -> dict[str, Any] | None:
         length = min(win, n - s)
-        ref = _read_raw(anchor_raw, storage_dtype, s, length).astype(np.float32)
-        tgt = _read_raw(target_raw, storage_dtype, s, length).astype(np.float32)
+        ref = _read_raw(anchor_raw, storage_dtype, s, length).astype(np.float64)
+        tgt = _read_raw(target_raw, storage_dtype, s, length).astype(np.float64)
         if float(np.sqrt(np.mean(ref * ref))) < 1e-6 \
                 or float(np.sqrt(np.mean(tgt * tgt))) < 1e-6:
             return None
-        # 极性无关 |CC| 峰（见 `_abs_peak_delay` 注释：gcc_phat_int 的极性
-        # 翻转启发式在反相素材上会选到伪分支）。
-        lag, cc = _abs_peak_delay(
-            ref, tgt, sample_rate=sample_rate, search=search)
+        a12 = signal.resample_poly(ref, 1, dec).astype(np.float64)
+        b12 = signal.resample_poly(tgt, 1, dec).astype(np.float64)
+        n12 = min(len(a12), len(b12))
+        if n12 < 16:
+            return None
+        nfft = int(1 << int(np.ceil(np.log2(2 * n12))))
+        A = np.fft.rfft(a12[:n12] - a12[:n12].mean(), nfft)
+        B = np.fft.rfft(b12[:n12] - b12[:n12].mean(), nfft)
+        surf = np.fft.irfft(A * np.conj(B), nfft)
+        den = (float(np.linalg.norm(a12[:n12]))
+               * float(np.linalg.norm(b12[:n12])) + 1e-12)
+        radius12 = max(4, search48 // dec)
+        search = radius12 + 2
+        cand = np.abs(np.concatenate(
+            [surf[:search + 1], surf[-search:]]) / den)
+        m = np.concatenate([np.arange(0, search + 1),
+                            np.arange(-search, 0)]).astype(np.int64)
+        i = int(np.argmax(cand))
+        coarse = -float(m[i]) * dec
+        c0 = len(ref) // 2 - seg_samples // 2
+        av = ref[c0:c0 + seg_samples] - ref[c0:c0 + seg_samples].mean()
+        best = (coarse, 0.0)
+        for mm in range(int(coarse) - 8, int(coarse) + 9):
+            b0 = c0 + mm
+            if b0 < 0 or b0 + seg_samples > len(tgt):
+                continue
+            bv = tgt[b0:b0 + seg_samples] - tgt[b0:b0 + seg_samples].mean()
+            dn = float(np.linalg.norm(av)) * float(np.linalg.norm(bv))
+            if dn < 1e-9:
+                continue
+            val = float(np.dot(av, bv) / dn)
+            if abs(val) > abs(best[1]):
+                best = (float(mm), val)
+        cc = abs(float(best[1]))
         if cc < min_cc:
             return None
         return {
             "start_s": s / float(sample_rate),
             "center_s": (s + length / 2.0) / float(sample_rate),
-            "residual": float(lag),
+            "residual": float(best[0]),
             "cc": float(cc),
         }
 
-    # S5: 残差窗**互相独立**（只是对 pass1 输出 vs 锚点测 lag），按窗并行；
-    # 归并按 starts 顺序，结果与串行逐位一致。80 min ≈239 窗、单窗 ~0.15 s：
-    # 串行 ~50 s/target → 4 线程 ~15 s/target（抖动来自 I/O 读取）。
+    # S5: 残差窗互相独立，按窗并行；归并按 starts 顺序，结果与串行逐位一致。
     workers = min(4, max(1, (os.cpu_count() or 4)))
-    rows: list[dict[str, Any]] = []
     if len(starts) > 1 and workers > 1:
         with ThreadPoolExecutor(max_workers=workers) as ex:
             measured = list(ex.map(measure_one, starts))
         rows = [m for m in measured if m is not None]
     else:
-        for s in starts:
-            m = measure_one(s)
-            if m is not None:
-                rows.append(m)
+        rows = [m for m in (measure_one(s) for s in starts) if m is not None]
+    n_windows = len(starts)
     if len(rows) < int(prof["residual_min_blocks"]):
-        return {"ok": False, "reason": "too_few_blocks", "n_blocks": len(rows)}
-    centers = np.asarray([r["center_s"] for r in rows], dtype=np.float64)
-    vals = np.asarray([r["residual"] for r in rows], dtype=np.float64)
-    weights = np.asarray([r["cc"] for r in rows], dtype=np.float64)
-    span = float(prof["residual_smooth_span_seconds"])
+        return {"ok": False, "reason": "too_few_blocks",
+                "n_blocks": len(rows), "n_windows": n_windows}
     outlier = float(prof["residual_outlier_samples"])
     max_abs = float(prof["residual_max_abs_samples"])
+    span = float(prof["residual_smooth_span_seconds"])
+    smooth_hop = float(prof.get(
+        "residual_smooth_hop_seconds",
+        float(prof["residual_hop_seconds"])))
+
+    # 离群: 偏离局部中位（±2 窗）> 30 采样
+    t = np.asarray([r["start_s"] for r in rows], dtype=np.float64)
+    y = np.asarray([r["residual"] for r in rows], dtype=np.float64)
+    keep = np.ones(y.size, dtype=bool)
+    for k in range(y.size):
+        lo, hi = max(0, k - 2), min(y.size, k + 3)
+        if abs(y[k] - float(np.median(y[lo:hi]))) > outlier:
+            keep[k] = False
+    if int(keep.sum()) >= 5:
+        t, y = t[keep], y[keep]
+
+    # 5 min 滑动中位（1 min 跳）→ 1 s 网格
+    ts: list[float] = []
+    ys: list[float] = []
+    t0 = 0.0
+    dur = n / float(sample_rate)
+    while t0 < dur:
+        m = np.abs(t - (t0 + span / 2.0)) <= span
+        if int(m.sum()) >= 3:
+            ts.append(t0 + span / 2.0)
+            ys.append(float(np.median(y[m])))
+        t0 += smooth_hop
+    if len(ts) < 2:
+        # 短素材（平滑窗覆盖不到两个采样点）: 直接对窗口残差插值，
+        # 让合成/短片段检查仍能验证本函数；真实 80 min 素材不会走这里。
+        ts, ys = list(t), list(y)
+    if len(ts) < 2:
+        return {"ok": False, "reason": "too_few_blocks",
+                "n_blocks": len(rows), "n_windows": n_windows}
     grid_s = _chunk_samples(sample_rate, float(prof["tv_grid_hop_seconds"]))
     grid = np.arange(0, n, grid_s, dtype=np.float64)
-    curve = np.empty(grid.size, dtype=np.float64)
-    for gi in range(grid.size):
-        t = grid[gi] / float(sample_rate)
-        m = np.abs(centers - t) <= span / 2.0
-        if not m.any():
-            m = np.zeros(centers.size, dtype=bool)
-            m[int(np.argmin(np.abs(centers - t)))] = True
-        v = vals[m]
-        w = weights[m]
-        med = _weighted_median(v, w)
-        keep = np.abs(v - med) <= outlier
-        if keep.any():
-            med = _weighted_median(v[keep], w[keep])
-        curve[gi] = float(np.clip(med, -max_abs, max_abs))
-    # 统计口径: 只统计**被 5 min 平滑曲线接受**的窗口（离局部中位 >30 的
-    # 块按研究口径丢弃，不参与"残差是否显著"的判定）。
-    smooth_at_blocks = np.interp(centers, grid / float(sample_rate), curve)
-    keep_mask = np.abs(vals - smooth_at_blocks) <= outlier
-    for k, r in enumerate(rows):
-        r["kept"] = bool(keep_mask[k])
-    kept = vals[keep_mask]
-    if kept.size < int(prof["residual_min_blocks"]):
-        return {"ok": False, "reason": "too_few_blocks",
-                "n_blocks": int(kept.size), "n_windows": len(rows)}
-    median_abs = float(np.median(np.abs(kept)))
+    curve = np.interp(grid, np.asarray(ts) * float(sample_rate),
+                      np.asarray(ys))
+    curve = np.clip(curve, -max_abs, max_abs)
+    median_abs = float(np.median(np.abs(curve)))
     if median_abs < float(prof["residual_min_median_samples"]):
         return {"ok": False, "reason": "residual_negligible",
-                "n_blocks": int(kept.size), "n_windows": len(rows),
+                "n_blocks": len(rows), "n_windows": n_windows,
                 "median_abs": median_abs}
+    smooth_at_blocks = np.interp(
+        np.asarray([r["start_s"] for r in rows], dtype=np.float64),
+        grid / float(sample_rate), curve)
+    kept = sum(1 for r, v in zip(rows, smooth_at_blocks)
+               if abs(r["residual"] - v) <= outlier)
     return {
         "ok": True,
         "grid_t": [float(x) for x in grid],
         "grid_s": [float(x) for x in curve],
         "blocks": rows,
-        "n_blocks": int(kept.size),
-        "n_windows": len(rows),
+        "n_blocks": int(kept),
+        "n_windows": n_windows,
         "median_abs": median_abs,
-        "max_abs": float(np.max(np.abs(kept))),
-        "discarded": int((~keep_mask).sum()),
+        "max_abs": float(np.max(np.abs(curve))),
+        "discarded": int(len(rows) - kept),
     }
 
 
@@ -906,11 +1011,32 @@ def align_time_varying(
         rounds = 1
 
         # 3) 第二轮残差（只在代表上测，s_total 同施加到全组）
+        #
+        # 残差在**分数插值重建的 pass-1** 上测（见 render_fractional_pass1：
+        # 与 K research fine pass 的测量条件一致），最终施加仍用内置整数
+        # 执行器。重建失败时退回整数 pass-1（保守回退，不改变语义）。
         residual_stats: dict[str, Any] = {"used": False}
         if int(prof["max_rounds"]) > 1:
-            res = measure_residual_curve(
-                decoded[anchor], applied[rep], sample_rate=sample_rate,
-                storage_dtype=storages[rep], profile=prof)
+            frac_raw = tgt_dir / f"round1_frac_{rep}.f32"
+            try:
+                render_fractional_pass1(
+                    decoded[rep], frac_raw, curve,
+                    sample_rate=sample_rate,
+                    storage_dtype=storages[rep], profile=prof)
+                res = measure_residual_curve(
+                    decoded[anchor], frac_raw, sample_rate=sample_rate,
+                    storage_dtype="f32", profile=prof)
+            except Exception as exc:                   # noqa: BLE001
+                log(f"long-take: CH{rep + 1} fractional pass-1 failed "
+                    f"({type(exc).__name__}: {exc}) — 退回整数 pass-1")
+                res = measure_residual_curve(
+                    decoded[anchor], applied[rep], sample_rate=sample_rate,
+                    storage_dtype=storages[rep], profile=prof)
+            finally:
+                try:
+                    frac_raw.unlink()
+                except OSError:
+                    pass
             residual_stats = dict(res)
             if res.get("ok"):
                 total = add_curves(curve, res)

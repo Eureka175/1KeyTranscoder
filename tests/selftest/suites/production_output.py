@@ -836,3 +836,19 @@ def l3_production_output() -> None:
            and "yields to the plan's alignment decision" in combined2
            and (d / "out_conflict2" / "clip.MP4").is_file(),
            f"rc={sync_conflict.returncode}")
+
+    # 2026-10-30 用户决策: **--audio-plan 权限最高**。透明入口与计划同时
+    # 出现时不再 FATAL，而是计划接管（透明选项被忽略，显式 INFO）。
+    plan_priority = sh(
+        __import__("sys").executable, ROOT / "1kt.py",
+        "--input", str(conflict_in), "--output", str(d / "out_plan_priority"),
+        "--encoder", "x265",
+        "--channel-sync-transparent", "--audio-plan", str(keep_two),
+        "--headless", timeout=600,
+    )
+    combined3 = (plan_priority.stdout or "") + (plan_priority.stderr or "")
+    record("l3.p4c.T9 --audio-plan + --channel-sync-transparent -> 计划最高优先 (rc=0)",
+           plan_priority.returncode == 0
+           and "yields to the plan (plan has highest priority)" in combined3
+           and (d / "out_plan_priority" / "clip.MP4").is_file(),
+           f"rc={plan_priority.returncode}")

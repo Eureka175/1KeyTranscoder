@@ -380,41 +380,57 @@ Unit: 1008 PASS / 2 FAIL (both are environment-only: no real Sony corpus).
 Integration (synthetic): ALL PASS after the multichannel refactor.
 ```
 
-### 14.2 ACCEPTANCE — NOT MET (measured, real 80 min files)
+### 14.2 ACCEPTANCE — NOT MET (measured, real 80 min files; final 2026-10-30)
 
 ```text
 status   : FAIL against the task-book tolerances as written
-curve layer (median |Δ| ≤1 / p90 ≤5 / max ≤50 samples, vs K research fine curve)
-  C1306 CH3  1.81 / 15.2 / 54        CH4  2.00 / 15.6 / 27
-  C1305 CH3  5.88 / 45.1 / 62        CH4 11.00 / 45.0 / 88
-audio layer (median ≤2 / p90 ≤10 / ≥90% of 5 min blocks ≤5 samples, ours vs K)
-  C1306 CH3  3 / 9 / 77% ≤5          CH4  3 / 6.5 / 77% ≤5
-  C1305 CH3  5 / 28 / 55% ≤5         CH4  8 / 116 / 35% ≤5
+curve layer (median |Δ| ≤1 / p90 ≤5 / max ≤50 samples, vs K applytv+refine_curve)
+  C1306 CH3  1.77 / 8.23 / 13        CH4  2.81 / 12.48 / 22
+  C1305 CH3  4.80 / 12.14 / 46       CH4  7.00 / 35.22 / 47
+audio layer (median ≤2 / p90 ≤10 / ≥90% of 5 min blocks ≤5 samples,
+             ours vs rebuilt research-fine audio; CH1/CH2 exact 0/0 + known 4)
+  C1306 CH3  2 / 10 / 81% ≤5         CH4  3 / 12.5 / 77% ≤5
+  C1305 CH3  5 / 9 / 52% ≤5          CH4  6 / 34 / 42% ≤5
 reason   : K's own measured-vs-applied consistency (research doc §12.3) is
            median 5–23 / p90 17–63 samples — the tolerances are below the
            content-ambiguity noise floor of the materials themselves. Our
-           round-1 curve is bit-identical to K pass1 (0/0/0 over 4808 points);
-           all remaining difference is round-2 residual on ambiguous content.
-decision : pending user (tighten residual replication vs relax tolerance to the
-           measured noise floor).
+           round-1 curve is bit-identical to K pass1 (0/0/0); after porting the
+           K fine-pass measurement verbatim (12k resample_poly + ±8 refine +
+           5-min sliding median) AND measuring the residual on a fractionally
+           reconstructed pass-1 (K interp_write conditions), the curve p90
+           improved from 15.2/15.6 to 8.2/12.5 (C1306) and 45/45 to 12.1/35.2
+           (C1305). Remaining difference is the round-2 residual only.
+decision : user asked to "make both long videos fully pass" but did not approve
+           a tolerance change. Strict pass is impossible against the measured
+           noise floor; needs a user call (revise tolerance vs accept K parity
+           as the criterion).
 ```
 
-### 14.3 K ORACLE INCONSISTENCY — blocks the C1305 acceptance verdict
+### 14.3 K C1305 ORACLE — BLOCKED on missing research artefacts
 
 ```text
-status   : BLOCKED on a defect in the reference data, not in our code
-C1306 restored deliverable (2026-10-25) matches K's research fine curve
-   (measured-vs-pass1: median 2.7 / p90 18–43).
-C1305 restored deliverable (2026-10-29, four days later) instead matches the
-   old GLOBAL LINEAR solution: solve/drift a=1015.09, b=-0.012 ppm
-   (measured-vs-drift median 3.1 / p90 18.9 / max 37.9), while measured-vs-pass1
-   is median 5.7–10 / p90 79–81.
-=> the C1305 restored audio was almost certainly rebuilt from the wrong
-   intermediate (old global-aligned audio) during a late restore; it is not the
-   fine audio described by K research doc §12/§16.
-decision : pending user — either re-export the C1305 restored deliverable from
-           the fine audio, or accept the research fine curve JSON as the C1305
-           oracle (recorded here so this is never silently "passed").
+status   : BLOCKED on reference data, not in our code. User decision was
+           "re-export the correct C1305 restored".
+What is available : applytv_*, refine_curve_*, drift_*, track_*, restored MP4s.
+What is missing   : data/_scratch/drift_rebuild.json (round-3 pass-1 anchors)
+           and aligned_fine wav / fine f32 for C1305. K:/I: `1kt_moved_20261026`
+            `_from_E/_from_I` are empty shells; F: scratch was deleted.
+Reconstruction attempts (direct 5-min-block lag, med/p90 vs K restored):
+   applytv + refine_curve (research doc §12/§16 reading) : CH3 9/46, CH4 10/104
+   drift global-linear + refine_curve                   : CH3 6/22, CH4 27/386
+   applytv only (pass1)                                 : CH3 5.7/81, CH4 19/116
+   Method validated on C1306: rebuilt fine vs restored = CH1/2 0/0,
+   CH3 3.5/28.5, CH4 4.5/18.5.
+Also: rebuilding K pass-1 with the *exact blockwise* apply_tv interpolation and
+running the fine_delay algorithm reproduces the SAME residual difference
+(curve 4.8/12.14, 7/35.22) => refine_curve was measured on a pass-1 that is
+neither applytv nor drift (i.e. the missing drift_rebuild anchors).
+Conclusion: a "correct C1305 restored" cannot be rebuilt from what is on disk;
+the restored MP4 does not match any reconstructible research final.
+decision : user must provide one of:
+   1. aligned_fine/<C1305>/aligned_4ch_fine.wav (or fine f32);
+   2. data/_scratch/drift_rebuild.json;
+   3. a re-exported correct C1305 restored from the K side.
 ```
 
 ### 14.4 OTHER OPEN ITEMS

@@ -2218,26 +2218,24 @@ def main() -> int:
     # 不依赖编码器配置)
     if args.channel_sync_transparent:
         if getattr(args, "audio_plan", None):
-            # S0 审计发现: 透明入口在 --audio-plan 解析之前分流, 计划会被
-            # **静默忽略**。按用户决策 A3 "计划存在时自动逻辑让位", 这里不能
-            # 假装执行计划; 明确失败比静默忽略诚实。
+            # 2026-10-30 用户决策: **--audio-plan 权限最高**。透明入口让位给
+            # 计划（计划路径负责音频与输出容器），透明选项被忽略；这里明确
+            # INFO 而不是静默忽略，也不再 FATAL —— 计划存在时它说了算。
             print(
-                "[FATAL] --channel-sync-transparent does not support "
-                "--audio-plan (the plan would be silently ignored); use "
-                "the classic transcode path for an explicit audio plan.",
-                file=sys.stderr,
+                "[INFO] --audio-plan present: --channel-sync-transparent "
+                "yields to the plan (plan has highest priority)"
             )
-            return 2
-        return transparent_main(
-            args=args,
-            script_dir=script_dir,
-            input_root=input_root,
-            output_root=output_root,
-            ffmpeg=ffmpeg,
-            ffprobe=ffprobe,
-            gpac=gpac,
-            gyroflow=gyroflow,
-        )
+        else:
+            return transparent_main(
+                args=args,
+                script_dir=script_dir,
+                input_root=input_root,
+                output_root=output_root,
+                ffmpeg=ffmpeg,
+                ffprobe=ffprobe,
+                gpac=gpac,
+                gyroflow=gyroflow,
+            )
 
     try:
         default_config_name = {

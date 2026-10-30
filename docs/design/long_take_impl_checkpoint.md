@@ -431,3 +431,82 @@ med≤2/p90≤10/≥90%≤5）C1306 也还差一点（音频 med 3），C1305 �
 | L3 production_output 子集（26 项） | **0 FAIL** |
 | 多声道布局 A6 专项（`work/long_take/s3/multichannel_check.py`） | T5/T6 全 PASS |
 | 合成集成 T1–T4（`work/long_take/s3/integration_check.py`） | 全 PASS（S3 重构后复跑） |
+
+### 用户决策（2026-10-30 晚，new）
+
+1. **重新导出正确 C1305 restored**（K restored 音频用错中间产物）。处理见下节
+   "C1305 oracle 重建"。
+2. **保证两条长视频完整通过**（目标）。
+3. **`--audio-plan` 权限最高**：透明入口与计划并存时不再 FATAL，计划接管
+   （`1kt.py` 已改：INFO + 继续走计划路径；L3 p4c T9 新增断言）。
+4. **remux 失败 → 源文件拷贝**：保持现有回退语义（不改 status 语义）。
+5. **>8CH 保持现状**（仅 `--audio-plan alignment=enabled` 显式开启）。
+6. **CH1/CH2 是一个 stereo 组，不能动这两条轨之间的关系**：即决策 C 不变
+   （组内 −4 保持；对应 K 的 0 的 4 采样差是预期）。
+7. **透明重封装暂时置空**：不移植 fast_restore，不阻塞音频域验收；容器产物
+   另行处理。
+
+### C1305 oracle 重建（重新导出正确 fine 音频）
+
+K 盘上 `aligned_fine` wav / `drift_rebuild.json` 均不可用（K/I 的
+`1kt_moved_20261026\data\_from_*` 是空壳）。用**可用的 K JSON** 重建研究 fine
+音频（`work/long_take/s6/build_fine_oracle.py`）：
+- `final_shift(t) = applytv_<stem>.json(grid) + refine_curve_<stem>.json(grid)`
+  （CH1=0 常量、CH2=−4 常量，与 K `apply_tv.py` 的 CH2 处理一致）；
+- 用**内置** `run_time_varying`（`core.long_take.apply_curve`，hold/latest-start
+  1 s 网格）施加到源码流 → `accept/oracle/<token>/fine_{0..3}.f32`；
+- 验证方法在 C1306 上有效（其 restored 与 fine 一致）：重建 fine vs K restored
+  直接互相关 **CH1/CH2 = 0/0、CH3 med 3.5/p90 28.5、CH4 med 4.5/p90 18.5**
+  （与 K 自身测量噪声同量级）；
+- C1305 重建后 vs K restored：CH1/CH2=0/0、CH3 med 9/p90 46、CH4 med 10/p90 104
+  → 进一步确认 K C1305 restored 与 research fine 不是同一版音频。
+
+### round-2 残差改为**研究 fine pass 同源实现**（2026-10-30 晚）
+
+之前的实现是"盒式抽取 + ±80 搜索 + 自定义加权中位平滑"；本轮改为
+`fine_delay.py` 同算法：`resample_poly` 12 kHz 粗扫 + ±8 全速率精化 +
+|CC|≥0.20 + 局部中位离群 + **5 min 滑动中位（1 min 跳）** + |r|≤100。
+合成注入 7 采样仍精确恢复，integration T1–T4 全 PASS。
+目的：让 round-2 与 K `refine_curve` 同源，缩小与 K 成品的差异
+（重跑实测见下一节）。
+
+
+### 最终结果（2026-10-30 23:30，含本轮三处改进）
+
+**本轮改进**
+1. round-2 残差改为 **K fine pass 同源实现**（12 kHz 
+esample_poly 粗扫 +
+   ±8 全速率精化 + |CC|≥0.20 + 局部中位离群 + 5 min 滑动中位 + |r|≤100）。
+2. 残差改在**分数插值重建的 pass-1** 上测量（
+ender_fractional_pass1，
+   与 K interp_write 同条件）；生产施加仍用内置整数执行器。
+3. 
+esidual_min_median_samples 1.0 → **0.25**：K fine 即使残差中位 <1 也施加，
+   C1306 CH4（中位 0.87）此前被丢弃，实测音频 p90 12.5 →（丢弃时）22.5。
+
+**最终数字（两条长视频，音频域运行完成）**
+
+| 文件 | 耗时（整文件 / long-take 附加） | 曲线 CH3 med/p90/max | 曲线 CH4 med/p90/max | 音频 CH3 med/p90/≤5 | 音频 CH4 med/p90/≤5 |
+|---|---|---|---|---|---|
+| C1305 | 478.6 s / 197.8 s | 4.80 / 12.14 / 46 | 7.00 / 35.22 / 47 | 5 / 9 / 52% | 6 / 34 / 42% |
+| C1306 | 303.6 s / 164.9 s | **1.77 / 8.23 / 13** | 2.81 / 12.48 / 22 | 2 / 10 / 81% | 3 / 12.5 / 77% |
+
+（曲线 vs pplytv+refine_curve；音频 vs 重建的 research fine 音频；CH1/CH2
+为 0/0 与已知 4。仍未达任务书字面容差，原因见 known-limitations §14.2。）
+
+**C1305 正确 restored 重建：BLOCKED**
+- pplytv+refine 重建 vs K restored：CH3 9/46、CH4 10/104；
+- drift+refine 重建 vs K restored：CH3 6/22、CH4 27/386；
+- 用 K **块式插值**逐位重建 pass1 再跑 fine 算法，残差与分数 pass1 完全相同
+  → 
+efine_curve 的 pass1 既不是 applytv 也不是 drift（应是丢失的
+  drift_rebuild.json）；
+- 方法在 C1306 上验证有效（重建 fine vs restored：CH1/2 0/0、CH3 3.5/28.5、
+  CH4 4.5/18.5）。
+→ 需要用户提供 ligned_fine wav / drift_rebuild.json / K 侧重导成品之一。
+
+**用户决策落实**
+- --audio-plan 权限最高：1kt.py 透明入口与计划并存时 INFO + 计划接管
+  （不再 FATAL）；L3 p4c T9 新增断言，production_output 子集 27 项 0 FAIL。
+- remux 失败 → 源文件拷贝：保持现状（status 语义未改）。
+- >8CH 保持现状；CH1/CH2 stereo 组关系保持（决策 C）；透明重封装置空。
