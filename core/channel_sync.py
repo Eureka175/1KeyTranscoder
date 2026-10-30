@@ -688,11 +688,31 @@ def _decode_multichannel_streams(
                 return c.index, "empty raw"
             return c.index, None
 
-        with ThreadPoolExecutor(
-                max_workers=min(4, max(1, len(targets)))) as ex:
-            for idx, err in ex.map(write_one, targets):
+        # 注意: **不能**按声道并行调 reader.read() —— AudioPCMReader 内部对
+        # 每个 stream 缓存**单个文件句柄**并 seek 读取，多线程共享会互相踩
+        # 掉读位置（实测 4ch 单流时 CH3/CH4 读出全零 → silent_track）。
+        # 不同 stream 的句柄彼此独立，因此只按 stream 分块并行、块内顺序。
+        by_stream: dict[int, list["ChannelRef"]] = {}
+        for c in targets:
+            by_stream.setdefault(int(c.stream), []).append(c)
+
+        def write_stream(chs: list["ChannelRef"]) -> dict[int, str]:
+            out_errors: dict[int, str] = {}
+            for c in chs:
+                idx, err = write_one(c)
                 if err:
-                    errors[int(idx)] = str(err)
+                    out_errors[idx] = err
+            return out_errors
+
+        groups = list(by_stream.values())
+        if len(groups) > 1:
+            with ThreadPoolExecutor(
+                    max_workers=min(4, len(groups))) as ex:
+                for group_errors in ex.map(write_stream, groups):
+                    errors.update(group_errors)
+        else:
+            for group_errors in map(write_stream, groups):
+                errors.update(group_errors)
     finally:
         reader.close()
     return errors

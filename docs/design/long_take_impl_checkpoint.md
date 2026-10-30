@@ -377,9 +377,26 @@ med≤2/p90≤10/≥90%≤5）C1306 也还差一点（音频 med 3），C1305 �
   输出与源 codec/channels/layout/duration_ts 一致；逐声道实测施加量 {0,0,−500,−700}。
 - T6：单条 stereo 流（2 声道）→ `not_eligible`（`channel_count_out_of_range: 2`）。
 - 单声道路径回归：`integration_check.py` T1–T4 全 PASS（S3 改动后仍通过）。
+- **透明模式端到端**（`multichannel_transparent_check.py`，真实 1kt 命令）：
+  4 s MP4（1 视频 + 1 条 4ch ipcm 流，注入 0/+4/−500/−700）→
+  `1kt.py --input … --output … --channel-sync-transparent` **rc=0**；
+  输出仍为 1 视频 + 1 条 4ch 流，codec/duration_ts 保持，视频基本流 SHA256
+  逐位一致；逐声道实测施加量 {0, 0, −500, −700}（音频真的被重写，不是
+  字节拷贝）。
 - 注：fixture 不能用 ffmpeg `join` 滤镜（实测按输入默认单声道 layout 名字映射，
   4 个 mono join 成 4.0 的通道顺序会变成 [1,2,0,3]）；改用内置 `write_wav` 按位置
   交织再转 MOV。
+
+**性能/内存实测（最终代码，C1305 80 min 4×mono）**：
+- long-take 附加 **169.8 s** / 整文件音频域 **410.8 s**（C1306：146.3 s / 280.1 s）。
+- 峰值 RSS：主进程 **743 MB**、整棵进程树（ffmpeg + 12 个帧级估计子进程）
+  **1473 MB**（`work/long_take/s6/rss_probe.py`，0.5 s 采样）——预算 ≤3 GB ✓。
+
+**修复（本轮实测发现）**：`_decode_multichannel_streams` 起初按声道并行调
+`AudioPCMReader.read()` —— reader 对每个 stream 缓存**单个文件句柄**并 seek，
+多线程共享会互相踩读位置（实测 4ch 单流时 CH3/CH4 读出全零 → silent_track；
+多声道透明 E2E 因此暴露）。改为**按 stream 分块并行、块内顺序**（不同 stream
+句柄独立），T5/E2E 恢复。
 
 **已知边界**：>8 声道仍按任务书只允许 `--audio-plan alignment=enabled` 显式开启；
 非 PCM/混合布局的拒绝语义不变。
