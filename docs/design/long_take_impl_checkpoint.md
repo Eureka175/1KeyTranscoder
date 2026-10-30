@@ -578,7 +578,11 @@ deliver 音频作 oracle 验收。
 | 音频（vs K 交付音频） | med≤2/p90≤10/≥90%≤5 | CH1/3/4 0/0/0 100%；CH2 4/4/4（决策 C） | 同左 |
 
 耗时：整文件音频域 C1305 689.9 s / C1306 389.1 s；long-take 附加
-231.0 s / 193.8 s。unit 1011/2（环境项）；integration/多声道 E2E 全 PASS。
+231.0 s / 193.8 s。unit 1019/2（环境项）；integration/多声道 E2E 全 PASS。
+参考引擎复测峰值 RSS：主进程 **775 MB** / 进程树 **1470 MB**（预算 ≤3 GB）。
+**确定性复跑**（同一代码、同一输入第二次完整运行两条长视频）：输出音频 raw
+逐位相同（SHA256 一致）、施加曲线逐点相同、残差决策相同
+（work/long_take/s6/determinism_check.py）。
 产物：`work/long_take/accept/final_accept_v2.json`、`reference_verification.json`、
 `deliver_audit.json`、`ref_pipeline_*.log`。
 
