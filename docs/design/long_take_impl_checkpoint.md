@@ -602,6 +602,10 @@ deliver 音频作 oracle 验收。
   `d3191cf` 参考算法 L1 测试。
 - **发布草稿**：`docs/release_notes_long_take.md`（VERSION/push/release 待用户
   决定）。
+- **生产端到端**：2026-10-31 晚补测 production_tv_e2e.py —— 真实
+  1kt.py --channel-sync-transparent 在合成 4×mono（10.4 ppm 真实漂移）上
+  applied/time_varying/reference 引擎，输出 4×mono 保持，CH2/CH4 残差 0/0、
+  CH3 中位 3.5 采样（末段 hold 边界 max 44）。
 - **机器休眠**：已注册 Windows 计划任务 `1kt_hibernate_0745`（07:45）、
   `1kt_hibernate_0752`、`1kt_hibernate_0758`（备份，`shutdown /h`，
   WakeToRun），并关闭 AC/DC 自动睡眠；按用户要求 08:00 前进入休眠。

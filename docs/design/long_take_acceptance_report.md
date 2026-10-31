@@ -103,6 +103,11 @@ CH2 的 4 采样差是**用户决策**：CH1/CH2 是一个 stereo 组，不能�
 - 极性组级翻转（交付物同口径）；
 - A6 多声道单流 / 多声道透明重封装 E2E（T5/T6 + 真实 1kt 命令）全 PASS；
 - 长镜头退出语义：进程不退出；透明模式 remux 失败 = 源文件拷贝。
+- **生产入口端到端**（work/long_take/s3/production_tv_e2e.py，合成 4×mono、
+  10.4 ppm 真实漂移）：1kt.py --channel-sync-transparent rc=0，channel_sync
+  pplied、path=time_varying、targets pply_engine=reference；输出保持
+  1 视频 + 4×mono 流与 duration_ts；输出残差 CH2/CH4 = 0/0、CH3 中位 3.5 采样
+  （末段 hold 边界 max 44，夹具漂移是真实素材的 ~250 倍）。
 
 ## 7. 回归
 
