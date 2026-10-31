@@ -219,7 +219,7 @@ killed parent 后 QSVEncC64 孤儿仍持有管道。`_run` 虽有 120 s timeout�
 1261 PASS / 12 FAIL，12 条均为缺真实媒体环境项）。
 已覆盖：unit 1020/2（环境项）、C1305/C1306 audio parity（final MOV sha256
 完全一致）、透明 50 GiB E2E、6 源 hook 矩阵、in-place/copy/标准三路小样本。
-`final_accept_v2` 级长验收留到环境恢复后集中跑一次。
+`final_accept_v2` 已在记录产物上复跑：**OVERALL PASS**（曲线 0/0/0；音频 CH1/CH3/CH4 0/0，CH2 EXPECTED(4)）；新代码输出由 parity 证明与记录产物逐位一致。
 
 ### WS7 — 内存受限配置（2026-11-01，完成）
 
