@@ -55,8 +55,14 @@
 
 ## 已知边界 / 暂缓
 
-- 50 GiB 级透明重封装：GPAC 每步整文件重写导致不可用，用户决策"暂时置空"；
-  音频域验收不受影响，多声道透明路径已在合成 4 s 素材上端到端验证。
+- 50 GiB 级透明重封装：**已解决（2026-10-31）**。新增
+  `preservation/fast_restore.py` 字节级一次顺序读写重建（不调用 GPAC
+  整文件重写），透明模式 Sony 源 stage ≥2 GiB 时自动启用并做结构校验，
+  失败回退标准流程。真实 50 GiB C1305 实测：stage mux 258.7 s、
+  **fast restore 99.1 s（~1.08 GiB/s 合计 I/O）**；视频/rtmd 全量
+  streamhash 与源一致、音频 payload 与固定 MOV 逐包一致、容器结构
+  （ftyp/9 uuid/meta/track ids/tref/ipcm 条目）与源一致。
+  详见 `docs/design/transparent_remux_fast_restore.md`。
 - remux 失败终态仍为 `applied + file_copied`（日志 `byte copy` 可区分），是否
   改 `verify_failed` 待产品决策。
 - A1 回归语料（226 片段/584 轨）本机不可用 → 以本次全量回归 + 真实两文件

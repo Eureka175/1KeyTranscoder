@@ -609,3 +609,35 @@ deliver 音频作 oracle 验收。
 - **机器休眠**：已注册 Windows 计划任务 `1kt_hibernate_0745`（07:45）、
   `1kt_hibernate_0752`、`1kt_hibernate_0758`（备份，`shutdown /h`，
   WakeToRun），并关闭 AC/DC 自动睡眠；按用户要求 08:00 前进入休眠。
+  （任务已于 07:45/07:52/07:58 全部成功执行；唤醒后已删除并恢复电源策略。）
+
+### 透明模式 50 GiB 正确 remux：fast restore（2026-10-31 晚）
+
+用户要求"查一下透明模式 50 GiB 容器产物怎么进行正确的 remux"。
+
+**根因**：标准 `transparent_restore` 用多次 GPAC 操作恢复 Sony 元数据
+（`-ref`/meta/`-flat`/`-brand`/uuid），每一步都整文件重写；研究阶段实测
+`-ref` 17 min 推进不到 1 GiB，50 GiB 不可用。stage（GPAC mux 产物）本身
+已经合法，缺的只是容器层：ftyp brand、9 个 uuid、文件级 nrtm meta、
+meta 轨 tref、音频 sample entry（GPAC 写 in24，源是 ipcm）。
+
+**实现**：新模块 `preservation/fast_restore.py`，一次顺序读写完成
+`ftyp(源)+root-uuid(源)+mdat(stage 流拷)+重建 moov(+uuid/tref/源音频条目,
+stco/co64 按新 mdat 位置平移并做范围校验)+其余 root box+meta(源)`，
+不调用任何 GPAC；生产 hook 在 stage ≥2 GiB 的 Sony 源上自动启用，结构校验
+失败回退标准流程；测试/诊断入口 `set_fast_restore_mode()`（不改变注入钩子
+的 6 位置参数签名，L1 契约测试仍 PASS）。
+
+**验证**：
+- 真实短 Sony clip（107 MB，XAVC+rtmd+nrtm+9 uuid）：fast 输出与源结构一致
+  （ftyp/uuid/meta/音频 ipcm 条目/track ids/tref），视频、4 音频、rtmd 的
+  payload streamhash 与源**逐包一致**；标准 GPAC 路径仅有的差异是留在
+  in24 条目 + 把 nrtm meta 重编码成 3391 B（源 11304 B）→ fast 更接近源。
+- 真实 50 GiB C1305：stage mux **258.7 s（0.19 GiB/s）**、
+  fast restore **99.1 s（0.50 GiB/s，合计 I/O ~1.08 GiB/s）**；
+  结构校验全 PASS，视频/rtmd 全量 streamhash 与源一致，4 条音频 payload
+  与固定 MOV 逐包一致，解码音频与对齐 raw 差 < PCM24 量化误差。
+- 文档：`docs/design/transparent_remux_fast_restore.md`；脚本
+  `work/long_take/s7/fast_restore_equiv.py`、`fast_restore_50g.py`。
+- 已知限制：仅 Sony（rtmd+bundle）源；运行期需 stage+输出两份 ~50 GiB；
+  生产只做结构校验（完整 payload hash 属验收脚本，耗时）。

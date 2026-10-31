@@ -455,12 +455,26 @@ A1 regression corpus (226 clips / 584 tracks)     : NOT RUN / corpus not
    copy (C17), and an AudioPCMReader thread-sharing bug in the multichannel
    decoder (same-stream channels read concurrently -> zero-filled CH3/CH4;
    4ch transparent E2E now passes).
-Transparent 50 GiB remux (container layer)        : DEFERRED by user decision
-   (2026-10-30 "透明重封装暂时置空"). GPAC rewrites the whole file for every
-   edit (`-ref` measured 14 h unfinished on the 50 GiB C1305 stage), so the
-   transparent command cannot produce a finished 50 GiB container yet; audio
-   domain acceptance uses the same run_channel_sync (transparent=False) and the
-   full multichannel transparent path is verified on synthetic 4 s material.
+Transparent 50 GiB remux (container layer)        : RESOLVED 2026-10-31.
+   The standard multi-pass GPAC restore is unusable on 50 GiB (`-ref` alone
+   measured 17 min for <1 GiB because every metadata step rewrites the whole
+   file). New production path `preservation/fast_restore.py` rebuilds the
+   container in ONE sequential read/write pass (source ftyp + root uuids +
+   stream-copied stage mdat + rebuilt moov with inserted uuid/tref/source
+   audio sample entries and shifted stco/co64 + source file-level meta;
+   no GPAC rewrite). The transparent hook switches to it automatically for
+   Sony stages >= 2 GiB, with structural verification and fallback to the
+   standard GPAC path on any failure. Measured on the real 50 GiB C1305 stage:
+   stage mux 258.7 s (0.19 GiB/s), fast restore **99.1 s (0.50 GiB/s;
+   ~1.08 GiB/s combined I/O)**; full video streamhash and rtmd payload match
+   the source, audio payloads match the fixed MOVs bit-for-bit, structure
+   (ftyp/9 uuid/meta/track ids/tref/ipcm entries) matches the source.
+   Small-file equivalence vs the standard GPAC path was verified on a real
+   Sony clip (video/audio/rtmd payload hashes identical; the standard path's
+   only legacy differences are QuickTime in24 audio entries and a re-encoded
+   smaller nrtm meta, so the fast path is closer to the source).
+   See `docs/design/transparent_remux_fast_restore.md`, scripts
+   `work/long_take/s7/fast_restore_equiv.py` / `fast_restore_50g.py`.
 Remux failure terminal status                     : DEFERRED. Remux failure +
    fallback copy still reports status=applied with file_copied=true (log says
    "byte copy"). Whether this must become verify_failed is a product decision.

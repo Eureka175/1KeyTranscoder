@@ -135,7 +135,12 @@ python work\long_take\s6\final_accept_v2.py   # OVERALL: PASS
 
 ## 9. 仍待处理（不阻塞本验收）
 
-1. 透明重封装 50 GiB 容器产物（GPAC 多轮整文件重写，用户决策"暂时置空"）；
+1. ~~透明重封装 50 GiB 容器产物~~ **已解决（2026-10-31）**：新增
+   `preservation/fast_restore.py`（一次顺序读写的字节级容器重建，不调用
+   GPAC 整文件重写）；真实 50 GiB C1305 实测 stage mux 258.7 s、
+   fast restore **99.1 s**，视频/rtmd 全量 streamhash 与源一致、音频 payload
+   逐包一致、结构/元数据与源一致。见
+   `docs/design/transparent_remux_fast_restore.md`。
 2. remux 失败终态 `applied + file_copied` 的语义是否改 `verify_failed`；
 3. A1 回归语料（226 片段/584 轨）本机不可用 → 以本次全量回归 + 真实两文件替代；
 4. 发布/VERSION/push 决策（本地提交，未 push）。

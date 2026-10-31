@@ -775,6 +775,22 @@ def l1_transparent_contract() -> None:
            list(rsig.parameters) == ["source", "adds", "dst", "work_dir",
                                      "gpac", "log"],
            str(list(rsig.parameters)))
+    # 2026-10-31: 大文件快速字节级还原 (preservation/fast_restore.py) 接在
+    # 透明恢复钩子里: 大于阈值自动启用、失败回退标准 GPAC 流程。钩子签名
+    # 必须保持不变 (上面一条), 模式开关是模块级测试入口。
+    from preservation.fast_restore import (
+        FAST_RESTORE_MIN_BYTES,
+        fast_restore_from_stage,
+        verify_fast_restore_structure,
+    )
+    from preservation import transparent_restore as _tr
+    record("p12c.透明恢复的大文件 fast-restore 入口就绪",
+           callable(fast_restore_from_stage)
+           and callable(verify_fast_restore_structure)
+           and FAST_RESTORE_MIN_BYTES >= 1 << 30
+           and callable(getattr(_tr, "set_fast_restore_mode", None)),
+           f"threshold={FAST_RESTORE_MIN_BYTES} B, "
+           f"mode_hook={callable(getattr(_tr, 'set_fast_restore_mode', None))}")
 
     # --- 5. check 路由三分支 ---------------------------------------------
     from preservation import checker as _checker

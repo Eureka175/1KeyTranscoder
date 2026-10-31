@@ -29,7 +29,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-__all__ = ["restore_after_transparent_remux"]
+__all__ = ["restore_after_transparent_remux", "set_fast_restore_mode"]
+
+#: Test hook: force the fast path on/off without changing the public hook
+#: signature (channel_sync injects this function positionally).  None = auto
+#: (fast for stages >= FAST_RESTORE_MIN_BYTES).
+_FORCE_FAST: bool | None = None
+
+
+def set_fast_restore_mode(mode: bool | None) -> None:
+    """测试/诊断用: None=自动, True=强制快速路径, False=强制标准 GPAC 路径."""
+    global _FORCE_FAST
+    _FORCE_FAST = mode
 
 
 def restore_after_transparent_remux(
@@ -48,12 +59,17 @@ def restore_after_transparent_remux(
     **0/146146** 个 IMU 样本, 相机型号也认不出来 —— 而 rtmd **轨的
     payload 逐字节相同**。也就是说丢的完全是容器层。
 
-    步骤与 `preservation/pipeline.py` 的第 4~5c 步一致, 顺序也一样:
+    标准流程与 `preservation/pipeline.py` 的第 4~5c 步一致:
         mux_new(stage) -> reconstruct(tref/cdsc + nrtm) -> flatten
         -> set_brand -> insert_uuid_boxes(stage -> dst) -> item_type patch
 
-    `flatten` 不能省: 字节级 uuid 插入要求 moov 在 mdat 之后, 而且
-    它将 movie timescale 归位, 后面的 set_brand 再按源 timescale 恢复。
+    **大文件快速路径（2026-10-31）**: 以上每一步 GPAC 都会整文件重写,
+    50 GiB stage 上实测 `-ref` 17 分钟推进不到 1 GiB。stage >=
+    `fast_restore.FAST_RESTORE_MIN_BYTES`（默认 2 GiB）时改走
+    `preservation.fast_restore.fast_restore_from_stage`: 一次顺序读写的
+    字节级重建（ftyp/root-uuid/meta/tref/audio sample entry/co64-stco 修正,
+    不调用任何 GPAC 重写）。`fast` 参数可显式强制 True/False（测试用）;
+    快速路径失败会自动回退到标准流程，语义不变。
 
     返回 stage 路径 (调用方不再需要); 失败则抛异常, 由调用方回退到
     原样拷贝 —— 元数据保全失败时**不能**交出一个"看着像成品"的文件。
@@ -78,6 +94,46 @@ def restore_after_transparent_remux(
         f"brand={bundle.major_brand!r}")
 
     gpac.mux_new(stage, adds)
+    stage_size = stage.stat().st_size
+    from preservation.fast_restore import (
+        FAST_RESTORE_MIN_BYTES,
+        fast_restore_from_stage,
+        verify_fast_restore_structure,
+    )
+
+    use_fast = bool(_FORCE_FAST) if _FORCE_FAST is not None else (
+        stage_size >= FAST_RESTORE_MIN_BYTES)
+    if use_fast:
+        try:
+            stats = fast_restore_from_stage(
+                source=source, stage=stage, bundle=bundle,
+                bundle_dir=bundle_dir, dst=dst, log=log)
+            ver = verify_fast_restore_structure(source, dst)
+            if not ver.get("ok"):
+                raise RuntimeError(
+                    "fast restore structural verification failed: "
+                    + "; ".join(ver.get("problems") or []))
+            log("channel-sync: fast restore metadata verified — track ids "
+                f"{ver.get('track_ids')}, uuid "
+                f"{ver.get('uuid_count')}, tref={ver.get('tref_present')}, "
+                f"meta={ver.get('meta_bytes')} B, bytes="
+                f"{stats.get('bytes_written')}")
+            try:
+                stage.unlink()
+            except OSError:
+                pass
+            return stage
+        except Exception as exc:                   # noqa: BLE001
+            log(f"channel-sync: fast restore failed ({type(exc).__name__}: "
+                f"{exc}) — falling back to standard GPAC restore")
+            try:
+                if dst.exists():
+                    dst.unlink()
+            except OSError:
+                pass
+            # 标准流程需要干净的 stage; mux_new 的产物仍是合法的 stage,
+            # reconstruct/flatten 会就地修它。
+
     sony.reconstruct(bundle, bundle_dir, stage)
     gpac.flatten(stage)
 
