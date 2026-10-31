@@ -208,13 +208,15 @@ in-place 与 copy 结构校验均通过；标准路径仍有已知 in24/meta 重
 
 ### WS6 — 长测试回归（环境阻塞）
 
-全量 L3 尝试 3 次：两次卡在 `hardware_audio` 的 nvenc 用例、一次卡在
-`p4c_production` 的 qsv 用例；py-spy 显示父测试等待 `run_tool`/
-`_device_identity` 的 subprocess `communicate`，对应 native 编码器探测进程
-不退出（遗留 QSVEncC64 孤儿进程持有管道）。**同样的 1kt 命令单独重跑分别
-21 s / 33 s 正常完成**，说明不是本轮代码逻辑；属于本机硬件探测/子进程管道
-环境问题（此前 v0.8.11 基线全量 L3 为 1261 PASS / 12 FAIL，12 条均为缺
-真实媒体环境项）。
+全量 L3 尝试 4 次（03:38 起第 4 次持续 13 min 未完成）：
+每次都卡在 `hardware_audio`/`p4c_production` 的硬件子进程上；py-spy 显示父
+测试等待 `run_tool`/`_device_identity` 的 subprocess `communicate`，对应
+native 编码器探测进程（QSVEncC64/NVEncC64 `--check-features`）不退出，且
+killed parent 后 QSVEncC64 孤儿仍持有管道。`_run` 虽有 120 s timeout，但
+每个卡住的硬件 probe 都会吃掉 2 min，多用例累加使 L3 远超正常 15 min。
+**同样的 1kt 命令单独重跑分别 21 s / 33 s 正常完成**，说明不是本轮代码
+逻辑；属于本机硬件探测/子进程管道环境问题（此前 v0.8.11 基线全量 L3 为
+1261 PASS / 12 FAIL，12 条均为缺真实媒体环境项）。
 已覆盖：unit 1020/2（环境项）、C1305/C1306 audio parity（final MOV sha256
 完全一致）、透明 50 GiB E2E、6 源 hook 矩阵、in-place/copy/标准三路小样本。
 `final_accept_v2` 级长验收留到环境恢复后集中跑一次。

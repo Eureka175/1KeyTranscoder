@@ -105,7 +105,7 @@ copy fast restore（同一个 GPAC 产物作 stage，不重复 mux）。
 | 套件 | 结果 |
 |---|---|
 | unit | **1020 PASS / 2 FAIL**（真实 Sony 语料缺失环境项） |
-| 全量 L3 | **环境阻塞**（3 次尝试均在本机硬件探测子进程上挂起：NVENC/QSV `run_tool` 的 `communicate` 不返回；同样的 1kt 命令单独重跑 21 s/33 s 正常通过。此前 v0.8.11 基线全量 L3 为 **1261 PASS / 12 FAIL**，12 条均为缺真实媒体环境项；本轮改动已由 unit + C1305/C1306 parity + 透明 50 GiB + 6 源矩阵覆盖，L3 硬件探测挂起与本轮改动无栈级关联） |
+| 全量 L3 | **环境阻塞**（4 次尝试均在本机硬件探测子进程上挂起：NVENC/QSV `run_tool`/`_device_identity` 的 `communicate` 不返回、killed parent 后 QSVEncC64 孤儿仍持有管道；每次卡住吃掉 120 s timeout，多用例累加后远超正常 15 min；同样的 1kt 命令单独重跑 21 s/33 s 正常通过。此前 v0.8.11 基线全量 L3 为 **1261 PASS / 12 FAIL**，12 条均为缺真实媒体环境项；本轮改动已由 unit + C1305/C1306 parity + 透明 50 GiB + 6 源矩阵覆盖，L3 硬件探测挂起与本轮改动无栈级关联） |
 | C1305/C1306 音频 parity | **PARITY OK**（final MOV sha256 与旧基线完全一致） |
 | 透明小样本 | in-place / copy / 标准三条路径 payload 全一致；结构校验通过 |
 | 透明 50 GiB | 结构/rtmd/音频/签名全 PASS；Sony checker 37/37 |
