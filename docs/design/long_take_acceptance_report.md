@@ -111,8 +111,9 @@ CH2 的 4 采样差是**用户决策**：CH1/CH2 是一个 stereo 组，不能�
 
 ## 7. 回归
 
-- unit：**1019 PASS / 2 FAIL**（含 8 条参考算法断言；2 FAIL 均为环境缺 Sony 语料项）；
-- 全量 L3：**1251 PASS / 12 FAIL**（12 条全部是 `testsets/` 真实媒体缺失的
+- unit：**1020 PASS / 2 FAIL**（含 8 条参考算法断言与 1 条 fast-restore
+  契约断言；2 FAIL 均为环境缺 Sony 语料项）；
+- 全量 L3：**1261 PASS / 12 FAIL**（12 条全部是 `testsets/` 真实媒体缺失的
   环境项；无代码/算法类失败）。
 
 ## 8. 复现命令

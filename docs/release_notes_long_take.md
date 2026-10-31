@@ -38,8 +38,8 @@
   与我们输出 CH1/3/4 0/0、CH2 4/4（stereo 组决策）。
 - 性能：long-take 附加 231.0 s / 193.8 s（预算 ≤20 min）；整文件音频域
   689.9 s / 389.1 s；峰值 RSS 743 MB（主）/1473 MB（进程树）。
-- 测试：unit **1019 PASS / 2 FAIL**（均为缺真实 Sony 语料环境项）；
-  全量 L3 **1260 PASS / 12 FAIL**（12 条均为 `testsets/` 真实媒体缺失的
+- 测试：unit **1020 PASS / 2 FAIL**（均为缺真实 Sony 语料环境项）；
+  全量 L3 **1261 PASS / 12 FAIL**（12 条均为 `testsets/` 真实媒体缺失的
   环境项，无代码/算法失败）；synthetic、integration T1–T4、A6 多声道及
   透明重封装 E2E 全 PASS。
 

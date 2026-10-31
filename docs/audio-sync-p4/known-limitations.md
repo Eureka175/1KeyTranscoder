@@ -442,8 +442,8 @@ A1 regression corpus (226 clips / 584 tracks)     : NOT RUN / corpus not
    available on this machine; task book §8.2 allows a hold-out set with the
    gap stated — the 4 synthetic integration cases + real 80 min files are what
    was actually run. The regression that WAS run and classified (2026-10-30/31):
-   unit 1019 PASS / 2 FAIL (both environment-only: real Sony corpus absent);
-   L3 full run 1260 PASS / 12 FAIL — all 12 are missing `testsets/` real media
+   unit 1020 PASS / 2 FAIL (both environment-only: real Sony corpus absent);
+   L3 full run 1261 PASS / 12 FAIL — all 12 are missing `testsets/` real media
    (Sony/DJI/A7M5/classic), no code/algorithm failures. Legacy C15–C32
    channel-sync expectations updated for the new defaults (anchor CH1→CH8,
    any-non-constant → whole-file TV, TV failure → unaligned original; mechanism
