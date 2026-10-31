@@ -1108,20 +1108,34 @@ def align_time_varying(
     results: dict[str, Any] = {}
     final_raw: dict[int, Path] = {}
     flipped: list[int] = []
-    any_target = False
-    t1 = time.time()
-    for members in units:
-        rep = members[0]
-        any_target = True
+
+    def _process_unit(members: list[int]) -> dict[str, Any]:
+        """单 target 的下游流水线（曲线→round1→残差→round2→极性）。
+
+        各 unit 只读 decoded raw、各自写 target_<rep>/ 目录，互不共享可变
+        状态，因此可以由调用方并行执行；返回值由主线程按 units 顺序合并，
+        报告内容与串行实现逐位相同（日志交错不影响数据）。
+        """
+        rep = int(members[0])
         tgt_dir = work_dir / f"target_{rep}"
         tgt_dir.mkdir(parents=True, exist_ok=True)
+        out: dict[str, Any] = {
+            "rep": rep, "result": None, "fixed": {}, "flipped": [],
+            "elapsed": 0.0,
+        }
+        t_start = time.time()
+
+        def _done(result: dict[str, Any]) -> dict[str, Any]:
+            out["result"] = result
+            out["elapsed"] = round(time.time() - t_start, 3)
+            return out
+
         # 1) 窗级连续性测量（组代表 vs 锚点）—— 已在上面的并行阶段算好
         if rep in measured_err:
             log(f"long-take: CH{rep + 1} window measurement failed: "
                 f"{measured_err[rep]}")
-            results[str(rep)] = {"ok": False, "reason": REASON_TRACK_FAILED,
-                                 "detail": measured_err[rep]}
-            continue
+            return _done({"ok": False, "reason": REASON_TRACK_FAILED,
+                          "detail": measured_err[rep]})
         windows = measured[rep]
         n_samples = _raw_length(decoded[rep], storages[rep])
         curve = build_curve_from_windows(
@@ -1129,9 +1143,8 @@ def align_time_varying(
             sample_rate=sample_rate, profile=prof)
         if not curve.get("ok"):
             log(f"long-take: CH{rep + 1} curve invalid: {curve.get('reason')}")
-            results[str(rep)] = {"ok": False, "reason": REASON_CURVE_INVALID,
-                                 "curve": curve}
-            continue
+            return _done({"ok": False, "reason": REASON_CURVE_INVALID,
+                          "curve": curve})
         log(f"long-take: CH{rep + 1} curve ok — windows "
             f"{curve['n_windows']}, anchors {curve['n_anchors']}, "
             f"max|shift| {curve['max_shift']:.1f} samples")
@@ -1173,9 +1186,8 @@ def align_time_varying(
                 break
             applied[m] = dst
         if len(applied) != len(members):
-            results[str(rep)] = {"ok": False, "reason": REASON_APPLY_REFUSED,
-                                 "apply": stats}
-            continue
+            return _done({"ok": False, "reason": REASON_APPLY_REFUSED,
+                          "apply": stats})
         rounds = 1
 
         # 3) 第二轮残差（只在代表上测，s_total 同施加到全组）
@@ -1243,14 +1255,14 @@ def align_time_varying(
                 inv = tgt_dir / f"polarity_{m}.{storages[m]}"
                 _invert_raw(applied[m], inv, storage_dtype=storages[m])
                 applied[m] = inv
-                flipped.append(m)
+                out["flipped"].append(int(m))
             log(f"long-take: group CH{[m + 1 for m in members]} polarity "
                 f"flipped (votes {pol['votes']}, neg "
                 f"{pol['negative_ratio']:.0%}, |CC| "
                 f"{pol['median_abs_cc']:.2f})")
         for m in members:
-            final_raw[m] = applied[m]
-        results[str(rep)] = {
+            out["fixed"][int(m)] = applied[m]
+        return _done({
             "ok": True,
             "members": [m + 1 for m in members],
             "rounds": rounds,
@@ -1266,9 +1278,23 @@ def align_time_varying(
             "apply_engine": apply_engine,
             "residual": residual_stats,
             "polarity": pol,
-        }
-        timings[f"target_{rep}"] = round(time.time() - t1, 3)
-        t1 = time.time()
+        })
+
+    # 各 unit 的下游流水线互相独立 → 并行；合并顺序固定为 units 顺序，
+    # 因此 results / flipped / 报告字段与串行实现一致（timings 值不同）。
+    if len(units) > 1:
+        with ThreadPoolExecutor(max_workers=min(4, len(units))) as ex:
+            unit_outs = list(ex.map(_process_unit, units))
+    else:
+        unit_outs = [_process_unit(m) for m in units]
+    for ur in unit_outs:
+        rep = int(ur["rep"])
+        results[str(rep)] = ur["result"]
+        timings[f"target_{rep}"] = float(ur["elapsed"])
+        for m, p in ur["fixed"].items():
+            final_raw[int(m)] = p
+        flipped.extend(int(x) for x in ur["flipped"])
+    any_target = bool(units)
 
     timings["total"] = round(time.time() - t_all, 3)
     ok = bool(units) and bool(any_target) and all(
