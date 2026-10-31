@@ -280,6 +280,11 @@ DEFAULTS: dict[str, Any] = {
     # 内部键 (不是 CLI 开关): 供 config/回归的 off 臂与单元测试使用;
     # 默认行为 = 高相关刚性双轨绑定为整组同偏移。
     "stereo_bind_enabled": True,
+    # 性能/内存预算 (2026-11-01 perf, 内部键不是 CLI 开关):
+    # stereo 候选对并发上限（默认 4 = 既有行为）；帧级估计的进程数上限
+    # （默认 12 = 既有行为）。内存受限的 config 可调低，结果不变。
+    "stereo_bind_workers": 4,
+    "est_worker_cap": 12,
 
     # —— 兼容 ——
     "max_lag_seconds": None,             # 旧键: 读取时映射为 search_window_ms
@@ -289,7 +294,8 @@ DEFAULTS: dict[str, Any] = {
 _INT_KEYS = ("min_audio_streams", "min_auto_channels", "max_auto_channels",
              "coarse_rate", "min_usable_frames",
              "group_snr_samples", "group_snr_min_samples",
-             "min_shift_samples", "recheck_windows", "verify_agree_samples")
+             "min_shift_samples", "recheck_windows", "verify_agree_samples",
+             "stereo_bind_workers", "est_worker_cap")
 #: **可为 None** 的整数键 (P4.6): None 是"未指定, 用上游具名默认常量", 与 0
 #: 不是一回事。它们不能进 `_INT_KEYS` —— `int(None)` 会抛错, 而
 #: `effective_opts` 的 except 会把**整份配置**回退成 DEFAULTS, 于是调用方写的
@@ -1139,7 +1145,10 @@ def _detect_stereo_groups(
     pair_results: dict[tuple[int, int], dict[str, Any]] = {}
     pairs = [(a, b) for _score, a, b in ranked]
     if len(pairs) > 1:
-        with ThreadPoolExecutor(max_workers=min(4, len(pairs))) as ex:
+        pair_workers = max(1, int(
+            eff.get("stereo_bind_workers", 4) or 4))
+        with ThreadPoolExecutor(
+                max_workers=min(pair_workers, len(pairs))) as ex:
             futs = {ex.submit(evaluate, a, b): (a, b) for a, b in pairs}
             for fut, key in list(futs.items()):
                 try:
@@ -2342,7 +2351,8 @@ def run_channel_sync(
         ) if healthy else 0
         _est_workers = 1
         if _n_frames_est >= 2000:
-            _est_workers = max(2, min(12, (os.cpu_count() or 4) - 1))
+            _cap = max(2, int(eff.get("est_worker_cap", 12) or 12))
+            _est_workers = max(2, min(_cap, (os.cpu_count() or 4) - 1))
             log(f"channel-sync: frame-parallel estimation "
                 f"({_n_frames_est} frames -> {_est_workers} processes)")
 

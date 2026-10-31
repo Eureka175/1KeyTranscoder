@@ -16,10 +16,11 @@
   moov 补丁**；不再产生 50 GiB stage 中间文件。
 - 磁盘中间文件：C1306 音频侧中间写盘 **~10.6 → ~6.0 GB（-43%）**；
   round1/round2/polarity 中间 raw 不再落盘。
-- 内存：并行化后峰值 RSS 主进程 **~1.14–1.23 GB**、进程树 ~1.9–2.3 GB
-  （旧串行 775 MB / 1470 MB）。已提供非 CLI 的 `measure_parallel_units` /
-  `pipeline_parallel_units` 开关，可退回约 0.8 GB 峰值（wall +~45 s）；
-  仍有进一步压缩空间（见 §5）。
+- 内存：默认速度优先时峰值 RSS 主进程 ~1.14–1.23 GB、进程树 ~1.9–2.3 GB
+  （旧串行 775 MB / 1470 MB）。**内存受限配置实测：`stereo_bind_workers=1` +
+  `est_worker_cap=4` + 串行 long-take → 主进程 748.6 MB / 树 1036.2 MB**
+  （-39% / -55%，输出仍逐位一致），代价 wall 236.3 → 338.9 s；三个预算键
+  都是 config/内部键（非 CLI），默认值保持既有行为。
 
 ## 1. 测量环境与基线
 
@@ -63,7 +64,7 @@
 | C1306 wall（同 harness） | 296.3 s | **236.3 s** | **-20.2%** | 同上（4 条 MOV sha256 一致） |
 | C1306 long-take | 159.8 s | 100.6 s | -37% | 同上 |
 | 音频中间写盘（C1306） | ~10.6 GB | **~6.0 GB** | **-43%** | work 目录只剩 final MOV + report |
-| 峰值 RSS（主/树） | 775/1470 MB | 1138–1232 / 1922–2331 MB | 内存上升（并行代价） | 可用 profile 开关换回 |
+| 峰值 RSS（主/树） | 775/1470 MB | 1138–1232 / 1922–2331 MB（默认并行） | 内存上升（并行代价）；内存受限配置可降到 **748.6/1036.2 MB**，输出逐位一致 |
 
 结果文件：`K:\1kt_work\perf\ws5\c1305\`、`K:\1kt_work\perf\ws2\run8\`，
 parity 报告 `K:\1kt_work\perf\ws1\baseline_*_manifest.json`。
