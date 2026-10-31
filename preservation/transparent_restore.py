@@ -116,8 +116,13 @@ def restore_after_transparent_remux(
         """GPAC -brand/-ab flags whose output ftyp size equals the source ftyp.
 
         The in-place path can only overwrite ftyp without moving the mdat when
-        GPAC's ftyp has exactly the source ftyp size.  GPAC always emits
-        ``isom`` + the major brand; each additional brand adds 4 bytes.
+        GPAC's ftyp has exactly the source ftyp size.  GPAC emits ``isom``
+        plus the major brand (if it is not ``isom``) by default; every ``-ab``
+        brand adds 4 bytes.  For a Sony XAVC source (32-byte ftyp: XAVC +
+        mp42 + nras + iso6 compatible brands) ``-brand XAVC -ab mp42 -ab nras``
+        reproduces the 32-byte size, so the source ftyp can be written over
+        GPAC's one byte-for-byte.  The same accounting generalises to isom /
+        other cameras (e.g. a 24-byte ftyp needs one extra brand).
         """
         from preservation import isobmf
 
@@ -127,10 +132,11 @@ def restore_after_transparent_remux(
         if src_ftyp is None or not major:
             return None, ()
         size = int(src_ftyp.size)
-        if size < 24 or (size - 16) % 4:
+        if size < 20 or (size - 16) % 4:
             return None, ()
-        n_total = (size - 16) // 4
-        needed = n_total - 2
+        n_total = (size - 16) // 4          # number of compat brand entries
+        base = 1 + (1 if major != "isom" else 0)
+        needed = n_total - base
         compat = [b for b in (bundle.compatible_brands or [])
                   if b and b not in (major, "isom")]
         if needed < 0 or needed > len(compat):

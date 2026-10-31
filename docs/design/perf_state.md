@@ -189,11 +189,35 @@ in-place 与 copy 结构校验均通过；标准路径仍有已知 in24/meta 重
 是透明路径剩余最大项；自写 muxer 直写最终文件（连 audio MOV 中间文件也省掉）
 风险高，放到音频优化后再评估。
 
+### WS5 — 真实素材回归/验收（进行中）
+
+**C1305（80.1 min）音频域，新代码**：wall **357.2 s**（验收基线 689.9 s，
+**-48.2%**）；long-take **118.6 s**（旧 231.0 s）；RSS 峰值主 1138.8 MB /
+树 1922.5 MB。parity_check：4 条 final `audio_*.mov` 与旧的验收基线
+**sha256 完全一致**，report 语义一致 → **无回归**。
+
+**C1306（69.4 min）**：wall 236.3 s（旧 harness 296.3 s，**-20.2%**；验收
+口径 389.1 s 含额外解码/比较）；parity OK。
+
+**透明 hook 6 源矩阵**（`work/perf/ws5/test_hook_matrix.py`，全部 PASS）：
+- XAVC clips（ftyp 32）：**in-place** 路径，结构/payload/签名全部与源一致；
+- 原始 isom hard cases C0911/12/15/16（ftyp 24）：in-place 前置检查按预期拒绝
+  （`stage ftyp size 20 != source ftyp size 24`），自动回退 **copy fast restore
+  on the already-muxed file**（不重复 mux），同样全部 PASS。
+- 说明 in-place 的适用性检查与回退链在真实布局上工作正常。
+
+### WS6 — 长测试回归（待做）
+
+全量 L3（`tests/full_autotest.py`）在新代码上重跑；C1305/C1306 的
+`final_accept_v2` 级验收留到所有改动稳定后集中跑一次。
+
 ## 下一步
 
-1. 完成 WS1（timing + cProfile）。
-2. 按热点实现 WS2（音频计算：FFT/中值/clamp/插值向量化 + 并行）。
-3. WS3（I/O/趟数）→ WS4（元数据）→ WS5（fast-only 评估）→ WS6（长测试验收）。
+1. 等全量 L3 结果；若失败逐一修复。
+2. 性能目标对照（audio C1305/C1306、透明 50 GiB、RSS）写入最终报告。
+3. 可选后续优化：残差测量预抽取（需位级一致性证明，内存代价）、估计阶段
+   换参考重测的并行化（语义需保持）、窗测量串行+批处理版本（≤0.8 GB 与 wall 平衡）。
+4. 整理 `work/` 临时产物（K:/F: 项目内），保留小型 JSON/日志证据。
 
 ## 关键文件
 
