@@ -149,3 +149,36 @@ python 1kt.py --input <dir with 20260919_C1305.MP4> --output <out> \
 **生成 stage**（一次 `mux_new`，约 4 min / 50 GiB）与**抽取元数据 bundle**
 （只读）。要完全去掉 GPAC 需要自写 muxer + 纯 Python nrtm 解析，属于另一个
 量级的工作，当前没有必要。
+
+### 4.4 更宽矩阵验证（2026-11-01 00:00，7 个真实源全 PASS）
+
+脚本 `work/long_take/s7/fast_restore_matrix.py`，报告
+`work/long_take/accept/fast_restore_matrix.json`。覆盖：
+
+| 源 | 特点 | 源大小 | 输出 | 总耗时 | 结果 |
+|---|---|---|---|---|---|
+| K clips_refined C1305 clip | XAVC restored，**flattened stage**（moov 在 mdat 后） | 0.10 GiB | 0.10 GiB | 3.8 s | PASS（16/16） |
+| K clips_refined C1306 clip | 另一 take，meta 12464 B | 0.11 GiB | 0.11 GiB | 1.9 s | PASS（16/16） |
+| I hard_cases C0911 | 原始 `isom` 布局：meta 在 moov 前、无 root/moov uuid、`iods`、mdat 最后 | 0.87 GiB | 0.87 GiB | 7.4 s | PASS（16/16） |
+| I hard_cases C0912 | 同上布局 | 0.40 GiB | 0.40 GiB | 6.5 s | PASS（16/16） |
+| I hard_cases C0915 | 同上布局 | 0.16 GiB | 0.16 GiB | 2.8 s | PASS（16/16） |
+| I hard_cases C0916 | 同上布局（接近门槛） | 0.10 GiB | 0.10 GiB | 2.1 s | PASS（16/16） |
+| C1306 全长 69.4 min | 43.12 GiB stage，生产对齐音频 | **43.13 GiB** | 43.12 GiB | 338.8 s（stage 162.9 s + fast 57.8 s） | PASS（16/16） |
+| C1305 全长 80.1 min | 真实 1kt 透明命令 E2E | 49.82 GiB | 49.78 GiB | 12.8 min | PASS（20/20，见 4.3） |
+
+每个小源验证 16 项：结构 vs 源（ftyp/uuid 多重集/文件级 meta/音频
+sample entry/track ids/tref）、视频**完整** streamhash、rtmd 完整 streamhash、
+4 条音频 payload 与固定 MOV 逐包一致、解码音频与源逐样本相等、流签名/时长
+与源一致。C1306 全长另验证：解码音频与生产对齐 raw **逐样本相等（diff=0）**。
+
+**不适用源的判定**（负向/边界）：
+- `clips_final` 的两个"已对齐但未恢复元数据"文件没有 rtmd 流、没有 meta 轨
+  tref → 矩阵判为 **不适用（skip）**；`fast_restore_from_stage` 也新增了前置
+  检查（无 uuid/meta/tref 时抛错让调用方回退），不会产出缺元数据的假成品。
+- 把裸 stage 交给 `verify_fast_restore_structure` → 正确报 5 类问题
+  （ftyp/meta/uuid/音频条目/tref），结构校验能拦住"没恢复就交付"。
+- stage 在 mdat 前还是后（flattened）都能正确重建（动态布局，co64/stco 按
+  新 mdat 位置平移并做范围校验）。
+
+人工验证文件已整理到 `F:\1kt_temp\fast_restore_matrix\deliverables\`
+（README + 8 个成品：6 个小源 + 2 个全长，附 matrix_report.json）。

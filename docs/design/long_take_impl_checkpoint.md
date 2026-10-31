@@ -641,6 +641,20 @@ stco/co64 按新 mdat 位置平移并做范围校验)+其余 root box+meta(源)`
   `work/long_take/s7/fast_restore_equiv.py`、`fast_restore_50g.py`。
 - 已知限制：仅 Sony（rtmd+bundle）源；运行期需 stage+输出两份 ~50 GiB；
   生产只做结构校验（完整 payload hash 属验收脚本，耗时）。
+**更宽矩阵（2026-11-01 00:00）**：7 个真实源全部 PASS（16 项检查/源）：
+K clips_refined C1305/C1306 clip（含 flattened stage 变体）、I: hard_cases
+C0911/C0912/C0915/C0916（原始 isom 布局：meta 在 moov 前、无 root/moov
+uuid、iods、mdat 最后）、C1306 全长 43.12 GiB（stage mux 162.9 s +
+fast restore 57.8 s）。验证覆盖：结构 vs 源、视频/rtmd 完整 streamhash、
+4 音频 payload 与固定 MOV 逐包一致、解码音频逐样本相等、流签名/时长。
+边界：clips_final 的两个「已对齐未恢复元数据」文件无 rtmd/tref →
+`fast_restore_from_stage` 前置检查抛错让调用方回退（不产假成品）；裸
+stage 会被结构校验拒绝。人工验证文件在
+`F:\1kt_temp\fast_restore_matrix\deliverables\`（README + 6 个小源 +
+2 个全长成品 + matrix_report.json）。matrix 脚本：
+`work/long_take/s7/fast_restore_matrix.py`；报告：
+`work/long_take/accept/fast_restore_matrix.json`。
+
 
 **真实生产命令端到端（2026-10-31 23:30–23:43）**：原样运行
 `1kt.py --channel-sync-transparent` 于 50 GiB C1305，总耗时 ~12.8 min；

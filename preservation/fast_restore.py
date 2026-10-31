@@ -395,6 +395,14 @@ def fast_restore_from_stage(
     dst_ids = _handler_ids(stage_moov_bytes)
 
     tref_bytes = _rebuild_tref(source_moov, src_ids, dst_ids)
+    has_sony_meta = bool(root_uuids or meta_src or moov_uuid or bundle.boxes)
+    if not has_sony_meta or tref_bytes is None:
+        # 例如"已对齐但未恢复元数据"的 finals: 没有 root uuid / 文件级 meta /
+        # meta 轨 tref。这不是 fast restore 能补出来的东西, 必须让调用方
+        # 明确回退, 而不是产出一个"看着像成品"却没有元数据的文件。
+        raise RuntimeError(
+            "source does not carry Sony container metadata (uuid/meta/tref); "
+            "fast restore not applicable")
 
     trak_uuid: dict[str, list[bytes]] = {}
     for box in sorted(bundle.boxes, key=lambda b: (b.parent_context,
