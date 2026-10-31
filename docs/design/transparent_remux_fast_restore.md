@@ -119,3 +119,33 @@ chunk offset 做范围校验、只丢弃 size=0 的 padding、失败自动回退
 - 限制：fast 路径只适用于"stage 已含目标轨 + 源有可抽取的 Sony bundle"的
   场景；非 Sony 源不走该路径。full payload 校验（完整视频 hash）耗时且只在
   验收脚本里做，生产只做结构校验（毫秒级，只读 moov）。
+
+### 4.3 真实用户命令端到端（最终验证，2026-10-31 23:30）
+
+用**生产入口的原样命令**跑 50 GiB C1305：
+
+```powershell
+python 1kt.py --input <dir with 20260919_C1305.MP4> --output <out> \
+    --channel-sync-transparent --headless --jobs 1 --keep-work
+```
+
+结果（日志 `work/long_take/accept/transparent_e2e_50g.log`）：
+
+- 总耗时约 **12.8 min**（23:30:33 → 23:43:20），其中音频分析/决策 + 时变
+  对齐约 7 min、元数据抽取 28 s、stage mux + fast restore 合计约 4.3 min、
+  恢复后的 Sony checker 约 1 min；
+- `[SYNC-OK] ... transparent remux (scope=file, fixed=2, remux)`；
+- `[CHECK] level=basic PRESERVED=37 MODIFIED=0 MISSING=0
+  structural_success=True`（Sony 元数据 37 项全部保留）；
+- 输出 `20260919_C1305.MP4` 49.78 GiB；channel-sync report：`status=applied`、
+  `path=time_varying`、`apply_engine=reference`、决策
+  anchor/already_aligned/fixed/fixed；
+- 独立复核脚本 `work/long_take/s7/verify_transparent_e2e_50g.py`：20 项检查
+  **全部 PASS（FAILED: none）**——结构 vs 源一致（ftyp/9 uuid/11304 B meta/
+  tref/`ipcm` 条目/track ids）、视频首 10 s streamhash 一致、rtmd payload
+  逐包一致、4 条音频解码后与对齐 raw f32 **逐样本相等（diff=0）**。
+
+结论：不调用 GPAC 做**元数据恢复的整文件重写**是可行的；但 GPAC 仍然用于
+**生成 stage**（一次 `mux_new`，约 4 min / 50 GiB）与**抽取元数据 bundle**
+（只读）。要完全去掉 GPAC 需要自写 muxer + 纯 Python nrtm 解析，属于另一个
+量级的工作，当前没有必要。

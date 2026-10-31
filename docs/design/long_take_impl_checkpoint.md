@@ -641,3 +641,14 @@ stco/co64 按新 mdat 位置平移并做范围校验)+其余 root box+meta(源)`
   `work/long_take/s7/fast_restore_equiv.py`、`fast_restore_50g.py`。
 - 已知限制：仅 Sony（rtmd+bundle）源；运行期需 stage+输出两份 ~50 GiB；
   生产只做结构校验（完整 payload hash 属验收脚本，耗时）。
+
+**真实生产命令端到端（2026-10-31 23:30–23:43）**：原样运行
+`1kt.py --channel-sync-transparent` 于 50 GiB C1305，总耗时 ~12.8 min；
+`[SYNC-OK] ... transparent remux (scope=file, fixed=2, remux)`；
+Sony checker `PRESERVED=37 MODIFIED=0 MISSING=0 structural_success=True`；
+独立复核 20/20 PASS：结构/元数据与源一致、视频 10 s streamhash、rtmd
+payload、4 音频解码与对齐 raw 逐样本相等（diff=0）。脚本
+`work/long_take/s7/verify_transparent_e2e_50g.py`，结果
+`work/long_take/accept/transparent_e2e_50g.json`。GPAC 仍用于 stage mux
+（一次写 ~4 min）和 bundle 抽取（只读）；被消除的是恢复阶段的多次整文件
+重写。
