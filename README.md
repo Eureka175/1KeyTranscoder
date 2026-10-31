@@ -485,6 +485,8 @@ GitHub **pre-release**).
 
 ## Limitations
 
+- **Inputs**: 1KeyTranscoder expects **camera originals**. Re-transcoding an already-restored deliverable can fail the structural preservation check (the checker reports \	imeline.movie_duration\ / \ideo.track_duration\ / \ideo.elst\ as MODIFIED) — this is a fail-closed safeguard, not a silent success. Use \--repair\/\--check\ for deliverables instead of transcoding them again.
+
 - **Platform**: Windows 10/11 x64 only.
 - **Channel sync**: 3–8 channel PCM sources are aligned automatically; 2CH/1CH and
   compressed formats are not aligned, and more than 8 channels require
