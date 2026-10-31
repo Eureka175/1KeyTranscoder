@@ -50,8 +50,8 @@ from typing import Any, Callable
 from . import isobmf
 from .sony import PreservationBundle
 
-__all__ = ["fast_restore_from_stage", "FAST_RESTORE_MIN_BYTES",
-           "verify_fast_restore_structure"]
+__all__ = ["fast_restore_from_stage", "fast_restore_inplace",
+           "FAST_RESTORE_MIN_BYTES", "verify_fast_restore_structure"]
 
 #: Files at least this large use the fast path automatically.  Below it the
 #: (well-tested) GPAC multi-pass restore is kept; on small files both are
@@ -343,6 +343,43 @@ def _actual_movie_timescale(path: Path) -> int:
     raise RuntimeError(f"no mvhd in {path}")
 
 
+def _build_restored_moov(
+    stage_moov_bytes: bytes,
+    *,
+    moov_uuid: bytes,
+    trak_uuid: dict[str, list[bytes]],
+    tref_bytes: bytes | None,
+    src_entries: list[bytes],
+) -> tuple[bytes, dict[str, Any]]:
+    """Insert Sony metadata / source audio entries into the stage moov.
+
+    Shared by the copy-based (`fast_restore_from_stage`) and the in-place
+    (`fast_restore_inplace`) restore paths so both can never drift apart.
+    """
+    moov = bytearray(stage_moov_bytes)
+    inserted_uuid = 0
+    for handler in ("vide", "soun", "meta"):
+        for i, payload in enumerate(trak_uuid.get(handler, [])):
+            if _trak_uuid_count(bytes(moov), handler, i) == 0:
+                if _insert_tail(moov, handler, i, payload):
+                    inserted_uuid += 1
+    inserted_moov_uuid = 0
+    if moov_uuid and _moov_uuid_count(bytes(moov)) == 0:
+        _insert_moov_tail(moov, moov_uuid)
+        inserted_moov_uuid = 1
+    inserted_tref = 0
+    if tref_bytes is not None:
+        if _insert_tail(moov, "meta", 0, tref_bytes):
+            inserted_tref = 1
+    entry_descs = _replace_audio_entries(moov, src_entries)
+    return bytes(moov), {
+        "uuid_inserted_trak": inserted_uuid,
+        "uuid_inserted_moov": inserted_moov_uuid,
+        "tref_inserted": inserted_tref,
+        "audio_entries": entry_descs,
+    }
+
+
 def fast_restore_from_stage(
     *,
     source: Path,
@@ -414,28 +451,20 @@ def fast_restore_from_stage(
         trak_uuid.setdefault(handler, []).append(
             (Path(bundle_dir) / box.payload_file).read_bytes())
 
-    # ---- build the new moov
-    moov = bytearray(stage_moov_bytes)
-    inserted_uuid = 0
-    for handler in ("vide", "soun", "meta"):
-        for i, payload in enumerate(trak_uuid.get(handler, [])):
-            if _trak_uuid_count(bytes(moov), handler, i) == 0:
-                if _insert_tail(moov, handler, i, payload):
-                    inserted_uuid += 1
-    inserted_moov_uuid = 0
-    if moov_uuid and _moov_uuid_count(bytes(moov)) == 0:
-        _insert_moov_tail(moov, moov_uuid)
-        inserted_moov_uuid = 1
-    inserted_tref = 0
-    if tref_bytes is not None:
-        if _insert_tail(moov, "meta", 0, tref_bytes):
-            inserted_tref = 1
-    entry_descs = _replace_audio_entries(moov, src_entries)
+    # ---- build the new moov (shared with the in-place restore path)
+    new_moov_bytes, moov_stats = _build_restored_moov(
+        stage_moov_bytes, moov_uuid=moov_uuid, trak_uuid=trak_uuid,
+        tref_bytes=tref_bytes, src_entries=src_entries)
+    inserted_uuid = moov_stats["uuid_inserted_trak"]
+    inserted_moov_uuid = moov_stats["uuid_inserted_moov"]
+    inserted_tref = moov_stats["tref_inserted"]
+    entry_descs = moov_stats["audio_entries"]
 
     # ---- dynamic layout: new mdat starts right after ftyp + root uuids
     new_prefix = len(ftyp_src) + sum(len(b) for b in root_uuids)
     old_prefix = int(mdat.start)
     delta = new_prefix - old_prefix
+    moov = bytearray(new_moov_bytes)
     off_descs = _patch_chunk_offsets(moov, delta)
     new_moov_bytes = bytes(moov)
     new_mdat_start = new_prefix
@@ -519,6 +548,165 @@ def fast_restore_from_stage(
         f" (ftyp {len(ftyp_src)} B, mdat {delta:+d}, uuid +{inserted_uuid}"
         f"/{inserted_moov_uuid}, tref {inserted_tref}, "
         f"audio entries {len(entry_descs)}, chunks {checked} checked)")
+    return report
+
+
+def fast_restore_inplace(
+    *,
+    source: Path,
+    path: Path,
+    bundle: PreservationBundle,
+    bundle_dir: Path,
+    log: Callable[[str], None] = print,
+) -> dict[str, Any]:
+    """Restore container metadata **in place** on a GPAC flat mux output.
+
+    Motivation (2026-11-01): the copy-based fast restore still writes the whole
+    ``mdat`` twice (GPAC stage write + fast-restore copy).  If GPAC writes the
+    final file itself with ``-flat`` (mdat first / moov last) and a ftyp whose
+    size equals the source ftyp, the ``mdat`` bytes and their offsets do not
+    move at all: only ``ftyp`` (32 B), the ``moov`` (few MiB) and the appended
+    root uuid/meta boxes need to be written.  That reduces the 50 GiB
+    transparent path from ~3 full-file writes to 1 GPAC write + a few MiB of
+    patching (user requirement: minimize disk writes / intermediate files).
+
+    Preconditions (checked, otherwise ``RuntimeError: in-place restore not
+    applicable: ...`` and the caller must fall back to the copy path):
+
+    * stage root order = ``ftyp, mdat, ..., moov`` (GPAC ``-flat``);
+    * stage ftyp size == source ftyp size (the stage is then patched with the
+      exact source ftyp bytes, no shift);
+    * ``mdat.start == len(source ftyp)`` (nothing before mdat);
+    * the stage moov starts after the mdat (flat storage).
+    """
+    source = Path(source)
+    path = Path(path)
+    path_roots = isobmf.root_boxes(path)
+    src_roots = {b.type: b for b in isobmf.root_boxes(source)}
+    if "ftyp" not in src_roots:
+        raise RuntimeError("in-place restore not applicable: source has no ftyp")
+    ftyp_src = _read_box(source, src_roots["ftyp"])
+    meta_src = (_read_box(source, src_roots["meta"])
+                if "meta" in src_roots else b"")
+    root_uuids = [_read_box(source, b) for b in isobmf.root_boxes(source)
+                  if b.type == "uuid"]
+
+    moov_src_box = src_roots.get("moov")
+    if moov_src_box is None:
+        raise RuntimeError("in-place restore not applicable: source has no moov")
+    source_moov = _read_box(source, moov_src_box)
+    src_ids = _handler_ids(source_moov)
+    moov_uuid = b""
+    for child in _children(source_moov, _moov_root(source_moov)):
+        if child.type == "uuid":
+            moov_uuid += source_moov[child.start:child.end]
+
+    from .sample_entry import read_audio_entries
+
+    src_entries = [e["bytes"] for e in read_audio_entries(source)]
+
+    ftyp_box = next((b for b in path_roots if b.type == "ftyp"), None)
+    mdat = next((b for b in path_roots if b.type == "mdat"), None)
+    moov_box = next((b for b in path_roots if b.type == "moov"), None)
+    if ftyp_box is None or mdat is None or moov_box is None:
+        raise RuntimeError("in-place restore not applicable: "
+                           "stage lacks ftyp/mdat/moov")
+    if ftyp_box.size != len(ftyp_src):
+        raise RuntimeError(
+            "in-place restore not applicable: stage ftyp size "
+            f"{ftyp_box.size} != source ftyp size {len(ftyp_src)}")
+    if int(mdat.start) != len(ftyp_src):
+        raise RuntimeError(
+            "in-place restore not applicable: mdat starts at "
+            f"{int(mdat.start)}, expected {len(ftyp_src)} (flat layout)")
+    if int(moov_box.start) < int(mdat.end):
+        raise RuntimeError("in-place restore not applicable: "
+                           "moov overlaps mdat (not flat storage)")
+
+    stage_moov_bytes = _read_box(path, moov_box)
+    dst_ids = _handler_ids(stage_moov_bytes)
+    tref_bytes = _rebuild_tref(source_moov, src_ids, dst_ids)
+    has_sony_meta = bool(root_uuids or meta_src or moov_uuid or bundle.boxes)
+    if not has_sony_meta or tref_bytes is None:
+        raise RuntimeError(
+            "in-place restore not applicable: source does not carry Sony "
+            "container metadata (uuid/meta/tref)")
+
+    trak_uuid: dict[str, list[bytes]] = {}
+    for box in sorted(bundle.boxes, key=lambda b: (b.parent_context,
+                                                   b.ordinal)):
+        ctx = box.parent_context or ""
+        if not ctx.startswith("trak:"):
+            continue
+        handler = ctx.split(":", 1)[1]
+        trak_uuid.setdefault(handler, []).append(
+            (Path(bundle_dir) / box.payload_file).read_bytes())
+
+    new_moov_bytes, moov_stats = _build_restored_moov(
+        stage_moov_bytes, moov_uuid=moov_uuid, trak_uuid=trak_uuid,
+        tref_bytes=tref_bytes, src_entries=src_entries)
+    checked = _check_offsets(new_moov_bytes, int(mdat.start), int(mdat.end))
+
+    # Root boxes that live AFTER the moov in the stage (normally none) must be
+    # re-emitted after the grown/shrunk moov; everything before mdat is never
+    # touched.
+    tail_blobs = [_read_box(path, b) for b in path_roots
+                  if int(b.start) >= int(moov_box.end)
+                  and not b.type.startswith("\x00")]
+    appended = list(tail_blobs) + list(root_uuids)
+    if meta_src:
+        appended.append(meta_src)
+
+    final_pos = int(moov_box.start) + len(new_moov_bytes) + sum(
+        len(b) for b in appended)
+    old_size = path.stat().st_size
+    with path.open("r+b") as fh:
+        fh.seek(0)
+        fh.write(ftyp_src)                    # identical size, no shift
+        fh.seek(int(moov_box.start))
+        fh.write(new_moov_bytes)
+        pos = int(moov_box.start) + len(new_moov_bytes)
+        for blob in appended:
+            fh.seek(pos)
+            fh.write(blob)
+            pos += len(blob)
+        fh.truncate(pos)
+    rewritten = len(ftyp_src) + len(new_moov_bytes) + sum(
+        len(b) for b in appended)
+
+    flags = isobmf.normalize_track_flags(path)
+    report = {
+        "fast_restore": True,
+        "inplace": True,
+        "source": str(source),
+        "dst": str(path),
+        "bytes_rewritten": rewritten,
+        "bytes_untouched_mdat": int(mdat.size),
+        "file_size_old": old_size,
+        "file_size_new": final_pos,
+        "ftyp_bytes": len(ftyp_src),
+        "root_uuids": [len(b) for b in root_uuids],
+        "meta_bytes": len(meta_src),
+        "mdat": {"start": int(mdat.start), "size": int(mdat.size),
+                 "delta": 0},
+        "moov": {"old_start": int(moov_box.start),
+                 "old_size": int(moov_box.size),
+                 "new_size": len(new_moov_bytes),
+                 "growth": len(new_moov_bytes) - int(moov_box.size)},
+        "uuid_inserted_trak": moov_stats["uuid_inserted_trak"],
+        "uuid_inserted_moov": moov_stats["uuid_inserted_moov"],
+        "tref_inserted": moov_stats["tref_inserted"],
+        "tref_bytes": len(tref_bytes) if tref_bytes else 0,
+        "audio_entries": moov_stats["audio_entries"],
+        "chunk_offsets_checked": checked,
+        "tkhd_flags_patched": len(flags),
+        "track_ids": {"source": src_ids, "stage": dst_ids},
+    }
+    log(f"fast-restore: in-place {path.stat().st_size / 2**30:.2f} GiB "
+        f"(ftyp {len(ftyp_src)} B, mdat untouched {int(mdat.size) / 2**30:.2f}"
+        f" GiB, moov {int(moov_box.size)} -> {len(new_moov_bytes)} B, "
+        f"appended {sum(len(b) for b in appended)} B, "
+        f"chunks {checked} checked)")
     return report
 
 

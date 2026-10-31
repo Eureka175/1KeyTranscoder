@@ -26,6 +26,7 @@ that predicate (a source carrying an ``rtmd`` data track).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -93,46 +94,129 @@ def restore_after_transparent_remux(
         f"{'yes' if bundle.nrtm else 'no'}, "
         f"brand={bundle.major_brand!r}")
 
-    gpac.mux_new(stage, adds)
-    stage_size = stage.stat().st_size
     from preservation.fast_restore import (
         FAST_RESTORE_MIN_BYTES,
         fast_restore_from_stage,
+        fast_restore_inplace,
         verify_fast_restore_structure,
     )
 
+    def _verify_fast(label: str, target: Path, stats: dict) -> None:
+        ver = verify_fast_restore_structure(source, target)
+        if not ver.get("ok"):
+            raise RuntimeError(
+                "fast restore structural verification failed: "
+                + "; ".join(ver.get("problems") or []))
+        log(f"channel-sync: fast restore metadata verified ({label}) — track "
+            f"ids {ver.get('track_ids')}, uuid {ver.get('uuid_count')}, "
+            f"tref={ver.get('tref_present')}, meta={ver.get('meta_bytes')} B, "
+            f"bytes={stats.get('bytes_written', stats.get('bytes_rewritten'))}")
+
+    def _fast_brand_args() -> tuple[str | None, tuple[str, ...]]:
+        """GPAC -brand/-ab flags whose output ftyp size equals the source ftyp.
+
+        The in-place path can only overwrite ftyp without moving the mdat when
+        GPAC's ftyp has exactly the source ftyp size.  GPAC always emits
+        ``isom`` + the major brand; each additional brand adds 4 bytes.
+        """
+        from preservation import isobmf
+
+        src_ftyp = next((b for b in isobmf.root_boxes(source)
+                         if b.type == "ftyp"), None)
+        major = bundle.major_brand
+        if src_ftyp is None or not major:
+            return None, ()
+        size = int(src_ftyp.size)
+        if size < 24 or (size - 16) % 4:
+            return None, ()
+        n_total = (size - 16) // 4
+        needed = n_total - 2
+        compat = [b for b in (bundle.compatible_brands or [])
+                  if b and b not in (major, "isom")]
+        if needed < 0 or needed > len(compat):
+            return None, ()
+        return major, tuple(compat[:needed])
+
+    try:
+        source_size = source.stat().st_size
+    except OSError:
+        source_size = 0
     use_fast = bool(_FORCE_FAST) if _FORCE_FAST is not None else (
-        stage_size >= FAST_RESTORE_MIN_BYTES)
+        source_size >= FAST_RESTORE_MIN_BYTES)
+
     if use_fast:
-        try:
-            stats = fast_restore_from_stage(
-                source=source, stage=stage, bundle=bundle,
-                bundle_dir=bundle_dir, dst=dst, log=log)
-            ver = verify_fast_restore_structure(source, dst)
-            if not ver.get("ok"):
-                raise RuntimeError(
-                    "fast restore structural verification failed: "
-                    + "; ".join(ver.get("problems") or []))
-            log("channel-sync: fast restore metadata verified — track ids "
-                f"{ver.get('track_ids')}, uuid "
-                f"{ver.get('uuid_count')}, tref={ver.get('tref_present')}, "
-                f"meta={ver.get('meta_bytes')} B, bytes="
-                f"{stats.get('bytes_written')}")
+        brand, add_brands = _fast_brand_args()
+        if brand:
+            # Preferred: GPAC writes the FINAL path in flat layout with a
+            # source-sized ftyp, then only ftyp/moov/root-uuid/meta are
+            # patched in place — the 50 GiB mdat is never copied again.
             try:
-                stage.unlink()
-            except OSError:
-                pass
-            return stage
-        except Exception as exc:                   # noqa: BLE001
-            log(f"channel-sync: fast restore failed ({type(exc).__name__}: "
-                f"{exc}) — falling back to standard GPAC restore")
-            try:
+                dst.parent.mkdir(parents=True, exist_ok=True)
                 if dst.exists():
                     dst.unlink()
-            except OSError:
-                pass
-            # 标准流程需要干净的 stage; mux_new 的产物仍是合法的 stage,
-            # reconstruct/flatten 会就地修它。
+                gpac.mux_new(dst, adds, flat=True, brand=brand,
+                             add_brands=add_brands)
+                stats = fast_restore_inplace(
+                    source=source, path=dst, bundle=bundle,
+                    bundle_dir=bundle_dir, log=log)
+                _verify_fast("in-place", dst, stats)
+                return dst
+            except Exception as exc:                   # noqa: BLE001
+                log(f"channel-sync: in-place fast restore failed "
+                    f"({type(exc).__name__}: {exc}) — trying copy fast "
+                    "restore on the already-muxed file")
+                tmp = dst.with_name(dst.name + ".fasttmp")
+                try:
+                    if not dst.is_file():
+                        raise RuntimeError("no muxed file for copy fallback")
+                    stats = fast_restore_from_stage(
+                        source=source, stage=dst, bundle=bundle,
+                        bundle_dir=bundle_dir, dst=tmp, log=log)
+                    _verify_fast("copy", tmp, stats)
+                    os.replace(tmp, dst)
+                    return dst
+                except Exception as exc2:              # noqa: BLE001
+                    log(f"channel-sync: copy fast restore failed "
+                        f"({type(exc2).__name__}: {exc2}) — falling back to "
+                        "standard GPAC restore")
+                    for p in (tmp, dst):
+                        try:
+                            p.unlink()
+                        except OSError:
+                            pass
+        else:
+            # ftyp size cannot be matched in place -> mux a normal stage and
+            # use the (already validated) copy-based fast restore.
+            try:
+                if stage.exists():
+                    stage.unlink()
+                gpac.mux_new(stage, adds)
+                stats = fast_restore_from_stage(
+                    source=source, stage=stage, bundle=bundle,
+                    bundle_dir=bundle_dir, dst=dst, log=log)
+                _verify_fast("copy", dst, stats)
+                try:
+                    stage.unlink()
+                except OSError:
+                    pass
+                return dst
+            except Exception as exc:                   # noqa: BLE001
+                log(f"channel-sync: fast restore failed "
+                    f"({type(exc).__name__}: {exc}) — falling back to "
+                    "standard GPAC restore")
+                for p in (dst, stage):
+                    try:
+                        p.unlink()
+                    except OSError:
+                        pass
+
+    # Standard GPAC multi-pass restore: needs a fresh stage.
+    try:
+        if stage.exists():
+            stage.unlink()
+    except OSError:
+        pass
+    gpac.mux_new(stage, adds)
 
     sony.reconstruct(bundle, bundle_dir, stage)
     gpac.flatten(stage)

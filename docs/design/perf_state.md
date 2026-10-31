@@ -97,10 +97,12 @@ C1306 基线（timing 模式，`K:\1kt_work\perf\ws1\c1306_timing.json`）：
 4 个 round1/round2 raw 的 sha256 + report 语义）→ **PARITY OK（逐位一致）**；
 unit **1020 PASS / 2 FAIL**（仅环境项）。
 
-### WS2b — 待做（下一轮）
+### WS2b — 第二轮（2026-11-01，完成）
 
-- 每个 target 的**下游流水线**（曲线→round1 施加→残差→round2→极性）按 unit
-  并行（预计再省 ~30 s）。
+- 每个 target 的**下游流水线**（曲线→round1→残差→round2→极性）拆成嵌套函数，
+  按 unit 线程并行；合并顺序固定为 units 顺序（报告字段/翻转列表与串行一致，
+  仅 timings 值不同）。C1306 wall **253.9 → 234.7 s**（vs baseline 296.3，
+  **-20.8%**）；long-take 125.1 → 100.6 s。parity_check 仍 **PARITY OK**。
 - 残差测量：60 s 窗重叠 resample_poly 目前每窗重复重采样；评估整文件预抽取
   （需先证明与逐窗口径逐位一致）→ 预计残差 34 s → ~15 s。
 - 解码/健康扫描/估计阶段的内存与 CPU 再平衡；RSS 当前量级待测。
@@ -117,6 +119,46 @@ unit **1020 PASS / 2 FAIL**（仅环境项）。
 - 元数据侧：见 WS4 —— **GPAC mux 后原地修补 moov/元数据**（不再写 stage +
   再整文件复制），目标 50 GiB 透明路径只剩 1 次 GPAC 写 + 小 moov 补丁；
   这是"最小化落盘中间文件"的核心。
+
+### WS4 — 元数据/透明路径（第一轮完成，2026-11-01）
+
+**目标**：透明 50 GiB 不再写 stage + 再整文件复制；最小化落盘中间文件。
+
+实现：
+1. `gpac.mux_new(..., flat=True, brand=..., add_brands=...)`：GPAC 直接以
+   **flat 布局**（mdat 先、moov 后）把最终产物写到目标路径，并用
+   `-brand XAVC -ab mp42 -ab nras` 得到 **32 字节 ftyp**（与 Sony XAVC 源
+   ftyp 同尺寸）。
+2. `preservation/fast_restore.py::fast_restore_inplace`：在**同一文件**上
+   只改写 ftyp（32 B）+ moov（约 7.6 MB）+ 追加 root uuid/文件级 meta
+   （15.5 KB）；**mdat 一个字节都不动**，50 GiB 不再需要第二次整文件读写。
+   moov 内 chunk offset 无需平移（mdat 位置不变），仍校验 509,356 个
+   chunk offset 全部落在 mdat 内。
+3. `transparent_restore` 自动选择：源 ftyp 尺寸可由 GPAC 旗标匹配时走
+   in-place；否则回退 copy-based fast restore（同一个 GPAC 产物作 stage，
+   写临时文件后原子替换）；再失败才回退标准 GPAC 多轮流程。语义不变：
+   任何失败最终仍回退源文件拷贝。
+
+**50 GiB C1305 真实端到端（01:54:08–02:03:46）**：
+
+| 指标 | 旧（copy fast restore） | 新（in-place） |
+|---|---|---|
+| 总耗时 | 12.8 min | **9.63 min（-25%）** |
+| 磁盘写入 | GPAC stage 50 GiB + fast restore 写 50 GiB（另读 50 GiB） | **仅 GPAC 写 50 GiB + 7.6 MB moov 补丁** |
+| 临时文件 | stage 50 GiB + 输出 50 GiB | **无 stage**（输出即最终文件） |
+| 元数据校验 | 通过 | 通过（ftyp/uuid 9/9/meta 11304 B/tref/ipcm/签名）|
+| payload | 通过 | rtmd 全量 streamhash = 源；视频 10 s hash 相同；4 音频解码与生产对齐 raw **diff=0** |
+| Sony checker | PRESERVED=37 | **PRESERVED=37 MODIFIED=0 MISSING=0** |
+| 日志 | `fast-restore: one-pass rebuild` | `fast-restore: in-place 49.78 GiB (mdat untouched 49.77 GiB, moov 7587467 -> 7587661 B, appended 15522 B, chunks 509356 checked)` |
+
+小样本对照（107 MB XAVC clip，`work/perf/ws4/test_inplace_clip.py`）：in-place /
+copy / 标准 GPAC 三条路径的视频、4 音频、rtmd payload 全部与源逐包相同；
+in-place 与 copy 结构校验均通过；标准路径仍有已知 in24/meta 重编码差异。
+50 GiB 复核脚本：`work/perf/ws4/verify_e2e_50g.py`。
+
+**剩余项（WS4b）**：GPAC `-flat` mux 本身仍是 50 GiB 一次写（~2.5–4 min），
+是透明路径剩余最大项；自写 muxer 直写最终文件（连 audio MOV 中间文件也省掉）
+风险高，放到音频优化后再评估。
 
 ## 下一步
 

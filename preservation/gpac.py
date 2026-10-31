@@ -460,11 +460,29 @@ class GpacContainerBackend:
 
     # -- reconstruction ---------------------------------------------------
 
-    def mux_new(self, dst: Path, adds: list[str]) -> None:
-        """MP4Box -timescale T -new dst -add A -add B ..."""
+    def mux_new(self, dst: Path, adds: list[str], *,
+                flat: bool = False,
+                brand: str | None = None,
+                add_brands: tuple[str, ...] = ()) -> None:
+        """MP4Box -timescale T -new dst -add A -add B ...
+
+        ``flat`` stores all media data first (mdat before moov) — required by
+        the in-place fast restore (2026-11-01), which patches ftyp/moov on a
+        flat GPAC output instead of copying the whole file a second time.
+        ``brand`` / ``add_brands`` control the output ftyp size/brands; the
+        Sony XAVC combination ``brand="XAVC", add_brands=("mp42", "nras")``
+        yields a 32-byte ftyp, matching the source ftyp size, so the stage
+        ftyp can be overwritten in place without moving the mdat.
+        """
         dst.parent.mkdir(parents=True, exist_ok=True)
         base = _rel_base(dst)
         cmd = [str(self.mp4box)] + self._ts_args()
+        if flat:
+            cmd.append("-flat")
+        if brand:
+            cmd += ["-brand", brand]
+        for b in add_brands:
+            cmd += ["-ab", b]
         cmd += ["-new", _opt(dst, base)]
         for a in adds:
             cmd += ["-add", _opt_spec(a, base)]
