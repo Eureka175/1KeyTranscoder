@@ -59,6 +59,7 @@ import os
 import shutil
 import struct
 import subprocess
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
@@ -2224,20 +2225,35 @@ def run_channel_sync(
         # 相关性极高、整片 lag 刚性的**双轨**默认绑定为一组: 整组用同一个
         # 偏移/曲线, 组内相对偏移保持源样。检测机制全部复用既有实现
         # (sample_pair_snr -> group_by_snr -> 一次连续性跟踪确认), 不新造聚类。
+        #
+        # 2026-11-01 性能优化: 检测只读 decoded raw, 与锚点估计**互不依赖**
+        # (锚点选择不看绑定组), 因此放到后台 daemon 线程与锚点估计并行执行,
+        # 结果在逐轨决策前汇合。语义不变: 失败一律回落为"无绑定组"。
         bound_groups: list[list[int]] = []
         stereo_report: dict[str, Any] = {"enabled": False}
+        _detect_thread: threading.Thread | None = None
+        _detect_error: BaseException | None = None
+        _detect_holder: dict[str, Any] = {}
         if eff["stereo_bind_enabled"]:
-            bound_groups, stereo_report = _detect_stereo_groups(
-                streams=arrs,
-                decoded=decoded,
-                storages=storage,
-                healthy=healthy,
-                sample_rate=sample_rate,
-                eff=eff,
-                log=log,
-            )
-            if stereo_report.get("candidates") or stereo_report.get("groups"):
-                ctx["stereo_groups"] = stereo_report
+            def _run_detect() -> None:
+                nonlocal _detect_error
+                try:
+                    _detect_holder["result"] = _detect_stereo_groups(
+                        streams=arrs,
+                        decoded=decoded,
+                        storages=storage,
+                        healthy=healthy,
+                        sample_rate=sample_rate,
+                        eff=eff,
+                        log=log,
+                    )
+                except BaseException as exc:            # noqa: BLE001
+                    _detect_error = exc
+
+            _detect_thread = threading.Thread(
+                target=_run_detect, name="channel-sync-stereo-bind",
+                daemon=True)
+            _detect_thread.start()
 
         # 3. 锚点候选回退: [CH1, CH2, ..., CH8] (用户决策 A4; 旧默认由 config
         #    覆盖时仍生效), 仅健康轨可当选
@@ -2639,6 +2655,23 @@ def run_channel_sync(
             if i in materiality_note:
                 rows[i]["materiality"] = materiality_note[i]
             return decision, e, ev
+
+        # 2b(汇合). stereo 绑定检测与锚点估计并行执行，这里等它完成。
+        # 检测线程只读 decoded raw / streams（与估计阶段传路径的进程池无共享
+        # 可变状态），失败语义与串行实现一致：检测异常 -> 无绑定组，主路径
+        # 照常继续（stereo_report 记录 error 供诊断）。
+        if _detect_thread is not None:
+            _detect_thread.join()
+            if _detect_error is not None:
+                log(f"channel-sync: stereo-bind detection failed: "
+                    f"{type(_detect_error).__name__}: {_detect_error}")
+                stereo_report = {"enabled": False,
+                                 "error": f"{type(_detect_error).__name__}"}
+            else:
+                bound_groups, stereo_report = _detect_holder.get(
+                    "result", ([], {"enabled": False}))
+            if stereo_report.get("candidates") or stereo_report.get("groups"):
+                ctx["stereo_groups"] = stereo_report
 
         # 主路径: 相对主锚点逐轨决策。这一段与"分组锚点"引入前逐字节相同。
         for i in healthy:

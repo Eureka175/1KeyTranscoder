@@ -1060,6 +1060,51 @@ def align_time_varying(
             continue
         units.append([i])
 
+    # 1a) 窗级连续性测量：各 unit 互相独立，可并行；锚点 coarse 缓存只算
+    #     一次并在各线程间共享（coarse_decimate 结果与单次调用逐位相同，
+    #     共享只省重复计算，不改变测量值）。measure 允许外部注入（测试/研究），
+    #     非默认实现时保持串行，避免改变其线程安全假设。
+    _default_measure = measure is sync_estimate.measure_window_delays
+    _anchor_coarse = None
+    measured: dict[int, Any] = {}
+    measured_err: dict[int, str] = {}
+    if units:
+        if _default_measure:
+            _anchor_coarse = sync_estimate.coarse_decimate(
+                decoded[anchor], sample_rate=sample_rate,
+                coarse_rate=int(prof["track_coarse_rate"]),
+                storage_dtype=storage_common)
+        _m_kwargs = dict(
+            sample_rate=sample_rate,
+            window_seconds=float(prof["track_window_seconds"]),
+            hop_seconds=float(prof["track_hop_seconds"]),
+            coarse_rate=int(prof["track_coarse_rate"]),
+            min_cc=float(prof["track_min_cc"]),
+            storage_dtype=storage_common,
+        )
+
+        def _measure_unit(mem: list[int]) -> dict[str, Any]:
+            kw = dict(_m_kwargs)
+            if _anchor_coarse is not None:
+                kw["ref_decimated"] = _anchor_coarse
+            return measure(decoded[anchor], decoded[mem[0]], **kw)
+
+        if len(units) > 1 and _default_measure:
+            with ThreadPoolExecutor(max_workers=min(4, len(units))) as ex:
+                futs = {ex.submit(_measure_unit, m): int(m[0]) for m in units}
+                for fut, rep in list(futs.items()):
+                    try:
+                        measured[rep] = fut.result()
+                    except Exception as exc:           # noqa: BLE001
+                        measured_err[rep] = f"{type(exc).__name__}: {exc}"
+        else:
+            for m in units:
+                try:
+                    measured[int(m[0])] = _measure_unit(m)
+                except Exception as exc:               # noqa: BLE001
+                    measured_err[int(m[0])] = f"{type(exc).__name__}: {exc}"
+        _anchor_coarse = None
+
     results: dict[str, Any] = {}
     final_raw: dict[int, Path] = {}
     flipped: list[int] = []
@@ -1070,23 +1115,14 @@ def align_time_varying(
         any_target = True
         tgt_dir = work_dir / f"target_{rep}"
         tgt_dir.mkdir(parents=True, exist_ok=True)
-        # 1) 窗级连续性测量（组代表 vs 锚点）
-        try:
-            windows = measure(
-                decoded[anchor], decoded[rep],
-                sample_rate=sample_rate,
-                window_seconds=float(prof["track_window_seconds"]),
-                hop_seconds=float(prof["track_hop_seconds"]),
-                coarse_rate=int(prof["track_coarse_rate"]),
-                min_cc=float(prof["track_min_cc"]),
-                storage_dtype=storage_common,
-            )
-        except Exception as exc:                       # noqa: BLE001
+        # 1) 窗级连续性测量（组代表 vs 锚点）—— 已在上面的并行阶段算好
+        if rep in measured_err:
             log(f"long-take: CH{rep + 1} window measurement failed: "
-                f"{type(exc).__name__}: {exc}")
+                f"{measured_err[rep]}")
             results[str(rep)] = {"ok": False, "reason": REASON_TRACK_FAILED,
-                                 "detail": f"{type(exc).__name__}: {exc}"}
+                                 "detail": measured_err[rep]}
             continue
+        windows = measured[rep]
         n_samples = _raw_length(decoded[rep], storages[rep])
         curve = build_curve_from_windows(
             windows.get("windows", []), n_samples=n_samples,
