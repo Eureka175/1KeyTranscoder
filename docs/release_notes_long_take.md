@@ -1,7 +1,8 @@
 # Release notes draft — 长镜头默认音频对齐（long-take default alignment）
 
-> **状态：实现完成、真实素材验收 PASS、待用户决定发布方式（VERSION / push /
-> release 平台）。** 本文件是草稿，未改变任何产品版本号。
+> **状态：已并入 v0.8.11 发布（2026-11-01，prerelease）。** 本文件保留为
+> 长镜头实现期的过程草稿；正式发布说明见
+> [`release_notes_v0.8.11.md`](release_notes_v0.8.11.md)。
 > 相关文档：`docs/design/long_take_default_alignment.md`（任务书）、
 > `docs/design/long_take_impl_checkpoint.md`（实施记录）、
 > `docs/design/long_take_acceptance_report.md`（最终验收）、

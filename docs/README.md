@@ -35,7 +35,7 @@ F:\1KeyTranscoder\
 ├── 1kt.py                  主入口（CLI + 编排；硬件批量逻辑在 core/batch_hw.py）
 ├── watchfolder.py          轮询批处理入口（转调 1kt.py）
 ├── start.bat               双击启动
-├── VERSION                 版本号唯一来源（0.8.8）
+├── VERSION                 版本号唯一来源（0.8.11）
 ├── LICENSE                 GNU LGPL v3 正文（本项目许可；GitHub 由它识别）
 ├── NOTICE                  项目版权 + SPDX: LGPL-3.0-or-later + 文本索引
 ├── licenses/GPL-3.0.txt    GNU GPL v3 全文（LGPL-3.0 并入引用；不放在
@@ -125,8 +125,9 @@ F:\1KeyTranscoder\
 
 | 文件 | 说明 |
 |---|---|
-| [`release_notes_v0.8.8.md`](release_notes_v0.8.8.md) | **v0.8.8 发布说明（当前版本）**：归档修复能力合入主程序（`1kt.py --repair`）、自主批处理（`--repair-dirs`/断点续跑/失败串行重试/总账）、成人品硬闸门（`validate.compare` + 视频载荷 streamhash + 大小）、最新稳定算法默认值（生产工作点 + 分组锚点）。含 669 文件全量实测（0 FAILED）与短时真实编码测试。✅ **已随 tag `v0.8.8`** |
-| [`release_notes_next.md`](release_notes_next.md) | **下一开发周期（尚未发布，未分配版本号）**：**硬件 Video Encode Backend（NVENC / QSV）接入 `--audio-plan`** —— 视频侧 `VideoHandoff` 单向接手契约、软硬件共用一个音频实现、视频基本流 sha256 与默认路径逐字节一致、`--hw-decode` 仍走硬件、Sony/DJI 逐文件明确拒绝、实测已知限制（nvenc-av1 编码器无法创建）。另含本次新增的用户文档 |
+| [`release_notes_v0.8.11.md`](release_notes_v0.8.11.md) | **v0.8.11 发布说明（当前版本 · Pre-release）**：默认长镜头音频对齐（reference round-3 `drift_rebuild` + `fine_delay`、stereo 组、极性、多声道 A6）+ **透明模式 50 GiB byte-level fast restore**（一次顺序读写、真实端到端 12.8 min、Sony checker 37/37、7 源矩阵 PASS）+ `--audio-plan` 权限最高与相关修复。✅ **已随 tag `v0.8.11`（prerelease）** |
+| [`release_notes_v0.8.8.md`](release_notes_v0.8.8.md) | **v0.8.8 发布说明（历史版本）**：归档修复能力合入主程序（`1kt.py --repair`）、自主批处理（`--repair-dirs`/断点续跑/失败串行重试/总账）、成人品硬闸门（`validate.compare` + 视频载荷 streamhash + 大小）、最新稳定算法默认值（生产工作点 + 分组锚点）。含 669 文件全量实测（0 FAILED）与短时真实编码测试。✅ **已随 tag `v0.8.8`** |
+| [`release_notes_next.md`](release_notes_next.md) | **历史设计文档（实现已随 v0.8.8 交付；v0.8.11 发布说明 §4 补录）**：**硬件 Video Encode Backend（NVENC / QSV）接入 `--audio-plan`** —— 视频侧 `VideoHandoff` 单向接手契约、软硬件共用一个音频实现、视频基本流 sha256 与默认路径逐字节一致、`--hw-decode` 仍走硬件、Sony/DJI 逐文件明确拒绝、实测已知限制（nvenc-av1 编码器无法创建）。另含本次新增的用户文档 |
 | [`audio_plan.md`](audio_plan.md) | **`--audio-plan` 用户指南（面向使用者）**：一分钟上手、默认行为、各后端支持表、计划文件结构、选择/排除/排序、编码继承与"什么时候不会重编码"、alignment（含压缩音频规则）、mapping（source / independent / grouped）、外挂音频命名与排序规则、硬件后端用法、可直接复制的常见组合、限制与排错。文档里每个 JSON 示例都由回归保证能被真实 schema 解析 |
 | [`release_notes_v0.7.1.md`](release_notes_v0.7.1.md) | **v0.7.1 发布说明（音频模型 Phase 1 + Phase 2 + Phase 3A/3B）**：`AudioStream`/`AudioChannel`/`AudioTrack`/`AudioPlan` 数据模型、`AudioSource`/Selection/Channel Mapping/`AudioMapSpec`、**`AudioTimeline`（时长·EOF·offset 唯一权威）/ `AudioPCMReader`（canonical float32）/ `AudioRouter` / `WavExporter` / `AudioMixer`（N→1 + gain + peak/clipping）/ `AudioOutputSpec`**、与 channel-sync 的只读连接、序列化 schema、新增测试矩阵、**默认音频路径 unchanged** 的证据与"未实现"清单。⚠️ **已随 tag `v0.7.1` 冻结**，不再改写 |
 | [`release_notes_v0.8.0.md`](release_notes_v0.8.0.md) | **v0.8.0 发布说明（历史版本）**：任意 reference 的音频延迟矫正、Phase 4A 选择性 MP4 音频保留、Phase 4B 音频编码 + 输出编排、Phase 4C 接入生产入口、**Phase 5 格式感知 alignment + 编码继承 + 外挂音频发现与 mapping**。含实测证据（compressed 显式 alignment 的真实 offset 与互相关残差、4/6/8CH × mapping 矩阵、视频基本流 sha256 不变）、新增 reason code 契约与"未实现"清单。✅ **已随 tag `v0.8.0` 冻结**（发布前名为 `release_notes_next.md`） |

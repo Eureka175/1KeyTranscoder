@@ -8,7 +8,7 @@
 > metadata preservation, a structured PCM audio pipeline, channel-delay repair, and an
 > archive-repair mode that can verify and fix already-produced deliverables.
 
-[![Version](https://img.shields.io/badge/version-0.8.8-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.8.11-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -16,7 +16,7 @@
 ## Contents
 
 - [Overview](#overview)
-- [What's new in 0.8.8](#whats-new-in-088)
+- [What's new in 0.8.11](#whats-new-in-0811-pre-release)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick start](#quick-start)
@@ -63,25 +63,42 @@ On top of that the project ships:
 Target use case: a single workstation turning multi-hour Sony / DJI shoots into archive
 copies that keep the motion and lens metadata tools such as Gyroflow and NLEs need.
 
-## What's new in 0.8.8
+## What's new in 0.8.11 (pre-release)
 
-- **Archive repair is now part of the main program**: `1kt.py --repair ...` runs a whole
-  batch (directory filter, resume file, serial retry of failures, machine-readable
-  summary) and is ready to be called by batch scripts. The standalone
-  `archive_repair.py check|repair` CLI remains available.
-- **Repair uses the latest stable algorithms by default**: the production work point
-  (`production_opts()`) plus grouped anchors, residual-audio rounds, and the container
-  fixes introduced in 0.8.7; precision mode stays opt-in and is enabled automatically
-  for retries.
-- **Hard integrity gates for repaired deliverables**: a repair is only accepted when the
-  independent `validate.compare` reports no MODIFIED/MISSING, the video packet streamhash
-  equals the source, and (container-only path) the output size equals the source.
-  Failing files are retried serially and reported as `FAILED` if still unresolved — never
-  silently delivered.
-- The 0.8.7 line already added the channel-sync production defaults (grouped anchors in
-  `start.bat`), the 2CH-silent skip policy, and the DJI default metadata policy.
+- **Long-take audio alignment is now part of the default path** for 3–8 channel
+  PCM sources (no new CLI switch). When the constant-delay path is rejected,
+  the whole file falls back to a time-varying pass that implements the research
+  round-3 algorithm exactly: `drift_rebuild` pass-1 (2-min weighted-median
+  anchors -> 7-anchor median filter -> 30-sample/anchor clamp) + `fine_delay`
+  residual (60 s windows, 5-min sliding median, fractional 10k-grid apply).
+  Stereo groups are bound with rigid-confirmation gates and keep their
+  intra-group offset; polarity is detected and flipped per group; multichannel
+  layouts (stereo/quad/5.1/7.1 in one stream) are handled per channel without
+  downmixing. Failures fall back safely to the unaligned original audio.
+- **Acceptance on two real 80-minute takes is PASS**: curve layer
+  median/p90/max = **0/0/0 samples** against an independently re-run reference
+  pipeline; audio layer vs the K deliverables = **0/0/0 on CH1/CH3/CH4**
+  (CH2 differs by the intentional 4-sample stereo-group decision).
+- **Transparent mode can now produce 50 GiB containers.** The old Sony restore
+  rewrote the whole file for every metadata step (measured: `-ref` alone
+  17 min for <1 GiB). The new `preservation/fast_restore.py` rebuilds the
+  container in one sequential read/write pass (no GPAC rewrite): real 50 GiB
+  C1305 stage mux 258.7 s, restore **99.1 s**, end-to-end transparent command
+  **12.8 min** with the Sony checker reporting 37/37 items preserved and 20/20
+  independent payload/structure checks PASS.
+- **`--audio-plan` has highest priority**: a plan always wins over automatic
+  channel-sync; transparent mode yields to it with an INFO line instead of
+  refusing both flags.
+- Fixes: multichannel decoder file-handle race (CH3/CH4 could decode as all
+  zeros), `ref_of` on bound groups with a fixed representative, empty
+  `fixed_files` for mono-multistream layouts, 16-bit `ipcm` sample-entry false
+  positive that downgraded transparent remux to a byte copy, and GPAC temp
+  files now live on the media volume (the 50 GiB remux previously hit ENOSPC
+  on C:).
 
-See [v0.8.8 release notes](docs/release_notes_v0.8.8.md).
+See [v0.8.11 release notes](docs/release_notes_v0.8.11.md). The previous
+release (v0.8.8) added archive repair to the main program; its notes are
+[here](docs/release_notes_v0.8.8.md).
 
 ## Requirements
 
@@ -124,9 +141,9 @@ python release\verify_package.py dist\1KeyTranscoder-v<version>-win64-selfcontai
     --extract-dir "%TEMP%\1KT-clean"
 ```
 
-GitHub releases with downloadable packages exist up to **v0.8.0**; no self-contained
-package is published for 0.8.1–0.8.8. Build one from the current source with the command
-above.
+The v0.8.11 **pre-release** is published with a self-contained package (attached to
+the GitHub release). Earlier 0.8.1–0.8.8 did not ship a package; build one from the
+source with the command above.
 
 ### From source
 
@@ -447,6 +464,8 @@ Local-only, untracked directories: `tools/` (shared toolchain), `testsets/` (tes
   final report, patches, provenance.
 - [x265 profile design](docs/x265-profile-design.md) — why the four profiles exist and how
   they were calibrated.
+- [v0.8.11 release notes](docs/release_notes_v0.8.11.md) — default long-take audio
+  alignment (reference round-3), 50 GiB transparent-mode fast restore.
 - [v0.8.8 release notes](docs/release_notes_v0.8.8.md) — archive repair in the main
   program, autonomous batches, integrity gates.
 - [v0.8.0 release notes](docs/release_notes_v0.8.0.md) — audio plan, format-aware
@@ -454,23 +473,25 @@ Local-only, untracked directories: `tools/` (shared toolchain), `testsets/` (tes
 
 ## Release
 
-Current source version: **0.8.8** (`VERSION`, tag `v0.8.8`).
+Current source version: **0.8.11** (`VERSION`, tag `v0.8.11`, published as a
+GitHub **pre-release**).
 
 - Self-contained packages are produced by `release/build_release.py`; see
   [Installation](#installation).
-- The most recent published GitHub package is
-  [v0.8.0](https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.8.0); all releases:
-  <https://github.com/Eureka175/1KeyTranscoder/releases>.
-- `VERSION`, the git tag and the builder must agree: the builder refuses mismatches unless
-  a development build is explicitly requested.
+- The v0.8.11 pre-release package is attached to
+  <https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.8.11>.
+- `VERSION`, the git tag and the builder must agree: the builder refuses
+  mismatches unless a development build is explicitly requested.
 
 ## Limitations
 
 - **Platform**: Windows 10/11 x64 only.
-- **Channel sync**: constant integer sample offsets only; at least three independent mono
-  PCM tracks at 48/96 kHz; 2CH/1CH and compressed formats are not aligned. Drift correction
-  and resampling are not part of the production path; `--channel-sync-tv` is opt-in
-  research and requires explicit policy/coordinate decisions.
+- **Channel sync**: 3–8 channel PCM sources are aligned automatically; 2CH/1CH and
+  compressed formats are not aligned, and more than 8 channels require
+  `--channel-sync alignment=enabled`. Constant offsets use the fixed path; otherwise the
+  whole file falls back to time-varying alignment (reference round-3 algorithm) or, on
+  failure, to the unaligned original audio. Resampling and loudness are not part of the
+  pipeline.
 - **Audio plan**: `--audio-plan` cannot be combined with `--channel-sync`; Sony/DJI
   preservation rejects a plan per file instead of ignoring it. External audio must be named
   after the clip.
