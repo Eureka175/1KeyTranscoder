@@ -118,6 +118,12 @@ PROFILE: dict[str, Any] = {
     # 取 0.25 保留"有证据就施加"，同时仍能过滤纯噪声。
     "residual_min_median_samples": 0.25,
     "max_rounds": 2,
+    # 性能/内存权衡（2026-11-01）: 各 target 的窗级测量默认并行（速度优先,
+    # 峰值 RSS 约 +470 MB）；内存受限环境可在 profile 里置 False，改为顺序
+    # 测量（峰值回落约 0.8 GB，wall +~45 s）。不是 CLI 开关。
+    "measure_parallel_units": True,
+    # 各 target 的下游流水线（施加/残差/极性）默认并行；同上可关。
+    "pipeline_parallel_units": True,
     # 极性（E）: 60 s 窗 / 30 s 跳, 零延迟 ±16 采样带符号峰
     "polarity_window_seconds": 60.0,
     "polarity_hop_seconds": 30.0,
@@ -439,6 +445,58 @@ def render_fractional_pass1(
             out[invalid] = 0.0
             fh.write(out.astype(np.float32).tobytes())
     return Path(dst_raw)
+
+
+def reference_interp_write_inplace(
+    path_raw: Path,
+    curve: Mapping[str, Any],
+    *,
+    sample_rate: int,
+    storage_dtype: str = "f32",
+    profile: Mapping[str, Any] | None = None,
+    grid_step: int = 10_000,
+    chunk_samples: int = 5_000_000,
+) -> dict[str, Any]:
+    """`reference_interp_write` 的**同文件**版本（磁盘写入最小化）。
+
+    数学与 `reference_interp_write` 逐位一致：每个 chunk 只读自己的
+    ``[s0, s1)`` 输入，`np.interp(pos, arange(s0,s1), vals)` 的块边界
+    clamp 语义保持不变（这正是研究实现的口径）。因为输出只依赖于**同一
+    chunk 的原始输入**，读完该块后可以立即写回同位置，不需要额外临时文件。
+    仅支持 f32（参考实现的输出精度即 float32；f64 路径保持原实现）。
+    """
+    if storage_dtype != "f32":
+        return {"executed": False, "reason": "inplace_requires_f32"}
+    prof = dict(PROFILE if profile is None else profile)
+    n = _raw_length(Path(path_raw), "f32")
+    if n <= 0:
+        return {"executed": False, "reason": "empty_source"}
+    grid_t = np.asarray(curve["grid_t"], dtype=np.float64)
+    grid_s = np.asarray(curve["grid_s"], dtype=np.float64)
+    grid = np.arange(0, n, int(grid_step), dtype=np.float64)
+    shift = np.interp(grid, grid_t, grid_s)
+    chunk = max(1, int(chunk_samples))
+    dtype = np.dtype("<f4")
+    with Path(path_raw).open("r+b") as fh:
+        for s0 in range(0, n, chunk):
+            s1 = min(n, s0 + chunk)
+            idx = np.arange(s0, s1, dtype=np.float64)
+            fh.seek(s0 * dtype.itemsize)
+            raw = fh.read((s1 - s0) * dtype.itemsize)
+            if len(raw) != (s1 - s0) * dtype.itemsize:
+                raise RuntimeError(
+                    f"short read in in-place apply at {path_raw}:{s0}")
+            vals = np.frombuffer(raw, dtype=dtype).astype(np.float64)
+            pos = idx + np.interp(idx, grid, shift)
+            invalid = (pos < 0.0) | (pos > n - 1.0)
+            np.clip(pos, 0.0, n - 1.0, out=pos)
+            block = np.interp(pos, np.arange(s0, s1, dtype=np.float64), vals)
+            block[invalid] = 0.0
+            fh.seek(s0 * dtype.itemsize)
+            fh.write(block.astype(np.float32).tobytes())
+    return {"executed": True, "engine": "reference_interp_inplace",
+            "grid_step": int(grid_step), "n_samples": n,
+            "output": str(path_raw)}
 
 
 def reference_interp_write(
@@ -944,6 +1002,26 @@ def _invert_raw(src: Path, dst: Path, *, storage_dtype: str,
     return written
 
 
+def _invert_raw_inplace(path: Path, *, storage_dtype: str,
+                        chunk_samples: int = 4_800_000) -> int:
+    """同文件极性翻转（逐块读-取反-写回，不产生新中间文件）。"""
+    item = 4 if storage_dtype == "f32" else 8
+    dtype = np.dtype("<f4") if item == 4 else np.dtype("<f8")
+    written = 0
+    pos = 0
+    with open(path, "r+b") as fh:
+        while True:
+            raw = fh.read(chunk_samples * item)
+            if not raw:
+                break
+            block = -np.frombuffer(raw, dtype=dtype)
+            fh.seek(pos)
+            fh.write(block.tobytes())
+            pos += len(raw)
+            written += block.size
+    return written
+
+
 def _convert_storage(src: Path, src_dtype: str, dst_dtype: str, dst: Path,
                      chunk_samples: int = 4_800_000) -> int:
     """raw PCM 精度转换（仅当同一文件内各声道解码精度不一致时使用）。"""
@@ -1089,7 +1167,8 @@ def align_time_varying(
                 kw["ref_decimated"] = _anchor_coarse
             return measure(decoded[anchor], decoded[mem[0]], **kw)
 
-        if len(units) > 1 and _default_measure:
+        if (len(units) > 1 and _default_measure
+                and bool(prof.get("measure_parallel_units", True))):
             with ThreadPoolExecutor(max_workers=min(4, len(units))) as ex:
                 futs = {ex.submit(_measure_unit, m): int(m[0]) for m in units}
                 for fut, rep in list(futs.items()):
@@ -1161,11 +1240,31 @@ def align_time_varying(
         # 报告里标 engine=builtin）。
         rounds = 0
         applied: dict[int, Path] = {}
+        inplace_round1: set[int] = set()
         apply_engine = str(prof.get("tv_apply_engine", "reference"))
         for m in members:
             dst = tgt_dir / f"round1_{m}.{storages[m]}"
             stats: dict[str, Any]
-            if apply_engine == "reference":
+            if apply_engine == "reference" and storages[m] == "f32":
+                # 磁盘写入最小化: round-1 直接改写 decoded[m] 本身（f32 时
+                # 输出与输入同尺寸；参考插值的每个 chunk 只依赖自己的输入，
+                # 可安全原地写回）。失败会留下半改写文件 -> 该 target 失败，
+                # 由 channel_sync 回退未对齐原音，不交半成品。
+                try:
+                    stats = reference_interp_write_inplace(
+                        decoded[m], curve, sample_rate=sample_rate,
+                        storage_dtype=storages[m], profile=prof)
+                except Exception as exc:               # noqa: BLE001
+                    log(f"long-take: CH{m + 1} in-place round-1 apply "
+                        f"failed ({type(exc).__name__}: {exc})")
+                    return _done({
+                        "ok": False, "reason": REASON_APPLY_REFUSED,
+                        "detail": f"in-place round-1: {type(exc).__name__}: "
+                                  f"{exc}"})
+                if stats.get("executed"):
+                    inplace_round1.add(int(m))
+                    applied[m] = decoded[m]
+            elif apply_engine == "reference":
                 try:
                     stats = reference_interp_write(
                         decoded[m], dst, curve, sample_rate=sample_rate,
@@ -1184,7 +1283,8 @@ def align_time_varying(
                 log(f"long-take: CH{m + 1} round-1 apply refused: "
                     f"{stats.get('reason')} {stats.get('detail')}")
                 break
-            applied[m] = dst
+            if int(m) not in inplace_round1:
+                applied[m] = dst
         if len(applied) != len(members):
             return _done({"ok": False, "reason": REASON_APPLY_REFUSED,
                           "apply": stats})
@@ -1208,7 +1308,28 @@ def align_time_varying(
                     settled = {}
                     for m in members:
                         dst = tgt_dir / f"round2_{m}.{storages[m]}"
-                        if apply_engine == "reference":
+                        stats2: dict[str, Any]
+                        if apply_engine == "reference" and storages[m] == "f32":
+                            # 同文件 round-2（磁盘写入最小化）。若 round-1 也是
+                            # 原地改写 decoded，失败后 decoded 不再是原始音频，
+                            # 不能用内置执行器"总曲线"回退（会二次施加），
+                            # 因此直接让该 target 失败、回退未对齐原音。
+                            try:
+                                stats2 = reference_interp_write_inplace(
+                                    applied[m], res, sample_rate=sample_rate,
+                                    storage_dtype=storages[m], profile=prof)
+                            except Exception as exc:   # noqa: BLE001
+                                log(f"long-take: CH{m + 1} in-place round-2 "
+                                    f"failed ({type(exc).__name__}: {exc})")
+                                if int(m) in inplace_round1:
+                                    return _done({
+                                        "ok": False,
+                                        "reason": REASON_APPLY_REFUSED,
+                                        "detail": "in-place round-2: "
+                                                  f"{type(exc).__name__}: {exc}"})
+                                stats2 = {"executed": False,
+                                          "reason": "inplace_round2_failed"}
+                        elif apply_engine == "reference":
                             try:
                                 stats2 = reference_interp_write(
                                     applied[m], dst, res,
@@ -1228,7 +1349,10 @@ def align_time_varying(
                                 sample_rate=sample_rate,
                                 storage_dtype=storages[m], profile=prof)
                         if stats2.get("executed"):
-                            settled[m] = dst
+                            settled[m] = (
+                                applied[m] if storages[m] == "f32"
+                                and apply_engine == "reference"
+                                else dst)
                     if len(settled) == len(members):
                         applied = settled
                         curve = total
@@ -1246,15 +1370,22 @@ def align_time_varying(
                 log(f"long-take: CH{rep + 1} residual skipped "
                     f"({res.get('reason')})")
 
-        # 4) 极性（代表 vs 锚点，组级一起翻）
+        # 4) 极性（代表 vs 锚点，组级一起翻）—— 同文件取反，不落新中间文件
         pol = detect_polarity(
             decoded[anchor], applied[rep], sample_rate=sample_rate,
             storage_dtype=storages[rep], profile=prof)
         if pol.get("flip"):
             for m in members:
-                inv = tgt_dir / f"polarity_{m}.{storages[m]}"
-                _invert_raw(applied[m], inv, storage_dtype=storages[m])
-                applied[m] = inv
+                try:
+                    _invert_raw_inplace(applied[m],
+                                        storage_dtype=storages[m])
+                except Exception as exc:               # noqa: BLE001
+                    log(f"long-take: CH{m + 1} in-place polarity failed "
+                        f"({type(exc).__name__}: {exc})")
+                    return _done({
+                        "ok": False, "reason": REASON_APPLY_REFUSED,
+                        "detail": f"in-place polarity: "
+                                  f"{type(exc).__name__}: {exc}"})
                 out["flipped"].append(int(m))
             log(f"long-take: group CH{[m + 1 for m in members]} polarity "
                 f"flipped (votes {pol['votes']}, neg "
@@ -1282,7 +1413,7 @@ def align_time_varying(
 
     # 各 unit 的下游流水线互相独立 → 并行；合并顺序固定为 units 顺序，
     # 因此 results / flipped / 报告字段与串行实现一致（timings 值不同）。
-    if len(units) > 1:
+    if len(units) > 1 and bool(prof.get("pipeline_parallel_units", True)):
         with ThreadPoolExecutor(max_workers=min(4, len(units))) as ex:
             unit_outs = list(ex.map(_process_unit, units))
     else:

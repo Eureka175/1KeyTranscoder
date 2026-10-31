@@ -835,6 +835,29 @@ def _track_health(arr: Any, np: Any) -> tuple[bool, float]:
     return True, 10.0 * math.log10(ssq / n)
 
 
+def _trim_working_set() -> None:
+    """Windows best-effort: release FREE pages from the process working set.
+
+    The stereo-bind phase and the long-take phase each hold large (231 MB)
+    coarse-decimation arrays, and Windows Python does not return freed numpy
+    blocks to the OS promptly; without a trim the RSS peak carries the
+    detect-phase pages into the long-take phase (measured +~460 MB).  This only
+    trims pages that are already free, so it cannot evict live data.
+    """
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        psapi = ctypes.WinDLL("psapi", use_last_error=True)
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        psapi.EmptyWorkingSet.argtypes = [wintypes.HANDLE]
+        psapi.EmptyWorkingSet.restype = wintypes.BOOL
+        psapi.EmptyWorkingSet(kernel32.GetCurrentProcess())
+    except Exception:                                  # noqa: BLE001
+        pass
+
+
 def _close_map(arr: Any) -> None:
     """关闭流句柄 (Windows 上删除文件前必须先关)。
 
@@ -2672,6 +2695,12 @@ def run_channel_sync(
                     "result", ([], {"enabled": False}))
             if stereo_report.get("candidates") or stereo_report.get("groups"):
                 ctx["stereo_groups"] = stereo_report
+            # 检测阶段的大 coarse 缓存已经释放；把空页还给 OS，避免它和
+            # 随后的 long-take 测量缓存叠加成 RSS 峰值。
+            import gc as _gc
+
+            _gc.collect()
+            _trim_working_set()
 
         # 主路径: 相对主锚点逐轨决策。这一段与"分组锚点"引入前逐字节相同。
         for i in healthy:
@@ -3493,6 +3522,9 @@ def run_channel_sync(
         for i in range(n_tracks):
             if stream_channels[i] > 1 and i not in fixed_ok:
                 continue                    # 交织时还要读原始声道
+            if i in fixed_ok and fixed_raw[i] == decoded[i]:
+                # 原地长镜头施加: decoded_* 已经就是 fixed 音频, 不能在这里删。
+                continue
             try:
                 decoded[i].unlink()
             except OSError:

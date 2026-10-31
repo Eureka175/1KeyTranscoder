@@ -1185,7 +1185,11 @@ def boundary_pileup(frames: list[FrameDelay], search_samples: float) -> float:
 # decimate(ftype="fir", zero_phase=True) 的 FIR 半长为 10*q 输入样本
 # (q <= 12 时为 120 采样), 32 个 coarse 样本的余量大于它, 因此分块结果与
 # "整文件一次 decimate" 数值一致 (单测钉住; 余量内的暂态全部丢弃)。
-_COARSE_CHUNK_SECONDS = 100.0
+# 2026-11-01 perf: 100 s -> 25 s chunks. coarse_decimate 的分块边界在两侧
+# 多读 margin 后丢弃，因此结果与整文件一次 decimate 逐位一致（单测钉住）；
+# 更小的 chunk 只减少每线程的 transient f64 缓冲（~38 MB -> ~10 MB），
+# 在 2 个 target 并行测量时直接降低峰值 RSS。
+_COARSE_CHUNK_SECONDS = 25.0
 _COARSE_MARGIN = 32
 # 首窗全搜索后的全速率精化半径 (研究口径 ±12, 比窗内连续性精化 ±8 略宽):
 # 12 kHz 粗峰量化误差最大 q 个全速率样本, 首窗没有连续性约束兜底。

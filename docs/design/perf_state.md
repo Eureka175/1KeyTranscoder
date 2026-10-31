@@ -97,16 +97,45 @@ C1306 基线（timing 模式，`K:\1kt_work\perf\ws1\c1306_timing.json`）：
 4 个 round1/round2 raw 的 sha256 + report 语义）→ **PARITY OK（逐位一致）**；
 unit **1020 PASS / 2 FAIL**（仅环境项）。
 
-### WS2b — 第二轮（2026-11-01，完成）
+### WS3 — 音频磁盘写入/中间文件（2026-11-01，完成第一轮）
 
-- 每个 target 的**下游流水线**（曲线→round1→残差→round2→极性）拆成嵌套函数，
-  按 unit 线程并行；合并顺序固定为 units 顺序（报告字段/翻转列表与串行一致，
-  仅 timings 值不同）。C1306 wall **253.9 → 234.7 s**（vs baseline 296.3，
-  **-20.8%**）；long-take 125.1 → 100.6 s。parity_check 仍 **PARITY OK**。
-- 残差测量：60 s 窗重叠 resample_poly 目前每窗重复重采样；评估整文件预抽取
+改动（`core/long_take.py`）：
+- **round-1 原地施加**：f32 参考插值直接改写 `decoded_*.f32` 本身。
+- **round-2 原地施加**：`reference_interp_write_inplace` 逐块读被 round-1
+  改写后的同一文件、算完立即写回（研究实现的块边界 clamp 语义不变）。
+- **极性原地翻转**：`_invert_raw_inplace` 逐块取反写回。
+- `channel_sync` finalize 识别 `fixed_raw[i] == decoded[i]` 的原地情形，
+  不会提前删除正在作为成品的 decoded 文件。
+
+实测（C1306，一条 target 的中间文件）：
+| 项 | 旧 | 新 |
+|---|---|---|
+| work 目录中间 raw | `round1_*` + `round2_*` + `polarity_*`（每 target ~2.3 GB） | **无**（只有 final `audio_*.mov` + report） |
+| 音频侧写盘（C1306 估算） | decoded 3.7 GB + round 文件 4.6 GB + MOV 2.3 GB ≈ **10.6 GB** | decoded 3.7 GB + MOV 2.3 GB ≈ **6.0 GB（-43%）** |
+| 正确性 | — | parity_check：4 条 final MOV 与 baseline sha256 完全一致；report 语义一致 |
+
+**注意（内存）**：并行化后实测 **RSS 峰值主进程 1232–1278 MB / 进程树
+2303–2331 MB**（旧串行基线 775 / 1470 MB）。逐阶段映射（run6/7/8 日志）：
+估算阶段 12 个子进程把 tree 推到 ~2.3 GB；long-take 并行窗测量在 124–181 s
+之间让主进程达到 ~1.2 GB（anchor + 2×target coarse 缓存 ~693 MB + 每线程
+FFT 缓冲 ~120 MB + 基础 ~200 MB）。已做的缓解：
+- `_COARSE_CHUNK_SECONDS` 100 s → 25 s（transient f64 缓冲 -28 MB/线程，结果逐位不变，
+  parity_check 证实）；
+- stereo 检测结束后 `gc.collect()` + Windows `EmptyWorkingSet` 归还空页
+  （峰值 1261 → 1232 MB，作用有限——峰值在测量阶段本身）；
+- PROFILE 新增 `measure_parallel_units` / `pipeline_parallel_units` 两个
+  非 CLI 开关：内存受限时置 False 可退回顺序测量（峰值约 0.8 GB，wall +~45 s）。
+下一步若要硬压到 ≤0.8 GB 默认：把窗测量改为**串行 + 窗级批处理**（同一
+target 内预取 batch 的 CC 面，内存可控）或使用 mmap 的 coarse 缓存，
+属较大改动。
+
+### WS3b — 待做
+
+- 残差测量：60 s 窗重叠 resample_poly 每窗重复重采样；评估整文件预抽取
   （需先证明与逐窗口径逐位一致）→ 预计残差 34 s → ~15 s。
-- 解码/健康扫描/估计阶段的内存与 CPU 再平衡；RSS 当前量级待测。
-- CUDA：先评估能否在**不改结果**的前提下用于 coarse 抽取/FFT；FP64 避免。
+- 估计阶段（18 次 pair，~65 s）的重复读取/滤波缓存；`换参考` 的 6 次
+  几何阶梯目前顺序执行。
+- 窗测量串行 + 批处理版本（兼顾 ≤0.8 GB 与 wall）。
 
 ### WS2 补充：磁盘写入/中间文件与内存（新要求，规划）
 
