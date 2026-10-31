@@ -94,16 +94,17 @@ parity 报告 `K:\1kt_work\perf\ws1\baseline_*_manifest.json`。
 | Sony checker | PRESERVED=37 | PRESERVED=37 / MODIFIED=0 / MISSING=0 | 不变 |
 | payload | 通过 | rtmd 全量 streamhash = 源；视频 10 s hash 一致；4 音频解码与生产 raw diff=0 | 不变 |
 
-6 源 hook 矩阵（XAVC clips + isom hard cases）全部 PASS；isom 源按适用性检查
-自动回退 copy fast restore（不重复 mux）；推广后的 brand 推导可让 24 B ftyp
-的 isom 源也走 in-place（已实现，待重跑矩阵确认）。
+6 源 hook 矩阵（XAVC clips + isom hard cases）全部 PASS；XAVC 与 isom
+源现在都走 **in-place**（isom 24 B ftyp 通过 `-brand isom -ab iso2` 匹配尺寸，
+`_fast_brand_args` 按源 ftyp 尺寸通用推导）；in-place 不适用时仍自动回退
+copy fast restore（同一个 GPAC 产物作 stage，不重复 mux）。
 
 ## 4. 回归
 
 | 套件 | 结果 |
 |---|---|
 | unit | **1020 PASS / 2 FAIL**（真实 Sony 语料缺失环境项） |
-| 全量 L3 | 待填（本轮） |
+| 全量 L3 | **环境阻塞**（3 次尝试均在本机硬件探测子进程上挂起：NVENC/QSV `run_tool` 的 `communicate` 不返回；同样的 1kt 命令单独重跑 21 s/33 s 正常通过。此前 v0.8.11 基线全量 L3 为 **1261 PASS / 12 FAIL**，12 条均为缺真实媒体环境项；本轮改动已由 unit + C1305/C1306 parity + 透明 50 GiB + 6 源矩阵覆盖，L3 硬件探测挂起与本轮改动无栈级关联） |
 | C1305/C1306 音频 parity | **PARITY OK**（final MOV sha256 与旧基线完全一致） |
 | 透明小样本 | in-place / copy / 标准三条路径 payload 全一致；结构校验通过 |
 | 透明 50 GiB | 结构/rtmd/音频/签名全 PASS；Sony checker 37/37 |

@@ -206,10 +206,18 @@ in-place 与 copy 结构校验均通过；标准路径仍有已知 in24/meta 重
   on the already-muxed file**（不重复 mux），同样全部 PASS。
 - 说明 in-place 的适用性检查与回退链在真实布局上工作正常。
 
-### WS6 — 长测试回归（待做）
+### WS6 — 长测试回归（环境阻塞）
 
-全量 L3（`tests/full_autotest.py`）在新代码上重跑；C1305/C1306 的
-`final_accept_v2` 级验收留到所有改动稳定后集中跑一次。
+全量 L3 尝试 3 次：两次卡在 `hardware_audio` 的 nvenc 用例、一次卡在
+`p4c_production` 的 qsv 用例；py-spy 显示父测试等待 `run_tool`/
+`_device_identity` 的 subprocess `communicate`，对应 native 编码器探测进程
+不退出（遗留 QSVEncC64 孤儿进程持有管道）。**同样的 1kt 命令单独重跑分别
+21 s / 33 s 正常完成**，说明不是本轮代码逻辑；属于本机硬件探测/子进程管道
+环境问题（此前 v0.8.11 基线全量 L3 为 1261 PASS / 12 FAIL，12 条均为缺
+真实媒体环境项）。
+已覆盖：unit 1020/2（环境项）、C1305/C1306 audio parity（final MOV sha256
+完全一致）、透明 50 GiB E2E、6 源 hook 矩阵、in-place/copy/标准三路小样本。
+`final_accept_v2` 级长验收留到环境恢复后集中跑一次。
 
 ## 下一步
 
