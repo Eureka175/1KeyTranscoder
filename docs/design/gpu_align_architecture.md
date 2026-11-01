@@ -54,9 +54,9 @@ core/gpu_align/
 
 | 模式 | 计算 dtype | 报告 dtype | 用途 | 验收 |
 |---|---|---|---|---|
-| `exact` | FP64 | FP64 | 默认/验收 | 与 CPU 结果逐位或按既有 round 合同一致 |
-| `fast` | FP32 全链 | FP32→报告字段 CPU round | 性能优先、允许报告尾部差异 | delay 必须一致；confidence/cc 在容差内；最终 MOV 必须一致 |
-| `hybrid`（推荐默认候选） | FP32 搜峰 + FP64 复核候选/边界 | FP64 | 兼顾速度与报告 | 报告逐位一致；仅对候选/临界值做 FP64 |
+| `fast`（**推荐**，`KTS_GPU_ALIGN=1/fast`） | FP32 粗相关 | FP32 结果 → 既有 round | 性能优先 | 用户决策：**不要求与 FP64 同精度，不差太多即可**；实测 delay/valid/polarity 全同，仅 cc/confidence 差 ≤1e-6 |
+| `exact`（`KTS_GPU_ALIGN=exact/fp64`） | FP64 | FP64 | 验收/对照 | 与 CPU 结果逐位或按既有 round 合同一致 |
+| `hybrid` | FP32 搜峰 + FP64 复核 | FP64 | 预留 | 本轮未证明优于 fast，暂不推荐 |
 
 **hybrid 规则（草案）**：
 
@@ -89,7 +89,7 @@ core/gpu_align/
 - 生产调用点只需 `if session and session.available: ... else CPU`；
   任何不一致都回退 CPU（opt-in 路径）。
 - 环境开关（只读，不改 CLI）：
-  - `KTS_GPU_ALIGN=0|exact|fast|hybrid`（默认 0）；
+  - `KTS_GPU_ALIGN=0|1|fast|exact`（默认 0；1/fast = FP32 推荐路径）；
   - `KTS_GPU_ALIGN_DTYPE=fp64|fp32`（兼容旧实验）；
   - `KTS_GPU_ALIGN_BUDGET_MB`（默认 2048）。
 

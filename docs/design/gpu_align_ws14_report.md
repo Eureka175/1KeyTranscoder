@@ -75,3 +75,68 @@ python work/perf/ws14/bench_gpu_align.py --seconds 300 --frames 64 \
 3. opt-in 集成窗级路径，跑 C1306 片段与端到端短测；
 4. 若 FP32 hybrid 无法保持报告逐位一致，则只保留 exact FP64 + fast 实验；
 5. 每个节点更新本报告/架构文档并 push。
+---
+
+## 5. M2/M3 里程碑结果（2026-11-01 17:15）
+
+### 5.1 统一架构落地
+
+新增 `core/gpu_align/`：
+
+- `backend.py`：CuPy/CUDA 探测、ASCII 路径、VRAM 预算、OOM/回退；
+- `precision.py`：`fast`（FP32，推荐）/`exact`（FP64）/`hybrid`（预留）；
+- `window_cc.py`：**批量窗级 coarse CC** + `surface_windows()` 一次算全窗口
+  相关面，CPU 只做连续性峰值选择；
+- `frame_gcc.py`：批量 GCC-PHAT surface（CPU 峰逻辑保持）；
+- `refine.py`：GPU 整数 lag 精化（单窗，实测不划算，保留为对照）；
+- `residual_cc.py`：残差 coarse 引擎；
+- `session.py`：生命周期/预算/统计；
+- `parity.py`：CPU vs GPU 窗口/表面 parity 合同；
+- 单元测试 `tests/selftest/suites/gpu_align.py`（无 GPU 也可跑）。
+
+### 5.2 真实 C1306 长镜头单对（60 s 窗 / 10 s hop，411 窗）
+
+| 模式 | wall | 相对 CPU | 窗口记录差异 |
+|---|---:|---:|---|
+| CPU 参考 | **36.7 s** | 1.00× | — |
+| GPU `exact`（FP64） | **14.3 s** | **2.57×** | 411/411 **完全一致** |
+| GPU `fast`（FP32，第一次调用，含 JIT/prefetch） | **11.3 s** | **3.29×** | — |
+| GPU `fast`（同进程第二次，稳态） | **3.23 s** | **11.6×** | delay/valid/polarity **全同**；`coarse_cc`/`confidence` 最大差 **1.0e-6** |
+
+`KTS_GPU_ALIGN=fast` 差异汇总（411 窗）：
+
+- delay 数值差：0 窗；max |Δdelay| = 0.0
+- valid 差异：0；polarity 差异：0
+- `coarse_cc` max |Δ| = 1.0e-6；`confidence` max |Δ| = 1.0e-6
+- initial lag 一致（-1），initial cc 差 0
+
+用户决策：**不要求 FP64 同精度，不差太多即可**。因此 `KTS_GPU_ALIGN=1`
+默认走 fast；`exact` 仅用于对照/验收。
+
+### 5.3 帧级 GCC-PHAT surface
+
+64 帧 coarse batch（200 ms 帧 / 100 ms hop / ±80 ms）：
+
+| 实现 | surface wall | 相对 CPU |
+|---|---:|---:|
+| CPU `gcc_phat_int` 循环 | 24.0 ms | 1.00× |
+| GPU FP64 batch | 7.7 ms | **3.12×** |
+| GPU FP32 batch | 6.7 ms | **3.57×** |
+
+argmax 64/64 相同；但 CPU 峰/置信度逻辑仍占大头，帧级**整条路径**尚未
+证明有收益，暂不接入生产。
+
+### 5.4 精化步骤
+
+`_refine_window_peak`（2 s 段、±8 整数点积）在 Windows 上 CPU 约 0.09 s
+/25 窗；GPU 单窗调用 0.18 s，**更慢**（kernel 启动/host 读主导）。因此
+exact 路径的 2.57× 被精化限制；当前不做 GPU 精化，后续可评估批量
+两遍法（coarse 全窗 → 批量精化 → 连续性复核）。
+
+### 5.5 结论（M2/M3）
+
+- 窗级粗相关架构可行：FP64 exact 2.57×、FP32 fast 稳态可达 11.6×；
+- fast 仅报告尾部差 1e-6，delay/valid/polarity 全同，符合用户"不差太多"；
+- 帧级/精化路径尚不划算，保持 CPU；架构不默认启用；
+- 下一步：opt-in 集成短测、fallback/确定性、最终 audio MOV 对照；
+- VERSION 仍为 `0.9.0`，不发布 v1.0.0。

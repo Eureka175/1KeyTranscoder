@@ -43,6 +43,7 @@ fine_delay_samples = round(全局延迟) + 相位斜率残余, 报告为诊断�
 from __future__ import annotations
 
 import math
+import os
 import threading
 import warnings
 from collections import OrderedDict
@@ -1433,6 +1434,7 @@ def measure_window_delays(
     workers: int = 1,
     storage_dtype: str = "f32",
     gpu_cc: bool = False,
+    gpu_align: bool | None = None,
 ) -> dict[str, Any]:
     """长镜头**窗级连续性漂移测量** (S1 测量原语; 只测量, 不构造曲线/不施加)。
 
@@ -1533,6 +1535,36 @@ def measure_window_delays(
             except Exception:                          # noqa: BLE001
                 _gpu = None
 
+        # Optional new GPU architecture (opt-in; exact FP64 by default).
+        # Precompute every regular window's full-search surface once, then do
+        # the continuity peak selection on the CPU.  This removes the
+        # per-window launch/host round-trip that made the old gpu_cc path
+        # barely useful for sequential windows.
+        _align_sess = None
+        _align_eng = None
+        _surf_windows = None
+        _surf_valid = None
+        _surf_lo = _surf_hi = 0
+        if gpu_align is None:
+            _env = os.environ.get("KTS_GPU_ALIGN", "0").strip().lower()
+            gpu_align = _env not in ("", "0", "off", "false", "no")
+        if gpu_align:
+            try:
+                from .gpu_align import AlignGpuSession
+                from .gpu_align.window_cc import WindowCCEngine
+
+                _mode = os.environ.get("KTS_GPU_ALIGN", "").strip().lower()
+                if _mode in ("", "0", "off", "false", "no"):
+                    _mode = "exact"
+                _align_sess = AlignGpuSession.create(mode=_mode)
+                if _align_sess is not None:
+                    _align_eng = WindowCCEngine(
+                        _align_sess.backend, ref12, tgt12,
+                        policy=_align_sess.policy)
+                    _align_eng.warmup()
+            except Exception:                          # noqa: BLE001
+                _align_sess = _align_eng = None
+
         def _coarse_peak(start_c: int, count_c: int, lag_lo: int,
                          lag_hi: int) -> tuple | None:
             if _gpu is not None:
@@ -1548,6 +1580,18 @@ def measure_window_delays(
                                    lag_lo, lag_hi, q)
 
         n_windows = 0 if n < win else (n - win) // hop + 1
+        if _align_eng is not None and n_windows > 0:
+            try:
+                _surf_c = int(math.ceil(search_samples / q))
+                _reqs = [(int(round(w * hop / q)),
+                          int(round(win / q))) for w in range(n_windows)]
+                (_surf_windows, _surf_lo, _surf_hi,
+                 _surf_valid) = _align_eng.surface_windows(
+                    _reqs, lag_lo_c=-_surf_c, lag_hi_c=_surf_c)
+                if _surf_windows.ndim != 2 or _surf_windows.shape[0] != n_windows:
+                    _surf_windows = None
+            except Exception:                          # noqa: BLE001
+                _surf_windows = None
         initial: dict[str, Any] = {
             "lag": None, "cc": 0.0, "coarse_cc": 0.0, "refine_quality": 0.0,
             "valid": False, "polarity": 1, "start_sample": 0, "attempts": [],
@@ -1612,9 +1656,31 @@ def measure_window_delays(
                 "search_radius_samples": int(radius),
             }
             if prev is not None:
-                peak = _coarse_peak(
-                    int(round(start / q)), int(round(win / q)),
-                    prev - radius, prev + radius)
+                peak = None
+                if _surf_windows is not None and w < _surf_windows.shape[0]:
+                    try:
+                        n_c = int(round(win / q))
+                        m_lo = max(-(n_c - 1),
+                                   int(math.ceil(-(prev + radius) / q)))
+                        m_hi = min(n_c - 1,
+                                   int(math.floor(-(prev - radius) / q)))
+                        if m_lo <= m_hi and _surf_lo <= m_lo and m_hi <= _surf_hi:
+                            _pk = _align_eng.peaks_from_windows(
+                                _surf_windows[w:w + 1],
+                                _surf_valid[w:w + 1],
+                                m_lo=_surf_lo,
+                                lag_lo_c=m_lo, lag_hi_c=m_hi,
+                            )[0]
+                            if _pk is not None:
+                                peak = (float(_pk.lag * q),
+                                        float(_pk.signed_cc),
+                                        float(_pk.abs_cc))
+                    except Exception:                  # noqa: BLE001
+                        peak = None
+                if peak is None:
+                    peak = _coarse_peak(
+                        int(round(start / q)), int(round(win / q)),
+                        prev - radius, prev + radius)
                 if peak is not None:
                     lag_c, signed, abs_cc = peak
                     row["coarse_cc"] = round(float(abs_cc), 6)
@@ -1645,8 +1711,23 @@ def measure_window_delays(
             "decimated_rate": int(coarse_rate),
             "rejected_windows": int(rejected),
             "workers_effective": 1,
+            "gpu_align": {
+                "used": _align_eng is not None,
+                "stats": ([s.as_dict() for s in _align_eng.stats]
+                          if _align_eng is not None else []),
+            },
         }
     finally:
+        if _align_eng is not None:
+            try:
+                _align_eng.close()
+            except Exception:                          # noqa: BLE001
+                pass
+        if _align_sess is not None:
+            try:
+                _align_sess.close()
+            except Exception:                          # noqa: BLE001
+                pass
         if _gpu is not None:
             try:
                 from . import gpu_cc as _gpu_mod

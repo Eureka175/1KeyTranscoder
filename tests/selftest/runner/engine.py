@@ -46,7 +46,7 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
         channel_sync, cli, codecs, container_flags, core, dji_metadata,
         hardware, hardware_audio, hwdecode_results, long_take, pipeline,
         production_output, native_decode, source_contract, toolchain,
-        workdir,
+        workdir, gpu_align,
     )
 
     return {
@@ -59,6 +59,7 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("classifier/scaling", core.l1_classifier_scaling),
             ("gpac/dji", core.l1_gpac_dji),
             ("integrity/pix_fmt geometry", core.l1_integrity_geometry),
+            ("gpu_align policy/parity", gpu_align.l1_gpu_align),
             ("gpac/paths", core.l1_gpac_paths),
             ("tkhd 轨道标志/alternate group (PR 多音轨)",
              container_flags.l1_track_flags),
