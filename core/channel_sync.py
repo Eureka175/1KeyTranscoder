@@ -1040,6 +1040,13 @@ def _detect_stereo_groups(
     }
     if len(healthy) < 2:
         return [], report
+    # Optional GPU alignment path: warm CuPy kernels in the caller thread
+    # before candidate pairs are measured in a thread pool.
+    if sync_estimate.gpu_align_enabled():
+        try:
+            sync_estimate.prewarm_gpu_align()
+        except Exception:                              # noqa: BLE001
+            pass
     snr_pairs: dict[tuple[int, int], Mapping[str, float]] = {}
     for a, b in itertools.combinations(sorted(healthy), 2):
         try:
