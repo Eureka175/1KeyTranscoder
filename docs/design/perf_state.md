@@ -300,11 +300,15 @@ frames=600 wall=0.390 s -> 0.649 ms/frame
    逐帧 decimate 之和相当（O(n log n) 的整段 decimate 并不便宜）。已回退。
 3. 因此帧级 GPU 批处理若保持 12 进程并行，每个 worker 还需一份 CUDA 上下文
    与 FFT 缓冲（VRAM 12×~200 MB+），收益仅限 42% 中一部分，性价比低。
-4. 更有希望的下一步（未实现）：**run 级共享 coarse 缓存**——每个通道在
-   channel-sync 开始时抽取一次 8 kHz 阵列（f64，C1305 约 307 MB/通道），
-   通过 `multiprocessing.shared_memory` 或只读 memmap 给 12 个 worker 切片，
-   彻底消掉逐帧 decimate；再叠加 GPU 批量 FFT，预计估计阶段 -50% 左右
-   （C1305 wall 204 → ~150 s），但需要跨进程共享设计 + 位级复验。
+4. **run 级共享 coarse 缓存的成本模型**（`work/perf/ws10/cost_coarse_cache.py`）：
+   60 s 整段 decimate 36.5 ms → C1305 每通道 ~2.9 s、4 通道 ~11.7 s；
+   而逐帧 decimate 0.146 ms/frame × 41645 帧 ≈ 6.1 s CPU/通道/次 pair，
+   12 进程并行后 wall 分摊后总共只能省 ~36 s（还要再扣 11.7 s 建缓存），
+   净收益仅 ~24 s（C1305 204 → ~180 s，-12%）；再把 42% 的 gcc FFT 搬 GPU
+   最多再省 ~20 s（且 12 个 worker 各需 CUDA 上下文）。需要
+   shared_memory/memmap 跨进程设计 + 位级复验，复杂度高、收益有限，
+   **本轮不做**。当前并行进程池已经把这部分成本大部分摊掉了；除非将来
+   改为单进程 GPU 批处理流水线（需要向量化峰逻辑，风险更高），否则不值得。
 
 ## 下一步
 

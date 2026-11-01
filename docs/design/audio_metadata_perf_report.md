@@ -137,8 +137,11 @@ copy fast restore（同一个 GPAC 产物作 stage，不重复 mux）。
 **帧级 GPU 批处理（评估后不采用）**：微基准显示帧估计 CPU 的 54% 是逐帧
 coarse 抽取、42% 是两阶段 GCC-PHAT；每 chunk 缓存 decimate 的试验在
 C1306 上 150.3 s vs 148.0 s（无收益）且 tree RSS +0.7–1.5 GB，已回退。
-要真正受益，需要 run 级共享 8 kHz coarse 缓存（跨进程共享）+ 批量
-GPU FFT，预计估计阶段 -50%，留作下一步。
+成本模型：run 级 8 kHz coarse 缓存建模建缓存 11.7 s/4 通道、逐帧 decimate
+并行后总计可省 ~36 s，净收益仅 ~24 s（C1305 204 → ~180 s，-12%）；再叠
+GPU FFT 最多再省 ~20 s，且需 12 个 worker 各持 CUDA 上下文 + 跨进程共享
+设计。结论：在当前 12 进程并行架构下性价比不足，本轮不集成；若未来改
+单进程 GPU 批处理流水线（向量化峰逻辑）再评估。
 
 
 - **CUDA 已接入但默认关闭**（`channel_sync` 配置项 `gpu_cc`）：只有窗级
