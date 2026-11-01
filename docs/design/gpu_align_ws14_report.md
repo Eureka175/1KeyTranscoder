@@ -303,3 +303,23 @@ stereo/frame/apply 等 CPU 占比更高；fp32 199.6 s 略优于 fp64 204.7 s，
   两者均 done=1、PRESERVED=36，视频/音频/解码 120 帧完全一致；确认
   `--gpu-align` 映射到 `KTS_GPU_ALIGN` 的链路可用。
 - **VERSION** 仍为 `0.9.0`；未发布 v1.0.0。
+---
+
+## 12. 显存占用实测（fp32 默认路径）
+
+环境：RTX 5070 Laptop 8 GiB；C1306 12 kHz / 60 s 窗 / 411 窗；
+`measure_window_delays`；nvidia-smi 0.05–0.1 s 采样。
+
+| `KTS_GPU_ALIGN_BUDGET_MB` | 峰值 GPU 占用 | 批大小 | wall |
+|---:|---:|---:|---:|
+| 512 | **420 MiB** | 5 窗/批 | 32.0 s |
+| 1024 | **780 MiB** | 11 窗/批 | 20.2 s |
+| 2048（当前默认上限） | **1470 MiB** | 23 窗/批 | 24.7 s |
+
+- 默认预算为 `min(2048 MiB, free×0.6)`；实际按批自动缩放。
+- fp64 相同窗口一次测量总占用约 **1.8 GiB 峰值**（含前一轮 CuPy pool），
+  引擎增量约 1.2 GiB；fp32 明显更省。
+- residual 引擎增量约 **64 MiB**；帧级 surface 批次很小（未接入生产）。
+- 没有 OOM；显存不足/CUDA 不可用时自动回退 CPU。
+- 若目标机显存较小，可设 `KTS_GPU_ALIGN_BUDGET_MB=512/1024`；以 wall
+  换显存。

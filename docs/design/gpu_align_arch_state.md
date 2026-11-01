@@ -111,3 +111,13 @@ KTS_GPU_ALIGN_BUDGET_MB=2048     # 显存预算上限
 - 默认 `KTS_GPU_ALIGN=0` 的 Sony 单文件短测：`done=1`、
   `PRESERVED=37`；GPU 关闭时默认行为不变；
 - 预算 8 MB 下 fp32 411 窗完成且两次记录相同；VERSION 仍 0.9.0。
+## 7. 显存占用（RTX 5070 Laptop 8 GiB）
+
+| 预算上限 | 峰值占用 | 批 | 说明 |
+|---:|---:|---:|---|
+| 512 MiB | 420 MiB | 5 窗 | 保守，wall 32 s |
+| 1024 MiB | 780 MiB | 11 窗 | 推荐低显存折中，wall 20 s |
+| 2048 MiB | 1470 MiB | 23 窗 | 当前默认上限，wall 25 s |
+
+residual 增量约 64 MiB；默认预算 `min(2048, free×0.6)`；OOM/无 CUDA
+自动回退 CPU。
