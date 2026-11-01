@@ -89,3 +89,11 @@ KTS_GPU_ALIGN_BUDGET_MB=2048     # 显存预算上限
 4. 决定是否把 `core/gpu_align` 合并回 v1.0 集成分支；合并前补 GPU 帧级
    no-go 报告和低配机 fallback 测试；
 5. VERSION 仍为 0.9.0，不发布 v1.0.0。
+## 6. 回退/验收补充
+
+- `CUDA_VISIBLE_DEVICES=-1` + `KTS_GPU_ALIGN=exact`：`used=false`，411 窗
+  测量完成，纯 CPU 44.1 s，无异常；
+- `final_accept_v2` 重跑 **OVERALL: PASS**；
+- 默认 `KTS_GPU_ALIGN=0` 的 Sony 单文件短测：`done=1`、
+  `PRESERVED=37`；GPU 关闭时默认行为不变；
+- VERSION 仍 0.9.0。

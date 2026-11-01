@@ -284,3 +284,15 @@ python tests/benchmark_gpu_align.py --seconds 300 --windows 20 --frames 64 \
 C1305 的完整入口收益低于 C1306（1.70–1.73×），因为 C1305 的
 stereo/frame/apply 等 CPU 占比更高；fast 199.6 s 略优于 exact 204.7 s，
 4 条最终 audio MOV 均与 CPU 逐字节一致。
+---
+
+## 11. 回退与最终验收
+
+- **无 CUDA 回退**：设置 `CUDA_VISIBLE_DEVICES=-1`、`KTS_GPU_ALIGN=exact`
+  直接跑 `measure_window_delays`：`gpu_align.used=false`，411 窗测量完成，
+  wall 44.1 s（纯 CPU），无异常。说明 CUDA 不可用时不会中断生产路径。
+- **final_accept_v2**（C1305/C1306 曲线+音频层）：GPU 工作后重跑
+  **OVERALL: PASS**（使用既有验收产物，默认路径未变）。
+- **默认路径短测**：`KTS_GPU_ALIGN=0` 的 Sony 单文件 `1kt.py`：
+  `done=1`、`PRESERVED=37 MODIFIED=0 MISSING=0`；GPU 不启用时行为不变。
+- **VERSION** 仍为 `0.9.0`；未发布 v1.0.0。
