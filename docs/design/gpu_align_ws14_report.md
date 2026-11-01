@@ -189,3 +189,44 @@ exact 45.1 s（1.70×）。
 - `_refine_window_peak` 单窗 GPU 较 CPU 慢，需批量两遍法；
 - C1305/C1306 的最终 audio MOV/final_accept 尚未用新架构全量重跑；
 - 默认关闭、VERSION 0.9.0 不变。
+---
+
+## 7. C1305 复验（M5）
+
+同一隔离副本方法，C1305 4ch / 3 targets：
+
+| 模式 | wall | 相对 CPU | 最终 raw |
+|---|---:|---:|---|
+| CPU | **131.8 s** | 1.00× | baseline |
+| exact（FP64） | **109.7 s** | **1.20×** | 与 CPU **sha256 全同** |
+
+C1305 的收益低于 C1306（1.64×），因为其下游 apply/残差/写盘占比更高；
+但最终 3 条 raw 与 CPU **逐字节一致**，说明新引擎的窗口/连续性结果没有
+改变对齐语义。两个素材共同证明：
+
+- exact GPU 路径可安全 opt-in；
+- fast 路径在 C1306 上最终 raw 同样一致；
+- 端到端收益受下游 CPU（apply/残差/写盘）限制，下一步应优化这些环节，
+  而不是继续堆 FFT 吞吐。
+---
+
+## 8. 可重复的 tracked 基准
+
+新增 `tests/benchmark_gpu_align.py`（开发基准，不纳入 autotest）：
+
+```
+python tests/benchmark_gpu_align.py --seconds 300 --windows 20 --frames 64 \
+  --json K:\1kt_work\perf\ws14\tracked_bench.json
+```
+
+300 s C1306 数据、20 个 60 s 窗、64 帧的结果：
+
+| 项 | CPU | exact | fast |
+|---|---:|---:|---:|
+| 窗级粗相关（20 窗） | 1.706 s | **0.209 s（8.1×）** | **0.092 s（18.6×）** |
+| 窗级 parity | — | max \|Δcc\|=8.9e-16 | max \|Δcc\|=4.3e-7 |
+| 帧级 surface（64 帧） | 0.023 s | **0.0118 s（1.95×）** | **0.0116 s（1.99×）** |
+| 帧级 argmax 一致 | — | 64/64 | 64/64 |
+
+帧级整路径仍需 CPU 峰逻辑，因此该表只说明 surface 阶段的加速，不能
+直接换算成 `estimate_pair` 的端到端收益。
