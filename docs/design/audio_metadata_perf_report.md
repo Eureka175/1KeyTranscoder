@@ -134,6 +134,12 @@ copy fast restore（同一个 GPAC 产物作 stage，不重复 mux）。
 | 透明 50 GiB | 结构/rtmd/音频/签名全 PASS；Sony checker 37/37 |
 
 ## 5. 未做/下一步
+**帧级 GPU 批处理（评估后不采用）**：微基准显示帧估计 CPU 的 54% 是逐帧
+coarse 抽取、42% 是两阶段 GCC-PHAT；每 chunk 缓存 decimate 的试验在
+C1306 上 150.3 s vs 148.0 s（无收益）且 tree RSS +0.7–1.5 GB，已回退。
+要真正受益，需要 run 级共享 8 kHz coarse 缓存（跨进程共享）+ 批量
+GPU FFT，预计估计阶段 -50%，留作下一步。
+
 
 - **CUDA 已接入但默认关闭**（`channel_sync` 配置项 `gpu_cc`）：只有窗级
   coarse CC 的 FFT 走 cuFFT float64（本机实测 36× 于 CPU），其余数学保持

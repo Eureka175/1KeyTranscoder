@@ -278,6 +278,34 @@ CuPy/CUDA 不可用时逐窗回落 CPU。
   从 204.1 s 反而升到 223.0 s（CPU/GPU 争用），已回退为 12；说明当前并行度
   已到甜点，估计阶段下一步应做帧级 GPU 批处理而非继续加进程。
 
+### WS10 — 帧级 GPU 批处理估计（2026-11-01，评估后不采用）
+
+微基准（`work/perf/ws10/profile_est_frames.py`，60 s 真实音频、600 帧单进程）：
+
+```
+frames=600 wall=0.390 s -> 0.649 ms/frame
+  gcc_phat_int（两阶段 FFT+峰逻辑）: 0.164 s (42%)
+  _coarse_slice（逐帧 scipy.decimate）: 0.211 s (54%)
+  read_f64（IO）: 0.012 s
+```
+
+结论与试验：
+
+1. 帧估计的 CPU 成本 **54% 在逐帧 coarse 抽取**、42% 在两阶段 GCC-PHAT；
+   Python/IO 只有 ~3%。GPU 只能加速 42% 的 FFT 部分，最乐观节省约 40% 的
+   估计 CPU。
+2. 尝试"每 chunk 只 decimate 一次 + 切片"缓存（`_est_frames` 内层帧用缓存、
+   chunk 首尾 8 帧仍走原路径）：C1306 **150.3 s vs 148.0 s**（无收益），
+   tree RSS 2311→3885 MB（+0.7–1.5 GB）；原因是 chunk 的 filtfilt 代价与
+   逐帧 decimate 之和相当（O(n log n) 的整段 decimate 并不便宜）。已回退。
+3. 因此帧级 GPU 批处理若保持 12 进程并行，每个 worker 还需一份 CUDA 上下文
+   与 FFT 缓冲（VRAM 12×~200 MB+），收益仅限 42% 中一部分，性价比低。
+4. 更有希望的下一步（未实现）：**run 级共享 coarse 缓存**——每个通道在
+   channel-sync 开始时抽取一次 8 kHz 阵列（f64，C1305 约 307 MB/通道），
+   通过 `multiprocessing.shared_memory` 或只读 memmap 给 12 个 worker 切片，
+   彻底消掉逐帧 decimate；再叠加 GPU 批量 FFT，预计估计阶段 -50% 左右
+   （C1305 wall 204 → ~150 s），但需要跨进程共享设计 + 位级复验。
+
 ## 下一步
 
 1. 环境恢复后补跑全量 L3 + `final_accept_v2` 长验收。
