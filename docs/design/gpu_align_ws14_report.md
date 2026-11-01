@@ -279,6 +279,8 @@ python tests/benchmark_gpu_align.py --seconds 300 --windows 20 --frames 64 \
 |---|---:|---:|---|
 | CPU | **300.9 s** | 1.00× | baseline |
 | exact（窗口 + residual GPU） | **204.7 s** | **1.47×** | **sha256 全部相同** |
+| fast（FP32 窗口 + residual） | **199.6 s** | **1.51×** | **sha256 全部相同** |
 
-C1305 的完整入口收益低于 C1306（1.70×），因为 C1305 的 stereo/frame/
-apply 等 CPU 占比更高；但 4 条最终 audio MOV 与 CPU 逐字节一致。
+C1305 的完整入口收益低于 C1306（1.70–1.73×），因为 C1305 的
+stereo/frame/apply 等 CPU 占比更高；fast 199.6 s 略优于 exact 204.7 s，
+4 条最终 audio MOV 均与 CPU 逐字节一致。

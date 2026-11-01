@@ -55,7 +55,7 @@ KTS_GPU_ALIGN_BUDGET_MB=2048     # 显存预算上限
 | long-take C1306（3 targets） | 115.1 s | **47.1 s（2.45×）** | **57.4 s（2.01×）** | 最终 raw sha256 全同 |
 | long-take C1305（3 targets） | 131.8 s | **62.7 s（2.10×）** | — | 最终 raw sha256 全同 |
 | 完整 channel_sync C1306 | 208.8 s | **123.1 s（1.70×）** | **120.5 s（1.73×）** | 4 条 audio MOV sha256 全同 |
-| 完整 channel_sync C1305 | 300.9 s | **204.7 s（1.47×）** | — | 4 条 audio MOV sha256 全同 |
+| 完整 channel_sync C1305 | 300.9 s | **204.7 s（1.47×）** | **199.6 s（1.51×）** | 4 条 audio MOV sha256 全同 |
 
 - FP32 的窗级/残差结果在本次真实素材上与 FP64/CPU 逐点或 ≤1e-6 一致；
   用户已明确不要求 FP64 同精度。
