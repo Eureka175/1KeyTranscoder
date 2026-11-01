@@ -631,3 +631,23 @@ def l1_gpac_paths() -> None:
 # ===========================================================================
 # L1 — 纯逻辑单测
 # ===========================================================================
+
+def l1_integrity_geometry() -> None:
+    """A3: pix_fmt-aware frame-signature geometry (4:2:0 / 4:2:2 / 4:4:4)."""
+    from encoders.integrity import _pix_geometry
+    section("L1 integrity.pix_fmt geometry")
+    cases = [
+        ("yuv420p10le", 1920, 1080, 4147200, 1036800, 2),
+        ("yuv422p10le", 1920, 1080, 4147200, 2073600, 2),
+        ("yuv444p10le", 1920, 1080, 4147200, 4147200, 2),
+        ("yuv420p", 1920, 1080, 2073600, 518400, 1),
+    ]
+    for fmt, w, h, y_want, c_want, b_want in cases:
+        y, c, b = _pix_geometry(w, h, fmt)
+        record(f"integrity.geometry {fmt}",
+               (y, c, b) == (y_want, c_want, b_want),
+               f"got={(y, c, b)} want={(y_want, c_want, b_want)}")
+    y, c, b = _pix_geometry(1920, 1080, "yuv422p10le")
+    record("integrity.geometry 4:2:2 frame bytes = 4 bytes/pixel (10-bit)",
+           y + 2 * c == 1920 * 1080 * 4,
+           f"frame={y + 2 * c}")

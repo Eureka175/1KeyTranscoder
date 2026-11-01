@@ -3680,6 +3680,22 @@ def run_channel_sync(
             except RuntimeError as exc:
                 return finish("verify_failed", str(exc), channels=rows)
 
+        if file_copied:
+            # B1 (user decision): a remux failure that falls back to a byte
+            # copy must NOT report success.  The output at dst is the source
+            # bytes (usable), but no remux/verification happened; the terminal
+            # state is verify_failed so batch counters and logs agree.
+            return report(
+                "verify_failed",
+                "transparent remux failed; output is a byte copy of the "
+                "source (no verification performed)",
+                scope=scope,
+                channels=rows,
+                audio_files=audio_files,
+                fixed_files=[audio_files[si] for si in streams_with_fixes],
+                output_file=output_file,
+                file_copied=True,
+            )
         return report(
             "applied",
             f"measure -> fix -> verify OK ({len(fixed_ok)}/{n_tracks} fixed)",
@@ -3688,7 +3704,7 @@ def run_channel_sync(
             audio_files=audio_files,
             fixed_files=[audio_files[si] for si in streams_with_fixes],
             output_file=output_file,
-            file_copied=file_copied,
+            file_copied=False,
         )
     finally:
         for a in arrs:

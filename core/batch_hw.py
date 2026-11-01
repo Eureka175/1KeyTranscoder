@@ -1054,6 +1054,8 @@ def encode_one_sony_hw(
     warnings: list[str] = []
 
     def encode_video(source: Path, out_mov: Path) -> None:
+        if audio_task is not None:
+            audio_task.note_video_started()
         if status_cb:
             status_cb("encoding", f"{planned[0]}/{planned[1]}")
         enc_warnings, used, enc_fps = hw_encode_with_fallback(
@@ -1073,6 +1075,10 @@ def encode_one_sony_hw(
         file_logger.info("ENCODE_FORMAT | %s/%s", used[0], used[1])
         if throughput_cb is not None:
             throughput_cb(enc_fps)
+        if audio_task is not None:
+            audio_task.note_video_finished()
+        if audio_task is not None:
+            audio_task.note_video_finished()
 
     def pipe_log(msg: str) -> None:
         logger.info("[SONY] %s", msg)
@@ -1333,6 +1339,8 @@ def encode_one_hw_classic(
     work_dir = work_root / job_id_for(src)
     if status_cb:
         status_cb("encoding", f"{planned[0]}/{planned[1]}")
+    if audio_task is not None:
+        audio_task.note_video_started()
     try:
         warnings, used, enc_fps = hw_encode_with_fallback(
             label="nvencc" if backend.kind == "nvencc" else "qsvencc",
@@ -1351,7 +1359,11 @@ def encode_one_hw_classic(
         logger.error("[FAIL] hardware encode | %s | %s", src, exc)
         file_logger.exception("HW ENCODE FAILED")
         safe_unlink(part_dst)
+        if audio_task is not None:
+            audio_task.note_video_finished()
         return "failed"
+    if audio_task is not None:
+        audio_task.note_video_finished()
     if throughput_cb is not None:
         throughput_cb(enc_fps)
 
@@ -1671,6 +1683,8 @@ def encode_one_dji_hw(
         status_cb("preserve", "dji djmd pipeline")
 
     def encode_video(source: Path, out_mov: Path) -> None:
+        if audio_task is not None:
+            audio_task.note_video_started()
         if status_cb:
             status_cb("encoding", f"{planned[0]}/{planned[1]}")
         enc_warnings, used, enc_fps = hw_encode_with_fallback(
@@ -2211,6 +2225,11 @@ def place_final(
 
     safe_unlink(dst)
     os.replace(staged, dst)
+    # A6: after a container re-mux the original `.part.mov` intermediate has
+    # no consumer.  Leaving it in the output tree polluted user-visible
+    # directories (observed for MP4 sources).  Safe to delete only after the
+    # staged container is in place.
+    safe_unlink(intermediate)
     log(f"final: {staged.name} -> {dst.name}")
 
 
@@ -2300,6 +2319,23 @@ def _record_throughput(
 #: and memory, so audio stages are serialized even when video slots are many.
 _AUDIO_SYNC_GATE = threading.Semaphore(1)
 
+#: A5: if the machine is already CPU-saturated (software decode fallback,
+#: concurrent audio, ...), do not overlap the audio stage with video encode;
+#: wait for the video to finish and run audio serially.  psutil is optional;
+#: without it the historical always-overlap behaviour is kept.
+_AUDIO_CPU_BUSY_PCT = 75.0
+
+
+def _cpu_busy(threshold: float = _AUDIO_CPU_BUSY_PCT) -> bool:
+    try:
+        import psutil
+    except Exception:                                  # noqa: BLE001
+        return False
+    try:
+        return float(psutil.cpu_percent(interval=0.25)) >= threshold
+    except Exception:                                  # noqa: BLE001
+        return False
+
 
 class AudioSyncTask:
     """Run channel_sync in a worker thread while the video encoder runs.
@@ -2328,6 +2364,9 @@ class AudioSyncTask:
         self.file_logger = file_logger
         self.report: dict[str, Any] | None = None
         self.audio_sources: list[Path] | None = None
+        self._video_started = threading.Event()
+        self._video_finished = threading.Event()
+        self._cancelled = threading.Event()
         self._thread = threading.Thread(
             target=self._run, name=f"audio-sync:{src.name}", daemon=True)
 
@@ -2335,10 +2374,35 @@ class AudioSyncTask:
         self._thread.start()
         return self
 
+    def note_video_started(self) -> None:
+        self._video_started.set()
+
+    def note_video_finished(self) -> None:
+        self._video_finished.set()
+
+    def abort(self) -> None:
+        """Release a task that will never reach its merge point."""
+        self._cancelled.set()
+        self._video_started.set()
+        self._video_finished.set()
+
     def _run(self) -> None:
         from core.channel_sync import run_channel_sync
 
         try:
+            # Wait until the video stage really starts; then sample CPU.  If
+            # the machine is saturated (e.g. hardware decode fell back to
+            # software), wait for the video and run the audio serially.
+            self._video_started.wait(timeout=30.0)
+            if self._cancelled.is_set():
+                return
+            if _cpu_busy():
+                self.logger.info(
+                    "[P2] %s: CPU busy -> audio-sync deferred until video "
+                    "finishes (serial fallback)", self.src.name)
+                self._video_finished.wait(timeout=3600.0)
+            if self._cancelled.is_set():
+                return
             with _AUDIO_SYNC_GATE:
                 res = run_channel_sync(
                     source=self.src,
@@ -2637,10 +2701,11 @@ def process_file_hw(
             audio_task=audio_task,
         )
 
-    # Join an async audio task even when the encoder failed before reaching the
-    # audio merge point (its get() is idempotent; success paths already joined).
+    # Release an async audio task even when the encoder failed before reaching
+    # the merge point.  Success paths have already joined it (get() is
+    # idempotent); abort() only matters for early failures.
     if audio_task is not None:
-        audio_task.get()
+        audio_task.abort()
     if result == "failed" and ctx.failed_path is not None:
         record_failure(
             ctx.failed_path,
@@ -2721,6 +2786,24 @@ class AdaptiveJobs:
         return self._adapt(agg_fps, label, "completion window")
 
 
+def _admit_sources(ctx: BatchCtx, backend, sources: list[Path]) -> None:
+    """B2: make every queued source visible in the dashboard up front."""
+    if ctx.status is None:
+        return
+    for src in sources:
+        ctx.status.admit(src, ctx.preset, backend.name)
+
+
+def _largest_first(sources: list[Path]) -> list[Path]:
+    """B4: long jobs first so refilling short jobs cannot starve them."""
+    def key(p: Path) -> tuple[int, str]:
+        try:
+            return (-p.stat().st_size, str(p))
+        except OSError:
+            return (0, str(p))
+    return sorted(sources, key=key)
+
+
 def run_hw_pool(
     ctx: BatchCtx,
     backend,
@@ -2734,6 +2817,8 @@ def run_hw_pool(
     the worker count is adjusted between waves from measured aggregate
     throughput)."""
     counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0}
+    _admit_sources(ctx, backend, sources)
+    admitted = list(sources)
 
     if workers != "auto":
         n = int(workers)
@@ -2755,7 +2840,15 @@ def run_hw_pool(
     # ---- continuous adaptive scheduling (P1) ----
     ctx.show_progress = False
     ctrl = AdaptiveJobs(logger, start=2)
-    pending = deque(sources)
+    # B4: longest first; the continuous refill then packs shorter jobs around
+    # the long critical-path file instead of delaying it to the last wave.
+    ordered = _largest_first(admitted)
+    logger.info(
+        "[SCHED] auto largest-first order: %s",
+        ", ".join(p.name for p in ordered[:5]) +
+        (" ..." if len(ordered) > 5 else ""),
+    )
+    pending = deque(ordered)
     fps_window: deque[float] = deque(maxlen=8)
     counters.update({"done": 0, "skipped": 0, "failed": 0,
                      "dry-run": 0})
@@ -2827,6 +2920,15 @@ def run_multihw_pool(
             flip = not flip
 
     ctx.show_progress = False
+    # B2: admit the routed sources using the backend that will run them.
+    if ctx.status is not None:
+        for _src in nvenc_sources:
+            ctx.status.admit(_src, ctx.preset, backend_nvenc.name)
+        for _src in qsv_sources:
+            ctx.status.admit(_src, ctx.preset, backend_qsv.name)
+    # B4: largest-first within each routed queue.
+    nvenc_sources = deque(_largest_first(list(nvenc_sources)))
+    qsv_sources = deque(_largest_first(list(qsv_sources)))
     ctrl_n = AdaptiveJobs(logger, start=2)
     ctrl_q = AdaptiveJobs(logger, start=1)
 
@@ -2849,41 +2951,59 @@ def run_multihw_pool(
     )
 
     counters = {"done": 0, "skipped": 0, "failed": 0, "dry-run": 0}
+    fps_n: deque[float] = deque(maxlen=8)
+    fps_q: deque[float] = deque(maxlen=8)
 
-    while nvenc_sources or qsv_sources:
-        remaining = budget
-        wave: list[tuple[Path, Any]] = []
-        # Take from each queue up to its own controller's allowance, but never
-        # more than the global budget: the two limits compose, they do not add.
-        take_n = min(ctrl_n.current, len(nvenc_sources), remaining)
-        for _ in range(take_n):
-            wave.append((nvenc_sources.popleft(), backend_nvenc))
-        remaining -= take_n
-        take_q = min(ctrl_q.current, len(qsv_sources), remaining)
-        for _ in range(take_q):
-            wave.append((qsv_sources.popleft(), backend_qsv))
-        if not wave:
-            break
-        ctx.throughput.clear()
-        with ThreadPoolExecutor(max_workers=len(wave)) as ex:
-            futures = {
-                ex.submit(process_file_hw, ctx, be, src, logger): src
-                for src, be in wave
-            }
-            for fut in as_completed(futures):
-                counters[fut.result()] += 1
-        if len(wave) >= budget:
-            logger.debug(
-                "[MULTIHW] wave hit the global budget (%d/%d)", len(wave), budget
-            )
-        agg_n = sum(
-            fps for name, fps in ctx.throughput if name == "nvenc"
-        )
-        agg_q = sum(
-            fps for name, fps in ctx.throughput if name == "qsv"
-        )
-        if any(name == "nvenc" for name, _ in ctx.throughput):
-            ctrl_n.note_wave(agg_n, "nvenc")
-        if any(name == "qsv" for name, _ in ctx.throughput):
-            ctrl_q.note_wave(agg_q, "qsv")
+    with ThreadPoolExecutor(max_workers=budget) as ex:
+        futures: dict[Any, tuple[Path, Any, str]] = {}
+        active_n = 0
+        active_q = 0
+        while nvenc_sources or qsv_sources or futures:
+            # B1: refill each backend up to its own target while respecting
+            # the global budget; completion immediately frees a slot.
+            while len(futures) < budget:
+                made = False
+                if nvenc_sources and active_n < ctrl_n.current:
+                    _src = nvenc_sources.popleft()
+                    _f = ex.submit(process_file_hw, ctx, backend_nvenc,
+                                   _src, logger)
+                    futures[_f] = (_src, backend_nvenc, "nvenc")
+                    active_n += 1
+                    made = True
+                if len(futures) >= budget:
+                    break
+                if qsv_sources and active_q < ctrl_q.current:
+                    _src = qsv_sources.popleft()
+                    _f = ex.submit(process_file_hw, ctx, backend_qsv,
+                                   _src, logger)
+                    futures[_f] = (_src, backend_qsv, "qsv")
+                    active_q += 1
+                    made = True
+                if not made:
+                    break
+            if not futures:
+                break
+            done, _ = wait(tuple(futures.keys()),
+                           return_when=FIRST_COMPLETED)
+            for fut in done:
+                _src, _be, _name = futures.pop(fut)
+                if _name == "nvenc":
+                    active_n -= 1
+                else:
+                    active_q -= 1
+                try:
+                    counters[fut.result()] += 1
+                except Exception:                      # noqa: BLE001
+                    logger.exception("[SCHED] multihw worker raised")
+                    counters["failed"] += 1
+            with ctx.throughput_lock:
+                samples = list(ctx.throughput)
+                ctx.throughput.clear()
+            for name, fps in samples:
+                (fps_n if name == "nvenc" else fps_q).append(fps)
+            if fps_n:
+                ctrl_n.note_sample(sum(fps_n), "nvenc")
+            if fps_q:
+                ctrl_q.note_sample(sum(fps_q), "qsv")
+
     return counters

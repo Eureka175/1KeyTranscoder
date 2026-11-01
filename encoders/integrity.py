@@ -467,8 +467,31 @@ _Y_STRIDE = 977
 _C_STRIDE = 331
 
 
+def _pix_geometry(w: int, h: int, pix_fmt: str) -> tuple[int, int, int]:
+    """Return (Y plane bytes, one chroma plane bytes, bytes/sample).
+
+    The old implementation hard-coded 4:2:0 and 2 bytes/sample.  Canon
+    XF-HEVC 4:2:2 10-bit made that raise IndexError; 4:4:4 had the same class
+    of error.  Y plane is always w*h*bps; chroma plane follows subsampling.
+    """
+    fmt = (pix_fmt or "").lower()
+    bps = 2 if any(t in fmt for t in ("10", "12", "16", "p010", "p012", "p016")) else 1
+    if "444" in fmt:
+        cw, ch = w, h
+    elif "422" in fmt:
+        cw, ch = w // 2, h
+    elif "420" in fmt or fmt.startswith(("nv12", "nv21", "p010", "p016")):
+        cw, ch = w // 2, h // 2
+    else:
+        # Unknown planar format: keep the historical 4:2:0 geometry so the
+        # existing 4:2:0 path is never changed by this branch.
+        cw, ch = w // 2, h // 2
+    return w * h * bps, cw * ch * bps, bps
+
+
 def _iter_decoded(path: Path, w: int, h: int, pix_fmt: str, ffmpeg: Path):
-    fsz = w * h * 3 if pix_fmt.startswith("yuv420") else w * h * 2
+    ysz, csz, _bps = _pix_geometry(w, h, pix_fmt)
+    fsz = ysz + 2 * csz
     cmd = [
         str(ffmpeg), "-v", "error", "-nostdin", "-i", str(path),
         "-map", "0:v:0", "-f", "rawvideo", "-pix_fmt", pix_fmt, "-",
@@ -501,10 +524,10 @@ def frame_signatures(
     exe = ffmpeg or _default_ffmpeg()
     if exe is None:
         return [], "ffmpeg not found"
-    ysz = w * h * 2
-    csz = (w // 2) * (h // 2) * 2
-    y_idx = list(range(0, max(ysz - 1, 1), 2 * _Y_STRIDE))
-    c_idx = list(range(0, max(csz - 1, 1), 2 * _C_STRIDE))
+    ysz, csz, bps = _pix_geometry(w, h, pix_fmt)
+    sample_bytes = 2 if bps == 2 else 1
+    y_idx = list(range(0, max(ysz - 1, 1), sample_bytes * _Y_STRIDE))
+    c_idx = list(range(0, max(csz - 1, 1), sample_bytes * _C_STRIDE))
     chunk_offsets = [
         min(int(ysz * f) & ~1, max(ysz - _CHUNK - 1, 0)) for f in _CHUNK_FRACS
     ]
@@ -512,10 +535,16 @@ def frame_signatures(
     err: str | None = None
     try:
         for buf in _iter_decoded(Path(path), w, h, pix_fmt, exe):
-            ys = [buf[i] | (buf[i + 1] << 8) for i in y_idx]
-            us = [buf[ysz + i] | (buf[ysz + i + 1] << 8) for i in c_idx]
-            vs = [buf[ysz + csz + i] | (buf[ysz + csz + i + 1] << 8)
-                  for i in c_idx]
+            if bps == 2:
+                ys = [buf[i] | (buf[i + 1] << 8) for i in y_idx]
+                us = [buf[ysz + i] | (buf[ysz + i + 1] << 8)
+                      for i in c_idx]
+                vs = [buf[ysz + csz + i] | (buf[ysz + csz + i + 1] << 8)
+                      for i in c_idx]
+            else:
+                ys = [buf[i] for i in y_idx]
+                us = [buf[ysz + i] for i in c_idx]
+                vs = [buf[ysz + csz + i] for i in c_idx]
             ny = len(ys)
             d = sum(abs(ys[i + 1] - ys[i]) for i in range(ny - 1)) / max(ny - 1, 1)
             cd = hashlib.sha256()

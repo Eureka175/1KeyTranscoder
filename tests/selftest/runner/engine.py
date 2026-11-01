@@ -58,6 +58,7 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("container/format policy", core.l1_container_format),
             ("classifier/scaling", core.l1_classifier_scaling),
             ("gpac/dji", core.l1_gpac_dji),
+            ("integrity/pix_fmt geometry", core.l1_integrity_geometry),
             ("gpac/paths", core.l1_gpac_paths),
             ("tkhd 轨道标志/alternate group (PR 多音轨)",
              container_flags.l1_track_flags),

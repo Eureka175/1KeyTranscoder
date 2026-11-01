@@ -32,9 +32,18 @@ class DashboardStatus:
 
     # -- worker side ---------------------------------------------------
 
-    def start(self, src, preset: str, backend: str) -> None:
+    def admit(self, src, preset: str, backend: str) -> None:
+        """Create a queued row at admission time (B2).
+
+        The scheduler admits every source before any worker starts, so the
+        dashboard shows the whole queued population instead of only the files
+        that happen to be in the current wave.
+        """
         with self._lock:
-            self.rows[str(src)] = {
+            key = str(src)
+            if key in self.rows:
+                return
+            self.rows[key] = {
                 "source": str(src),
                 "name": Path(str(src)).name,
                 "preset": preset,
@@ -45,6 +54,29 @@ class DashboardStatus:
                 "fps": 0.0,
                 "started": time.time(),
             }
+
+    def start(self, src, preset: str, backend: str) -> None:
+        with self._lock:
+            key = str(src)
+            row = self.rows.get(key)
+            if row is None:
+                row = {
+                    "source": str(src),
+                    "name": Path(str(src)).name,
+                    "preset": preset,
+                    "backend": backend,
+                    "status": "queued",
+                    "detail": "",
+                    "frames": 0,
+                    "fps": 0.0,
+                    "started": time.time(),
+                }
+                self.rows[key] = row
+            else:
+                # Keep the admission timestamp so dashboard elapsed includes
+                # queue time; workers must not reset it.
+                row["preset"] = preset
+                row["backend"] = backend
 
     def update(
         self,
