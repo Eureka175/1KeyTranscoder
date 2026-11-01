@@ -75,6 +75,18 @@
 | T2.1 | ✅ | `gcc_phat_int` 拆为 `_gcc_surface` + `_gcc_peak_from_surface`；600 帧真实数据与备份实现 0 mismatch |
 | T2.2+ | ⬜ | 未开工 |
 
+**T2.2 原型实测（GPU 批量 surface，真实 60 s 音频 600 帧）**：
+
+- 产物：`core/gpu_frames.py`（只算 float64 相关面；峰逻辑仍走 CPU
+  `_gcc_peak_from_surface`）。
+- 全速率阶段：CPU 0.414 ms/帧 → **GPU 0.054 ms/帧（7.6×）**；首批含 CUDA
+  JIT/上下文时首调 2.3 s，必须预热。
+- 与 CPU 参考对比：**600/600 帧整数 delay 完全相同**；confidence 只有
+  385/600 逐位相同（其余差 float64 FFT 末位）。这意味着：最终整数移位/音频
+  很可能不变，但 report/confidence 门限需要重新验证，符合"高风险"预判。
+- 该原型尚未接入 `_est_frames`；接入后还需 CPU 峰逻辑开销与单进程串行代价
+  （G2 门）。
+
 **T1.5 原型实测（memmap 文件版，CPU 默认路径）**：
 
 | 素材 | v0.9.0 基线 | + coarse cache | 结论 |
