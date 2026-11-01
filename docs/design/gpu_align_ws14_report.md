@@ -248,3 +248,22 @@ python tests/benchmark_gpu_align.py --seconds 300 --windows 20 --frames 64 \
 
 帧级整路径仍需 CPU 峰逻辑，因此该表只说明 surface 阶段的加速，不能
 直接换算成 `estimate_pair` 的端到端收益。
+---
+
+## 9. 完整 channel_sync 生产入口验证（C1306）
+
+使用真实 C1306 源文件（43 GB）与 `channel_sync.run_channel_sync` 的完整
+生产路径（stereo 组检测 + 帧级估计 + long-take 窗级/残差 + 最终音频
+编码），不是只测 `align_time_varying`：
+
+| 模式 | wall | 相对 CPU | 最终 4 条 audio MOV |
+|---|---:|---:|---|
+| CPU | **208.8 s** | 1.00× | baseline |
+| exact（窗口 + residual GPU） | **123.1 s** | **1.70×** | **sha256 全部相同** |
+
+- 帧级估计仍为 CPU（`estimate_pair` 12 进程池），stereo 检测也是 CPU；
+  收益完全来自窗级 coarse CC 与 residual seed 的 GPU 化；
+- 4 条音频 MOV 的 sha256 **逐条相同**，说明整条 aligned 音频路径输出
+  一致；
+- 这组数据（208.8 s）与 v0.9.0 的音频域 C1306 基线（约 204–217 s）同一
+  量级，可视为可比的完整入口结果。
