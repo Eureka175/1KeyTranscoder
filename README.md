@@ -8,7 +8,7 @@
 > metadata preservation, a structured PCM audio pipeline, channel-delay repair, and an
 > archive-repair mode that can verify and fix already-produced deliverables.
 
-[![Version](https://img.shields.io/badge/version-0.8.11-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.0-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -16,7 +16,7 @@
 ## Contents
 
 - [Overview](#overview)
-- [What's new in 0.8.11](#whats-new-in-0811-pre-release)
+- [What's new in 0.9.0](#whats-new-in-090-pre-release)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick start](#quick-start)
@@ -63,42 +63,43 @@ On top of that the project ships:
 Target use case: a single workstation turning multi-hour Sony / DJI shoots into archive
 copies that keep the motion and lens metadata tools such as Gyroflow and NLEs need.
 
-## What's new in 0.8.11 (pre-release)
+## What's new in 0.9.0 (pre-release)
 
-- **Long-take audio alignment is now part of the default path** for 3–8 channel
-  PCM sources (no new CLI switch). When the constant-delay path is rejected,
-  the whole file falls back to a time-varying pass that implements the research
-  round-3 algorithm exactly: `drift_rebuild` pass-1 (2-min weighted-median
-  anchors -> 7-anchor median filter -> 30-sample/anchor clamp) + `fine_delay`
-  residual (60 s windows, 5-min sliding median, fractional 10k-grid apply).
-  Stereo groups are bound with rigid-confirmation gates and keep their
-  intra-group offset; polarity is detected and flipped per group; multichannel
-  layouts (stereo/quad/5.1/7.1 in one stream) are handled per channel without
-  downmixing. Failures fall back safely to the unaligned original audio.
-- **Acceptance on two real 80-minute takes is PASS**: curve layer
-  median/p90/max = **0/0/0 samples** against an independently re-run reference
-  pipeline; audio layer vs the K deliverables = **0/0/0 on CH1/CH3/CH4**
-  (CH2 differs by the intentional 4-sample stereo-group decision).
-- **Transparent mode can now produce 50 GiB containers.** The old Sony restore
-  rewrote the whole file for every metadata step (measured: `-ref` alone
-  17 min for <1 GiB). The new `preservation/fast_restore.py` rebuilds the
-  container in one sequential read/write pass (no GPAC rewrite): real 50 GiB
-  C1305 stage mux 258.7 s, restore **99.1 s**, end-to-end transparent command
-  **12.8 min** with the Sony checker reporting 37/37 items preserved and 20/20
-  independent payload/structure checks PASS.
-- **`--audio-plan` has highest priority**: a plan always wins over automatic
-  channel-sync; transparent mode yields to it with an INFO line instead of
-  refusing both flags.
-- Fixes: multichannel decoder file-handle race (CH3/CH4 could decode as all
-  zeros), `ref_of` on bound groups with a fixed representative, empty
-  `fixed_files` for mono-multistream layouts, 16-bit `ipcm` sample-entry false
-  positive that downgraded transparent remux to a byte copy, and GPAC temp
-  files now live on the media volume (the 50 GiB remux previously hit ENOSPC
-  on C:).
+0.9.0 is a **performance-only** release: the default path produces the same
+outputs as 0.8.11 (bit-identical final audio on both 80-minute acceptance takes),
+but finishes much faster and writes far less intermediate data to disk.
 
-See [v0.8.11 release notes](docs/release_notes_v0.8.11.md). The previous
-release (v0.8.8) added archive repair to the main program; its notes are
-[here](docs/release_notes_v0.8.8.md).
+- **Audio alignment (default CPU path)**: C1305 80-minute take **689.9 -> 288.4 s
+  (-58.2%)**, C1306 same harness **296.3 -> 217.0 s (-26.8%)**; long-take pass
+  231.0 -> 118.6 s. Stereo-bind detection overlaps anchor estimation, long-take
+  windows run in parallel, per-target apply pipelines run in parallel, and the
+  round-1/round-2/polarity stages are applied **in place** (no extra intermediate
+  raw files). Frame estimation reuses one process pool instead of spawning a new
+  12-process pool for every pair.
+- **Transparent 50 GiB containers**: end-to-end **12.8 -> 9.63 min** with disk
+  writes reduced by ~66% (one 50 GiB GPAC write + a 7.6 MB moov patch instead of
+  a full stage copy). The new `fast_restore_inplace` rebuilds the container on
+  the flat GPAC output while **leaving mdat untouched**; the Sony checker still
+  reports 37/37 items preserved.
+- **Optional CUDA (off by default)**: `channel_sync` config key `gpu_cc` moves
+  the window-level coarse-CC FFT (and the round-2 residual window FFT) to cuFFT
+  **float64** (measured ~36x faster than CPU). With it enabled: C1305
+  **204.1 s (-70.4% vs 0.8.11)**, C1306 **148.0 s (-50.1%)**, final audio still
+  bit-identical to the CPU path. GPU acceleration is **not enabled by default**
+  and has no hard dependency (CuPy/CUDA unavailable -> automatic CPU fallback).
+- **Memory trade-off is explicit**: default CPU parallelism raises peak RSS to
+  ~1.14-1.23 GB main / ~1.9-2.3 GB tree; the low-memory profile
+  (`stereo_bind_workers=1`, `est_worker_cap=4`, serial long-take) drops it to
+  **748.6/1036.2 MB** at ~+43% wall. No new CLI flags: the three new knobs are
+  config/internal keys.
+- **Verification**: final audio MOVs sha256-identical to the 0.8.11 baselines;
+  `final_accept_v2` OVERALL PASS (curve 0/0/0, audio CH1/CH3/CH4 0/0, CH2
+  EXPECTED(4)); transparent 50 GiB Sony checker 37/37; 6-source fast-restore
+  matrix PASS; unit 1020 PASS / 2 environment-only FAIL.
+
+See [v0.9.0 release notes](docs/release_notes_v0.9.0.md). The previous release
+(v0.8.11) added default long-take audio alignment and 50 GiB transparent fast
+restore; its notes are [here](docs/release_notes_v0.8.11.md).
 
 ## Requirements
 
@@ -464,6 +465,8 @@ Local-only, untracked directories: `tools/` (shared toolchain), `testsets/` (tes
   final report, patches, provenance.
 - [x265 profile design](docs/x265-profile-design.md) — why the four profiles exist and how
   they were calibrated.
+- [v0.9.0 release notes](docs/release_notes_v0.9.0.md) — audio/metadata
+  performance (CUDA opt-in), bit-identical outputs.
 - [v0.8.11 release notes](docs/release_notes_v0.8.11.md) — default long-take audio
   alignment (reference round-3), 50 GiB transparent-mode fast restore.
 - [v0.8.8 release notes](docs/release_notes_v0.8.8.md) — archive repair in the main
@@ -473,13 +476,13 @@ Local-only, untracked directories: `tools/` (shared toolchain), `testsets/` (tes
 
 ## Release
 
-Current source version: **0.8.11** (`VERSION`, tag `v0.8.11`, published as a
+Current source version: **0.9.0** (`VERSION`, tag `v0.9.0`, published as a
 GitHub **pre-release**).
 
 - Self-contained packages are produced by `release/build_release.py`; see
   [Installation](#installation).
-- The v0.8.11 pre-release package is attached to
-  <https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.8.11>.
+- The v0.9.0 pre-release package is attached to
+  <https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.9.0>.
 - `VERSION`, the git tag and the builder must agree: the builder refuses
   mismatches unless a development build is explicitly requested.
 

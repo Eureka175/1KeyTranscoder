@@ -126,7 +126,7 @@ copy fast restore（同一个 GPAC 产物作 stage，不重复 mux）。
 | 套件 | 结果 |
 |---|---|
 | unit | **1020 PASS / 2 FAIL**（真实 Sony 语料缺失环境项） |
-| 全量 L3 | **环境阻塞**（4 次尝试均在本机硬件探测子进程上挂起：NVENC/QSV `run_tool`/`_device_identity` 的 `communicate` 不返回、killed parent 后 QSVEncC64 孤儿仍持有管道；每次卡住吃掉 120 s timeout，多用例累加后远超正常 15 min；同样的 1kt 命令单独重跑 21 s/33 s 正常通过。此前 v0.8.11 基线全量 L3 为 **1261 PASS / 12 FAIL**，12 条均为缺真实媒体环境项；本轮改动已由 unit + C1305/C1306 parity + 透明 50 GiB + 6 源矩阵覆盖，L3 硬件探测挂起与本轮改动无栈级关联） |
+| 全量 L3 | **1261 PASS / 12 FAIL**（`KTS_PROBE_TIMEOUT=60`，18.8 min），与 v0.8.11 基线**完全同数**；12 条均为环境项（A7M5 4CH、Sony C9037、classic_test.MP4、DJI 机型语料、cls 语料），无产品回归 |
 | C1305/C1306 音频 parity（CPU 默认） | **PARITY OK**（final MOV sha256 与旧基线完全一致） |
 | C1305/C1306 音频 parity（CUDA opt-in） | **PARITY OK**（两文件 final MOV 与 CPU 基线逐位一致） |
 | `final_accept_v2` 复跑（记录产物） | **OVERALL: PASS**（曲线 CH3/CH4 0/0/0；音频 CH1/CH3/CH4 0/0，CH2 EXPECTED(4)）；新代码输出已由 parity 证明与这些记录产物逐位一致 |

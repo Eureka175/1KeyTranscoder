@@ -70,6 +70,7 @@ Three rules this module obeys
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -481,12 +482,25 @@ def caps_items(d: dict):
     return sorted(d.items(), key=lambda i: str(i[0]))
 
 
+def _probe_timeout(timeout: int) -> int:
+    """Cap a probe timeout when KTS_PROBE_TIMEOUT is set (tests/diagnostics)."""
+    raw = os.environ.get("KTS_PROBE_TIMEOUT", "").strip()
+    if raw:
+        try:
+            cap = int(raw)
+        except ValueError:
+            return timeout
+        if cap > 0:
+            return min(timeout, cap)
+    return timeout
+
+
 def _run(cmd: list[str], timeout: int = 120) -> tuple[int, str]:
     try:
         p = subprocess.run(
             cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-            errors="replace", timeout=timeout,
+            errors="replace", timeout=_probe_timeout(timeout),
         )
         return p.returncode, p.stdout or ""
     except subprocess.TimeoutExpired:

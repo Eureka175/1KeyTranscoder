@@ -16,6 +16,7 @@ capability is irrelevant by design.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from dataclasses import asdict, dataclass, field
@@ -59,6 +60,19 @@ class BackendCaps:
         return json_path, raw_path
 
 
+def _probe_timeout(timeout: int) -> int:
+    """Cap a probe timeout when KTS_PROBE_TIMEOUT is set (tests/diagnostics)."""
+    raw = os.environ.get("KTS_PROBE_TIMEOUT", "").strip()
+    if raw:
+        try:
+            cap = int(raw)
+        except ValueError:
+            return timeout
+        if cap > 0:
+            return min(timeout, cap)
+    return timeout
+
+
 def run_tool(tool: Path, *args: str, timeout: int = 120) -> str:
     proc = subprocess.run(
         [str(tool), *args],
@@ -68,7 +82,7 @@ def run_tool(tool: Path, *args: str, timeout: int = 120) -> str:
         text=True,
         encoding="utf-8",
         errors="replace",
-        timeout=timeout,
+        timeout=_probe_timeout(timeout),
     )
     return proc.stdout or ""
 

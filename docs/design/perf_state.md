@@ -208,7 +208,14 @@ in-place 与 copy 结构校验均通过；标准路径仍有已知 in24/meta 重
 
 ### WS6 — 长测试回归（环境阻塞）
 
-全量 L3 尝试 4 次（03:38 起第 4 次持续 13 min 未完成）：
+**最终结果（2026-11-01 12:48，v0.9.0）**：`KTS_PROBE_TIMEOUT=60` 下全量 L3
+18.8 min 完成，**1261 PASS / 12 FAIL**，与 v0.8.11 基线完全同数；12 条全部
+为缺失测试集/语料的环境项（A7M5 4CH、Sony C9037、classic_test.MP4、DJI 机型
+语料、cls 语料），无代码/产品性失败。10 s 超时试跑产生 9 条 QSV toolchain
+超时假失败（1247/21），60 s 恢复；该环境变量仅用于测试/诊断，默认 120 s
+行为不变。
+
+历史：全量 L3 尝试 4 次（03:38 起第 4 次持续 13 min 未完成）：
 每次都卡在 `hardware_audio`/`p4c_production` 的硬件子进程上；py-spy 显示父
 测试等待 `run_tool`/`_device_identity` 的 subprocess `communicate`，对应
 native 编码器探测进程（QSVEncC64/NVEncC64 `--check-features`）不退出，且
