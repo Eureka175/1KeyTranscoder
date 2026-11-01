@@ -712,6 +712,7 @@ def estimate_pair(
     ref_index: int = -1,
     tgt_index: int = -1,
     workers: int = 1,
+    gpu_frames: bool | None = None,
     _frames_override: list["FrameDelay"] | None = None,
 ) -> PairEstimate:
     """两阶段 + 精估 (§8.3/§8.4; ref_src/tgt_src 支持 raw 路径或 1-D ndarray)。
@@ -733,6 +734,22 @@ def estimate_pair(
        带内加权 LS -> fine_delay_samples (诊断/复检, 不驱动修正);
     5) 反相检测: 锚段白化相关面, 仅记录。
     """
+    if gpu_frames is None:
+        _frame_mode = os.environ.get("KTS_GPU_FRAME_BATCH", "0").strip().lower()
+        gpu_frames = _frame_mode not in ("", "0", "off", "false", "no")
+    _hybrid = False
+    if gpu_frames:
+        _hybrid = (
+            os.environ.get("KTS_GPU_FRAME_HYBRID", "1").strip().lower()
+            not in ("", "0", "off", "false", "no")
+            and int(workers or 1) > 1
+            and isinstance(ref_src, (str, Path))
+            and isinstance(tgt_src, (str, Path))
+            and _frames_override is None
+        )
+        if not _hybrid:
+            # single-process GPU path only
+            workers = 1
     opened: list[Any] = []
     try:
         # 帧级并行 (workers>1): 只在两个源都是**路径**时可用 —— 子进程必须
@@ -764,6 +781,20 @@ def estimate_pair(
         tgt = open_source(tgt_src, storage_dtype)
         if isinstance(tgt_src, (str, Path)):
             opened.append(tgt)
+        if _hybrid:
+            try:
+                from .gpu_align.frame_est import estimate_frames_hybrid
+                _hybrid_frames, _hybrid_stats = estimate_frames_hybrid(
+                    ref_src, tgt_src, storage_dtype=storage_dtype,
+                    sample_rate=sample_rate,
+                    search_window_ms=search_window_ms,
+                    frame_ms=frame_ms, hop_ms=hop_ms,
+                    min_confidence=min_confidence,
+                    frame_min_rms_dbfs=frame_min_rms_dbfs,
+                    workers=int(workers))
+                _frames_override = _hybrid_frames
+            except Exception:                      # noqa: BLE001
+                _frames_override = None
         return _estimate_pair(
             ref, tgt,
             sample_rate=sample_rate,
@@ -778,6 +809,8 @@ def estimate_pair(
             frame_min_rms_dbfs=frame_min_rms_dbfs,
             ref_index=ref_index,
             tgt_index=tgt_index,
+            storage_dtype=storage_dtype,
+            gpu_frames=bool(gpu_frames),
             frames_override=_frames_override,
         )
     finally:
@@ -943,6 +976,8 @@ def _estimate_pair(
     frame_min_rms_dbfs: float = -50.0,
     ref_index: int = -1,
     tgt_index: int = -1,
+    storage_dtype: str = "f32",
+    gpu_frames: bool = False,
     frames_override: list["FrameDelay"] | None = None,
 ) -> PairEstimate:
     n = min(ref.shape[0], tgt.shape[0])
@@ -969,6 +1004,22 @@ def _estimate_pair(
         # 已由进程池算好 (帧区间并行); 这里只做聚合与精估, 与顺序路径共用
         # 同一段代码, 因此两条路径的结果定义完全相同。
         frames: list[FrameDelay] = list(frames_override)
+    elif gpu_frames:
+        _gpu_frames: list[FrameDelay] | None = None
+        try:
+            from .gpu_align.frame_est import estimate_frames_gpu
+
+            _gpu_frames, _gpu_stats = estimate_frames_gpu(
+                ref, tgt, sample_rate=sample_rate,
+                storage_dtype=storage_dtype, k_lo=0, k_hi=n_frames,
+                frame=frame, hop=hop, h_c=h_c, f_c=f_c, s_c=s_c,
+                w_half=w_half, q=q, min_confidence=min_confidence,
+                rms_floor=rms_floor)
+        except Exception:                          # noqa: BLE001
+            _gpu_frames = None
+        frames = (_gpu_frames if _gpu_frames is not None
+                  else _est_frames(ref, tgt, k_lo=0, k_hi=n_frames,
+                                   **_frame_kw))
     else:
         frames = _est_frames(ref, tgt, k_lo=0, k_hi=n_frames, **_frame_kw)
 
@@ -1225,6 +1276,11 @@ def _get_estimation_pool(workers: int) -> Any:
 
 def shutdown_estimation_pool() -> None:
     """Release the reusable estimation pool (called at end of channel-sync)."""
+    try:
+        from .gpu_align.frame_est import clear_frame_coarse_cache
+        clear_frame_coarse_cache()
+    except Exception:                                  # noqa: BLE001
+        pass
     global _PROC_POOL, _PROC_POOL_WORKERS
     with _PROC_POOL_LOCK:
         pool, _PROC_POOL = _PROC_POOL, None

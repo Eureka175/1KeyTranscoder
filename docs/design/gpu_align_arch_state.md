@@ -3,8 +3,9 @@
 > **分支**：`feature/gpu-align-arch`（从 `feature/v1.0-async` 切出）
 > **版本**：VERSION 保持 **0.9.0**；程序默认开启 **fp32 + CUDA 音频对齐**（CUDA 不可用时自动回退 CPU）。`--gpu-align off` 可关闭。
 > **目标**：CUDA FP32/FP64 性能验证 + 整体音频对齐 GPU 优化架构重写。
-> **报告**：[gpu_align_ws14_report.md](gpu_align_ws14_report.md)；
+> **报告**：[gpu_align_ws14_report.md](gpu_align_ws14_report.md)、[gpu_frame_batch_report.md](gpu_frame_batch_report.md)；
 > **设计**：[gpu_align_architecture.md](gpu_align_architecture.md)。
+> **帧级批处理**：实验 opt-in，默认关闭；单对 hybrid 约 1.2×，完整入口未通过性能门。
 
 ## 1. 当前提交
 

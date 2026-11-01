@@ -136,6 +136,7 @@ F:\1KeyTranscoder\
 | [`plans/hardware-codec-policy-redesign.md`](plans/hardware-codec-policy-redesign.md) | **硬件编解码策略与执行管线重构规划书**（含实施状态与 `SUPERSEDED` 标注）。当前生效架构：`x265`/`svtav1` = FFmpeg 硬解 + FFmpeg 编码；`nvenc`/`qsv` = rigaya 原生读端，**Sony → `--avsw`（预防性）、非 Sony → `--avhw`（完整性闸门保护）**。**不存在** FFmpeg → y4m → rigaya stdin 的生产路径 |
 | [plans/v1.0-async-rollout-plan.md](plans/v1.0-async-rollout-plan.md) | **v1.0 异步/调度长期实施计划**：P1 连续补槽、P2 音视频 overlap、A/B 任务、验收门与状态记录。 |
 | [design/gpu_align_arch_state.md](design/gpu_align_arch_state.md) | **GPU 音频对齐架构状态/移交**：分支提交、模块、环境开关、实测汇总、限制与下一步。 |
+| [design/gpu_frame_batch_report.md](design/gpu_frame_batch_report.md) | 帧级 `estimate_pair` GPU 批处理实验：实现、单对 hybrid 1.2×、完整入口未通过、默认关闭。 |
 | [design/gpu_align_architecture.md](design/gpu_align_architecture.md) | **GPU 音频对齐新架构**：`core/gpu_align` 后端/精度策略/窗级与帧级批处理/显存预算/回退/parity 合同。 |
 | [design/gpu_align_ws14_report.md](design/gpu_align_ws14_report.md) | **GPU 对齐 FP32/FP64 实测报告**：微基准、C1306/C1305 端到端、精度差与 go/no-go 建议。 |
 | [plans/async-pipeline-and-scheduler.md](plans/async-pipeline-and-scheduler.md) | **异步流水线与连续 jobs 调度规划（未实现）**：当前 \--jobs auto\ 是波次调度（波尾空槽），固定 \--jobs N\ 已能连续补槽；建议 Phase 1 连续补槽、Phase 2 同文件 audio/video overlap（音频只依赖源）、Phase 3 metadata/mux stage 流水线；含资源预算、验收与风险。 |
