@@ -1188,14 +1188,19 @@ def align_time_varying(
         # contention instead of throughput (measured: 3 units fast 110 s vs
         # prewarmed sequential much lower).  Prewarm once in this thread and
         # keep units sequential when GPU alignment is selected.
-        _gpu_align = bool(_default_measure
-                          and sync_estimate.gpu_align_enabled())
+        _gpu_mode = (sync_estimate.gpu_align_mode()
+                     if _default_measure else "")
+        _gpu_align = bool(_gpu_mode)
         if _gpu_align:
             try:
                 sync_estimate.prewarm_gpu_align()
             except Exception:                          # noqa: BLE001
                 pass
-        if (len(units) > 1 and _default_measure and not _gpu_align
+        # FP32 fast kernels showed contention when units ran concurrently;
+        # FP64 exact benefits from the existing parallel-unit path.  Only
+        # serialize fast; exact keeps the proven parallel topology.
+        _serialize_units = bool(_gpu_align and _gpu_mode == "fast")
+        if (len(units) > 1 and _default_measure and not _serialize_units
                 and bool(prof.get("measure_parallel_units", True))):
             with ThreadPoolExecutor(max_workers=min(4, len(units))) as ex:
                 futs = {ex.submit(_measure_unit, m): int(m[0]) for m in units}

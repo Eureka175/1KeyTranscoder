@@ -154,11 +154,15 @@ exact 路径的 2.57× 被精化限制；当前不做 GPU 精化，后续可评�
 | 模式 | wall | 相对 CPU | 最终 raw |
 |---|---:|---:|---|
 | CPU | **115.1 s** | 1.00× | baseline |
-| fast（FP32 + 主线程 prewarm + unit 串行） | **81.7 s** | **1.41×** | 与 CPU **sha256 全同** |
-| exact（FP64，早前并行 unit） | **70.0 s** | **1.64×** | 与 CPU **sha256 全同** |
+| fast（FP32；prewarm + unit 串行） | **81.7 s** | **1.41×** | 与 CPU **sha256 全同** |
+| exact（FP64；prewarm + 并行 unit） | **71.3 s** | **1.61×** | 与 CPU **sha256 全同** |
 
 2ch 诊断（1 target）：CPU 76.7 s；fast 39.0 s（**1.97×**）；
 exact 45.1 s（1.70×）。
+
+unit 拓扑对照（C1306，3 targets）：exact 并行 **71.3 s** vs 强制串行
+**88.8 s**；fast 串行 **81.7 s**。因此策略为 **exact 保留并行 + prewarm，
+fast 串行**。串行 exact 的输出 raw 仍与 CPU 一致，只是更慢。
 
 ### 6.2 关键修复
 

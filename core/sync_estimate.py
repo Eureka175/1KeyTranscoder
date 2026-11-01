@@ -1414,6 +1414,16 @@ def _refine_window_peak(
     return int(best_m), abs(float(best_val))
 
 
+def gpu_align_mode() -> str:
+    """Normalised selected GPU alignment mode ("fast"/"exact"/"")."""
+    mode = os.environ.get("KTS_GPU_ALIGN", "0").strip().lower()
+    if mode in ("", "0", "off", "false", "no"):
+        return ""
+    if mode in ("exact", "fp64"):
+        return "exact"
+    return "fast"
+
+
 def gpu_align_enabled() -> bool:
     """True when the optional GPU alignment path is selected by env."""
     mode = os.environ.get("KTS_GPU_ALIGN", "0").strip().lower()
