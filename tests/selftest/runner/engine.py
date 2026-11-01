@@ -60,6 +60,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("gpac/dji", core.l1_gpac_dji),
             ("integrity/pix_fmt geometry", core.l1_integrity_geometry),
             ("gpu_align policy/parity", gpu_align.l1_gpu_align),
+            ("gpu_align fallback/availability",
+             gpu_align.l1_gpu_align_fallback),
             ("gpac/paths", core.l1_gpac_paths),
             ("tkhd 轨道标志/alternate group (PR 多音轨)",
              container_flags.l1_track_flags),

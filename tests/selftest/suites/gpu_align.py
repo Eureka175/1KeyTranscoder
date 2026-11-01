@@ -76,3 +76,22 @@ def l1_gpu_align() -> None:
     record("gpu_align.surface mismatch",
            not compare_surfaces(sa, SurfaceBatch(
                np.ones((2, 3)), 16, np.asarray([True, False]), 0, 2)).ok)
+
+def l1_gpu_align_fallback() -> None:
+    """GPU-off / unavailable paths must be explicit, not silent failures."""
+    from core.gpu_align import AlignGpuSession, gpu_available
+    from core.gpu_align.session import session_from_env
+
+    section("L1 gpu_align fallback/availability")
+    record("gpu_align.off mode returns no session",
+           session_from_env(mode="0") is None)
+    record("gpu_align.off literal is None",
+           AlignGpuSession.create(mode="off") is None)
+    record("gpu_align.available is bool",
+           isinstance(gpu_available(), bool))
+    # If the environment truly has no CUDA, creating an enabled session must
+    # still return None instead of raising; when CUDA exists this is a no-op.
+    if not gpu_available():
+        record("gpu_align.no CUDA -> None session",
+               AlignGpuSession.create(mode="fast") is None)
+
