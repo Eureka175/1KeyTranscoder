@@ -96,4 +96,4 @@ KTS_GPU_ALIGN_BUDGET_MB=2048     # 显存预算上限
 - `final_accept_v2` 重跑 **OVERALL: PASS**；
 - 默认 `KTS_GPU_ALIGN=0` 的 Sony 单文件短测：`done=1`、
   `PRESERVED=37`；GPU 关闭时默认行为不变；
-- VERSION 仍 0.9.0。
+- 预算 8 MB 下 fast 411 窗完成且两次记录相同；VERSION 仍 0.9.0。

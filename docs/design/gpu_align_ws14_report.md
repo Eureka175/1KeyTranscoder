@@ -295,4 +295,5 @@ stereo/frame/apply 等 CPU 占比更高；fast 199.6 s 略优于 exact 204.7 s�
   **OVERALL: PASS**（使用既有验收产物，默认路径未变）。
 - **默认路径短测**：`KTS_GPU_ALIGN=0` 的 Sony 单文件 `1kt.py`：
   `done=1`、`PRESERVED=37 MODIFIED=0 MISSING=0`；GPU 不启用时行为不变。
+- **显存预算压力**：`KTS_GPU_ALIGN_BUDGET_MB=8` 下 fast 仍完成 411 窗，两次窗口记录相同（deterministic），wall 10.6 s；说明批大小降级路径可用。
 - **VERSION** 仍为 `0.9.0`；未发布 v1.0.0。
