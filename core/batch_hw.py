@@ -36,9 +36,15 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import (
+    FIRST_COMPLETED,
+    ThreadPoolExecutor,
+    as_completed,
+    wait,
+)
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -1002,6 +1008,7 @@ def encode_one_sony_hw(
     status_cb: StatusCb | None = None,
     show_progress: bool = True,
     throughput_cb: Callable[[float], None] | None = None,
+    audio_task: "AudioSyncTask | None" = None,
 ) -> str:
     """Sony preservation path with a rigaya hardware encoder."""
     work_dir = work_root / job_id_for(src)
@@ -1082,9 +1089,17 @@ def encode_one_sony_hw(
                 "POLICY | AV1 Sony preserve: rtmd/nrtm/uuid kept, "
                 "XAVC brand NOT restored (AV1 not in XAVC spec)"
             )
-        # 自动延时补偿 (Sony): 修正后的音频轨在重建时替代源音轨
+        # 自动延时补偿 (Sony): 修正后的音频轨在重建时替代源音轨。
+        # P2: --async-pipeline starts the audio task before this pipeline;
+        # run_sony_pipeline resolves it lazily right before the final mux, so
+        # metadata extraction + video encode overlap the audio stage.
         audio_sources = None
-        if channel_sync and source_summary["audio_streams"] > 0 \
+        audio_sources_getter = None
+        if audio_task is not None:
+            def audio_sources_getter() -> list[Path] | None:
+                audio_task.get()
+                return audio_task.audio_sources
+        elif channel_sync and source_summary["audio_streams"] > 0 \
                 and ffmpeg is not None:
             from core.channel_sync import run_channel_sync
 
@@ -1115,6 +1130,7 @@ def encode_one_sony_hw(
                 logger.warning("[SYNC-FAIL] %s | %s — 原音频照旧", src, exc)
                 file_logger.exception("CHANNEL SYNC FAILED")
 
+
         report = run_sony_pipeline(
             source=src,
             work_dir=work_dir,
@@ -1130,13 +1146,18 @@ def encode_one_sony_hw(
             quality_opts=quality_opts,
             quality_csv=quality_csv,
             audio_sources=audio_sources,
+            audio_sources_getter=audio_sources_getter,
             log=pipe_log,
         )
     except Exception as exc:
         logger.error("[FAIL] preservation pipeline | %s | %s", src, exc)
         file_logger.exception("PRESERVATION PIPELINE FAILED")
+        if audio_task is not None:
+            audio_task.get()
         return "failed"
 
+    if audio_task is not None:
+        audio_task.get()
     elapsed = time.monotonic() - started
 
     gyro = report.get("gyroflow")
@@ -1260,6 +1281,7 @@ def encode_one_hw_classic(
     show_progress: bool = True,
     throughput_cb: Callable[[float], None] | None = None,
     video_handoff: VideoHandoffHook | None = None,
+    audio_task: "AudioSyncTask | None" = None,
 ) -> str:
     """Non-Sony material: video + audio only, single-tool single pass.
     At check_level='full' the PSNR/SSIM sample gates delivery (FAIL
@@ -1380,12 +1402,16 @@ def encode_one_hw_classic(
         )
 
     # 自动延时补偿 (经典路径): 修正后的音频轨替换拷贝音频
-    if channel_sync and ffmpeg is not None:
+    # P2: with --async-pipeline the task was already started before the video
+    # encode; get() joins it now (its result is independent of the video).
+    sync_report = None
+    if audio_task is not None:
+        sync_report = audio_task.get()
+    elif channel_sync and ffmpeg is not None:
         from core.channel_sync import run_channel_sync
-        from preservation.audio_sync import remux_replace_audio
 
         try:
-            res = run_channel_sync(
+            sync_report = run_channel_sync(
                 source=src,
                 ffmpeg=ffmpeg,
                 work_dir=work_dir / "channel_sync",
@@ -1395,35 +1421,42 @@ def encode_one_hw_classic(
             )
             file_logger.info(
                 "CHANNEL_SYNC | %s | %s",
-                res["status"],
-                json.dumps(res.get("channels", []), ensure_ascii=False),
+                sync_report["status"],
+                json.dumps(sync_report.get("channels", []),
+                           ensure_ascii=False),
             )
-            if res["status"] == "applied":
-                synced = part_dst.with_name(part_dst.stem + ".synced.mov")
-                remux_replace_audio(
-                    gpac=gpac, video_src=part_dst,
-                    fixed_files=[Path(p) for p in (res.get("audio_files")
-                                                   or res["fixed_files"])],
-                    dst=synced,
-                    log=lambda msg: logger.info("[SYNC] %s", msg),
-                )
-                # GPAC 输出 mvhd timescale 与源不同: 按实际 timescale 修复
-                # tkhd/elst 时长 (否则音频被 elst 截断为 1/3)
-                from core.channel_sync import repair_remux_timescale
-
-                repair_remux_timescale(
-                    synced, log=lambda msg: logger.info("[SYNC] %s", msg)
-                )
-                safe_unlink(part_dst)
-                os.replace(synced, part_dst)
-            elif res["status"] in ("measure_failed", "verify_failed"):
-                logger.warning(
-                    "[SYNC-SKIP] %s | %s — 原音频照旧",
-                    src.name, res["detail"],
-                )
         except Exception as exc:
             logger.warning("[SYNC-FAIL] %s | %s — 原音频照旧", src, exc)
             file_logger.exception("CHANNEL SYNC FAILED")
+
+    if sync_report is not None:
+        res = sync_report
+        if res["status"] == "applied":
+            from preservation.audio_sync import remux_replace_audio
+
+            synced = part_dst.with_name(part_dst.stem + ".synced.mov")
+            remux_replace_audio(
+                gpac=gpac, video_src=part_dst,
+                fixed_files=[Path(p) for p in (res.get("audio_files")
+                                               or res["fixed_files"])],
+                dst=synced,
+                log=lambda msg: logger.info("[SYNC] %s", msg),
+            )
+            # GPAC 输出 mvhd timescale 与源不同: 按实际 timescale 修复
+            # tkhd/elst 时长 (否则音频被 elst 截断为 1/3)
+            from core.channel_sync import repair_remux_timescale
+
+            repair_remux_timescale(
+                synced, log=lambda msg: logger.info("[SYNC] %s", msg)
+            )
+            safe_unlink(part_dst)
+            os.replace(synced, part_dst)
+        elif res["status"] in ("measure_failed", "verify_failed"):
+            logger.warning(
+                "[SYNC-SKIP] %s | %s — 原音频照旧",
+                src.name, res["detail"],
+            )
+
 
     # 交付: 中间产物是 **MOV**, 最终容器跟随源。相同 -> 直接改名;
     # 不同 (源为 MP4) -> 无损容器重封装, 绝不重新编码。
@@ -1575,6 +1608,7 @@ def encode_one_dji_hw(
     status_cb: StatusCb | None = None,
     show_progress: bool = True,
     throughput_cb: Callable[[float], None] | None = None,
+    audio_task: "AudioSyncTask | None" = None,
 ) -> str:
     """DJI preservation path (Osmo Action / drones).
 
@@ -1697,8 +1731,14 @@ def encode_one_dji_hw(
 
             # 2-4. shared DJI rebuild: manifest -> GPAC mux ->
             # stts duration repair (hardware intermediate) -> dji check
+            # P2: with --async-pipeline the audio task was started before the
+            # video encode and is joined here, right before the container mux.
             audio_sources = None
-            if channel_sync and source_summary["audio_streams"] > 0 \
+            if audio_task is not None:
+                stage = audio_task.get()
+                if stage is not None and stage.get("status") == "applied":
+                    audio_sources = audio_task.audio_sources
+            elif channel_sync and source_summary["audio_streams"] > 0 \
                     and ffmpeg is not None:
                 from core.channel_sync import run_channel_sync
 
@@ -1758,6 +1798,8 @@ def encode_one_dji_hw(
     except Exception as exc:
         logger.error("[FAIL] dji pipeline | %s | %s", src, exc)
         file_logger.exception("DJI PIPELINE FAILED")
+        if audio_task is not None:
+            audio_task.get()
         return "failed"
 
     if not report.get("structural_success"):
@@ -2232,8 +2274,124 @@ class BatchCtx:
     video_handoff: VideoHandoffHook | None = None
     warnings_total: list[str] = field(default_factory=list)
     # (backend_name, encode_fps) samples collected by workers, read by
-    # the adaptive wave scheduler between waves
+    # the scheduler.  Guarded so the continuous scheduler can drain it while
+    # workers append.
     throughput: list[tuple[str, float]] = field(default_factory=list)
+    throughput_lock: Any = field(default_factory=threading.Lock)
+    #: P2 (opt-in): one global audio-sync slot; channel_sync itself already
+    #: spawns a 12-process estimator pool, so concurrent audio tasks must be
+    #: gated to avoid CPU/memory oversubscription.
+    audio_sync_gate: Any = field(
+        default_factory=lambda: threading.Semaphore(1))
+    #: P2: run audio channel-sync concurrently with video encode per file.
+    async_pipeline: bool = False
+
+
+def _record_throughput(
+    ctx: BatchCtx, backend_name: str, fps: float
+) -> None:
+    """Thread-safe append used by the continuous scheduler."""
+    with ctx.throughput_lock:
+        ctx.throughput.append((backend_name, fps))
+
+
+#: One process-wide audio-sync slot (P2).  channel_sync itself spawns a
+#: 12-process estimator pool; concurrent audio tasks would oversubscribe CPU
+#: and memory, so audio stages are serialized even when video slots are many.
+_AUDIO_SYNC_GATE = threading.Semaphore(1)
+
+
+class AudioSyncTask:
+    """Run channel_sync in a worker thread while the video encoder runs.
+
+    Only the source file is read, so the audio stage has no dependency on the
+    video intermediate.  ``AudioSyncTask.get()`` joins before the caller needs
+    the corrected audio tracks (final mux).
+    """
+
+    def __init__(
+        self, *,
+        src: Path,
+        work_dir: Path,
+        streams: Any,
+        channel_sync_opts: dict[str, Any] | None,
+        ffmpeg: Path,
+        logger: logging.Logger,
+        file_logger: logging.Logger,
+    ) -> None:
+        self.src = src
+        self.work_dir = work_dir
+        self.streams = streams
+        self.opts = channel_sync_opts
+        self.ffmpeg = ffmpeg
+        self.logger = logger
+        self.file_logger = file_logger
+        self.report: dict[str, Any] | None = None
+        self.audio_sources: list[Path] | None = None
+        self._thread = threading.Thread(
+            target=self._run, name=f"audio-sync:{src.name}", daemon=True)
+
+    def start(self) -> "AudioSyncTask":
+        self._thread.start()
+        return self
+
+    def _run(self) -> None:
+        from core.channel_sync import run_channel_sync
+
+        try:
+            with _AUDIO_SYNC_GATE:
+                res = run_channel_sync(
+                    source=self.src,
+                    ffmpeg=self.ffmpeg,
+                    work_dir=self.work_dir / "channel_sync",
+                    streams=self.streams,
+                    opts=self.opts,
+                    log=lambda msg: self.logger.info(
+                        "[SYNC] %s | %s", self.src.name, msg),
+                )
+            self.report = res
+            self.file_logger.info(
+                "CHANNEL_SYNC | %s | %s",
+                res["status"],
+                json.dumps(res.get("channels", []), ensure_ascii=False),
+            )
+            if res["status"] == "applied":
+                self.audio_sources = [
+                    Path(p) for p in (res.get("audio_files")
+                                      or res["fixed_files"])
+                ]
+            elif res["status"] in ("measure_failed", "verify_failed"):
+                self.logger.warning(
+                    "[SYNC-SKIP] %s | %s — 原音频照旧",
+                    self.src.name, res["detail"],
+                )
+        except Exception as exc:                       # noqa: BLE001
+            self.logger.warning(
+                "[SYNC-FAIL] %s | %s — 原音频照旧", self.src, exc)
+            self.file_logger.exception("CHANNEL SYNC FAILED")
+
+    def get(self) -> dict[str, Any] | None:
+        self._thread.join()
+        return self.report
+
+
+def _start_audio_sync(
+    *,
+    src: Path,
+    work_dir: Path,
+    src_info: Any,
+    channel_sync_opts: dict[str, Any] | None,
+    ffmpeg: Path | None,
+    logger: logging.Logger,
+    file_logger: logging.Logger,
+) -> AudioSyncTask | None:
+    if ffmpeg is None or not getattr(src_info, "raw_streams", None):
+        return None
+    return AudioSyncTask(
+        src=src, work_dir=work_dir, streams=src_info.raw_streams,
+        channel_sync_opts=channel_sync_opts, ffmpeg=ffmpeg,
+        logger=logger, file_logger=file_logger,
+    ).start()
 
 
 def _status_cb_for(
@@ -2352,6 +2510,23 @@ def process_file_hw(
                 "container rebuild skipped", dji_tool,
             )
 
+    # P2: audio channel-sync only reads the source; start it before dispatch so
+    # it overlaps the video encode.  One process-wide gate serializes audio
+    # stages (channel_sync itself spawns a 12-process estimator pool).
+    audio_task = None
+    if (ctx.async_pipeline and not ctx.dry_run and ctx.channel_sync
+            and ctx.ffmpeg is not None
+            and source_summary.get("audio_streams", 0) > 0):
+        audio_task = _start_audio_sync(
+            src=src,
+            work_dir=ctx.work_root / job_id_for(src),
+            src_info=src_info,
+            channel_sync_opts=ctx.channel_sync_opts,
+            ffmpeg=ctx.ffmpeg,
+            logger=logger,
+            file_logger=file_logger,
+        )
+
     if is_sony_source(source_streams):
         result = encode_one_sony_hw(
             src=src,
@@ -2385,9 +2560,9 @@ def process_file_hw(
             dry_run=ctx.dry_run,
             status_cb=_status_cb_for(ctx, src),
             show_progress=ctx.show_progress,
-            throughput_cb=lambda fps: ctx.throughput.append(
-                (backend.name, fps)
-            ),
+            throughput_cb=lambda fps: _record_throughput(
+                ctx, backend.name, fps),
+            audio_task=audio_task,
         )
     elif is_dji and (dji_keep_meta or ctx.preserve_metadata):
         result = encode_one_dji_hw(
@@ -2422,9 +2597,9 @@ def process_file_hw(
             dry_run=ctx.dry_run,
             status_cb=_status_cb_for(ctx, src),
             show_progress=ctx.show_progress,
-            throughput_cb=lambda fps: ctx.throughput.append(
-                (backend.name, fps)
-            ),
+            throughput_cb=lambda fps: _record_throughput(
+                ctx, backend.name, fps),
+            audio_task=audio_task,
         )
     else:
         result = encode_one_hw_classic(
@@ -2456,12 +2631,16 @@ def process_file_hw(
             dry_run=ctx.dry_run,
             status_cb=_status_cb_for(ctx, src),
             show_progress=ctx.show_progress,
-            throughput_cb=lambda fps: ctx.throughput.append(
-                (backend.name, fps)
-            ),
+            throughput_cb=lambda fps: _record_throughput(
+                ctx, backend.name, fps),
             video_handoff=ctx.video_handoff,
+            audio_task=audio_task,
         )
 
+    # Join an async audio task even when the encoder failed before reaching the
+    # audio merge point (its get() is idempotent; success paths already joined).
+    if audio_task is not None:
+        audio_task.get()
     if result == "failed" and ctx.failed_path is not None:
         record_failure(
             ctx.failed_path,
@@ -2494,8 +2673,8 @@ class AdaptiveJobs:
         self.stable_rounds = 0
         self.cap = max(2, min(8, (os.cpu_count() or 4)))
 
-    def note_wave(self, agg_fps: float, label: str = "") -> int:
-        """Record one wave's aggregate fps; returns next worker count."""
+    def _adapt(self, agg_fps: float, label: str, kind: str) -> int:
+        """Shared adaptation core (kind is only for the log line)."""
         if agg_fps > self.best_agg:
             self.best_agg = agg_fps
             self.best_w = self.current
@@ -2526,12 +2705,20 @@ class AdaptiveJobs:
 
         if self.logger is not None:
             self.logger.info(
-                "[ADAPTIVE%s] wave aggregate=%.1f fps -> next workers=%d "
+                "[ADAPTIVE%s] %s aggregate=%.1f fps -> next workers=%d "
                 "(best %.1f @ %d, cap %d)",
-                f" {label}" if label else "",
+                f" {label}" if label else "", kind,
                 agg_fps, self.current, self.best_agg, self.best_w, self.cap,
             )
         return self.current
+
+    def note_wave(self, agg_fps: float, label: str = "") -> int:
+        """Record one wave's aggregate fps (legacy/multihw path)."""
+        return self._adapt(agg_fps, label, "wave")
+
+    def note_sample(self, agg_fps: float, label: str = "") -> int:
+        """Record a rolling-window sample (continuous scheduler path)."""
+        return self._adapt(agg_fps, label, "completion window")
 
 
 def run_hw_pool(
@@ -2565,23 +2752,40 @@ def run_hw_pool(
                 counters[fut.result()] += 1
         return counters
 
-    # ---- adaptive wave scheduling ----
+    # ---- continuous adaptive scheduling (P1) ----
     ctx.show_progress = False
     ctrl = AdaptiveJobs(logger, start=2)
     pending = deque(sources)
-    while pending:
-        wave_size = min(ctrl.current, len(pending))
-        wave = [pending.popleft() for _ in range(wave_size)]
-        ctx.throughput.clear()
-        with ThreadPoolExecutor(max_workers=wave_size) as ex:
-            futures = {
-                ex.submit(process_file_hw, ctx, backend, src, logger): src
-                for src in wave
-            }
-            for fut in as_completed(futures):
-                counters[fut.result()] += 1
-        agg = sum(fps for _, fps in ctx.throughput)
-        ctrl.note_wave(agg, backend.name)
+    fps_window: deque[float] = deque(maxlen=8)
+    counters.update({"done": 0, "skipped": 0, "failed": 0,
+                     "dry-run": 0})
+    with ThreadPoolExecutor(max_workers=ctrl.cap) as ex:
+        futures: dict[Any, Path] = {}
+        while pending or futures:
+            # Refill immediately up to the current target; a completion below
+            # frees a slot and this loop draws the next source right away.
+            while pending and len(futures) < max(1, ctrl.current):
+                _src = pending.popleft()
+                futures[ex.submit(
+                    process_file_hw, ctx, backend, _src, logger)] = _src
+            if not futures:
+                break
+            done, _not_done = wait(
+                tuple(futures.keys()), return_when=FIRST_COMPLETED)
+            for fut in done:
+                futures.pop(fut, None)
+                try:
+                    counters[fut.result()] += 1
+                except Exception:                      # noqa: BLE001
+                    logger.exception("[SCHED] worker raised")
+                    counters["failed"] += 1
+            with ctx.throughput_lock:
+                samples = list(ctx.throughput)
+                ctx.throughput.clear()
+            fps_window.extend(fps for _name, fps in samples)
+            if fps_window:
+                ctrl.note_sample(sum(fps_window), backend.name)
+
     return counters
 
 

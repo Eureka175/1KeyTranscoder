@@ -303,6 +303,40 @@ sources queue
 
 ---
 
+## 9.5 实施进度（2026-11-01，feature/async-pipeline-p1p2）
+
+### 已实现
+
+- **P1 连续补槽**：`core/batch_hw.py` 的 `run_hw_pool(auto)` 改为
+  "共享队列 + `ctrl.current` 个在飞任务 + 完成即补"；`AdaptiveJobs` 新增
+  `note_sample()`（滚动窗口吞吐，取代每波聚合）。固定 `--jobs N` 路径不变。
+- **P2 同文件 audio/video overlap**（CLI `--async-pipeline`，默认关闭）：
+  - `AudioSyncTask` 在 `process_file_hw` 里先启动（音频只读源文件）；
+  - classic / Sony / DJI 三条路径分别在最终 mux 前 join；
+  - Sony 的 `run_sony_pipeline` 新增 `audio_sources_getter`，在最终 mux
+    前才解析音频结果，因此 metadata 提取 + 视频编码与音频并行；
+  - 进程级 `_AUDIO_SYNC_GATE = Semaphore(1)`：channel_sync 自带 12 进程池，
+    音频阶段仍串行，避免 CPU/内存超卖；
+  - 失败路径在 `process_file_hw` 统一 join，避免遗留线程。
+
+### 短测结果（7 个 20261025 素材 + 4ch C1305 片段）
+
+| 测试 | 结果 |
+|---|---|
+| unit | **1020 PASS / 2 FAIL**（均为缺真实 Sony/DJI 语料的既有环境项） |
+| P1 `--jobs auto` 7 文件 | `done=7 failed=0`；每个 `[DONE]` 后同一秒立刻出现下一个 `[START]`（波尾空槽消除）。batch wall 4m03s vs 旧波次 4m05s；本组含一个 139 s 长文件，持续占满 2 槽会让长文件略慢（222.8 s vs 旧 158 s），总吞吐几乎持平。更不均匀的文件组应受益更明显。 |
+| P1 输出 | 音频流全部与基线一致；视频流 5/7 逐位一致，2/7 不同——**同一命令两次 `--jobs 1` 的 NVENC 输出视频流也不同**（`det1 != det2`），但抽样解码 120 帧 MD5 相同。结论：NVENC 压缩位流本身非确定，验收应用解码帧/音轨/结构校验，不能拿整段压缩位流 sha 当 P1 等价证明。 |
+| P2 4ch classic (`--async-pipeline`) | 输出视频/音频/120 帧解码 MD5 与串行控制 **SAME**；但本片段硬件解码完整性失败后回退软件解码，音频线程与软件解码抢 CPU，wall **128.2 → 148.8 s（更慢）**。说明 async 只应在 GPU-bound 路径/CPU 有余量时开启，需按素材标定。 |
+| P2 Sony 2ch 冒烟 | `--async-pipeline` 完成，`PRESERVED=37 MODIFIED=0`；视频/音频/60 帧解码 MD5 与基线一致；20.17 s vs 旧 21.7 s（该文件音频为 2ch 不适格，重叠收益小，但 Sony getter 路径无回归）。 |
+
+### 尚未完成 / 结论
+
+- `run_multihw_pool` 的连续化尚未改（仍波次）；先验证单后端主路径。
+- Dashboard admission（所有文件显示 queued）未做；目前只显示已启动的槽位。
+- P2 的 CPU 争用需要更细的资源预算（audio 线程只在视频为 GPU 编码时启动，
+  或按当前 CPU 负载/解码路径决定），否则 classic 软件解码片段会变慢。
+- 因此 `--async-pipeline` 保持 **opt-in**；P1 连续补槽可独立默认启用。
+
 ## 10. 附录 A：状态机
 
 ```text

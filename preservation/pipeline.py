@@ -93,6 +93,7 @@ def run_sony_pipeline(
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
     audio_sources: list[Path] | None = None,
+    audio_sources_getter: Callable[[], list[Path] | None] | None = None,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """codec: "hevc" (XAVC 合规路径, 恢复 XAVC brand) 或 "av1"
@@ -217,6 +218,10 @@ def run_sony_pipeline(
     # native ISOBMFF track copies (exact source timing, no NHML).
     stage = work_dir / "final" / "stage.mov"
     stage.parent.mkdir(parents=True, exist_ok=True)
+    # P2: audio channel-sync may still be running in a worker thread; resolve
+    # it lazily here, immediately before the final mux (video is already done).
+    if audio_sources_getter is not None and audio_sources is None:
+        audio_sources = audio_sources_getter()
     adds = [f"{encoded_mov}#video"]
     if has_audio:
         if audio_sources:

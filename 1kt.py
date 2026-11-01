@@ -1375,6 +1375,16 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--async-pipeline",
+        action="store_true",
+        help=(
+            "实验性: 每文件把音频 channel-sync 与视频编码并行执行 "
+            "(音频只读源文件, 不依赖视频产物). 需要 channel-sync 开启; "
+            "音频阶段进程级串行 (channel_sync 自带估计进程池). "
+            "当前仅硬件后端生效. 输出与串行路径一致."
+        ),
+    )
+    parser.add_argument(
         "--log-level",
         type=str.lower,
         choices=["error", "warn", "info", "debug"],
@@ -2937,6 +2947,7 @@ def main() -> int:
             quality_opts=quality_opts,
             channel_sync=channel_sync_enabled,
             channel_sync_opts=channel_sync_opts,
+            async_pipeline=bool(getattr(args, "async_pipeline", False)),
             preserve_metadata=bool(getattr(args, "preserve_metadata", False)),
             dry_run=args.dry_run,
             failed_path=failed_path,
