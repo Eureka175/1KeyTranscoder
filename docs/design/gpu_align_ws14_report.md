@@ -260,10 +260,25 @@ python tests/benchmark_gpu_align.py --seconds 300 --windows 20 --frames 64 \
 |---|---:|---:|---|
 | CPU | **208.8 s** | 1.00× | baseline |
 | exact（窗口 + residual GPU） | **123.1 s** | **1.70×** | **sha256 全部相同** |
+| fast（FP32 窗口 + residual；serial units） | **120.5 s** | **1.73×** | **sha256 全部相同** |
 
 - 帧级估计仍为 CPU（`estimate_pair` 12 进程池），stereo 检测也是 CPU；
   收益完全来自窗级 coarse CC 与 residual seed 的 GPU 化；
 - 4 条音频 MOV 的 sha256 **逐条相同**，说明整条 aligned 音频路径输出
   一致；
+- **fast 在完整入口上略快于 exact（120.5 vs 123.1）**，与 long-take
+  单独测试（fast 57.4 vs exact 47.1）不同；完整入口中 stereo/frame CPU
+  阶段占比较大，fast 的窗口+residual 收益能体现；
 - 这组数据（208.8 s）与 v0.9.0 的音频域 C1306 基线（约 204–217 s）同一
   量级，可视为可比的完整入口结果。
+---
+
+## 10. 完整 channel_sync C1305
+
+| 模式 | wall | 相对 CPU | 最终 4 条 audio MOV |
+|---|---:|---:|---|
+| CPU | **300.9 s** | 1.00× | baseline |
+| exact（窗口 + residual GPU） | **204.7 s** | **1.47×** | **sha256 全部相同** |
+
+C1305 的完整入口收益低于 C1306（1.70×），因为 C1305 的 stereo/frame/
+apply 等 CPU 占比更高；但 4 条最终 audio MOV 与 CPU 逐字节一致。

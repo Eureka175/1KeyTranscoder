@@ -54,7 +54,8 @@ KTS_GPU_ALIGN_BUDGET_MB=2048     # 显存预算上限
 | residual（C1306 ch0/1） | 17.0 s | 7.1 s（2.4×） | 7.3 s（2.3×） | 4165/4165 点相同（exact 且 fast） |
 | long-take C1306（3 targets） | 115.1 s | **47.1 s（2.45×）** | **57.4 s（2.01×）** | 最终 raw sha256 全同 |
 | long-take C1305（3 targets） | 131.8 s | **62.7 s（2.10×）** | — | 最终 raw sha256 全同 |
-| 完整 channel_sync C1306 | 208.8 s | **123.1 s（1.70×）** | — | 4 条 audio MOV sha256 全同 |
+| 完整 channel_sync C1306 | 208.8 s | **123.1 s（1.70×）** | **120.5 s（1.73×）** | 4 条 audio MOV sha256 全同 |
+| 完整 channel_sync C1305 | 300.9 s | **204.7 s（1.47×）** | — | 4 条 audio MOV sha256 全同 |
 
 - FP32 的窗级/残差结果在本次真实素材上与 FP64/CPU 逐点或 ≤1e-6 一致；
   用户已明确不要求 FP64 同精度。
@@ -62,7 +63,8 @@ KTS_GPU_ALIGN_BUDGET_MB=2048     # 显存预算上限
   且 exact 内核/FFT plan 已预热。因此当前推荐 exact opt-in；fast 保留实验。
 - 帧级整路径、GPU 单窗精化目前无收益；**不接入**，保留 CPU。
 - 完整 channel_sync 仍是 CPU 帧估计/立体声检测为瓶颈；GPU 只加速窗级与
-  residual。
+  residual。fast 在完整 C1306 入口略快于 exact（120.5 vs 123.1），但
+  long-take 单独测试 exact 更快；两者最终 audio MOV 均与 CPU 相同。
 
 ## 4. 已知限制/风险
 
