@@ -1183,7 +1183,19 @@ def align_time_varying(
                 kw["ref_decimated"] = _anchor_coarse
             return measure(decoded[anchor], decoded[mem[0]], **kw)
 
-        if (len(units) > 1 and _default_measure
+        # The optional GPU path already batches a full target's windows; its
+        # device is shared, so running units in parallel adds context/FFT-plan
+        # contention instead of throughput (measured: 3 units fast 110 s vs
+        # prewarmed sequential much lower).  Prewarm once in this thread and
+        # keep units sequential when GPU alignment is selected.
+        _gpu_align = bool(_default_measure
+                          and sync_estimate.gpu_align_enabled())
+        if _gpu_align:
+            try:
+                sync_estimate.prewarm_gpu_align()
+            except Exception:                          # noqa: BLE001
+                pass
+        if (len(units) > 1 and _default_measure and not _gpu_align
                 and bool(prof.get("measure_parallel_units", True))):
             with ThreadPoolExecutor(max_workers=min(4, len(units))) as ex:
                 futs = {ex.submit(_measure_unit, m): int(m[0]) for m in units}

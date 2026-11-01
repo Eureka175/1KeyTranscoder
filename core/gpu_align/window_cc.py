@@ -282,10 +282,14 @@ class WindowCCEngine:
 
     def warmup(self) -> None:
         """Compile CuPy elementwise kernels / warm the FFT plan once."""
-        n = min(64, self.n)
+        n = min(128, self.n)
         if n >= 16:
             try:
+                # Both APIs are used by measure_window_delays; compile the
+                # crop/concat path too or the first real measurement pays
+                # the JIT cost (tens of seconds on this machine).
                 self.batch_peaks([(0, n, -8, 8)])
+                self.surface_windows([(0, n)], lag_lo_c=-8, lag_hi_c=8)
             except Exception:                          # noqa: BLE001
                 pass
 

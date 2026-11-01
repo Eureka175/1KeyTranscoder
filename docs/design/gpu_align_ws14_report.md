@@ -140,3 +140,52 @@ exact 路径的 2.57× 被精化限制；当前不做 GPU 精化，后续可评�
 - 帧级/精化路径尚不划算，保持 CPU；架构不默认启用；
 - 下一步：opt-in 集成短测、fallback/确定性、最终 audio MOV 对照；
 - VERSION 仍为 `0.9.0`，不发布 v1.0.0。
+---
+
+## 6. 端到端 long-take 与精度结论（M4，2026-11-01 17:40）
+
+> 用户决策：**不需要与 FP64 同精度，差得不多就行**。因此 fast 可作为
+> 可选快速路径，但端到端仍以实际收益和最终 raw 一致性判定。
+
+### 6.1 隔离源文件、完整 `align_time_varying`（C1306 4ch，3 targets）
+
+每次模式使用独立源副本，避免 in-place 施加互相污染：
+
+| 模式 | wall | 相对 CPU | 最终 raw |
+|---|---:|---:|---|
+| CPU | **115.1 s** | 1.00× | baseline |
+| fast（FP32 + 主线程 prewarm + unit 串行） | **81.7 s** | **1.41×** | 与 CPU **sha256 全同** |
+| exact（FP64，早前并行 unit） | **70.0 s** | **1.64×** | 与 CPU **sha256 全同** |
+
+2ch 诊断（1 target）：CPU 76.7 s；fast 39.0 s（**1.97×**）；
+exact 45.1 s（1.70×）。
+
+### 6.2 关键修复
+
+- **GPU measure units 串行化**：`align_time_varying` 原来对 3 个 target
+  并行测量；GPU 设备共享时并行只增加 context/FFT-plan 竞争。检测
+  `KTS_GPU_ALIGN` 后改为：主线程 prewarm + target 顺序测量（下游 apply
+  仍按原逻辑）。
+- **主线程 prewarm**：`sync_estimate.prewarm_gpu_align()` 在 spawn 前编译
+  CuPy 内核/FFT plan，避免每个 worker 重复 JIT。
+- **WindowCCEngine.warmup** 增加 `surface_windows` 小批量预热，覆盖
+  crop/concat 路径。
+
+### 6.3 精度/收益结论
+
+- fast 与 CPU：411 窗 delay/valid/polarity 全同；`coarse_cc`/`confidence`
+  max |Δ| = **1e-6**；最终 raw sha **一致**。
+- exact 与 CPU：411/411 窗口记录**完全一致**；最终 raw sha **一致**。
+- **本机 end-to-end exact 反而略快于 fast**：fast 的收益被 CPU refine
+  与下游 apply 吃掉，且 exact 的内核/FFT plan 已在前面调用中预热。
+  因此当前推荐：
+  - **验收/默认候选：exact**（仍为 opt-in，默认全关）；
+  - **fast**：保留为实验/后续 refine GPU 化后再评估；
+  - 不再追求 FP32 与 FP64 逐位同精度。
+
+### 6.4 未完成
+
+- 帧级整路径（CPU 峰逻辑）仍无收益；
+- `_refine_window_peak` 单窗 GPU 较 CPU 慢，需批量两遍法；
+- C1305/C1306 的最终 audio MOV/final_accept 尚未用新架构全量重跑；
+- 默认关闭、VERSION 0.9.0 不变。

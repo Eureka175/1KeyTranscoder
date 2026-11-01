@@ -1414,6 +1414,39 @@ def _refine_window_peak(
     return int(best_m), abs(float(best_val))
 
 
+def gpu_align_enabled() -> bool:
+    """True when the optional GPU alignment path is selected by env."""
+    mode = os.environ.get("KTS_GPU_ALIGN", "0").strip().lower()
+    return mode not in ("", "0", "off", "false", "no")
+
+
+def prewarm_gpu_align(mode: str | None = None) -> bool:
+    """Compile/warm the optional GPU window path in the *calling* thread.
+
+    long_take measures units in a thread pool; warming in the main thread
+    before spawning avoids each worker paying the one-time CuPy JIT/FFT-plan
+    cost (the kernels/cache are process-wide).  Returns True when warmed.
+    """
+    try:
+        from .gpu_align import AlignGpuSession
+        from .gpu_align.window_cc import WindowCCEngine
+
+        sess = AlignGpuSession.create(mode=mode)
+        if sess is None:
+            return False
+        try:
+            eng = WindowCCEngine(
+                sess.backend, np.zeros(2048), np.zeros(2048),
+                policy=sess.policy)
+            eng.warmup()
+            eng.close()
+        finally:
+            sess.close()
+        return True
+    except Exception:                                      # noqa: BLE001
+        return False
+
+
 def measure_window_delays(
     ref_src: Any,
     tgt_src: Any,
