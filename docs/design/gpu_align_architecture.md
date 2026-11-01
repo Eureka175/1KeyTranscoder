@@ -4,7 +4,8 @@
 > **目标**：把当前分散的 `core/gpu_cc.py` + 原型 `gpu_frames.py` 重写为统一的
 > GPU 对齐引擎，支持 **FP64 精确** 与 **FP32 快速** 两种精度策略、批处理、
 > 显存预算、CPU 回退和可验证的 parity 合同。
-> **硬约束**：默认关闭；不改变 v0.9.0 默认输出；`VERSION` 保持 `0.9.0`。
+> **默认**：程序默认开启 fp32 + CUDA 音频对齐；CUDA 不可用时回退 CPU；
+> `--gpu-align off` 可关闭。`VERSION` 保持 `0.9.0`。
 
 ## 1. 现状与问题
 
@@ -31,7 +32,7 @@
 core/gpu_align/
     __init__.py         公开 API 与 available()
     backend.py          CuPy 导入/设备上下文/显存预算/事件计时/OOM 分类
-    precision.py        Precision 枚举与策略（exact / fast / hybrid）
+    precision.py        Precision 枚举与策略（fp64 / fp32 / hybrid）
     types.py            结果数据类（WindowPeak, FrameSurface, BatchStats）
     window_cc.py        窗级粗相关批处理引擎
     frame_gcc.py        帧级 GCC-PHAT surface 批处理引擎
@@ -54,9 +55,9 @@ core/gpu_align/
 
 | 模式 | 计算 dtype | 报告 dtype | 用途 | 验收 |
 |---|---|---|---|---|
-| `fast`（**推荐**，`KTS_GPU_ALIGN=1/fast`） | FP32 粗相关 | FP32 结果 → 既有 round | 性能优先 | 用户决策：**不要求与 FP64 同精度，不差太多即可**；实测 delay/valid/polarity 全同，仅 cc/confidence 差 ≤1e-6 |
-| `exact`（`KTS_GPU_ALIGN=exact/fp64`） | FP64 | FP64 | 验收/对照 | 与 CPU 结果逐位或按既有 round 合同一致 |
-| `hybrid` | FP32 搜峰 + FP64 复核 | FP64 | 预留 | 本轮未证明优于 fast，暂不推荐 |
+| `fp32`（**默认推荐**，`KTS_GPU_ALIGN=fp32`） | FP32 粗相关 | FP32 结果 → 既有 round | 性能优先 | 用户决策：**不要求与 FP64 同精度，不差太多即可**；实测 delay/valid/polarity 全同，仅 cc/confidence 差 ≤1e-6 |
+| `fp64`（`KTS_GPU_ALIGN=fp64`） | FP64 | FP64 | 验收/对照 | 与 CPU 结果逐位或按既有 round 合同一致 |
+| `hybrid` | FP32 搜峰 + FP64 复核 | FP64 | 预留 | 本轮未证明优于 fp32，暂不推荐 |
 
 **hybrid 规则（草案）**：
 
@@ -87,19 +88,18 @@ core/gpu_align/
 - 每次批处理记录 `BatchStats`：dtype、batch、nfft、GPU ms、上传/下载 ms、
   OOM、fallback。
 - 生产调用点只需 `if session and session.available: ... else CPU`；
-  任何不一致都回退 CPU（opt-in 路径）。
-- 入口开关（opt-in，默认关闭）：--gpu-align {off,fast,exact}，或环境变量：
-  - `KTS_GPU_ALIGN=0|1|fast|exact`（默认 0；1/fast = FP32 推荐路径）；
-  - `KTS_GPU_ALIGN_DTYPE=fp64|fp32`（兼容旧实验）；
+  任何不一致都回退 CPU；默认路径在 CUDA 可用时使用 fp32。
+- 入口开关（默认 fp32）：--gpu-align {off,fp32,fp64}，或环境变量：
+  - `KTS_GPU_ALIGN=fp32|fp64|0`（默认 fp32；0=off）；
   - `KTS_GPU_ALIGN_BUDGET_MB`（默认 2048）。
 
 ## 3. 集成点（分阶段）
 
 | 阶段 | 集成 | 风险 | 门 |
 |---|---|---|---|
-| A | `sync_estimate.measure_window_delays` 的 `_coarse_peak` 改走 `WindowCCEngine`（opt-in） | 中 | 窗记录与 CPU 等价；C1306 长镜头 wall 下降 |
+| A | `sync_estimate.measure_window_delays` 的 `_coarse_peak` 改走 `WindowCCEngine`（默认 fp32） | 中 | 窗记录与 CPU 等价；C1306 长镜头 wall 下降 |
 | B | `long_take.measure_residual_curve` 的 coarse seed 改走 `ResidualEngine` | 低 | 残差曲线/最终 MOV 不变 |
-| C | 帧级 `_est_frames` 的 GCC-PHAT surface 批处理（opt-in；CPU 峰逻辑先保持） | 高 | 逐帧 delay/confidence 一致；否则停 |
+| C | 帧级 `_est_frames` 的 GCC-PHAT surface 批处理（实验；CPU 峰逻辑先保持） | 高 | 逐帧 delay/confidence 一致；否则停 |
 | D | 多通道/多窗批处理与流水线（GPU 队列 + 主线程决策） | 高 | 总 wall/显存/确定性 |
 
 ## 4. Parity 合同
@@ -109,17 +109,17 @@ core/gpu_align/
 - 最终 audio MOV sha256（与 v0.9.0 CPU 基准）；
 - `final_accept_v2`（C1305/C1306 曲线 + 音频层）；
 - 生产报告中的整数 delay、`coarse_cc` / `confidence` 的既有 round 字段
-  （`exact`/`hybrid` 必须；`fast` 允许记录差异，但需报告）；
+  （`fp64`/`hybrid` 必须；`fp32` 允许记录差异，但需报告）；
 - 轨迹/曲线决策（valid、极性、min_cc、连续性）。
 
-### 4.2 允许容差（fast 模式，仅性能评估）
+### 4.2 允许容差（fp32 模式，仅性能评估）
 
 | 字段 | 容差 |
 |---|---|
 | 整数 delay | 0（不允许翻转） |
 | 窗 coarse_cc | ≤1e-6（报告 round 后允许边界差） |
 | confidence | ≤1e-6 |
-| 最终输出 | 必须 sha256 一致（否则 fast 仅作为实验） |
+| 最终输出 | 必须 sha256 一致（否则 fp32 仅作为实验） |
 
 ### 4.3 测试分层
 
@@ -136,14 +136,14 @@ core/gpu_align/
 |---|---|
 | M1 | 本设计 + 初始 FP32/FP64 微基准报告 |
 | M2 | `core/gpu_align` 后端/窗级/帧级引擎 + 单元测试 |
-| M3 | 真实素材 parity/性能报告（exact/fast/hybrid） |
-| M4 | opt-in 集成到窗级路径；短测 + 回退测试 |
+| M3 | 真实素材 parity/性能报告（fp64/fp32/hybrid） |
+| M4 | 集成到窗级路径（默认 fp32）；短测 + 回退测试 |
 | M5 | 架构结论（go/no-go、默认值建议、剩余风险） |
 
 ## 6. 非目标
 
 - 不重写 CPU 决策/连续性/报告逻辑；
-- 不默认开启 GPU；
+- 默认开启 fp32（CUDA 可用时）；
 - 不改变 VERSION / 不发布 v1.0.0；
 - 不在本轮完成多机/多 GPU。
 
@@ -153,13 +153,13 @@ core/gpu_align/
 
 - 后端 / 精度 / 窗级 surface / 帧级 surface / 残差 / 精化 / session /
   parity / 单元测试均已落地（`core/gpu_align/`）。
-- 窗级路径已 opt-in 集成到 `sync_estimate.measure_window_delays`
-  （`KTS_GPU_ALIGN=fast|exact`，默认关闭）。
-- 端到端：C1306 CPU 115.1 s → fast 81.7 s / exact 70.0 s；C1305
-  CPU 131.8 s → exact 109.7 s；两者最终 raw sha256 与 CPU 一致。
-- 帧级整路径与 GPU 单窗精化尚无收益，保留 CPU；残差引擎已 opt-in 接入
+- 窗级路径已集成到 `sync_estimate.measure_window_delays`
+  （`KTS_GPU_ALIGN=fp32|fp64`；程序默认 fp32）。
+- 端到端：C1306 CPU 115.1 s → fp32 81.7 s / fp64 70.0 s；C1305
+  CPU 131.8 s → fp64 109.7 s；两者最终 raw sha256 与 CPU 一致。
+- 帧级整路径与 GPU 单窗精化尚无收益，保留 CPU；残差引擎已接入
   `long_take.measure_residual_curve`（KTS_GPU_ALIGN 下替换 legacy
-  gpu_cc seed；exact/fast 曲线与 CPU 逐点相同）。
-- 已知限制：fast 在端到端不总比 exact 快（下游 CPU/refine 占比）；
+  gpu_cc seed；fp64/fp32 曲线与 CPU 逐点相同）。
+- 已知限制：fp32 在端到端不总比 fp64 快（下游 CPU/refine 占比）；
   `surface_windows` 对不等长窗口只支持同组返回，生产长镜头窗口等长；
-  默认不启用、VERSION 保持 0.9.0。
+  默认 fp32、VERSION 保持 0.9.0。

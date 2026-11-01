@@ -24,14 +24,14 @@ def l1_gpu_align() -> None:
     from core.gpu_align.types import SurfaceBatch, WindowPeak
 
     section("L1 gpu_align policy/parity")
-    record("gpu_align.policy exact",
-           resolve_policy("exact").compute_dtype == "float64")
-    record("gpu_align.policy fast",
-           resolve_policy("fast").compute_dtype == "float32")
+    record("gpu_align.policy fp64",
+           resolve_policy("fp64").compute_dtype == "float64")
+    record("gpu_align.policy fp32",
+           resolve_policy("fp32").compute_dtype == "float32")
     record("gpu_align.policy hybrid",
            resolve_policy("hybrid").precision is Precision.HYBRID)
-    record("gpu_align.policy off-like no error",
-           resolve_policy("0").compute_dtype == "float64")
+    record("gpu_align.policy off-like defaults fp32",
+           resolve_policy("0").compute_dtype == "float32")
 
     # Pure peak-selection contract: negative m maps to NFFT wrap, but the
     # window array is already cropped; index arithmetic must stay in range.
@@ -56,16 +56,16 @@ def l1_gpu_align() -> None:
 
     cpu = [(3, 0.5, 0.5), (4, -0.25, 0.25)]
     gpu = [WindowPeak(3, 0.5, 0.5), WindowPeak(4, -0.25, 0.25)]
-    record("gpu_align.parity exact",
+    record("gpu_align.parity fp64",
            compare_window_peaks(cpu, gpu).ok)
     record("gpu_align.parity lag mismatch",
            not compare_window_peaks(cpu, [WindowPeak(5, 0.5, 0.5),
                                           gpu[1]]).ok)
-    record("gpu_align.parity fast cc tolerance",
+    record("gpu_align.parity fp32 cc tolerance",
            compare_window_peaks(
                cpu, [WindowPeak(3, 0.5000001, 0.5000001), gpu[1]],
                cc_tol=1e-5).ok)
-    record("gpu_align.parity fast cc rejection",
+    record("gpu_align.parity fp32 cc rejection",
            not compare_window_peaks(
                cpu, [WindowPeak(3, 0.5001, 0.5001), gpu[1]],
                cc_tol=1e-5).ok)
@@ -93,5 +93,5 @@ def l1_gpu_align_fallback() -> None:
     # still return None instead of raising; when CUDA exists this is a no-op.
     if not gpu_available():
         record("gpu_align.no CUDA -> None session",
-               AlignGpuSession.create(mode="fast") is None)
+               AlignGpuSession.create(mode="fp32") is None)
 

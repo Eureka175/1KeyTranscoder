@@ -39,13 +39,13 @@ class WindowCCEngine:
         self.cp = backend.cp
         self.policy = policy or resolve_policy()
         self.budget_bytes = int(budget_bytes or backend.budget_bytes())
-        storage = (self.cp.float32 if self.policy.precision is Precision.FAST
+        storage = (self.cp.float32 if self.policy.precision is Precision.FP32
                    else self.cp.float64)
-        self._storage_is_fast = self.policy.precision is Precision.FAST
+        self._storage_is_fp32 = self.policy.precision is Precision.FP32
         # Keep host copies for slicing; upload only the current batch.  The
         # coarse caches themselves can be large (C1305 4ch ~1.2 GB f64), so a
         # full upload plus batch is unnecessary VRAM pressure.
-        self._ref_host = np.asarray(ref12, dtype=np.float64 if not self._storage_is_fast else np.float32)
+        self._ref_host = np.asarray(ref12, dtype=np.float64 if not self._storage_is_fp32 else np.float32)
         self._tgt_host = np.asarray(tgt12, dtype=self._ref_host.dtype)
         self.stats: list[BatchStats] = []
 
@@ -57,7 +57,7 @@ class WindowCCEngine:
     def _batch_size(self, n: int, nfft: int) -> int:
         # rfft complex (nfft/2+1) + surface (nfft) + batch matrices; use a
         # conservative 64 bytes/element for float64, 32 for float32.
-        per = 64 if not self._storage_is_fast else 32
+        per = 64 if not self._storage_is_fp32 else 32
         est = max(1, self.budget_bytes // max(1, (nfft + 2 * n) * per))
         return int(min(64, max(1, est)))
 
@@ -65,13 +65,13 @@ class WindowCCEngine:
                          n: int) -> list[WindowPeak | None]:
         """items: (start_c, count_c, lag_lo, lag_hi); equal n."""
         cp = self.cp
-        compute = (cp.float32 if self._storage_is_fast else cp.float64)
+        compute = (cp.float32 if self._storage_is_fp32 else cp.float64)
         nfft = int(_fft.next_fast_len(2 * n - 1, real=True))
         starts = np.asarray([it[0] for it in items], dtype=np.int64)
         # Build (B,n) host matrices first; the coarse cache slices are small
         # compared with the FFT result and this keeps cupy advanced indexing
         # out of the hot path.
-        ref = np.empty((len(items), n), dtype=np.float32 if self._storage_is_fast
+        ref = np.empty((len(items), n), dtype=np.float32 if self._storage_is_fp32
                        else np.float64)
         tgt = np.empty_like(ref)
         for i, s in enumerate(starts):
@@ -130,7 +130,7 @@ class WindowCCEngine:
         This is the architecture's key API: the caller computes *all* window
         surfaces once with a fixed search range, then performs continuity /
         threshold peak selection on the CPU.  It avoids one GPU launch per
-        window while keeping the exact peak-selection semantics outside the
+        window while keeping the precise peak-selection semantics outside the
         engine.
 
         Returns (windows, m_lo, m_hi, valid):
@@ -141,7 +141,7 @@ class WindowCCEngine:
         if not reqs:
             return np.empty((0, 0)), 0, 0, np.zeros(0, dtype=bool)
         cp = self.cp
-        compute = cp.float32 if self._storage_is_fast else cp.float64
+        compute = cp.float32 if self._storage_is_fp32 else cp.float64
         groups: dict[int, list[int]] = {}
         for i, (s, count) in enumerate(reqs):
             n = min(int(count), self.n - s)

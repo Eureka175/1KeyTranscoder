@@ -1386,12 +1386,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--gpu-align",
-        choices=["off", "fast", "exact"],
+        choices=["off", "fp32", "fp64"],
         default=None,
         help=(
-            "实验性: 音频对齐 GPU 后端 (窗级 coarse CC + residual seed). "
-            "fast=FP32 推荐性能路径; exact=FP64 对照/更稳; off=强制 CPU. "
-            "默认不指定 = 保持 CPU (环境变量 KTS_GPU_ALIGN 同样有效)."
+            "音频对齐 GPU 后端 (窗级 coarse CC + residual seed). "
+            "默认 fp32 (CUDA 可用时); fp64=对照/保守; off=强制 CPU. "
+            "也可用 KTS_GPU_ALIGN=fp32|fp64|0 覆盖."
         ),
     )
     parser.add_argument(
@@ -2197,10 +2197,20 @@ def transparent_main(
 
 def main() -> int:
     args = parse_args()
-    # GPU alignment is opt-in; the env var is the single source of truth so
-    # long_take/measure_window_delays see the same mode in worker threads.
-    if getattr(args, "gpu_align", None):
-        os.environ["KTS_GPU_ALIGN"] = str(args.gpu_align)
+    # CUDA audio alignment is enabled by default in fp32; an explicit
+    # --gpu-align or KTS_GPU_ALIGN override wins.  The env var is the single
+    # source of truth so long_take/measure_window_delays see the same mode in
+    # worker threads.
+    _cli_gpu = getattr(args, "gpu_align", None)
+    _env_gpu = os.environ.get("KTS_GPU_ALIGN")
+    _gpu_mode = _cli_gpu or _env_gpu or "fp32"
+    _gpu_mode = str(_gpu_mode).strip().lower()
+    if _gpu_mode in ("off", "0", "false", "no"):
+        os.environ["KTS_GPU_ALIGN"] = "0"
+    elif _gpu_mode == "fp64":
+        os.environ["KTS_GPU_ALIGN"] = "fp64"
+    else:
+        os.environ["KTS_GPU_ALIGN"] = "fp32"
 
     script_dir = Path(__file__).resolve().parent
     input_root = Path(args.input).resolve()
@@ -2476,6 +2486,8 @@ def main() -> int:
         verbose=bool(args.verbose),
         fresh=bool(args.fresh_log),
     )
+    logger.info("GPU audio alignment: %s", os.environ.get(
+        "KTS_GPU_ALIGN", "fp32"))
     if audio_plan_request is not None and is_hardware:
         logger.warning(
             "[AUDIO] --audio-plan on a hardware backend: the video artifact "

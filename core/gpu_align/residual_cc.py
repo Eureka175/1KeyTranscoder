@@ -24,7 +24,7 @@ class ResidualCCEngine:
         self.backend = backend
         self.cp = backend.cp
         self.policy = policy or resolve_policy()
-        self._fast = self.policy.precision is Precision.FAST
+        self._is_fp32 = self.policy.precision is Precision.FP32
         self.budget_bytes = int(budget_bytes or backend.budget_bytes())
         self.stats: list[BatchStats] = []
 
@@ -35,7 +35,7 @@ class ResidualCCEngine:
         if n12 < 16:
             return None
         nfft = int(1 << int(math.ceil(math.log2(2 * n12))))
-        compute = cp.float32 if self._fast else cp.float64
+        compute = cp.float32 if self._is_fp32 else cp.float64
         try:
             t0 = time.perf_counter()
             a = cp.asarray(a12[:n12], dtype=compute)

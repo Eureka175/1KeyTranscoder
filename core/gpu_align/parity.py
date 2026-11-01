@@ -32,7 +32,7 @@ class ParityResult(dict):
 
 def compare_window_peaks(cpu: Sequence[Any], gpu: Sequence[Any], *,
                          cc_tol: float = 1e-9,
-                         lag_exact: bool = True) -> ParityResult:
+                         lag_equal: bool = True) -> ParityResult:
     if len(cpu) != len(gpu):
         return ParityResult(ok=False, reason="length mismatch",
                             cpu=len(cpu), gpu=len(gpu))
@@ -47,12 +47,12 @@ def compare_window_peaks(cpu: Sequence[Any], gpu: Sequence[Any], *,
             continue
         if pa is None:
             continue
-        if lag_exact and int(pa.lag) != int(pb.lag):
+        if lag_equal and int(pa.lag) != int(pb.lag):
             lag_bad += 1
         max_cc_diff = max(max_cc_diff,
                           abs(pa.signed_cc - pb.signed_cc),
                           abs(pa.abs_cc - pb.abs_cc))
-    ok = none_bad == 0 and (lag_bad == 0 if lag_exact else True) \
+    ok = none_bad == 0 and (lag_bad == 0 if lag_equal else True) \
         and max_cc_diff <= cc_tol
     return ParityResult(
         ok=ok, n=n, lag_bad=lag_bad, none_bad=none_bad,

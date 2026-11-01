@@ -75,7 +75,7 @@ def main():
     cpu_t = _timed(lambda: [se._coarse_cc_peak(a12, b12, s, c, -lag, lag, q)
                             for s, c in starts], repeat=1)
     out["window_cpu_s"] = cpu_t
-    for mode in ("exact", "fast"):
+    for mode in ("fp64", "fp32"):
         sess = AlignGpuSession.create(mode=mode)
         if sess is None:
             out[mode] = {"available": False}
@@ -91,7 +91,7 @@ def main():
         gpu = [None if p is None else (p.lag * q, p.signed_cc, p.abs_cc)
                for p in gpu]
         parity = compare_window_peaks(
-            cpu, gpu, cc_tol=1e-9 if mode == "exact" else 1e-5)
+            cpu, gpu, cc_tol=1e-9 if mode == "fp64" else 1e-5)
         out[mode] = {"wall_s": dt, "speedup": cpu_t / dt,
                      "parity": dict(parity),
                      "gpu_stats": [s.as_dict() for s in eng.stats]}
@@ -122,7 +122,7 @@ def main():
                                   rms_gate=rms) for i in range(B)]
     cpu_ft = time.perf_counter() - t0
     out["frame_cpu_s"] = cpu_ft
-    for mode in ("exact", "fast"):
+    for mode in ("fp64", "fp32"):
         sess = AlignGpuSession.create(mode=mode)
         if sess is None:
             continue

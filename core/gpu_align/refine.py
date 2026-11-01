@@ -5,7 +5,7 @@
 The coarse CC only narrows the lag to a few samples; the production
 `_refine_window_peak` then computes ~17 full-rate normalized dot products on a
 2 s segment.  Those dot products are independent of the continuity logic and
-map well to one small GPU batch per call, so this module provides the exact
+map well to one small GPU batch per call, so this module provides the full-precision
 same formula with a GPU backend and a CPU fallback.
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ class RefineEngine:
         self.backend = backend
         self.cp = backend.cp
         self.policy = policy or resolve_policy()
-        self._fast = self.policy.precision is Precision.FAST
+        self._is_fp32 = self.policy.precision is Precision.FP32
         self.budget_bytes = int(budget_bytes or backend.budget_bytes())
         self.calls = 0
         self.gpu_s = 0.0
@@ -64,7 +64,7 @@ class RefineEngine:
             dtype=np.float64)
         win_end = int(start_sample) + int(window_samples)
         cp = self.cp
-        compute = cp.float32 if self._fast else cp.float64
+        compute = cp.float32 if self._is_fp32 else cp.float64
         t0 = time.perf_counter()
         try:
             av_g = cp.asarray(av, dtype=compute)

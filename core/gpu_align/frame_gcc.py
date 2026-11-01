@@ -30,11 +30,11 @@ class FrameGccEngine:
         self.cp = backend.cp
         self.policy = policy or resolve_policy()
         self.budget_bytes = int(budget_bytes or backend.budget_bytes())
-        self._fast = self.policy.precision is Precision.FAST
+        self._is_fp32 = self.policy.precision is Precision.FP32
         self.stats: list[BatchStats] = []
 
     def _batch_size(self, nfft: int, width: int) -> int:
-        per = 40 if self._fast else 80
+        per = 40 if self._is_fp32 else 80
         return int(min(256, max(1, self.budget_bytes // max(1, nfft * per))))
 
     def surfaces(self, ref2d: np.ndarray, tgt2d: np.ndarray, *,
@@ -59,7 +59,7 @@ class FrameGccEngine:
         width = m_hi - m_lo + 1
         nfft = int(_fft.next_fast_len(F + L - 1, real=True))
         cp = self.cp
-        compute = cp.float32 if self._fast else cp.float64
+        compute = cp.float32 if self._is_fp32 else cp.float64
         batch = self._batch_size(nfft, width)
         out = np.empty((B, width), dtype=np.float64)
         valid_all = np.zeros(B, dtype=bool)

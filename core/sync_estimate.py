@@ -1415,13 +1415,13 @@ def _refine_window_peak(
 
 
 def gpu_align_mode() -> str:
-    """Normalised selected GPU alignment mode ("fast"/"exact"/"")."""
+    """Normalised GPU alignment mode ("fp32"/"fp64"/"")."""
     mode = os.environ.get("KTS_GPU_ALIGN", "0").strip().lower()
     if mode in ("", "0", "off", "false", "no"):
         return ""
-    if mode in ("exact", "fp64"):
-        return "exact"
-    return "fast"
+    if mode == "fp64":
+        return "fp64"
+    return "fp32"
 
 
 def gpu_align_enabled() -> bool:
@@ -1578,7 +1578,8 @@ def measure_window_delays(
             except Exception:                          # noqa: BLE001
                 _gpu = None
 
-        # Optional new GPU architecture (opt-in; exact FP64 by default).
+        # Optional new GPU architecture.  FP32 is the default when the
+        # program enables CUDA acceleration; fp64 remains available.
         # Precompute every regular window's full-search surface once, then do
         # the continuity peak selection on the CPU.  This removes the
         # per-window launch/host round-trip that made the old gpu_cc path
@@ -1598,7 +1599,7 @@ def measure_window_delays(
 
                 _mode = os.environ.get("KTS_GPU_ALIGN", "").strip().lower()
                 if _mode in ("", "0", "off", "false", "no"):
-                    _mode = "exact"
+                    _mode = "fp32"
                 _align_sess = AlignGpuSession.create(mode=_mode)
                 if _align_sess is not None:
                     _align_eng = WindowCCEngine(

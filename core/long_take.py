@@ -770,7 +770,7 @@ def measure_residual_curve(
         if min(win, n - s) >= win // 2
     ]
 
-    # Optional new GPU residual seed (exact/fast per KTS_GPU_ALIGN).
+    # Optional new GPU residual seed (fp32/fp64 per KTS_GPU_ALIGN).
     _align_engine = None
     _align_lock = threading.Lock()
     try:
@@ -1215,7 +1215,7 @@ def align_time_varying(
 
         # The optional GPU path already batches a full target's windows; its
         # device is shared, so running units in parallel adds context/FFT-plan
-        # contention instead of throughput (measured: 3 units fast 110 s vs
+        # contention instead of throughput (measured: 3 units fp32 110 s vs
         # prewarmed sequential much lower).  Prewarm once in this thread and
         # keep units sequential when GPU alignment is selected.
         _gpu_mode = (sync_estimate.gpu_align_mode()
@@ -1226,10 +1226,10 @@ def align_time_varying(
                 sync_estimate.prewarm_gpu_align()
             except Exception:                          # noqa: BLE001
                 pass
-        # FP32 fast kernels showed contention when units ran concurrently;
-        # FP64 exact benefits from the existing parallel-unit path.  Only
-        # serialize fast; exact keeps the proven parallel topology.
-        _serialize_units = bool(_gpu_align and _gpu_mode == "fast")
+        # FP32 kernels showed contention when units ran concurrently;
+        # FP64 benefits from the existing parallel-unit path.  Only
+        # serialize fp32; fp64 keeps the proven parallel topology.
+        _serialize_units = bool(_gpu_align and _gpu_mode == "fp32")
         if (len(units) > 1 and _default_measure and not _serialize_units
                 and bool(prof.get("measure_parallel_units", True))):
             with ThreadPoolExecutor(max_workers=min(4, len(units))) as ex:
