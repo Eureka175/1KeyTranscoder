@@ -42,8 +42,12 @@ fine_delay_samples = round(全局延迟) + 相位斜率残余, 报告为诊断�
 
 from __future__ import annotations
 
+import itertools
+import json
 import math
+import os
 import threading
+import time
 import warnings
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -388,45 +392,47 @@ class _GccOut:
     success: bool
 
 
-def gcc_phat_int(
+def _gcc_surface(
     ref: np.ndarray,
     tgt: np.ndarray,
-    *,
-    lag0: int,
-    search_lo: int,
-    search_hi: int,
     rms_gate: float = _RMS_GATE,
-) -> _GccOut:
-    """帧级 GCC-PHAT (整数精度; 置信度合成沿用 vendored 1.x 公式)。
+) -> tuple[np.ndarray, int] | None:
+    """Normalized GCC-PHAT correlation surface for one frame pair.
 
-    ref: (F,) 参考帧; tgt: (L,) 目标窗口 (L >= F), tgt[0] 对应的流位置比
-    ref[0] 早 lag0 样本 (lag0 = ref_start - tgt_start)。互相关面
-    c[m] = sum_n ref[n] * tgt[n + m], delay = m - lag0, 搜索范围
-    delay ∈ [search_lo, search_hi] (m ∈ [lag0+search_lo, lag0+search_hi]
-    与 [0, L-F] 的交集, 恒为连续区间, 无回绕)。
-    反相对的窗口按 vendored 1.2 规则翻转后照常取峰 (延迟仍正确)。
-    rms_gate: 任一窗 RMS 低于该值直接判失败 (帧级静音/近静音拦截 —
-    抽取滤波振铃会把真静音抬到 ~1e-3, 远高于精确零门)。
+    Returns ``(surface, nfft)`` or None when the frame is too short / silent.
+    Pure function: no peak selection here, so it can be batch-computed on the
+    GPU with exactly the same inputs (float64).
     """
-    fail = _GccOut(float("nan"), 0.0, 1, False)
     F = ref.shape[0]
     L = tgt.shape[0]
     if F == 0 or L < F:
-        return fail
+        return None
     ref = ref - ref.mean()
     tgt = tgt - tgt.mean()
     r_ref = float(np.sqrt(np.mean(ref * ref)))
     r_tgt = float(np.sqrt(np.mean(tgt * tgt)))
     if r_ref < rms_gate or r_tgt < rms_gate:
-        return fail
-    ref /= r_ref
-    tgt /= r_tgt
-
+        return None
+    ref = ref / r_ref
+    tgt = tgt / r_tgt
     nfft = fft.next_fast_len(F + L - 1, real=True)
     g = np.conj(fft.rfft(ref, nfft)) * fft.rfft(tgt, nfft)
-    g /= np.abs(g) + _EPS_REL * float(np.max(np.abs(g))) + _EPS_ABS
-    surface = fft.irfft(g, nfft)
+    g = g / (np.abs(g) + _EPS_REL * float(np.max(np.abs(g))) + _EPS_ABS)
+    return fft.irfft(g, nfft), int(nfft)
 
+
+def _gcc_peak_from_surface(
+    surface: np.ndarray,
+    nfft: int,
+    *,
+    F: int,
+    L: int,
+    lag0: int,
+    search_lo: int,
+    search_hi: int,
+) -> _GccOut:
+    """Exact peak / polarity / confidence logic on a correlated surface."""
+    fail = _GccOut(float("nan"), 0.0, 1, False)
     m_lo = max(0, lag0 + search_lo)
     m_hi = min(L - F, lag0 + search_hi)
     if m_lo > m_hi:
@@ -491,6 +497,40 @@ def gcc_phat_int(
     return _GccOut(
         delay_samples=delay_samples, confidence=confidence,
         polarity=polarity, success=bool(v >= 2.0 * nf),
+    )
+
+
+def gcc_phat_int(
+    ref: np.ndarray,
+    tgt: np.ndarray,
+    *,
+    lag0: int,
+    search_lo: int,
+    search_hi: int,
+    rms_gate: float = _RMS_GATE,
+) -> _GccOut:
+    """帧级 GCC-PHAT (整数精度; 置信度合成沿用 vendored 1.x 公式)。
+
+    ref: (F,) 参考帧; tgt: (L,) 目标窗口 (L >= F), tgt[0] 对应的流位置比
+    ref[0] 早 lag0 样本 (lag0 = ref_start - tgt_start)。互相关面
+    c[m] = sum_n ref[n] * tgt[n + m], delay = m - lag0, 搜索范围
+    delay ∈ [search_lo, search_hi] (m ∈ [lag0+search_lo, lag0+search_hi]
+    与 [0, L-F] 的交集, 恒为连续区间, 无回绕)。
+    反相对的窗口按 vendored 1.2 规则翻转后照常取峰 (延迟仍正确)。
+    rms_gate: 任一窗 RMS 低于该值直接判失败 (帧级静音/近静音拦截 —
+    抽取滤波振铃会把真静音抬到 ~1e-3, 远高于精确零门)。
+    """
+    F = ref.shape[0]
+    L = tgt.shape[0]
+    if F == 0 or L < F:
+        return _GccOut(float("nan"), 0.0, 1, False)
+    got = _gcc_surface(ref, tgt, rms_gate)
+    if got is None:
+        return _GccOut(float("nan"), 0.0, 1, False)
+    surface, nfft = got
+    return _gcc_peak_from_surface(
+        surface, nfft, F=F, L=L,
+        lag0=lag0, search_lo=search_lo, search_hi=search_hi,
     )
 
 
@@ -740,7 +780,8 @@ def estimate_pair(
         if (workers and int(workers) > 1
                 and isinstance(ref_src, (str, Path))
                 and isinstance(tgt_src, (str, Path))):
-            return _estimate_pair_parallel(
+            _t_est = time.perf_counter()
+            _res = _estimate_pair_parallel(
                 ref_src, tgt_src,
                 workers=int(workers),
                 sample_rate=sample_rate,
@@ -757,13 +798,20 @@ def estimate_pair(
                 tgt_index=tgt_index,
                 storage_dtype=storage_dtype,
             )
+            _maybe_dump_estimate(
+                _res, ref_src=ref_src, tgt_src=tgt_src,
+                frame_ms=frame_ms, hop_ms=hop_ms,
+                search_window_ms=search_window_ms, sample_rate=sample_rate,
+                elapsed=time.perf_counter() - _t_est, path="parallel")
+            return _res
         ref = open_source(ref_src, storage_dtype)
         if isinstance(ref_src, (str, Path)):
             opened.append(ref)
         tgt = open_source(tgt_src, storage_dtype)
         if isinstance(tgt_src, (str, Path)):
             opened.append(tgt)
-        return _estimate_pair(
+        _t_est = time.perf_counter()
+        _res = _estimate_pair(
             ref, tgt,
             sample_rate=sample_rate,
             search_window_ms=search_window_ms,
@@ -779,6 +827,12 @@ def estimate_pair(
             tgt_index=tgt_index,
             frames_override=_frames_override,
         )
+        _maybe_dump_estimate(
+            _res, ref_src=ref_src, tgt_src=tgt_src,
+            frame_ms=frame_ms, hop_ms=hop_ms,
+            search_window_ms=search_window_ms, sample_rate=sample_rate,
+            elapsed=time.perf_counter() - _t_est, path="sequential")
+        return _res
     finally:
         # 只关闭本函数自己从路径打开的流; 调用方传入的流由调用方管理。
         # opened 逐个追加, 因此第二个 open 抛错时第一个也一定会被关闭。
@@ -830,10 +884,23 @@ def _estimate_pair_parallel(
     )
     k_workers = max(1, min(int(workers), n_frames))
     bounds = np.linspace(0, n_frames, k_workers + 1).astype(int)
+    coarse_meta = None
+    if _coarse_cache_enabled():
+        ref_cache = _get_coarse_cache(ref_path, storage_dtype, q)
+        tgt_cache = _get_coarse_cache(tgt_path, storage_dtype, q)
+        if ref_cache is not None and tgt_cache is not None:
+            coarse_meta = {
+                "ref": str(ref_cache.filename),
+                "tgt": str(tgt_cache.filename),
+                "n": int(min(ref_cache.shape[0], tgt_cache.shape[0])),
+                "n_frames": int(n_frames),
+                "edge_frames": 8,
+            }
     payloads = [
         {"ref_path": ref_path, "tgt_path": tgt_path,
          "storage_dtype": storage_dtype,
-         "params": dict(params, k_lo=int(bounds[i]), k_hi=int(bounds[i + 1]))}
+         "params": dict(params, k_lo=int(bounds[i]), k_hi=int(bounds[i + 1])),
+         **({"coarse": coarse_meta} if coarse_meta else {})}
         for i in range(k_workers)
     ]
     chunks: list[list[FrameDelay]] = []
@@ -872,6 +939,10 @@ def _est_frames(
     q: int,
     min_confidence: float,
     rms_floor: float,
+    ref_coarse: Any | None = None,
+    tgt_coarse: Any | None = None,
+    n_frames_total: int = 0,
+    edge_frames: int = 0,
 ) -> list["FrameDelay"]:
     """逐帧测量 **[k_lo, k_hi)** 这一段. 帧之间完全独立 —— 每帧只读绝对
     样本位置 (`_coarse_slice` 无状态、带自身抽取余量), 因此任何切分方式都
@@ -880,8 +951,24 @@ def _est_frames(
     for k in range(k_lo, k_hi):
         center_sample = k * hop + frame // 2
         c0 = k * h_c
-        ref_c = _coarse_slice(ref, c0, c0 + f_c, q)
-        tgt_c = _coarse_slice(tgt, c0 - s_c, c0 + f_c + s_c, q)
+        use_cache = (ref_coarse is not None and tgt_coarse is not None
+                     and k >= edge_frames
+                     and (n_frames_total <= 0
+                          or k < n_frames_total - edge_frames)
+                     and c0 >= 0
+                     and c0 + f_c <= int(ref_coarse.shape[0])
+                     and c0 - s_c >= 0
+                     and c0 - s_c + f_c + 2 * s_c
+                     <= int(tgt_coarse.shape[0]))
+        if use_cache:
+            ref_c = np.asarray(
+                ref_coarse[c0:c0 + f_c], dtype=np.float64)
+            tgt_c = np.asarray(
+                tgt_coarse[c0 - s_c:c0 - s_c + f_c + 2 * s_c],
+                dtype=np.float64)
+        else:
+            ref_c = _coarse_slice(ref, c0, c0 + f_c, q)
+            tgt_c = _coarse_slice(tgt, c0 - s_c, c0 + f_c + s_c, q)
         g = gcc_phat_int(
             ref_c, tgt_c, lag0=s_c, search_lo=-s_c, search_hi=s_c,
             rms_gate=rms_floor,
@@ -917,8 +1004,23 @@ def _chunk_job(payload: dict) -> list["FrameDelay"]:
         _w.filterwarnings("ignore")
         ref = open_source(payload["ref_path"], payload["storage_dtype"])
         tgt = open_source(payload["tgt_path"], payload["storage_dtype"])
+        params = dict(payload["params"])
+        coarse = payload.get("coarse")
+        if coarse:
+            try:
+                params["ref_coarse"] = np.memmap(
+                    coarse["ref"], dtype="<f8", mode="r",
+                    shape=(coarse["n"],))
+                params["tgt_coarse"] = np.memmap(
+                    coarse["tgt"], dtype="<f8", mode="r",
+                    shape=(coarse["n"],))
+                params["n_frames_total"] = int(coarse["n_frames"])
+                params["edge_frames"] = int(coarse["edge_frames"])
+            except Exception:                          # noqa: BLE001
+                params.pop("ref_coarse", None)
+                params.pop("tgt_coarse", None)
         try:
-            return _est_frames(ref, tgt, **payload["params"])
+            return _est_frames(ref, tgt, **params)
         finally:
             for s in (tgt, ref):
                 c = getattr(s, "close", None)
@@ -1206,6 +1308,127 @@ _PROC_POOL: Any = None
 _PROC_POOL_WORKERS = 0
 _PROC_POOL_LOCK = threading.Lock()
 
+#: 黄金数据采集 (T0.2, 2026-11-01): 仅当 KTS_EST_DUMP_DIR 设置时写盘。
+_DUMP_COUNTER = itertools.count()
+_DUMP_LOCK = threading.Lock()
+
+
+_COARSE_CACHE: dict[tuple[str, str, int], np.ndarray] = {}
+_COARSE_CACHE_LOCK = threading.Lock()
+
+
+def _coarse_cache_enabled() -> bool:
+    return os.environ.get("KTS_COARSE_CACHE", "").strip().lower() in (
+        "1", "true", "yes", "on")
+
+
+def _coarse_cache_path(raw_path: Any, q: int) -> Path:
+    p = Path(str(raw_path))
+    return p.with_name(f".{p.name}.coarse_q{q}.f64")
+
+
+def _get_coarse_cache(raw_path: Any, storage_dtype: str,
+                      q: int) -> np.ndarray | None:
+    """Build/load one full-channel float64 coarse cache (opt-in, KTS_COARSE_CACHE=1)."""
+    if not _coarse_cache_enabled():
+        return None
+    key = (str(raw_path), str(storage_dtype), int(q))
+    with _COARSE_CACHE_LOCK:
+        cached = _COARSE_CACHE.get(key)
+        if cached is not None:
+            return cached
+        try:
+            from . import coarse_cache as _cc
+            path = _coarse_cache_path(raw_path, q)
+            src = open_source(raw_path, storage_dtype)
+            try:
+                arr = _cc.build_coarse_array(src, int(q))
+            finally:
+                close = getattr(src, "close", None)
+                if callable(close):
+                    close()
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            arr.tofile(str(tmp))
+            os.replace(str(tmp), str(path))
+            mapped = np.memmap(str(path), dtype="<f8", mode="r",
+                               shape=arr.shape)
+            _COARSE_CACHE[key] = mapped
+            return mapped
+        except Exception:                              # noqa: BLE001
+            return None
+
+
+def _clear_coarse_cache() -> None:
+    with _COARSE_CACHE_LOCK:
+        items = list(_COARSE_CACHE.items())
+        _COARSE_CACHE.clear()
+    for (raw_path, _dt, q), _arr in items:
+        try:
+            _coarse_cache_path(raw_path, q).unlink()
+        except OSError:
+            pass
+
+
+def _maybe_dump_estimate(
+    result: "PairEstimate",
+    *,
+    ref_src: Any,
+    tgt_src: Any,
+    frame_ms: float,
+    hop_ms: float,
+    search_window_ms: float,
+    sample_rate: int,
+    elapsed: float,
+    path: str,
+) -> None:
+    """Write frames + scalar fields of one estimate_pair call (opt-in)."""
+    root = os.environ.get("KTS_EST_DUMP_DIR", "").strip()
+    if not root:
+        return
+    try:
+        with _DUMP_LOCK:
+            idx = next(_DUMP_COUNTER)
+        stem = f"{os.getpid()}_{idx:04d}"
+        base = Path(root)
+        base.mkdir(parents=True, exist_ok=True)
+        frames = list(result.frames)
+        np.savez(
+            base / f"{stem}.npz",
+            delay_samples=np.asarray(
+                [f.delay_samples for f in frames], dtype=np.float64),
+            confidence=np.asarray(
+                [f.confidence for f in frames], dtype=np.float64),
+            center_sample=np.asarray(
+                [f.center_sample for f in frames], dtype=np.int64),
+        )
+        scalars = {
+            "call": idx,
+            "path": path,
+            "ref_index": result.ref,
+            "tgt_index": result.tgt,
+            "sample_rate": sample_rate,
+            "frame_ms": frame_ms,
+            "hop_ms": hop_ms,
+            "search_window_ms": search_window_ms,
+            "n_frames": len(frames),
+            "delay_samples": result.delay_samples,
+            "delay_ms": result.delay_ms,
+            "confidence": result.confidence,
+            "usable_frames": result.usable_frames,
+            "fine_delay_samples": result.fine_delay_samples,
+            "fine_delay_ms": result.fine_delay_ms,
+            "fine_fit_r2": result.fine_fit_r2,
+            "polarity": result.polarity,
+            "ref_src": str(ref_src),
+            "tgt_src": str(tgt_src),
+            "elapsed_s": round(elapsed, 6),
+        }
+        (base / f"{stem}.json").write_text(
+            json.dumps(scalars, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8")
+    except Exception:                                  # noqa: BLE001
+        pass
+
 
 def _get_estimation_pool(workers: int) -> Any:
     """Get/reuse the frame-estimation process pool (grown on demand)."""
@@ -1230,6 +1453,10 @@ def shutdown_estimation_pool() -> None:
         _PROC_POOL_WORKERS = 0
     if pool is not None:
         pool.shutdown(wait=True)
+    try:
+        _clear_coarse_cache()
+    except Exception:                                  # noqa: BLE001
+        pass
 
 
 def coarse_decimate(
