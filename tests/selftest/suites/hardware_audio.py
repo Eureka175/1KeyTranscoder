@@ -353,6 +353,7 @@ def l1_hardware_audio() -> None:
         "--repair-fix-layout", "--repair-no-container-fix",
         "--repair-no-groups", "--repair-accurate", "--repair-opt",
     }
+    ASYNC_ADDED = {"--async-pipeline"}
     V080_BASELINE = {
         "--version", "--input", "--output", "--preset", "--encoder", "--config",
         "--scaling-config", "--tool-nvencc", "--tool-qsvencc",
@@ -368,9 +369,9 @@ def l1_hardware_audio() -> None:
            f"missing: {sorted((V080_BASELINE - THIS_PHASE_ADDED) - args_now)}")
     record("v08hw.cli 除 P4.6/P4.12 的 opt-in 与本阶段新增外, 没有其它参数",
            args_now - P46_ADDED - P412_ADDED - THIS_PHASE_ADDED
-           - REPAIR_ADDED <= V080_BASELINE,
+           - REPAIR_ADDED - ASYNC_ADDED <= V080_BASELINE,
            f"unexpected: "
-           f"{sorted(args_now - P46_ADDED - P412_ADDED - THIS_PHASE_ADDED - REPAIR_ADDED - V080_BASELINE)}")
+           f"{sorted(args_now - P46_ADDED - P412_ADDED - THIS_PHASE_ADDED - REPAIR_ADDED - ASYNC_ADDED - V080_BASELINE)}")
     record("v08hw.cli v0.8.8 归档修复模式已合入主程序 (--repair + 修复选项)",
            REPAIR_ADDED <= args_now)
     record("v08hw.cli --repair 实际分派到 archive_repair.run_repair (不是空开关)",
