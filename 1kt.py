@@ -1385,6 +1385,16 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--gpu-align",
+        choices=["off", "fast", "exact"],
+        default=None,
+        help=(
+            "实验性: 音频对齐 GPU 后端 (窗级 coarse CC + residual seed). "
+            "fast=FP32 推荐性能路径; exact=FP64 对照/更稳; off=强制 CPU. "
+            "默认不指定 = 保持 CPU (环境变量 KTS_GPU_ALIGN 同样有效)."
+        ),
+    )
+    parser.add_argument(
         "--log-level",
         type=str.lower,
         choices=["error", "warn", "info", "debug"],
@@ -2187,6 +2197,10 @@ def transparent_main(
 
 def main() -> int:
     args = parse_args()
+    # GPU alignment is opt-in; the env var is the single source of truth so
+    # long_take/measure_window_delays see the same mode in worker threads.
+    if getattr(args, "gpu_align", None):
+        os.environ["KTS_GPU_ALIGN"] = str(args.gpu_align)
 
     script_dir = Path(__file__).resolve().parent
     input_root = Path(args.input).resolve()

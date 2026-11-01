@@ -38,7 +38,12 @@
   `long_take.align_time_varying`（GPU unit 拓扑）、
   `channel_sync`（stereo 检测 prewarm）。
 
-环境开关（不新增 CLI）：
+CLI / 环境开关：
+
+`
+--gpu-align {off,fast,exact}   # 新增 opt-in；默认不指定 = CPU
+`
+
 
 ```
 KTS_GPU_ALIGN=0|1|fast|exact     # 默认 0；1 映射 fast

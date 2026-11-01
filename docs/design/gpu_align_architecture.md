@@ -88,7 +88,7 @@ core/gpu_align/
   OOM、fallback。
 - 生产调用点只需 `if session and session.available: ... else CPU`；
   任何不一致都回退 CPU（opt-in 路径）。
-- 环境开关（只读，不改 CLI）：
+- 入口开关（opt-in，默认关闭）：--gpu-align {off,fast,exact}，或环境变量：
   - `KTS_GPU_ALIGN=0|1|fast|exact`（默认 0；1/fast = FP32 推荐路径）；
   - `KTS_GPU_ALIGN_DTYPE=fp64|fp32`（兼容旧实验）；
   - `KTS_GPU_ALIGN_BUDGET_MB`（默认 2048）。

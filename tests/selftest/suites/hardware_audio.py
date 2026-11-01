@@ -353,7 +353,7 @@ def l1_hardware_audio() -> None:
         "--repair-fix-layout", "--repair-no-container-fix",
         "--repair-no-groups", "--repair-accurate", "--repair-opt",
     }
-    ASYNC_ADDED = {"--async-pipeline"}
+    ASYNC_ADDED = {"--async-pipeline", "--gpu-align"}
     V080_BASELINE = {
         "--version", "--input", "--output", "--preset", "--encoder", "--config",
         "--scaling-config", "--tool-nvencc", "--tool-qsvencc",
