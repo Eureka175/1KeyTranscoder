@@ -178,6 +178,9 @@ unit 拓扑对照（C1306，3 targets，无 GPU residual）：exact 并行
 residual 的 exact 与 fast 在本对素材上都与 CPU **逐点相同**；这是端到端
 从 71.3 → 47.1 s（exact）/81.7 → 57.4 s（fast）的主要原因。
 
+C1305 ch0/ch1 复验：CPU 18.9 s；exact 7.9 s / fast 7.6 s；1 s 网格
+4808/4808 点相同（exact 与 fast 均相同）。
+
 ### 6.2 关键修复
 
 - **GPU measure units 串行化**：`align_time_varying` 原来对 3 个 target
