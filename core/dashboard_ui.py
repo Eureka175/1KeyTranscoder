@@ -77,7 +77,24 @@ def render(data: dict) -> None:
     sys.stdout.flush()
 
 
+def _enable_windows_vt() -> None:
+    """Enable ANSI/VT redraw in a freshly created Windows console."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(-11)      # STD_OUTPUT_HANDLE
+        mode = ctypes.c_uint()
+        if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            # ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+            kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+    except Exception:                                  # noqa: BLE001
+        pass
+
+
 def main() -> int:
+    _enable_windows_vt()
     if len(sys.argv) != 2:
         print("usage: python -m core.dashboard_ui <json_path>")
         return 2

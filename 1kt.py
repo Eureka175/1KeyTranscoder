@@ -1646,12 +1646,13 @@ def _job_scratch(
 def spawn_dashboard(json_path: Path, script_dir: Path):
     """Open the nvidia-smi style dashboard in a separate console."""
     try:
+        # 不要重定向 std 句柄: CREATE_NEW_CONSOLE 下只要给 stdin/stdout/stderr
+        # 任一 DEVNULL/PIPE, Windows 就会让子进程继承非控制台句柄, 看板把
+        # ANSI 输出写进 NUL, 新控制台窗口看起来"完全没有输出"。全部继承时
+        # 子进程拿到的是新控制台自己的句柄 (实测 GetConsoleMode 成功)。
         return subprocess.Popen(
             [sys.executable, "-m", "core.dashboard_ui", str(json_path)],
             cwd=str(script_dir),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
             creationflags=subprocess.CREATE_NEW_CONSOLE,
         )
     except OSError:

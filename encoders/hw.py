@@ -305,11 +305,10 @@ def ask_fallback_new_console(
         return True
 
     try:
+        # 同上: 新控制台窗口里必须继承控制台句柄, 否则 echo/choice 的提示
+        # 全被 DEVNULL 吞掉, 用户只看到一个空白窗口。
         subprocess.Popen(
             ["cmd", "/c", str(batch)],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
             creationflags=subprocess.CREATE_NEW_CONSOLE,
         )
     except OSError:
