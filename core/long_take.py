@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import math
 import os
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -769,6 +770,22 @@ def measure_residual_curve(
         if min(win, n - s) >= win // 2
     ]
 
+    # Optional new GPU residual seed (exact/fast per KTS_GPU_ALIGN).
+    _align_engine = None
+    _align_lock = threading.Lock()
+    try:
+        if sync_estimate.gpu_align_enabled():
+            from .gpu_align import AlignGpuSession
+            from .gpu_align.residual_cc import ResidualCCEngine
+
+            _sess = AlignGpuSession.create()
+            if _sess is not None:
+                _align_engine = ResidualCCEngine(
+                    _sess.backend, policy=_sess.policy)
+                _align_engine._session = _sess  # keep backend alive
+    except Exception:                                  # noqa: BLE001
+        _align_engine = None
+
     def measure_one(s: int) -> dict[str, Any] | None:
         length = min(win, n - s)
         ref = _read_raw(anchor_raw, storage_dtype, s, length).astype(np.float64)
@@ -782,7 +799,14 @@ def measure_residual_curve(
         if n12 < 16:
             return None
         coarse = None
-        if gpu_cc:
+        if _align_engine is not None:
+            try:
+                with _align_lock:
+                    coarse = _align_engine.peak(
+                        a12, b12, dec=dec, search48=search48)
+            except Exception:                          # noqa: BLE001
+                coarse = None
+        if coarse is None and gpu_cc:
             try:
                 from . import gpu_cc as _gpu_mod
                 coarse = _gpu_mod.residual_coarse(
@@ -837,6 +861,12 @@ def measure_residual_curve(
     else:
         rows = [m for m in (measure_one(s) for s in starts) if m is not None]
     n_windows = len(starts)
+    if _align_engine is not None:
+        try:
+            _align_engine.close()
+            _align_engine._session.close()
+        except Exception:                          # noqa: BLE001
+            pass
     if len(rows) < int(prof["residual_min_blocks"]):
         return {"ok": False, "reason": "too_few_blocks",
                 "n_blocks": len(rows), "n_windows": n_windows}

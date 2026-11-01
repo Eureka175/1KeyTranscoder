@@ -153,16 +153,30 @@ exact 路径的 2.57× 被精化限制；当前不做 GPU 精化，后续可评�
 
 | 模式 | wall | 相对 CPU | 最终 raw |
 |---|---:|---:|---|
-| CPU | **115.1 s** | 1.00× | baseline |
-| fast（FP32；prewarm + unit 串行） | **81.7 s** | **1.41×** | 与 CPU **sha256 全同** |
-| exact（FP64；prewarm + 并行 unit） | **71.3 s** | **1.61×** | 与 CPU **sha256 全同** |
+| CPU（窗口 + 残差全 CPU） | **115.1 s** | 1.00× | baseline |
+| exact（FP64 窗口 + FP64 residual；prewarm + 并行 unit） | **47.1 s** | **2.45×** | 与 CPU **sha256 全同** |
+| fast（FP32 窗口 + FP32 residual；prewarm + unit 串行） | **57.4 s** | **2.01×** | 与 CPU **sha256 全同** |
 
 2ch 诊断（1 target）：CPU 76.7 s；fast 39.0 s（**1.97×**）；
 exact 45.1 s（1.70×）。
 
-unit 拓扑对照（C1306，3 targets）：exact 并行 **71.3 s** vs 强制串行
-**88.8 s**；fast 串行 **81.7 s**。因此策略为 **exact 保留并行 + prewarm，
-fast 串行**。串行 exact 的输出 raw 仍与 CPU 一致，只是更慢。
+unit 拓扑对照（C1306，3 targets，无 GPU residual）：exact 并行
+**71.3 s** vs 强制串行 **88.8 s**；fast 串行 **81.7 s**。因此策略为
+**exact 保留并行 + prewarm，fast 串行**。
+
+### 6.3 GPU residual 接入
+
+`long_take.measure_residual_curve` 在 `KTS_GPU_ALIGN` 下使用新的
+`ResidualCCEngine`（同一公式、同一 coarse seed 语义）：
+
+| 项 | CPU | exact | fast |
+|---|---:|---:|---:|
+| C1306 ch0/ch1 residual wall | **17.0 s** | **7.1 s（2.4×）** | **7.3 s（2.3×）** |
+| 1 s 网格曲线 | 4165 点 | **4165/4165 完全相同** | **4165/4165 完全相同** |
+| summary（ok/n_blocks/median/max） | baseline | 完全相同 | 完全相同 |
+
+residual 的 exact 与 fast 在本对素材上都与 CPU **逐点相同**；这是端到端
+从 71.3 → 47.1 s（exact）/81.7 → 57.4 s（fast）的主要原因。
 
 ### 6.2 关键修复
 
@@ -180,8 +194,9 @@ fast 串行**。串行 exact 的输出 raw 仍与 CPU 一致，只是更慢。
 - fast 与 CPU：411 窗 delay/valid/polarity 全同；`coarse_cc`/`confidence`
   max |Δ| = **1e-6**；最终 raw sha **一致**。
 - exact 与 CPU：411/411 窗口记录**完全一致**；最终 raw sha **一致**。
-- **本机 end-to-end exact 反而略快于 fast**：fast 的收益被 CPU refine
-  与下游 apply 吃掉，且 exact 的内核/FFT plan 已在前面调用中预热。
+- residual 的 exact/fast 曲线均与 CPU 4165/4165 点相同（该对素材）。
+- **本机 end-to-end exact 快于 fast**（2.45× vs 2.01×）：fast 的收益被
+  CPU refine/下游 apply 吃掉，且 exact 的内核/FFT plan 已在前面调用中预热。
   因此当前推荐：
   - **验收/默认候选：exact**（仍为 opt-in，默认全关）；
   - **fast**：保留为实验/后续 refine GPU 化后再评估；

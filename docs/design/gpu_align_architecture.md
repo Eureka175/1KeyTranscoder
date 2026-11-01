@@ -157,8 +157,9 @@ core/gpu_align/
   （`KTS_GPU_ALIGN=fast|exact`，默认关闭）。
 - 端到端：C1306 CPU 115.1 s → fast 81.7 s / exact 70.0 s；C1305
   CPU 131.8 s → exact 109.7 s；两者最终 raw sha256 与 CPU 一致。
-- 帧级整路径与 GPU 单窗精化尚无收益，保留 CPU；残差引擎已实现但未接入
-  生产 residual 流程。
+- 帧级整路径与 GPU 单窗精化尚无收益，保留 CPU；残差引擎已 opt-in 接入
+  `long_take.measure_residual_curve`（KTS_GPU_ALIGN 下替换 legacy
+  gpu_cc seed；exact/fast 曲线与 CPU 逐点相同）。
 - 已知限制：fast 在端到端不总比 exact 快（下游 CPU/refine 占比）；
   `surface_windows` 对不等长窗口只支持同组返回，生产长镜头窗口等长；
   默认不启用、VERSION 保持 0.9.0。
