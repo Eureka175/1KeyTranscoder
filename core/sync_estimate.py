@@ -43,6 +43,7 @@ fine_delay_samples = round(全局延迟) + 相位斜率残余, 报告为诊断�
 from __future__ import annotations
 
 import math
+import threading
 import warnings
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -53,6 +54,7 @@ import numpy as np
 from scipy import fft, signal
 
 __all__ = [
+    "shutdown_estimation_pool",
     "FrameDelay",
     "PairEstimate",
     "RawStream",
@@ -838,9 +840,9 @@ def _estimate_pair_parallel(
     if k_workers <= 1 or n_frames == 0:
         chunks = [_chunk_job(payloads[0])] if payloads else [[]]
     else:
-        with ProcessPoolExecutor(max_workers=k_workers) as ex:
-            # map 保序: chunks 顺序 == 帧区间顺序
-            chunks = list(ex.map(_chunk_job, payloads))
+        ex = _get_estimation_pool(k_workers)
+        # map 保序: chunks 顺序 == 帧区间顺序
+        chunks = list(ex.map(_chunk_job, payloads))
     merged: list[FrameDelay] = [f for part in chunks for f in part]
 
     return estimate_pair(
@@ -1197,6 +1199,38 @@ _INITIAL_REFINE_RADIUS = 12
 # 首窗失败后继续尝试的窗数 (研究: 首窗 |CC| 不足可退化用第二窗).
 _INITIAL_ATTEMPTS = 2
 
+#: 帧级估计的**可复用进程池** (2026-11-01 perf). 之前每次 estimate_pair 都新建
+#: 12 进程池; 80 min 素材一次 run 会调用 18-36 次, Windows 上每次 spawn 的
+#: 启动成本被重复支付。池只决定"算在哪里", 帧输入/顺序/结果与新建池逐位相同。
+_PROC_POOL: Any = None
+_PROC_POOL_WORKERS = 0
+_PROC_POOL_LOCK = threading.Lock()
+
+
+def _get_estimation_pool(workers: int) -> Any:
+    """Get/reuse the frame-estimation process pool (grown on demand)."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    global _PROC_POOL, _PROC_POOL_WORKERS
+    with _PROC_POOL_LOCK:
+        if _PROC_POOL is not None and workers <= _PROC_POOL_WORKERS:
+            return _PROC_POOL
+        if _PROC_POOL is not None:
+            _PROC_POOL.shutdown(wait=True)
+        _PROC_POOL = ProcessPoolExecutor(max_workers=workers)
+        _PROC_POOL_WORKERS = workers
+        return _PROC_POOL
+
+
+def shutdown_estimation_pool() -> None:
+    """Release the reusable estimation pool (called at end of channel-sync)."""
+    global _PROC_POOL, _PROC_POOL_WORKERS
+    with _PROC_POOL_LOCK:
+        pool, _PROC_POOL = _PROC_POOL, None
+        _PROC_POOL_WORKERS = 0
+    if pool is not None:
+        pool.shutdown(wait=True)
+
 
 def coarse_decimate(
     src: Any,
@@ -1398,6 +1432,7 @@ def measure_window_delays(
     tgt_decimated: Any | None = None,
     workers: int = 1,
     storage_dtype: str = "f32",
+    gpu_cc: bool = False,
 ) -> dict[str, Any]:
     """长镜头**窗级连续性漂移测量** (S1 测量原语; 只测量, 不构造曲线/不施加)。
 
@@ -1487,6 +1522,31 @@ def measure_window_delays(
             tgt12 = _check_decimated(tgt_decimated, int(tgt.shape[0]), q,
                                      "tgt_decimated")
 
+        # 可选 GPU 粗相关: 只把窗级 coarse CC 的 FFT 放到 cuFFT(float64);
+        # 结果记录仍按 CPU 口径 round 到 6 位小数, 整数峰/refine 逻辑不变。
+        _gpu = None
+        if gpu_cc:
+            try:
+                from . import gpu_cc as _gpu_mod
+                if _gpu_mod.available():
+                    _gpu = _gpu_mod.prepare(ref12, tgt12)
+            except Exception:                          # noqa: BLE001
+                _gpu = None
+
+        def _coarse_peak(start_c: int, count_c: int, lag_lo: int,
+                         lag_hi: int) -> tuple | None:
+            if _gpu is not None:
+                try:
+                    from . import gpu_cc as _gpu_mod
+                    got = _gpu_mod.coarse_cc_peak(
+                        _gpu, start_c, count_c, lag_lo, lag_hi, q)
+                except Exception:                      # noqa: BLE001
+                    got = None
+                if got is not None:
+                    return got
+            return _coarse_cc_peak(ref12, tgt12, start_c, count_c,
+                                   lag_lo, lag_hi, q)
+
         n_windows = 0 if n < win else (n - win) // hop + 1
         initial: dict[str, Any] = {
             "lag": None, "cc": 0.0, "coarse_cc": 0.0, "refine_quality": 0.0,
@@ -1504,10 +1564,9 @@ def measure_window_delays(
             span_c = int(round(span / q))
             if span_c < 16:
                 break
-            peak = _coarse_cc_peak(
-                ref12, tgt12, int(round(start / q)), span_c,
-                -search_samples, search_samples, q,
-            )
+            peak = _coarse_peak(
+                int(round(start / q)), span_c,
+                -search_samples, search_samples)
             if peak is None:
                 continue
             lag_c, signed, abs_cc = peak
@@ -1553,10 +1612,9 @@ def measure_window_delays(
                 "search_radius_samples": int(radius),
             }
             if prev is not None:
-                peak = _coarse_cc_peak(
-                    ref12, tgt12, int(round(start / q)),
-                    int(round(win / q)), prev - radius, prev + radius, q,
-                )
+                peak = _coarse_peak(
+                    int(round(start / q)), int(round(win / q)),
+                    prev - radius, prev + radius)
                 if peak is not None:
                     lag_c, signed, abs_cc = peak
                     row["coarse_cc"] = round(float(abs_cc), 6)
@@ -1589,6 +1647,12 @@ def measure_window_delays(
             "workers_effective": 1,
         }
     finally:
+        if _gpu is not None:
+            try:
+                from . import gpu_cc as _gpu_mod
+                _gpu_mod.release(_gpu)
+            except Exception:                          # noqa: BLE001
+                pass
         for stream in reversed(opened):
             close = getattr(stream, "close", None)
             if callable(close):

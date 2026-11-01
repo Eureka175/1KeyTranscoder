@@ -239,6 +239,41 @@ C1306 实测：
 775/1470 基线），代价 +~100 s；默认仍速度优先。进一步降到 ≤0.6 GB 需要
 窗测量串行+批处理或 coarse 缓存 mmap（未做）。
 
+### WS8 — 持久化帧估计进程池（2026-11-01，完成）
+
+`core/sync_estimate.py` 复用同一个 ProcessPoolExecutor（第一次 estimate_pair 时
+按 12 创建，之后所有 pair 共用；`shutdown_estimation_pool()` 在 channel_sync
+finally 释放）。帧输入/顺序/结果逐位不变。
+
+| 素材 | estimate_pair 累计 | wall |
+|---|---|---|
+| C1305（36 次 pair） | 169.7 → **106.5 s（-37%）** | 357.2 → **288.4 s** |
+| C1306（18 次 pair） | 66.7 → ~47 s | 236.3 → **217.0 s** |
+
+parity_check：C1305/C1306 final MOV 与 baseline **逐位一致**。
+
+### WS9 — 可选 CUDA 窗级相关（2026-11-01，完成，opt-in）
+
+实现 `core/gpu_cc.py`：把 `measure_window_delays` 内 60 s/12 kHz 窗的
+rfft*conj→irfft 放到 cuFFT **float64**；整数峰/refine/6 位小数记录口径不变。
+`channel_sync.DEFAULTS["gpu_cc"]=False`，stereo 检测与 long-take 都读该开关；
+CuPy/CUDA 不可用时逐窗回落 CPU。
+
+- 环境：pip `cupy-cuda12x` + pip CUDA12 runtime wheels 复制到 `C:\CUDA12`；
+  本机用户名非 ASCII 导致 NVRTC 找不到源/头文件，用 `C:\sp_ascii` junction
+  到 site-packages 解决（`gpu_cc` 自动尝试该路径；正常 ASCII 环境不需要）。
+- 基准：1.44 M 点 float64 window FFT = **2.0–2.7 ms（GPU）vs 74 ms（CPU），36×**；
+  FP32 再快 3×，但会改变置信度末位，未采用。
+- 实测（两个真实文件，最终 audio MOV 与 CPU 基线 **PARITY OK**）：
+
+| 素材 | CPU 默认 | GPU opt-in | 变化 | VRAM 峰值 | GPU util |
+|---|---|---|---|---|---|
+| C1306 | 217.0 s | **160.5 s** | -26% | 1168 MiB | 33% |
+| C1305 | 288.4 s | **224.8 s** | -22% | 1288 MiB | 35% |
+
+- host RSS 在 GPU 模式下升到 ~1.9–2.2 GB（CuPy/runtime），已在报告中记录；
+  默认关闭，开启前需按验收素材复验 parity。
+
 ## 下一步
 
 1. 环境恢复后补跑全量 L3 + `final_accept_v2` 长验收。

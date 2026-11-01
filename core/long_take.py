@@ -122,6 +122,10 @@ PROFILE: dict[str, Any] = {
     # 峰值 RSS 约 +470 MB）；内存受限环境可在 profile 里置 False，改为顺序
     # 测量（峰值回落约 0.8 GB，wall +~45 s）。不是 CLI 开关。
     "measure_parallel_units": True,
+    # 可选 CUDA 加速 (2026-11-01): 只把窗级 coarse CC 的 FFT 放到 cuFFT
+    # (float64), 默认关闭; 需本机 CuPy/CUDA 可用。开启前必须用验收素材证明
+    # 输出与 CPU 路径逐位一致 (round 到 6 位小数的记录口径使这通常成立)。
+    "gpu_cc": False,
     # 各 target 的下游流水线（施加/残差/极性）默认并行；同上可关。
     "pipeline_parallel_units": True,
     # 极性（E）: 60 s 窗 / 30 s 跳, 零延迟 ±16 采样带符号峰
@@ -1160,6 +1164,8 @@ def align_time_varying(
             min_cc=float(prof["track_min_cc"]),
             storage_dtype=storage_common,
         )
+        if _default_measure:
+            _m_kwargs["gpu_cc"] = bool(prof.get("gpu_cc", False))
 
         def _measure_unit(mem: list[int]) -> dict[str, Any]:
             kw = dict(_m_kwargs)

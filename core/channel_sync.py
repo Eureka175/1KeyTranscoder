@@ -285,6 +285,10 @@ DEFAULTS: dict[str, Any] = {
     # （默认 12 = 既有行为）。内存受限的 config 可调低，结果不变。
     "stereo_bind_workers": 4,
     "est_worker_cap": 12,
+    # 可选 CUDA 加速 (2026-11-01 perf): 窗级 coarse CC 的 FFT 用 cuFFT
+    # (float64)。默认关闭; 需要本机 CuPy+CUDA 可用 (不可用自动回落 CPU)。
+    # 开启前须用验收素材证明输出逐位一致 (本项目 C1305/C1306 已证)。
+    "gpu_cc": False,
 
     # —— 兼容 ——
     "max_lag_seconds": None,             # 旧键: 读取时映射为 search_window_ms
@@ -360,7 +364,7 @@ def production_opts(
 _BOOL_KEYS = ("channel_sync_transparent", "time_varying", "group_anchor_enabled",
               "channel_sync_accurate", "verify_agree_veto",
               "track_reference", "skip_two_channel_only",
-              "stereo_bind_enabled")
+              "stereo_bind_enabled", "gpu_cc")
 
 # 参与"全部健康 target 均失败 -> 文件级 measure_failed" 判定的轨道级原因
 _ESTIMATION_FAIL_REASONS = frozenset({
@@ -1106,6 +1110,10 @@ def _detect_stereo_groups(
                 coarse_rate=int(LP["track_coarse_rate"]),
                 min_cc=float(LP["track_min_cc"]),
                 storage_dtype=str(storages[a]),
+                # 可选 CUDA: 与 long-take 路径共用 long_take.PROFILE["gpu_cc"]
+                # (默认 off); 只改窗级 coarse CC 的 FFT 计算位置, 记录仍按
+                # 6 位小数/整数峰口径, 因此比对基线应逐位一致。
+                gpu_cc=bool(eff.get("gpu_cc", False)),
             )
         except Exception as exc:                       # noqa: BLE001
             info["reason"] = f"measure_failed: {type(exc).__name__}"
@@ -3400,6 +3408,9 @@ def run_channel_sync(
                     sample_rate=sample_rate,
                     groups=bound_groups,
                     log=log,
+                    # 逐 run 显式的 profile: 不修改模块级 PROFILE (--jobs 并发安全)
+                    profile=dict(lt.PROFILE,
+                                 gpu_cc=bool(eff.get("gpu_cc", False))),
                 )
                 lt_block: dict[str, Any] = {
                     "enabled": True,
@@ -3687,3 +3698,7 @@ def run_channel_sync(
                 p.unlink()
             except OSError:
                 pass
+        try:
+            sync_estimate.shutdown_estimation_pool()
+        except Exception:                                  # noqa: BLE001
+            pass
