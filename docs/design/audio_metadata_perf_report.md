@@ -11,10 +11,11 @@
 
 - **音频域（CPU）**：C1305 80 min **689.9 → 288.4 s（-58.2%）**，C1306
   69 min **296.3 → 217.0 s（-26.8%）**；long-take 附加 **231.0 → 118.6 s**。
-- **音频域（CUDA，opt-in）**：C1305 **224.8 s（-67.4%）**、C1306
-  **160.5 s**（vs 296.3 harness，-45.8%）；只把窗级 coarse CC 的 FFT 移到
-  cuFFT float64，两个真实文件的最终 audio MOV 与 CPU 基线 **逐位一致
-  （PARITY OK）**；VRAM 峰值 ~1.17–1.29 GB、GPU 利用率 33–35%。
+- **音频域（CUDA，opt-in）**：C1305 **204.1 s（-70.4%）**、C1306
+  **148.0 s**（vs 296.3 harness，-50.1%）；窗级 coarse CC 与 round-2 残差的
+  窗 FFT 都移到 cuFFT float64，其余数学保持 CPU float64；两个真实文件的
+  最终 audio MOV 与 CPU 基线 **逐位一致（PARITY OK）**；VRAM 峰值
+  ~1.17–1.29 GB，GPU 利用率峰值 69–98%。
 - **持久化帧估计进程池**：C1305 `estimate_pair` 169.7 → **106.5 s（-37%）**，
   C1306 66.7 → ~47 s；18–36 次估计不再重复 spawn 12 进程。
 - **透明 50 GiB**：端到端 **12.8 → 9.63 min（-25%）**；磁盘写入从
@@ -63,21 +64,24 @@
 6. **持久化帧估计进程池**（`core/sync_estimate.py`）：一次 channel-sync 内复用
    同一个 12 进程池，不再为每次 `estimate_pair` 新建；帧输入/顺序/结果不变
    （只改"算在哪里"），结束时 `shutdown_estimation_pool()`。
-7. **可选 CUDA 窗级相关**（`core/gpu_cc.py`，默认关闭）：把 60 s/12 kHz 窗的
-   coarse CC FFT（rfft*conj -> irfft）放到 cuFFT **float64**（实测 2.0 ms/window
-   vs CPU 74 ms，36×）；整数峰/refine/记录（round 6 位）不变，C1305/C1306
-   最终 MOV 与 CPU 路径逐位一致。开关是 `channel_sync` 的 `gpu_cc` 配置项
-   （默认 False；CuPy/CUDA 不可用时自动回落 CPU）。
+7. **可选 CUDA 窗级/残差相关**（`core/gpu_cc.py`，默认关闭）：
+   - `measure_window_delays` 的 60 s/12 kHz coarse CC FFT（rfft*conj ->
+     irfft）→ cuFFT **float64**（实测 2.0 ms/window vs CPU 74 ms，36×）；
+   - `measure_residual_curve` 的窗 FFT 粗峰同样走 GPU（`residual_coarse`），
+     之后仍由 CPU float64 做整数精化与 CC 门限。
+   整数峰/refine/记录（round 6 位）不变，C1305/C1306 最终 MOV 与 CPU 路径
+   逐位一致。开关是 `channel_sync` 的 `gpu_cc` 配置项（默认 False；
+   CuPy/CUDA 不可用时自动回落 CPU）。
 
 ### 2.2 结果
 
 | 素材 | 基线 | 优化后 | 变化 | 正确性 |
 |---|---|---|---|---|
 | C1305 音频域 wall（CPU） | 689.9 s | **288.4 s** | **-58.2%** | 4 条 final `audio_*.mov` 与旧验收基线 **sha256 完全一致**；report 语义一致 |
-| C1305 音频域 wall（CUDA，opt-in） | 689.9 s | **224.8 s** | **-67.4%** | 同上（PARITY OK） |
+| C1305 音频域 wall（CUDA，opt-in） | 689.9 s | **204.1 s** | **-70.4%** | 同上（PARITY OK） |
 | C1305 long-take | 231.0 s | **118.6 s** | **-48.7%** | 同上 |
 | C1306 wall（CPU，同 harness） | 296.3 s | **217.0 s** | **-26.8%** | 同上（4 条 MOV sha256 一致） |
-| C1306 wall（CUDA，opt-in） | 296.3 s | **160.5 s** | **-45.8%** | 同上（PARITY OK） |
+| C1306 wall（CUDA，opt-in） | 296.3 s | **148.0 s** | **-50.1%** | 同上（PARITY OK） |
 | C1306 long-take | 159.8 s | 100.6 s | -37% | 同上 |
 | 音频中间写盘（C1306） | ~10.6 GB | **~6.0 GB** | **-43%** | work 目录只剩 final MOV + report |
 | 峰值 RSS（主/树，CPU） | 775/1470 MB | 1138–1232 / 1922–2331 MB（默认并行） | 内存上升（并行代价）；内存受限配置可降到 **748.6/1036.2 MB**，输出逐位一致 |
@@ -137,7 +141,9 @@ copy fast restore（同一个 GPAC 产物作 stage，不重复 mux）。
   素材/机器上验证前保持 opt-in。开启需要本机 CuPy + CUDA runtime（本机为
   pip CUDA12 runtime + `C:\CUDA12` 根 + `C:\sp_ascii` ASCII junction，原因见
   perf_state §WS9；普通 ASCII 用户名 + 官方 CUDA toolkit 不需要该 workaround）。
-  FP32 cuFFT（再快 3×）会改变置信度末位，未采用。
+  FP32 cuFFT（再快 3×）会改变置信度末位，未采用。该路径同时用于
+  round-2 残差的窗 FFT 粗峰（`residual_coarse`），C1305/C1306 的最终音频仍
+  与 CPU 基线逐位一致。
 - **内存峰值**（主 ~1.2 GB）：并行 long-take 测量持有 anchor+2×target coarse
   （~693 MB）是主因；已有 profile 开关换回 ~0.8 GB。进一步方案：窗测量串行 +
   窗级批处理 CUDA/CPU 预取，或 coarse 缓存 mmap。

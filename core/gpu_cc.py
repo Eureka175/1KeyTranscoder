@@ -85,6 +85,45 @@ def prepare(a12: np.ndarray, b12: np.ndarray) -> _Prepared | None:
         return None
 
 
+def residual_coarse(a12: np.ndarray, b12: np.ndarray, *,
+                    dec: int, search48: int) -> float | None:
+    """GPU equivalent of the residual window's FFT coarse peak.
+
+    Mirrors `long_take.measure_residual_curve.measure_one`: nfft =
+    2**ceil(log2(2*n12)), rfft*conj -> irfft, |cand|/den on +-search lags,
+    returns -m*dec.  The caller still runs the CPU float64 integer refinement
+    and CC threshold, so only the coarse seed can be affected by cuFFT
+    rounding (validated bit-identical on the acceptance material).
+    """
+    cp = _CUPY
+    if cp is None:
+        return None
+    try:
+        n12 = int(min(a12.shape[0], b12.shape[0]))
+        if n12 < 16:
+            return None
+        nfft = int(1 << int(np.ceil(np.log2(2 * n12))))
+        with cp.cuda.Device(0):
+            a = cp.asarray(a12[:n12], dtype=cp.float64)
+            b = cp.asarray(b12[:n12], dtype=cp.float64)
+            A = cp.fft.rfft(a - a.mean(), nfft)
+            B = cp.fft.rfft(b - b.mean(), nfft)
+            surf = cp.fft.irfft(A * cp.conj(B), nfft)
+            den = (float(cp.linalg.norm(a).item())
+                   * float(cp.linalg.norm(b).item()) + 1e-12)
+            radius12 = max(4, search48 // dec)
+            search = radius12 + 2
+            head = surf[:search + 1]
+            tail = surf[nfft - search:nfft]
+            cand = cp.abs(cp.concatenate([head, tail]) / den)
+            m = np.concatenate([np.arange(0, search + 1),
+                                np.arange(-search, 0)]).astype(np.int64)
+            i = int(cp.argmax(cand).item())
+            return float(-m[i]) * dec
+    except Exception:                                  # noqa: BLE001
+        return None
+
+
 def release(prep: _Prepared | None) -> None:
     cp = _CUPY
     if prep is None or cp is None:

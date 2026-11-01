@@ -732,6 +732,7 @@ def measure_residual_curve(
     sample_rate: int,
     storage_dtype: str = "f32",
     profile: Mapping[str, Any] | None = None,
+    gpu_cc: bool = False,
 ) -> dict[str, Any]:
     """在 round-1 输出上测残差（target vs anchor），返回 1 s 网格残差曲线。
 
@@ -780,20 +781,29 @@ def measure_residual_curve(
         n12 = min(len(a12), len(b12))
         if n12 < 16:
             return None
-        nfft = int(1 << int(np.ceil(np.log2(2 * n12))))
-        A = np.fft.rfft(a12[:n12] - a12[:n12].mean(), nfft)
-        B = np.fft.rfft(b12[:n12] - b12[:n12].mean(), nfft)
-        surf = np.fft.irfft(A * np.conj(B), nfft)
-        den = (float(np.linalg.norm(a12[:n12]))
-               * float(np.linalg.norm(b12[:n12])) + 1e-12)
-        radius12 = max(4, search48 // dec)
-        search = radius12 + 2
-        cand = np.abs(np.concatenate(
-            [surf[:search + 1], surf[-search:]]) / den)
-        m = np.concatenate([np.arange(0, search + 1),
-                            np.arange(-search, 0)]).astype(np.int64)
-        i = int(np.argmax(cand))
-        coarse = -float(m[i]) * dec
+        coarse = None
+        if gpu_cc:
+            try:
+                from . import gpu_cc as _gpu_mod
+                coarse = _gpu_mod.residual_coarse(
+                    a12, b12, dec=dec, search48=search48)
+            except Exception:                          # noqa: BLE001
+                coarse = None
+        if coarse is None:
+            nfft = int(1 << int(np.ceil(np.log2(2 * n12))))
+            A = np.fft.rfft(a12[:n12] - a12[:n12].mean(), nfft)
+            B = np.fft.rfft(b12[:n12] - b12[:n12].mean(), nfft)
+            surf = np.fft.irfft(A * np.conj(B), nfft)
+            den = (float(np.linalg.norm(a12[:n12]))
+                   * float(np.linalg.norm(b12[:n12])) + 1e-12)
+            radius12 = max(4, search48 // dec)
+            search = radius12 + 2
+            cand = np.abs(np.concatenate(
+                [surf[:search + 1], surf[-search:]]) / den)
+            m = np.concatenate([np.arange(0, search + 1),
+                                np.arange(-search, 0)]).astype(np.int64)
+            i = int(np.argmax(cand))
+            coarse = -float(m[i]) * dec
         c0 = len(ref) // 2 - seg_samples // 2
         av = ref[c0:c0 + seg_samples] - ref[c0:c0 + seg_samples].mean()
         best = (coarse, 0.0)
@@ -1305,7 +1315,8 @@ def align_time_varying(
         if int(prof["max_rounds"]) > 1:
             res = measure_residual_curve(
                 decoded[anchor], applied[rep], sample_rate=sample_rate,
-                storage_dtype=storages[rep], profile=prof)
+                storage_dtype=storages[rep], profile=prof,
+                gpu_cc=bool(prof.get("gpu_cc", False)))
             residual_stats = dict(res)
             if res.get("ok"):
                 total = add_curves(curve, res)

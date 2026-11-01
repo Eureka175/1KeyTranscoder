@@ -264,12 +264,13 @@ CuPy/CUDA 不可用时逐窗回落 CPU。
   到 site-packages 解决（`gpu_cc` 自动尝试该路径；正常 ASCII 环境不需要）。
 - 基准：1.44 M 点 float64 window FFT = **2.0–2.7 ms（GPU）vs 74 ms（CPU），36×**；
   FP32 再快 3×，但会改变置信度末位，未采用。
-- 实测（两个真实文件，最终 audio MOV 与 CPU 基线 **PARITY OK**）：
+- 实测（两个真实文件，最终 audio MOV 与 CPU 基线 **PARITY OK**；GPU 同时
+  用于 round-2 残差窗 FFT 粗峰）：
 
-| 素材 | CPU 默认 | GPU opt-in | 变化 | VRAM 峰值 | GPU util |
+| 素材 | CPU 默认 | GPU opt-in | 变化 | VRAM 峰值 | GPU util 峰值 |
 |---|---|---|---|---|---|
-| C1306 | 217.0 s | **160.5 s** | -26% | 1168 MiB | 33% |
-| C1305 | 288.4 s | **224.8 s** | -22% | 1288 MiB | 35% |
+| C1306 | 217.0 s | **148.0 s** | -32% | 1168 MiB | 98% |
+| C1305 | 288.4 s | **204.1 s** | -29% | 1288 MiB | 69% |
 
 - host RSS 在 GPU 模式下升到 ~1.9–2.2 GB（CuPy/runtime），已在报告中记录；
   默认关闭，开启前需按验收素材复验 parity。
