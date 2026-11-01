@@ -75,6 +75,30 @@
 | T2.1 | ✅ | `gcc_phat_int` 拆为 `_gcc_surface` + `_gcc_peak_from_surface`；600 帧真实数据与备份实现 0 mismatch |
 | T2.2+ | ⬜ | 未开工 |
 
+**T2.4 单进程 GPU 原型实测（真实 60 s，599 帧，CUDA 预热后）**：
+
+| 路径 | wall | 分解 |
+|---|---:|---|
+| CPU `_est_frames`（单进程） | 0.575 s（0.96 ms/帧） | — |
+| GPU 单进程原型 | **0.377 s（1.52×）** | cache+coarse gather 0.136 s；**CPU coarse 峰循环 0.192 s**；full gather 0.008 s；CPU full 峰循环 0.001 s |
+| 对比 | delay **599/599 相同**；confidence 逐位 203/599（其余差末位） | — |
+
+**G2 预判：单进程架构 no-go（按当前实现）**。原因：
+1. GPU 只把 FFT 阶段变快（T2.2 7.6×），但单进程下 **CPU 峰逻辑 0.192 s/599 帧**
+   成为新瓶颈（约占 GPU 路径 51%）；
+2. 生产估计目前是 12 进程并行（每 pair wall 3–8 s）；单进程串行 41k 帧约
+   26 s/pair × 18–36 次 = 470–940 s，远慢于现状，"单进程"本身不可行；
+3. 需要先做 T2.3 的**向量化峰逻辑**（NumPy/GPU），把 0.192 s 压到 ~0.02 s，
+   并保留 pair 级并行（多进程各自 GPU 或单进程多流），才可能进 G2。
+
+**建议的修订方案**（待决策）：
+- 方案 A：现有 12 进程池内每 worker 用 GPU 批量 surface（12 个 CUDA 上下文，
+  VRAM ~12×~200 MB），配 shared_memory 缓存；峰逻辑仍在 worker 内 CPU；
+- 方案 B：T2.3 向量化峰逻辑 + 单进程 GPU，但需要把 pair 估计重新并行化
+  （例如 2–4 个 GPU 进程各批处理不同 pair），并重新算 G2；
+- 方案 C：放弃"单进程"，只保留 T2.2 GPU surface + 现有进程池，收益上限较低
+  （gcc FFT 约占帧估计 CPU 42%，12 进程下 wall 收益有限）。
+
 **T2.2 原型实测（GPU 批量 surface，真实 60 s 音频 600 帧）**：
 
 - 产物：`core/gpu_frames.py`（只算 float64 相关面；峰逻辑仍走 CPU
