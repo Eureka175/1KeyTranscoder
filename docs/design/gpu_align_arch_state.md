@@ -20,6 +20,15 @@
 | `7efc88a` | C1305 residual 后 62.7 s（2.10×） |
 | `5f03f85` | stereo 检测前 prewarm |
 | `49fb0e1` | 完整 channel_sync C1306 208.8 → 123.1 s（1.70×） |
+| `7efc88a` | C1305 residual 后 62.7 s（2.10×） |
+| `5f03f85` | stereo 检测前 prewarm |
+| `d66ee7d` | 完整 C1306 fast 120.5 s；C1305 exact 204.7 s |
+| `ad8b2c1` | 完整 C1305 fast 199.6 s（1.51×） |
+| `bd8d116` | v1.0 计划补 GPU 分支记录 |
+| `d8355db` | no-CUDA fallback / final_accept_v2 PASS / 默认 smoke |
+| `bd6a1a8` | 8 MB 预算与确定性压力测试 |
+| `75b937d` | C1305 residual 4808 点 parity |
+| `c0193e3` | `--gpu-align {off,fast,exact}` CLI |
 
 ## 2. 实现范围
 
@@ -51,6 +60,8 @@ KTS_GPU_ALIGN_BUDGET_MB=2048     # 显存预算上限
 ```
 
 ## 3. 实测结果（摘要）
+
+> 单元测试：**1041 PASS / 2 FAIL**（既有缺 Sony/DJI 语料环境项）。
 
 | 测试 | CPU | exact | fast | 输出一致性 |
 |---|---:|---:|---:|---|
