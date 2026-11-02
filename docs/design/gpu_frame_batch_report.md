@@ -92,3 +92,31 @@ Parity（hybrid vs CPU12）：
 3. 置信度仅对阈值附近帧用精确 CPU 峰逻辑，其余用向量化，降低 usable 偏差；
 4. 完整 C1306/C1305 channel_sync 对照最终 audio MOV sha256；
 5. 达标后再决定是否默认开启。
+
+## 3.2 P0 完整入口阶段 A/B（同机、同素材、连续运行）
+
+C1306 69 min，4ch，`KTS_GPU_ALIGN=fp32`：
+
+### frame-off
+
+| 阶段 | wall |
+|---|---:|
+| 帧级估计（含 stereo/换参考） | 112 s |
+| long-take（窗口+残差+极性+apply） | 184 s |
+| **总计** | **296 s** |
+
+- 状态 `applied`；4 条 audio MOV sha256 与已有 fp32 基线**完全一致**；
+- 早期基线 120.5 s 本次未复现；当前机器 long-take 阶段明显偏慢。
+
+### frame-hybrid
+
+- 13:33:58 开始帧级阶段；
+- 13:35:32 完成 stereo；
+- 13:37:22 才进入换参考轨迹判定；
+- 13:39:47 仍在换参考/帧阶段，**>6 min 未完成**，已终止；
+- 相对 frame-off 的 112 s 帧阶段，hybrid **>349 s**，不可接受。
+
+结论：**完整入口 frame hybrid 不达标**，帧级路径保持 opt-in；
+P0 同时显示当前 long-take 阶段（184 s）才是最大头，下一步优化重点应转向
+long-take/窗口+残差，而不是继续默认化帧级。
+
