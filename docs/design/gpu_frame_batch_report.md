@@ -32,7 +32,8 @@ KTS_GPU_FRAME_PEAK=fast|exact    # 默认 fast；exact 用原 CPU 峰逻辑
 | GPU 单进程，fast 峰 | 34.0 s | 0.65× |
 | CPU+GPU hybrid，coarse 缓存冷 | 24–25 s | ~0.7× |
 | CPU+GPU hybrid，coarse 缓存热（隔离测试） | **15.97 s** | **1.26×** |
-| CPU+GPU hybrid，接入 `estimate_pair` 后（热） | **13.9 s** | **1.21×** |
+| CPU+GPU hybrid，接入后首对（冷缓存） | 13.0 s | 0.85× |
+| CPU+GPU hybrid，接入后热缓存 | **6.30 s** | **1.76×** |
 
 Parity（hybrid vs CPU12）：
 
@@ -45,13 +46,14 @@ Parity（hybrid vs CPU12）：
 ## 3. 完整 channel_sync 结果
 
 在 C1306 上启用 `KTS_GPU_FRAME_BATCH=1`（hybrid）后，完整
-`run_channel_sync` 在 5 分钟内未完成，超过已有 fp32 基线 120.5 s 的
-可接受范围，已终止。**未进入生产默认**。
+`run_channel_sync` 在 **~5 分钟内未完成**（日志停留在 stereo/帧阶段），
+远超已有 fp32 基线 120.5 s，已终止。**未进入生产默认**。
 
 原因判断：
 
-1. hybrid 每对都会启动/复用 12 进程 CPU 池，同时主进程跑 GPU；CPU 池把
-   机器打满，GPU 主线程被饿死，实际没有形成稳定 overlap；
+1. 初始版本 hybrid 被 `_estimate_pair_parallel` 提前截走（已修复为
+   `_hybrid` 时跳过 CPU 并行）；修复后单对稳定 1.76×，但完整入口仍慢，
+   说明还有阶段级资源争用/内存压力；
 2. 完整入口包含多对估计、宽窗复测和换参考阶梯，cold coarse build 被重复
    放大；
 3. 向量化置信度与 CPU 有差异，不能直接作为默认行为。

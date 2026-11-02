@@ -520,7 +520,14 @@ def estimate_frames_hybrid(ref_path: Any, tgt_path: Any, *,
     params = dict(frame=frame, hop=hop, h_c=h_c, f_c=f_c, s_c=s_c,
                   w_half=8, q=q, min_confidence=min_confidence,
                   rms_floor=rms_floor)
-    k_workers = max(1, min(int(workers), k_split))
+    # Keep CPU+GPU overlap: the GPU main thread also runs peak logic, so do
+    # not saturate all cores with the CPU pool.
+    _cpu_cap = int(os.environ.get("KTS_GPU_FRAME_CPU_WORKERS", "0") or 0)
+    if _cpu_cap > 0:
+        k_workers = max(1, min(int(workers), _cpu_cap, k_split))
+    else:
+        k_workers = max(1, min(int(workers), max(2, int(workers) - 2),
+                               k_split))
     import numpy as np
     bounds = [int(round(x)) for x in
               np.linspace(0, k_split, k_workers + 1)]

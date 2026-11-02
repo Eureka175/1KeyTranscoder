@@ -755,7 +755,7 @@ def estimate_pair(
         # 帧级并行 (workers>1): 只在两个源都是**路径**时可用 —— 子进程必须
         # 能自己打开数据。这里先把 n / 几何算出来以便切分, 真正的测量在
         # `_estimate_pair_parallel` 里由进程池完成, 父进程再负责聚合与精估。
-        if (workers and int(workers) > 1
+        if (not _hybrid and workers and int(workers) > 1
                 and isinstance(ref_src, (str, Path))
                 and isinstance(tgt_src, (str, Path))):
             return _estimate_pair_parallel(
