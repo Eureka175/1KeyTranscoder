@@ -35,6 +35,16 @@ KTS_GPU_FRAME_PEAK=fast|exact    # 默认 fast；exact 用原 CPU 峰逻辑
 | CPU+GPU hybrid，接入后首对（冷缓存） | 13.0 s | 0.85× |
 | CPU+GPU hybrid，接入后热缓存 | **6.30 s** | **1.76×** |
 
+C1305 单对（48072 帧，80 min）：
+
+| 方案 | wall | 相对 CPU12 |
+|---|---:|---:|
+| CPU 12 进程 | 12.13 s | 1.00× |
+| hybrid 首对（冷缓存） | 15.27 s | 0.79× |
+| hybrid 热缓存 | **9.18 s** | **1.32×** |
+
+- delay 48071/48072 相同；全局 delay 相同；usable 9583 vs 9584。
+
 Parity（hybrid vs CPU12）：
 
 - 41645 帧中 **41644 帧 delay 完全相同**；
