@@ -120,3 +120,25 @@ C1306 69 min，4ch，`KTS_GPU_ALIGN=fp32`：
 P0 同时显示当前 long-take 阶段（184 s）才是最大头，下一步优化重点应转向
 long-take/窗口+残差，而不是继续默认化帧级。
 
+## 3.3 P1 long-take profiling（同素材）
+
+直接在隔离的 C1306 4ch raw 副本上跑 `align_time_varying`（`KTS_GPU_ALIGN=fp32`）：
+
+| 项目 | wall |
+|---|---:|
+| 完整 long-take（3 units） | **55.2 s** |
+| 其中 target_1 / target_2 / target_3 | 20.9 / 26.7 / 26.6 s |
+| 预创建 12 进程 idle 池后再跑 | **52.6 s**（idle pool 无影响） |
+| 单 target 窗测量 | 10–13 s/411 窗 |
+| 单 target residual | 6.1 s |
+
+单独测试的 long-take 约 55 s，但 channel_sync 内嵌 long-take 实测约
+171–184 s，约为直接测试的 3 倍。已排除：
+
+- 12 进程估计池 idle 残留（52.6 s 与 55.2 s 基本一致）；
+- 算法本身（直接测试稳定 52–55 s）；
+- 单 target 窗/残差（34 s + 18 s，合计约 52 s）。
+
+最可能原因是 channel_sync 前置 112 s 帧估计后的整机热/频率/上下文状态，
+或 GPU/CPU 资源争用；需要温度/频率和逐 unit 计时确认。
+
