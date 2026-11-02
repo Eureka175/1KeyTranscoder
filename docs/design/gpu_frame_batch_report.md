@@ -142,3 +142,30 @@ long-take/窗口+残差，而不是继续默认化帧级。
 最可能原因是 channel_sync 前置 112 s 帧估计后的整机热/频率/上下文状态，
 或 GPU/CPU 资源争用；需要温度/频率和逐 unit 计时确认。
 
+## 3.4 用户空闲状态下重测（2026-11-02 下午）
+
+用户确认上一轮测试期间仍在用电脑；本轮在其未使用电脑时重测 C1306 4ch。
+
+### 完整 channel_sync frame-off
+
+- wall **256.4 s**，状态 `applied`；
+- 4 条 audio MOV sha256 **与已有基线完全一致**；
+- 早期 120.5 s 基线仍未复现。
+
+### 完整 channel_sync frame-hybrid
+
+- 帧阶段开始后 **>10 min** 仍未进入 long-take；已终止，不达标。
+
+### 直接 long-take（同素材、单进程）
+
+- 完整 long-take wall **211.6 s**（上一轮 55.2 s）；
+- 3 次 window measure：**45–49 s/次**；
+- 3 次 round-2 residual：**36–46 s/次**；
+- reference apply：约 6–7 s/次；
+- 同一窗口测量单独调用：**14.4 s**；带 `ref_decimated` + long-take 参数：**17.5 s**。
+
+即：同一 GPU 窗口测量在 long-take 内部约 3 倍慢，独立调用正常。
+GPU 计算基准（4096² fp32 matmul ×10）约 0.093 s，GPU 可用、时钟正常；
+暂不能归因为 GPU 降频，下一步需在 long-take 内记录 `gpu_align.used`/stats
+和每个 unit 的 measure 线程/进程状态。
+
