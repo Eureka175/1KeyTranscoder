@@ -169,3 +169,25 @@ GPU 计算基准（4096² fp32 matmul ×10）约 0.093 s，GPU 可用、时钟�
 暂不能归因为 GPU 降频，下一步需在 long-take 内记录 `gpu_align.used`/stats
 和每个 unit 的 measure 线程/进程状态。
 
+## 3.5 早期 120.5 s 基线不可复现（关键结论）
+
+用**同一个早期脚本** `work/perf/ws14/test_channel_sync_fast.py`
+（`KTS_GPU_ALIGN=fast`、同源文件、同输出目录约定）在当前空闲机器重跑：
+
+| 项目 | 早期 | 本次 |
+|---|---:|---:|
+| channel_sync wall | 120.5 s | **285.2 s** |
+| status | applied | applied |
+| 4 条 audio MOV sha256 | 基线 | **与早期完全一致** |
+
+同时：
+
+- 当前分支默认帧级路径为 CPU（`KTS_GPU_FRAME_BATCH` 未设）；
+- 直接 long-take：早期 55.2 s → 本次 211.6 s；
+- 但单独窗口测量 14–17 s、GPU matmul 正常；
+- 同脚本、同代码路径、同输出哈希，wall 差 2.4×。
+
+因此 **120.5 s 不是稳定可复现的基线**，更可能是早期运行时的
+机器/缓存/GPU-CPU 电源/后台负载状态造成的离群值；不能作为当前
+验收基线。需要一次受控的、重复 3 次的阶段级基准来重新建立基线。
+
