@@ -85,3 +85,24 @@ stages:
 结论：**P2 的 surface 双缓冲不作为默认**，保留 opt-in 实验。
 下一步必须做 **多 target 合批** 或 **GPU 端峰/连续性**，否则 CPU 串行段仍占主导。
 
+## 2026-11-03 — P2b 多 target surface 合批组件
+
+新增 `core/gpu_align/window_multi.py`：
+
+- 一个 anchor + 多个 target coarse 缓存；
+- 把所有 target 的窗请求合并成一个 GPU batch；
+- 输出与 `WindowCCEngine.surface_windows` 完全相同的裁剪/归一化窗口；
+- 暂未接入生产 `measure_window_delays`/long-take（先做组件与基准）。
+
+C1306 3 targets（619 窗/target）基准：
+
+| 模式 | wall | GPU ms | batch |
+|---|---:|---:|---:|
+| 逐 target engine | 3.82 s | 1316.8 | 60 |
+| 多 target 合批 | 3.56 s | 1565.7 | 56 |
+
+- 三个 target 的 surface 行 **逐值相等**；
+- wall 仅快约 **7%**，GPU 时间反而略高（批次合并/传输开销）；
+- 说明只做 surface 合批仍然无法显著提高端到端利用率；下一步必须
+  GPU 化/向量化 **峰选择 + full-rate refine + continuity**。
+

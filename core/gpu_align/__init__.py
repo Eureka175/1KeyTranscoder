@@ -26,11 +26,12 @@ from .observe import (
 from .runtime import GpuRunContext, begin_run, current_run, end_run
 from .types import BatchStats, SurfaceBatch, WindowPeak
 from .window_cc import WindowCCEngine
+from .window_multi import MultiWindowEngine
 
 __all__ = [
     "GpuBackend", "GpuOutOfMemory", "GpuUnavailable", "gpu_available",
     "get_backend", "Precision", "Policy", "resolve_policy",
-    "WindowCCEngine", "FrameGccEngine", "ResidualCCEngine",
+    "WindowCCEngine", "MultiWindowEngine", "FrameGccEngine", "ResidualCCEngine",
     "RefineEngine",
     "AlignGpuSession", "session_from_env", "WindowPeak", "SurfaceBatch",
     "BatchStats", "ParityResult", "compare_window_peaks", "compare_surfaces",
