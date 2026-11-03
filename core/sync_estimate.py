@@ -1987,8 +1987,20 @@ def measure_window_delays(
                 if _ctx is not None:
                     for _st in _refine_batch_eng.stats:
                         _ctx.metrics.record_batch(_st)
-            except Exception:                          # noqa: BLE001
-                pass
+            except Exception as _exc:                  # noqa: BLE001
+                if os.environ.get("KTS_GPU_REFINE_DEBUG"):
+                    print("batch_refine_error:", type(_exc).__name__, _exc)
+                # Correctness fallback: never leave provisional coarse
+                # confidence=0 rows when the GPU batch fails.
+                for _w, _start, _center, _abs_cc in _pending_refine:
+                    _lag, _quality = _refine_window_peak(
+                        ref, tgt, start_sample=_start,
+                        window_samples=win, coarse_lag=_center,
+                        radius=int(refine_radius_samples),
+                        segment_samples=seg_samples)
+                    windows[_w]["delay_samples"] = float(_lag)
+                    windows[_w]["confidence"] = round(
+                        float(min(_abs_cc, 1.0) * max(_quality, 0.0)), 6)
 
         rejected = sum(1 for r in windows if not r["valid"])
         return {

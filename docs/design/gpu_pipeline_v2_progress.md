@@ -280,3 +280,35 @@ long-take 原地施加后的中间结果**，或 `prep(if not exists)` 跳过了
 2. 下一步把 batch refine 改为 **确定性和 CPU-等价**（fp64、固定分批顺序、逐行 CPU 校验）；
 3. 在它通过 full channel parity 前，不进入默认/主线。
 
+## 2026-11-04 — 根因确认 + CPU fallback 修复
+
+根因不是 GPU 数值不确定，而是 **batch refine 偶尔抛异常/未执行**，
+旧代码捕获异常后直接 pass，留下 provisional 行：
+
+- `delay_samples = coarse lag`
+- `confidence = 0.0`
+
+这些 0 置信度行进入 long-take 曲线后改变了输出。
+
+修复：
+
+- batch refine 异常时，对所有 pending 窗口回退到 CPU
+  `_refine_window_peak`，不再保留 confidence=0 的 provisional 行；
+- 任何 batch 失败都不会污染完整输出。
+
+结果：
+
+| 测试 | 结果 |
+|---|---|
+| clean 300 s direct batch/off | digest 相等 |
+| clean 300 s long-take batch/off | **fixed raw 完全相等** |
+| 完整 C1306 channel_sync exact batch | **audio MOV 哈希与基线完全一致** |
+| 完整 C1306 exact batch wall | **519.9 s**（明显变慢，性能问题待查） |
+
+结论：
+
+- **parity 门已修复**；batch refine 可在 fallback 保护下保持输出一致；
+- 但 exact/fp64 batch 完整入口当前 519.9 s，比默认 263.9 s 慢；
+- 需要判断 fallback 是否被频繁触发，以及 batch 失败的根因（OOM/引擎
+  创建/批次大小），再决定是否继续启用 batch refine。
+
