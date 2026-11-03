@@ -256,3 +256,27 @@ long-take 原地施加后的中间结果**，或 `prep(if not exists)` 跳过了
 2. 在同一组干净输入上重跑 batch/default（long-take 与 direct measure）；
 3. 只有在干净输入上复现的差异才作为真正的 parity 阻塞。
 
+## 2026-11-03 — 最终定位：问题在 GPU batch refine 本身
+
+用 canonical 输入重建并校验 sha256 后：
+
+- direct `measure_window_delays` batch/off 在同一进程内曾相等；
+- 但在另一次进程/长镜头测试中，batch 结果与 CPU off 不一致；
+- 同一进程重复 batch 5 次结果一致（85d0…），CPU off 为 6e7a…；
+- 长镜头 batch/off 的 measure digest 与这条分歧一致。
+
+因此当前阻塞不在：
+- long-take 调用上下文；
+- 输入污染；
+- 线程/ref cache/prewarm。
+
+而在 **GPU batch refine 的数值/确定性**：
+- 它有时与 CPU off 一致，有时不一致；
+- 依赖运行/批次状态，不能保证 audio MOV parity。
+
+处理决定：
+
+1. batch refine 保持 opt-in，默认关闭；
+2. 下一步把 batch refine 改为 **确定性和 CPU-等价**（fp64、固定分批顺序、逐行 CPU 校验）；
+3. 在它通过 full channel parity 前，不进入默认/主线。
+
