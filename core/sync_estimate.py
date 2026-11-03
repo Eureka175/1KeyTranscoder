@@ -45,6 +45,7 @@ from __future__ import annotations
 import math
 import os
 import threading
+import time
 import warnings
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -1489,28 +1490,40 @@ def gpu_align_enabled() -> bool:
 def prewarm_gpu_align(mode: str | None = None) -> bool:
     """Compile/warm the optional GPU window path in the *calling* thread.
 
-    long_take measures units in a thread pool; warming in the main thread
-    before spawning avoids each worker paying the one-time CuPy JIT/FFT-plan
-    cost (the kernels/cache are process-wide).  Returns True when warmed.
+    Reuses the run-level session when one is active; otherwise preserves the
+    old standalone create/close behaviour.  Returns True when warmed.
     """
+    sess = None
+    owns = True
     try:
-        from .gpu_align import AlignGpuSession
         from .gpu_align.window_cc import WindowCCEngine
+        from .gpu_align import runtime as _gpu_runtime
 
-        sess = AlignGpuSession.create(mode=mode)
+        ctx = _gpu_runtime.current_run()
+        if ctx is not None:
+            sess = ctx.session()
+            owns = False
+        else:
+            from .gpu_align import AlignGpuSession
+            sess = AlignGpuSession.create(mode=mode)
         if sess is None:
             return False
+        eng = WindowCCEngine(
+            sess.backend, np.zeros(2048), np.zeros(2048),
+            policy=sess.policy)
         try:
-            eng = WindowCCEngine(
-                sess.backend, np.zeros(2048), np.zeros(2048),
-                policy=sess.policy)
             eng.warmup()
-            eng.close()
         finally:
-            sess.close()
+            eng.close()
         return True
     except Exception:                                      # noqa: BLE001
         return False
+    finally:
+        if sess is not None and owns:
+            try:
+                sess.close()
+            except Exception:                              # noqa: BLE001
+                pass
 
 
 def measure_window_delays(
@@ -1595,6 +1608,14 @@ def measure_window_delays(
     radius0 = max(0, int(continuity_radius_samples))
     radius_per_min = max(0, int(continuity_radius_per_minute))
     min_cc = float(min_cc)
+    _t_measure = time.perf_counter()
+    _owns_align_session = True
+    _ctx = None
+    try:
+        from .gpu_align import runtime as _gpu_runtime
+        _ctx = _gpu_runtime.current_run()
+    except Exception:                                  # noqa: BLE001
+        _ctx = None
 
     opened: list[Any] = []
     try:
@@ -1607,18 +1628,30 @@ def measure_window_delays(
         n = min(int(ref.shape[0]), int(tgt.shape[0]))
 
         if ref_decimated is None:
-            ref12 = coarse_decimate(
+            _build_ref = lambda: coarse_decimate(
                 ref, sample_rate=sample_rate, coarse_rate=coarse_rate,
-                storage_dtype=storage_dtype,
-            )
+                storage_dtype=storage_dtype)
+            if _ctx is not None:
+                _key = _ctx.coarse_key(
+                    ref_src, sample_rate=sample_rate,
+                    coarse_rate=coarse_rate, storage_dtype=storage_dtype)
+                ref12 = _ctx.coarse_get_or_build(_key, _build_ref)
+            else:
+                ref12 = _build_ref()
         else:
             ref12 = _check_decimated(ref_decimated, int(ref.shape[0]), q,
                                      "ref_decimated")
         if tgt_decimated is None:
-            tgt12 = coarse_decimate(
+            _build_tgt = lambda: coarse_decimate(
                 tgt, sample_rate=sample_rate, coarse_rate=coarse_rate,
-                storage_dtype=storage_dtype,
-            )
+                storage_dtype=storage_dtype)
+            if _ctx is not None:
+                _key = _ctx.coarse_key(
+                    tgt_src, sample_rate=sample_rate,
+                    coarse_rate=coarse_rate, storage_dtype=storage_dtype)
+                tgt12 = _ctx.coarse_get_or_build(_key, _build_tgt)
+            else:
+                tgt12 = _build_tgt()
         else:
             tgt12 = _check_decimated(tgt_decimated, int(tgt.shape[0]), q,
                                      "tgt_decimated")
@@ -1648,6 +1681,7 @@ def measure_window_delays(
         if gpu_align is None:
             _env = os.environ.get("KTS_GPU_ALIGN", "0").strip().lower()
             gpu_align = _env not in ("", "0", "off", "false", "no")
+        _owns_align_session = True
         if gpu_align:
             try:
                 from .gpu_align import AlignGpuSession
@@ -1656,12 +1690,18 @@ def measure_window_delays(
                 _mode = os.environ.get("KTS_GPU_ALIGN", "").strip().lower()
                 if _mode in ("", "0", "off", "false", "no"):
                     _mode = "fp32"
-                _align_sess = AlignGpuSession.create(mode=_mode)
+                if _ctx is not None:
+                    _align_sess = _ctx.session()
+                    _owns_align_session = False
+                else:
+                    _align_sess = AlignGpuSession.create(mode=_mode)
                 if _align_sess is not None:
                     _align_eng = WindowCCEngine(
                         _align_sess.backend, ref12, tgt12,
                         policy=_align_sess.policy)
                     _align_eng.warmup()
+                    if _ctx is not None:
+                        _ctx.metrics.record_engine(created=True)
             except Exception:                          # noqa: BLE001
                 _align_sess = _align_eng = None
 
@@ -1818,12 +1858,21 @@ def measure_window_delays(
             },
         }
     finally:
+        if _ctx is not None and _align_eng is not None:
+            try:
+                for _st in _align_eng.stats:
+                    _ctx.metrics.record_batch(_st)
+            except Exception:                          # noqa: BLE001
+                pass
+        if _ctx is not None:
+            _ctx.metrics.record_stage(
+                "window_measure", time.perf_counter() - _t_measure)
         if _align_eng is not None:
             try:
                 _align_eng.close()
             except Exception:                          # noqa: BLE001
                 pass
-        if _align_sess is not None:
+        if _align_sess is not None and _owns_align_session:
             try:
                 _align_sess.close()
             except Exception:                          # noqa: BLE001

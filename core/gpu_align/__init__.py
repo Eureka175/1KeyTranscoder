@@ -20,6 +20,10 @@ from .precision import Policy, Precision, resolve_policy
 from .refine import RefineEngine
 from .residual_cc import ResidualCCEngine
 from .session import AlignGpuSession, session_from_env
+from .observe import (
+    GpuRunMetrics, begin_metrics, current_metrics, end_metrics,
+)
+from .runtime import GpuRunContext, begin_run, current_run, end_run
 from .types import BatchStats, SurfaceBatch, WindowPeak
 from .window_cc import WindowCCEngine
 
@@ -30,6 +34,8 @@ __all__ = [
     "RefineEngine",
     "AlignGpuSession", "session_from_env", "WindowPeak", "SurfaceBatch",
     "BatchStats", "ParityResult", "compare_window_peaks", "compare_surfaces",
+    "GpuRunMetrics", "GpuRunContext", "begin_run", "end_run",
+    "current_run", "begin_metrics", "end_metrics", "current_metrics",
 ]
 
 __version__ = "0.1.0"

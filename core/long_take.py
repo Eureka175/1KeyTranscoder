@@ -771,18 +771,30 @@ def measure_residual_curve(
     ]
 
     # Optional new GPU residual seed (fp32/fp64 per KTS_GPU_ALIGN).
+    # Reuse the run-level session/engine when channel_sync has one.
     _align_engine = None
+    _align_sess = None
+    _owns_align_sess = True
+    _gpu_ctx = None
     _align_lock = threading.Lock()
+    _t_residual = time.perf_counter()
     try:
         if sync_estimate.gpu_align_enabled():
-            from .gpu_align import AlignGpuSession
-            from .gpu_align.residual_cc import ResidualCCEngine
+            from .gpu_align import runtime as _gpu_runtime
 
-            _sess = AlignGpuSession.create()
-            if _sess is not None:
-                _align_engine = ResidualCCEngine(
-                    _sess.backend, policy=_sess.policy)
-                _align_engine._session = _sess  # keep backend alive
+            _gpu_ctx = _gpu_runtime.current_run()
+            if _gpu_ctx is not None:
+                _align_engine = _gpu_ctx.residual_engine()
+                _owns_align_sess = False
+            if _align_engine is None:
+                from .gpu_align import AlignGpuSession
+                from .gpu_align.residual_cc import ResidualCCEngine
+
+                _align_sess = AlignGpuSession.create()
+                if _align_sess is not None:
+                    _align_engine = ResidualCCEngine(
+                        _align_sess.backend, policy=_align_sess.policy)
+                    _align_engine._session = _align_sess
     except Exception:                                  # noqa: BLE001
         _align_engine = None
 
@@ -861,10 +873,19 @@ def measure_residual_curve(
     else:
         rows = [m for m in (measure_one(s) for s in starts) if m is not None]
     n_windows = len(starts)
-    if _align_engine is not None:
+    if _gpu_ctx is not None and _align_engine is not None:
+        try:
+            for _st in _align_engine.stats:
+                _gpu_ctx.metrics.record_batch(_st)
+        except Exception:                          # noqa: BLE001
+            pass
+        _gpu_ctx.metrics.record_stage(
+            "residual_measure", time.perf_counter() - _t_residual)
+    if _align_engine is not None and _owns_align_sess:
         try:
             _align_engine.close()
-            _align_engine._session.close()
+            if _align_sess is not None:
+                _align_sess.close()
         except Exception:                          # noqa: BLE001
             pass
     if len(rows) < int(prof["residual_min_blocks"]):

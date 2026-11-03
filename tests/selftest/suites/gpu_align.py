@@ -95,3 +95,50 @@ def l1_gpu_align_fallback() -> None:
         record("gpu_align.no CUDA -> None session",
                AlignGpuSession.create(mode="fp32") is None)
 
+def l1_gpu_pipeline_runtime() -> None:
+    """P0/P1 contracts: run metrics, coarse cache and session lifecycle."""
+    from pathlib import Path
+
+    import numpy as np
+
+    from core.gpu_align.observe import (
+        begin_metrics, current_metrics, end_metrics,
+    )
+    from core.gpu_align.runtime import begin_run, current_run, end_run
+
+    section("L1 gpu_pipeline runtime/observability")
+
+    m = begin_metrics("fp32")
+    record("gpu_pipeline.metrics current", current_metrics() is m)
+    m.record_batch({"kernel": "window_cc", "gpu_ms": 2.5,
+                    "fallback": False})
+    m.record_batch({"kernel": "residual_cc", "gpu_ms": 1.5,
+                    "fallback": True})
+    m.record_stage("window_measure", 0.25)
+    m.record_session(created=True)
+    m.record_session(created=False)
+    s = end_metrics(wall_s=1.0)
+    record("gpu_pipeline.metrics batches", s["batches"] == 2)
+    record("gpu_pipeline.metrics fallback", s["fallback_batches"] == 1)
+    record("gpu_pipeline.metrics gpu_active",
+           abs(s["gpu_active_s"] - 0.004) < 1e-9)
+    record("gpu_pipeline.metrics session counts",
+           s["sessions_created"] == 1 and s["sessions_reused"] == 1)
+    record("gpu_pipeline.metrics cleared", current_metrics() is None)
+
+    ctx = begin_run("0")
+    record("gpu_pipeline.run current", current_run() is ctx)
+    key = ctx.coarse_key(Path("a.raw"), sample_rate=48000,
+                          coarse_rate=12000, storage_dtype="f32")
+    arr = ctx.coarse_get_or_build(key, lambda: np.zeros(8, dtype=np.float32))
+    arr2 = ctx.coarse_get_or_build(key, lambda: np.ones(8, dtype=np.float32))
+    record("gpu_pipeline.coarse same array", arr is arr2)
+    record("gpu_pipeline.coarse hit",
+           ctx.metrics.coarse_hits == 1
+           and ctx.metrics.coarse_misses == 1)
+    record("gpu_pipeline.off session is none", ctx.session() is None)
+    summary = end_run(wall_s=1.0)
+    record("gpu_pipeline.run end", current_run() is None
+           and summary is not None)
+    record("gpu_pipeline.run off summary",
+           summary["sessions_created"] == 0)

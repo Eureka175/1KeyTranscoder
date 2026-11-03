@@ -138,6 +138,7 @@ F:\1KeyTranscoder\
 | [design/gpu_align_arch_state.md](design/gpu_align_arch_state.md) | **GPU 音频对齐架构状态/移交**：分支提交、模块、环境开关、实测汇总、限制与下一步。 |
 | [design/gpu_frame_batch_report.md](design/gpu_frame_batch_report.md) | 帧级 `estimate_pair` GPU 批处理实验：实现、单对 hybrid 1.2×、完整入口未通过、默认关闭。 |
 | [design/gpu_pipeline_v2_architecture.md](design/gpu_pipeline_v2_architecture.md) | **GPU Pipeline v2 新架构**：持久 session、coarse 缓存复用、多 target 合批、双缓冲流水线、GPU 利用率目标 >50%。 |
+| [design/gpu_pipeline_v2_progress.md](design/gpu_pipeline_v2_progress.md) | GPU Pipeline v2 进度：P0 指标 + P1 持久 session/coarse 缓存复用，冒烟 GPU active 9%。 |
 | [design/gpu_align_architecture.md](design/gpu_align_architecture.md) | **GPU 音频对齐新架构**：`core/gpu_align` 后端/精度策略/窗级与帧级批处理/显存预算/回退/parity 合同。 |
 | [design/gpu_align_ws14_report.md](design/gpu_align_ws14_report.md) | **GPU 对齐 FP32/FP64 实测报告**：微基准、C1306/C1305 端到端、精度差与 go/no-go 建议。 |
 | [plans/async-pipeline-and-scheduler.md](plans/async-pipeline-and-scheduler.md) | **异步流水线与连续 jobs 调度规划（未实现）**：当前 \--jobs auto\ 是波次调度（波尾空槽），固定 \--jobs N\ 已能连续补槽；建议 Phase 1 连续补槽、Phase 2 同文件 audio/video overlap（音频只依赖源）、Phase 3 metadata/mux stage 流水线；含资源预算、验收与风险。 |

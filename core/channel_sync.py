@@ -60,6 +60,7 @@ import shutil
 import struct
 import subprocess
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
@@ -1905,6 +1906,15 @@ def run_channel_sync(
     work_dir.mkdir(parents=True, exist_ok=True)
     stem = source.stem
     ctx: dict[str, Any] = {"anchor": None}
+    _gpu_run_ctx = None
+    _gpu_run_t0 = time.perf_counter()
+    try:
+        if os.environ.get("KTS_GPU_ALIGN", "0").strip().lower() not in (
+                "", "0", "off", "false", "no"):
+            from .gpu_align.runtime import begin_run
+            _gpu_run_ctx = begin_run()
+    except Exception:                                  # noqa: BLE001
+        _gpu_run_ctx = None
 
     def report(
         status: str,
@@ -3725,3 +3735,19 @@ def run_channel_sync(
             sync_estimate.shutdown_estimation_pool()
         except Exception:                                  # noqa: BLE001
             pass
+        if _gpu_run_ctx is not None:
+            try:
+                from .gpu_align.runtime import end_run
+                _gpu_summary = end_run(
+                    wall_s=time.perf_counter() - _gpu_run_t0)
+                if _gpu_summary:
+                    (work_dir / "gpu_pipeline_metrics.json").write_text(
+                        json.dumps(_gpu_summary, indent=2,
+                                   ensure_ascii=False) + "\n",
+                        encoding="utf-8")
+                    log("channel-sync: GPU pipeline metrics: "
+                        f"active={_gpu_summary['gpu_active_ratio']:.1%} "
+                        f"sessions={_gpu_summary['sessions_created']} "
+                        f"batches={_gpu_summary['batches']}")
+            except Exception:                              # noqa: BLE001
+                pass

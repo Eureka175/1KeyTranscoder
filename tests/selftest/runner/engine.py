@@ -62,6 +62,8 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("gpu_align policy/parity", gpu_align.l1_gpu_align),
             ("gpu_align fallback/availability",
              gpu_align.l1_gpu_align_fallback),
+            ("gpu_pipeline runtime/observability",
+             gpu_align.l1_gpu_pipeline_runtime),
             ("gpac/paths", core.l1_gpac_paths),
             ("tkhd 轨道标志/alternate group (PR 多音轨)",
              container_flags.l1_track_flags),
