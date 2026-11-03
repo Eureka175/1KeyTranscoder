@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import math
 import os
+import queue
 import threading
 import time
 import warnings
@@ -1611,6 +1612,8 @@ def measure_window_delays(
     _t_measure = time.perf_counter()
     _owns_align_session = True
     _ctx = None
+    _surf_stop = threading.Event()
+    _surf_thread = None
     try:
         from .gpu_align import runtime as _gpu_runtime
         _ctx = _gpu_runtime.current_run()
@@ -1720,18 +1723,103 @@ def measure_window_delays(
                                    lag_lo, lag_hi, q)
 
         n_windows = 0 if n < win else (n - win) // hop + 1
+        _surf_q = None
+        _surf_failed = False
+        _surf_cur_lo = _surf_cur_end = 0
+        _surf_batch = None
+        _surf_batch_valid = None
+        _surf_batch_lo = 0
+        _surf_batch_hi = 0
+        _pipeline_surfaces = (
+            _align_eng is not None and n_windows > 0
+            and os.environ.get("KTS_GPU_SURFACE_PIPELINE", "0").strip().lower()
+            not in ("", "0", "off", "false", "no"))
         if _align_eng is not None and n_windows > 0:
             try:
                 _surf_c = int(math.ceil(search_samples / q))
                 _reqs = [(int(round(w * hop / q)),
                           int(round(win / q))) for w in range(n_windows)]
-                (_surf_windows, _surf_lo, _surf_hi,
-                 _surf_valid) = _align_eng.surface_windows(
-                    _reqs, lag_lo_c=-_surf_c, lag_hi_c=_surf_c)
-                if _surf_windows.ndim != 2 or _surf_windows.shape[0] != n_windows:
-                    _surf_windows = None
+                if _pipeline_surfaces:
+                    _chunk = max(1, int(os.environ.get(
+                        "KTS_GPU_SURFACE_BATCH", "32") or 32))
+                    _surf_q = queue.Queue(maxsize=2)
+
+                    def _surface_producer() -> None:
+                        try:
+                            for _lo in range(0, len(_reqs), _chunk):
+                                if _surf_stop.is_set():
+                                    return
+                                _w, _m_lo, _m_hi, _v = (
+                                    _align_eng.surface_windows(
+                                        _reqs[_lo:_lo + _chunk],
+                                        lag_lo_c=-_surf_c,
+                                        lag_hi_c=_surf_c))
+                                while not _surf_stop.is_set():
+                                    try:
+                                        _surf_q.put((_lo, _w, _v,
+                                                     _m_lo, _m_hi),
+                                                    timeout=0.2)
+                                        break
+                                    except queue.Full:
+                                        continue
+                        except Exception:              # noqa: BLE001
+                            try:
+                                _surf_q.put(("error", None, None, 0, 0),
+                                            timeout=0.5)
+                            except Exception:          # noqa: BLE001
+                                pass
+
+                    _surf_thread = threading.Thread(
+                        target=_surface_producer, name="gpu-surfaces",
+                        daemon=True)
+                    _surf_thread.start()
+                else:
+                    (_surf_windows, _surf_lo, _surf_hi,
+                     _surf_valid) = _align_eng.surface_windows(
+                        _reqs, lag_lo_c=-_surf_c, lag_hi_c=_surf_c)
+                    if (_surf_windows.ndim != 2
+                            or _surf_windows.shape[0] != n_windows):
+                        _surf_windows = None
             except Exception:                          # noqa: BLE001
                 _surf_windows = None
+                _surf_q = None
+
+        _surface_m_lo = 0
+        _surface_m_hi = 0
+
+        def _surface_for(w: int) -> tuple | None:
+            nonlocal _surf_cur_lo, _surf_cur_end, _surf_batch, \
+                _surf_batch_valid, _surf_batch_lo, _surf_failed, \
+                _surface_m_lo, _surface_m_hi
+            if _surf_windows is not None:
+                if w >= _surf_windows.shape[0]:
+                    return None
+                return (_surf_windows[w:w + 1], _surf_valid[w:w + 1],
+                        _surf_lo, _surf_hi)
+            if _surf_q is None or _surf_failed:
+                return None
+            while w >= _surf_cur_end:
+                try:
+                    item = _surf_q.get(timeout=60.0)
+                except Exception:                      # noqa: BLE001
+                    _surf_failed = True
+                    return None
+                if item[0] == "error":
+                    _surf_failed = True
+                    return None
+                (_surf_batch_lo, _surf_batch, _surf_batch_valid,
+                 _surface_m_lo, _surface_m_hi) = item
+                _surf_batch_lo = int(_surf_batch_lo)
+                _surf_cur_lo = _surf_batch_lo
+                _surf_cur_end = _surf_batch_lo + _surf_batch.shape[0]
+                if _surf_cur_end <= w:
+                    continue
+            i = w - _surf_batch_lo
+            if i < 0 or i >= _surf_batch.shape[0]:
+                return None
+            return (_surf_batch[i:i + 1], _surf_batch_valid[i:i + 1],
+                    _surface_m_lo, _surface_m_hi)
+
         initial: dict[str, Any] = {
             "lag": None, "cc": 0.0, "coarse_cc": 0.0, "refine_quality": 0.0,
             "valid": False, "polarity": 1, "start_sample": 0, "attempts": [],
@@ -1797,18 +1885,21 @@ def measure_window_delays(
             }
             if prev is not None:
                 peak = None
-                if _surf_windows is not None and w < _surf_windows.shape[0]:
+                _surf_item = _surface_for(w)
+                if _surf_item is not None:
                     try:
+                        _win_rows, _win_valid, _win_m_lo, _win_m_hi = (
+                            _surf_item)
                         n_c = int(round(win / q))
                         m_lo = max(-(n_c - 1),
                                    int(math.ceil(-(prev + radius) / q)))
                         m_hi = min(n_c - 1,
                                    int(math.floor(-(prev - radius) / q)))
-                        if m_lo <= m_hi and _surf_lo <= m_lo and m_hi <= _surf_hi:
+                        if (m_lo <= m_hi and _win_m_lo <= m_lo
+                                and m_hi <= _win_m_hi):
                             _pk = _align_eng.peaks_from_windows(
-                                _surf_windows[w:w + 1],
-                                _surf_valid[w:w + 1],
-                                m_lo=_surf_lo,
+                                _win_rows, _win_valid,
+                                m_lo=_win_m_lo,
                                 lag_lo_c=m_lo, lag_hi_c=m_hi,
                             )[0]
                             if _pk is not None:
@@ -1858,6 +1949,15 @@ def measure_window_delays(
             },
         }
     finally:
+        try:
+            _surf_stop.set()
+        except Exception:                                  # noqa: BLE001
+            pass
+        try:
+            if _surf_thread is not None:
+                _surf_thread.join(timeout=3)
+        except Exception:                                  # noqa: BLE001
+            pass
         if _ctx is not None and _align_eng is not None:
             try:
                 for _st in _align_eng.stats:

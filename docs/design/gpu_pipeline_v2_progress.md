@@ -60,3 +60,28 @@ stages:
 - Unit 测试：**1053 PASS / 2 FAIL**（既有缺 Sony/DJI 语料环境项）；
 - 输出 parity：context vs 无 context windows 相等；
 - VERSION 未变。
+
+## 2026-11-03 — P2 尝试：surface 双缓冲
+
+实现：
+
+- `measure_window_delays` 新增可选 `KTS_GPU_SURFACE_PIPELINE=1`；
+- 后台线程按 `KTS_GPU_SURFACE_BATCH` 分批计算 GPU surface；
+- 主线程同时做窗连续性/峰/全速率 refine；
+- 默认 **关闭**（`0`），保持旧行为。
+
+实测 C1306 单 target 411 窗：
+
+| 模式 | wall | GPU active |
+|---|---:|---:|
+| legacy 一次性 surface | **10.30 s** | 5.65% |
+| pipeline batch=32 | 12.26 s | 5.95% |
+| pipeline batch=128 | 11.23 s | — |
+
+- windows/initial 与 legacy **完全一致**；
+- pipeline 没有收益，反而增加批次/线程开销；
+- 原因：CPU 的 `_refine_window_peak` 和连续性逻辑仍是串行瓶颈，GPU 只有少量 surface 计算；双缓冲无法提高 GPU 占比。
+
+结论：**P2 的 surface 双缓冲不作为默认**，保留 opt-in 实验。
+下一步必须做 **多 target 合批** 或 **GPU 端峰/连续性**，否则 CPU 串行段仍占主导。
+
