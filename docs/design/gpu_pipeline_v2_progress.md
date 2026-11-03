@@ -222,3 +222,37 @@ batch refine 继续 opt-in，默认关闭。
 下一步需要在同一进程内对 long-take 内部/外部的 **逐窗口行** 做差值，
 确认是窗值不同还是 digest 口径不同。
 
+## 2026-11-03 — 阻塞定位：测试输入/中间文件污染
+
+检查 C1306 4ch 输入时发现：不同测试副本的 sha256 不一致。
+
+当前 `work/long_take/accept/raw_audio` 的 canonical hashes：
+
+| 文件 | sha256 |
+|---|---|
+| c1306_ch0 | `313e…` |
+| c1306_ch1 | `8b11…` |
+| c1306_ch2 | `3503…` |
+| c1306_ch3 | `3f5f…` |
+
+但本轮 long-take A/B 测试副本记录到过：
+
+- `b505… / 4454… / 5783… / e665…`
+- `b505… / d9bc… / fa53… / c879…`
+
+说明测试副本并非全部来自同一份原始输入，部分目录/文件是**上一轮
+long-take 原地施加后的中间结果**，或 `prep(if not exists)` 跳过了覆盖。
+
+影响：
+
+- long-take 300 s A/B、direct/internal measure 对比**不可信**；
+- “long-take 内部 measure 与外部不同”的结论可能是输入污染造成；
+- batch refine 的 full channel 差异仍来自直接从 MP4 解码的 channel_sync
+  结果，这一点不受污染影响，仍需单独验证。
+
+下一步：
+
+1. 从 canonical raw 强制覆盖重建全部测试副本，校验 sha256；
+2. 在同一组干净输入上重跑 batch/default（long-take 与 direct measure）；
+3. 只有在干净输入上复现的差异才作为真正的 parity 阻塞。
+
