@@ -164,3 +164,21 @@ C1306 3 targets（619 窗/target）基准：
 结论：P3 组件在单窗口级别有效（3.85×），但完整入口 parity 未通过，
 先定位长镜头 measure 调用与曲线层的差异，再继续。
 
+## 2026-11-03 — P3 parity 进一步定位
+
+300 s 隔离素材（4 个 fresh copies）：
+
+| 模式 | long-take wall | applied | fixed raw |
+|---|---:|---|---|
+| batch refine exact | **11.9 s** | true | 3 个 sha 不同 |
+| default | 18.4 s | true | 基线 |
+
+- 同一素材上直接 `measure_window_delays`（default vs batch）在
+  C1306/C1305 全文件、300 s 短文件、带 ref cache/context 时，
+  windows 都逐窗相等；
+- 但 `align_time_varying` 内部调用时输出仍不同；
+- 说明差异发生在 **long-take 的调用上下文/曲线层**，不是单次窗测量的
+  delay/confidence 本身；
+- 需要继续抓 long-take 内部 measure 参数/线程/多 unit 状态；batch refine
+  仍只能 opt-in，默认关闭。
+
