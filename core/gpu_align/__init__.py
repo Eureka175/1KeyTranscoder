@@ -18,6 +18,7 @@ from .frame_gcc import FrameGccEngine
 from .parity import ParityResult, compare_surfaces, compare_window_peaks
 from .precision import Policy, Precision, resolve_policy
 from .refine import RefineEngine
+from .refine_batch import RefineBatchEngine
 from .residual_cc import ResidualCCEngine
 from .session import AlignGpuSession, session_from_env
 from .observe import (
@@ -32,7 +33,7 @@ __all__ = [
     "GpuBackend", "GpuOutOfMemory", "GpuUnavailable", "gpu_available",
     "get_backend", "Precision", "Policy", "resolve_policy",
     "WindowCCEngine", "MultiWindowEngine", "FrameGccEngine", "ResidualCCEngine",
-    "RefineEngine",
+    "RefineEngine", "RefineBatchEngine",
     "AlignGpuSession", "session_from_env", "WindowPeak", "SurfaceBatch",
     "BatchStats", "ParityResult", "compare_window_peaks", "compare_surfaces",
     "GpuRunMetrics", "GpuRunContext", "begin_run", "end_run",

@@ -1614,6 +1614,7 @@ def measure_window_delays(
     _ctx = None
     _surf_stop = threading.Event()
     _surf_thread = None
+    _refine_batch_eng = None
     try:
         from .gpu_align import runtime as _gpu_runtime
         _ctx = _gpu_runtime.current_run()
@@ -1707,6 +1708,22 @@ def measure_window_delays(
                         _ctx.metrics.record_engine(created=True)
             except Exception:                          # noqa: BLE001
                 _align_sess = _align_eng = None
+
+        _refine_batch_eng = None
+        _use_batch_refine = (
+            _align_sess is not None
+            and os.environ.get("KTS_GPU_REFINE_BATCH", "0").strip().lower()
+            not in ("", "0", "off", "false", "no"))
+        if _use_batch_refine:
+            try:
+                from .gpu_align.refine_batch import RefineBatchEngine
+                _refine_batch_eng = RefineBatchEngine(
+                    _align_sess.backend, policy=_align_sess.policy)
+                if _ctx is not None:
+                    _ctx.metrics.record_engine(created=True)
+            except Exception:                          # noqa: BLE001
+                _refine_batch_eng = None
+                _use_batch_refine = False
 
         def _coarse_peak(start_c: int, count_c: int, lag_lo: int,
                          lag_hi: int) -> tuple | None:
@@ -1869,6 +1886,7 @@ def measure_window_delays(
 
         # ---- 逐窗: 连续性约束搜索 + 全速率精化
         windows: list[dict[str, Any]] = []
+        _pending_refine: list[tuple[int, int, int, float]] = []
         for w in range(n_windows):
             start = w * hop
             t_min = start / sample_rate / 60.0
@@ -1917,18 +1935,57 @@ def measure_window_delays(
                     row["coarse_cc"] = round(float(abs_cc), 6)
                     row["polarity"] = 1 if signed >= 0 else -1
                     if abs_cc >= min_cc:
-                        lag, quality = _refine_window_peak(
-                            ref, tgt, start_sample=start, window_samples=win,
-                            coarse_lag=lag_c, radius=int(refine_radius_samples),
-                            segment_samples=seg_samples,
-                        )
-                        row["delay_samples"] = float(lag)
-                        row["confidence"] = round(
-                            float(min(abs_cc, 1.0) * max(quality, 0.0)), 6
-                        )
-                        row["valid"] = True
-                        prev = int(lag)
+                        if _use_batch_refine:
+                            # defer full-rate correlation to one GPU batch;
+                            # continuity uses the coarse lag provisional value.
+                            row["delay_samples"] = float(lag_c)
+                            row["confidence"] = 0.0
+                            row["valid"] = True
+                            prev = int(lag_c)
+                            _pending_refine.append(
+                                (w, int(start), int(lag_c), float(abs_cc)))
+                        else:
+                            lag, quality = _refine_window_peak(
+                                ref, tgt, start_sample=start,
+                                window_samples=win, coarse_lag=lag_c,
+                                radius=int(refine_radius_samples),
+                                segment_samples=seg_samples,
+                            )
+                            row["delay_samples"] = float(lag)
+                            row["confidence"] = round(
+                                float(min(abs_cc, 1.0) * max(quality, 0.0)), 6
+                            )
+                            row["valid"] = True
+                            prev = int(lag)
             windows.append(row)
+
+        if _pending_refine and _refine_batch_eng is not None:
+            try:
+                from .gpu_align.refine_batch import RefineRequest
+                _reqs = []
+                for _w, _start, _center, _abs_cc in _pending_refine:
+                    _c0 = _start + win // 2 - seg_samples // 2
+                    if _c0 < 0:
+                        _c0 = 0
+                    _rseg = read_f64(ref, _c0, seg_samples)
+                    _tspan = read_f64(
+                        tgt, _c0 + _center - int(refine_radius_samples),
+                        seg_samples + 2 * int(refine_radius_samples))
+                    _reqs.append(RefineRequest(
+                        _rseg, _tspan, int(_center),
+                        int(refine_radius_samples), int(_c0),
+                        int(_start + win), int(seg_samples)))
+                _got = _refine_batch_eng.refine(_reqs)
+                for (_w, _start, _center, _abs_cc), (_lag, _quality) in zip(
+                        _pending_refine, _got):
+                    windows[_w]["delay_samples"] = float(_lag)
+                    windows[_w]["confidence"] = round(
+                        float(min(_abs_cc, 1.0) * max(_quality, 0.0)), 6)
+                if _ctx is not None:
+                    for _st in _refine_batch_eng.stats:
+                        _ctx.metrics.record_batch(_st)
+            except Exception:                          # noqa: BLE001
+                pass
 
         rejected = sum(1 for r in windows if not r["valid"])
         return {
@@ -1967,6 +2024,11 @@ def measure_window_delays(
         if _ctx is not None:
             _ctx.metrics.record_stage(
                 "window_measure", time.perf_counter() - _t_measure)
+        if _refine_batch_eng is not None:
+            try:
+                _refine_batch_eng.close()
+            except Exception:                          # noqa: BLE001
+                pass
         if _align_eng is not None:
             try:
                 _align_eng.close()

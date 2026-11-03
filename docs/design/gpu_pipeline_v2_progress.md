@@ -106,3 +106,41 @@ C1306 3 targets（619 窗/target）基准：
 - 说明只做 surface 合批仍然无法显著提高端到端利用率；下一步必须
   GPU 化/向量化 **峰选择 + full-rate refine + continuity**。
 
+## 2026-11-03 — P3 第一批：GPU 批量 full-rate refine
+
+新增 `core/gpu_align/refine_batch.py`：
+
+- 把每个窗口的 ±8 个全速率候选 lag 合并成一个 GPU batch；
+- 每个候选段在 GPU 上归一化并计算归一化点积；
+- 返回 lag 与 |cc|；
+- `measure_window_delays` 新增 opt-in `KTS_GPU_REFINE_BATCH=1`：
+  - coarse/continuity 循环不再逐窗 CPU refine；
+  - 收集候选后一次 GPU refine；
+  - 默认 **0**，保持旧路径。
+
+### 组件基准（C1306 411 窗）
+
+| 方案 | 时间 |
+|---|---:|
+| CPU `_refine_window_peak` 逐窗 | 2.02 s |
+| GPU batch refine | **0.52 s（3.85×）** |
+| lag 相等 | 411/411 |
+| quality 最大差 | 3.1e-7 |
+
+### 集成到 `measure_window_delays`
+
+| 素材 | legacy | batch refine | 加速 | delay 相等 |
+|---|---:|---:|---:|---:|
+| C1306 | 10.81 s | **9.41 s** | 13% | 411/411 |
+| C1305 | 12.27 s | **11.63 s** | 5% | 475/475 |
+
+- valid 窗数相同；confidence 最大差 1e-6；
+- C1306 context GPU active ratio 4.8% → 7.6%（仍低）。
+
+### 风险 / 下一步
+
+- 两阶段让 continuity 使用 coarse lag 作为临时 prev；已在 C1305/C1306
+  上验证 windows 完全一致，但完整语料/长镜头还需对照；
+- 默认关闭，实验开关 opt-in；
+- 下一步：GPU/向量化 coarse peak + continuity，目标 GPU active >30%。
+
