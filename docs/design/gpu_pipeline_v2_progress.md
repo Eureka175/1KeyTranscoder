@@ -182,3 +182,19 @@ C1306 3 targets（619 窗/target）基准：
 - 需要继续抓 long-take 内部 measure 参数/线程/多 unit 状态；batch refine
   仍只能 opt-in，默认关闭。
 
+## 2026-11-03 — P3 parity 阻塞点（long-take measure 上下文）
+
+对 300 s 隔离素材抓取 `align_time_varying` 内部的每一次
+`measure_window_delays` 调用（保留默认 measure 身份）：
+
+- 3 次调用均在 **MainThread**，kwargs 完全相同
+  （`window_seconds=60`、`hop=10`、`min_cc=0.06`、`gpu_cc=False`、
+  `ref_decimated` 同为 anchor coarse 缓存）；
+- batch refine 与 default 的 3 次 measure 结果 digest **仍不同**；
+- 但用同一组 kwargs 在 long-take 外部直接调用 measure，
+  batch/default 的 windows 完全一致。
+
+结论：差异只出现在 `align_time_varying` 的 measure 调用上下文内，
+不在单次 measure 的参数或线程；需要继续查 long-take 内部的
+`ref_decimated` 对象/输入流状态或 measure 调用顺序。
+batch refine 继续 opt-in，默认关闭。
