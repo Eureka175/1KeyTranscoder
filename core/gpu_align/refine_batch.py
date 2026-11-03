@@ -37,11 +37,13 @@ class RefineRequest:
 class RefineBatchEngine:
     def __init__(self, backend: GpuBackend, *,
                  policy: Policy | None = None,
-                 budget_bytes: int | None = None) -> None:
+                 budget_bytes: int | None = None,
+                 exact: bool = False) -> None:
         self.backend = backend
         self.cp = backend.cp
         self.policy = policy or resolve_policy()
-        self._is_fp32 = self.policy.precision is Precision.FP32
+        self._is_fp32 = (self.policy.precision is Precision.FP32
+                         and not exact)
         self.budget_bytes = int(budget_bytes or backend.budget_bytes())
         self.stats: list[BatchStats] = []
 

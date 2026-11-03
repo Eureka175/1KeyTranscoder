@@ -1718,7 +1718,10 @@ def measure_window_delays(
             try:
                 from .gpu_align.refine_batch import RefineBatchEngine
                 _refine_batch_eng = RefineBatchEngine(
-                    _align_sess.backend, policy=_align_sess.policy)
+                    _align_sess.backend, policy=_align_sess.policy,
+                    exact=os.environ.get(
+                        "KTS_GPU_REFINE_EXACT", "1").strip().lower()
+                    not in ("", "0", "off", "false", "no"))
                 if _ctx is not None:
                     _ctx.metrics.record_engine(created=True)
             except Exception:                          # noqa: BLE001

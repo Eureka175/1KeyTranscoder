@@ -144,3 +144,23 @@ C1306 3 targets（619 窗/target）基准：
 - 默认关闭，实验开关 opt-in；
 - 下一步：GPU/向量化 coarse peak + continuity，目标 GPU active >30%。
 
+## 2026-11-03 — P3 batch refine 完整入口门（失败）
+
+在 C1306 完整 `channel_sync` 上启用 `KTS_GPU_REFINE_BATCH=1`：
+
+| 模式 | wall | audio_2/3 与基线 |
+|---|---:|---|
+| 默认（batch refine off） | 263.9 s | **sha256 完全一致** |
+| batch refine fp32 | 284.2 s | **不同** |
+| batch refine exact fp64 | 255.2 s | **仍不同** |
+
+- 单 target 窗口测量：C1306 411/411、C1305 475/475 delay 完全一致；
+  exact 模式 confidence 也完全相同；但完整长镜头输出仍变化
+  （CH3/CH4 曲线 windows 385/379 → 410，audio MOV 哈希不同）。
+- 因此 batch refine **不能进入默认**；即使 exact 模式也没有解决
+  long-take 上游/下游口径差异。
+- 当前默认仍是逐窗 CPU refine；batch refine 保持 opt-in 实验。
+
+结论：P3 组件在单窗口级别有效（3.85×），但完整入口 parity 未通过，
+先定位长镜头 measure 调用与曲线层的差异，再继续。
+
