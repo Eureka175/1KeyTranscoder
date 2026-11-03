@@ -198,3 +198,27 @@ C1306 3 targets（619 窗/target）基准：
 不在单次 measure 的参数或线程；需要继续查 long-take 内部的
 `ref_decimated` 对象/输入流状态或 measure 调用顺序。
 batch refine 继续 opt-in，默认关闭。
+
+## 2026-11-03 — P3 blocker: measure 在 long-take 内外的可复现差异
+
+已排除：
+
+- 输入文件不同：long-take batch/off 的 4 个输入 sha256 一致；
+- `ref_decimated` 不同：long-take 内传入的 anchor coarse 缓存 hash 与
+  外部直接构造完全一致（d739…）；
+- 线程不同：measure 调用在 MainThread；
+- kwargs 不同：窗口/跳/门/`gpu_cc`/ref cache 完全一致；
+- prewarm：外部先 `prewarm_gpu_align()` 再 measure，digest 不变。
+
+仍存在：
+
+- 同样输入、同样 kwargs、同样 ref cache 下：
+  - long-take 外部直接 `measure_window_delays`（batch refine）digest = `85d0…`；
+  - long-take 内部调用 digest = `0684…`；
+  - batch refine off 也出现类似差异；
+- 但一次 `ltd_direct_internal` 测试中，ch3 的 direct/internal batch digest
+  相同（4eb7…），说明差异与具体 unit/输入状态有关，尚非全量复现。
+
+下一步需要在同一进程内对 long-take 内部/外部的 **逐窗口行** 做差值，
+确认是窗值不同还是 digest 口径不同。
+
