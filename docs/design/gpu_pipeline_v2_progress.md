@@ -453,3 +453,19 @@ NVRTC/PATH 修复后，C1305 完整 channel_sync：
 - 若后续验证通过，可把 `KTS_GPU_REFINE_BATCH` 默认设为 1 且 exact=1；
 - GPU active 仍约 6–7%，下一阶段继续做 GPU peak/continuity。
 
+## 2026-11-04 — 最终 clean A/B 确认
+
+在 NVRTC/PATH 修复后重跑 300 s clean A/B（4 个输入校验 sha256）：
+
+- `direct_equal = true`；
+- `lt_fixed_equal = true`；
+- batch refine 与 default 的 long-take fixed raw 完全一致；
+- 输入 hash 也与 canonical raw 一致。
+
+至此：
+
+1. NVRTC 回退问题已修复；
+2. batch refine parity 已恢复且 clean A/B 可复现；
+3. C1306/C1305 完整入口均有 hash 对照；
+4. 默认仍为 CPU refine，batch refine 是默认化候选。
+
