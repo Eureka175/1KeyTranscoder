@@ -413,9 +413,11 @@ class GpacContainerBackend:
         for p in (gen_nhml, gen_media):
             if p.exists():
                 p.unlink()
+        base = _rel_base(src)
         _run(
             [str(self.mp4box), "-nhml", str(track_id), str(src)],
             f"MP4Box -nhml {track_id}",
+            cwd=base,
         )
         if not gen_nhml.is_file() or not gen_media.is_file():
             raise GpacError(
