@@ -432,3 +432,24 @@ C1306 完整 channel_sync，batch refine exact 连续两次：
 3. C1305 exact batch 212.3 s 仍略慢；
 4. batch refine 继续 opt-in，待 C1305 默认对照后再决定是否默认。
 
+## 2026-11-04 — C1305 默认 vs exact batch 对照
+
+NVRTC/PATH 修复后，C1305 完整 channel_sync：
+
+| 模式 | wall | audio MOV 哈希 |
+|---|---:|---|
+| 默认 CPU refine | 225.4 s | 与 CPU/exact 一致 |
+| batch refine exact | **212.3 s** | 一致 |
+
+- exact batch 在 C1305 也快约 **6%**；
+- C1306：默认 129.6 s → exact batch **118.9–120.0 s**（约 8%）；
+- 两个素材、重复运行均保持 audio MOV 哈希一致；
+- batch refine 目前仍是 opt-in，但已成为**默认化的候选**，只差 L3 /
+  final_accept / 目标机重复验证。
+
+### 当前候选决策
+
+- 保持默认 CPU refine，直到 L3/full acceptance 完成；
+- 若后续验证通过，可把 `KTS_GPU_REFINE_BATCH` 默认设为 1 且 exact=1；
+- GPU active 仍约 6–7%，下一阶段继续做 GPU peak/continuity。
+
