@@ -411,3 +411,24 @@ NVRTC 修复后，完整 C1306 channel_sync 同基线对照：
 - C1305 exact batch 212.3 s，输出一致，仍略慢于旧 fast 199.6 s；
 - batch refine 目前仍 opt-in；下一步用 C1305/L3/重复运行验证后再考虑默认。
 
+## 2026-11-04 — batch refine exact 复测稳定性
+
+C1306 完整 channel_sync，batch refine exact 连续两次：
+
+| 运行 | wall | audio MOV 哈希 | GPU active | batches |
+|---|---:|---|---:|---:|
+| #1 | 118.9 s | 一致 | 6.9% | 520 |
+| #2 | 120.0 s | 一致 | 6.7% | 520 |
+
+- 两次都无 fallback；
+- 输出与基线完全一致；
+- 早期 120.5 s 的“快基线”现在可以解释：当时 GPU 路径真实执行；
+  后来 PATH 丢失导致 CPU 回退，才出现 265–520 s。
+
+当前结论：
+
+1. NVRTC/PATH 修复是完整 GPU 路径恢复的关键；
+2. batch refine exact 在 C1306 上稳定 **119–120 s**，比默认 129.6 s 快；
+3. C1305 exact batch 212.3 s 仍略慢；
+4. batch refine 继续 opt-in，待 C1305 默认对照后再决定是否默认。
+
