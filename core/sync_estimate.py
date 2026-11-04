@@ -1330,21 +1330,47 @@ def coarse_decimate(
         out = np.zeros(n_out, dtype=np.float32)
         chunk = max(1, int(chunk_seconds * coarse_rate))
         margin = _COARSE_MARGIN
-        for c0 in range(0, n_out, chunk):
-            cnt = min(chunk, n_out - c0)
+
+        def _chunk(c0: int, cnt: int) -> tuple[int, np.ndarray]:
             in_lo = (c0 - margin) * q
             in_hi = (c0 + cnt + margin) * q
             buf = np.zeros(in_hi - in_lo, dtype=np.float64)
             lo = max(0, in_lo)
             hi = min(n, in_hi)
             if hi > lo:
-                buf[lo - in_lo: lo - in_lo + (hi - lo)] = np.asarray(
-                    stream[lo:hi], dtype=np.float64
-                )
+                if opened:
+                    # Each worker owns its RawStream: RawStream caches blocks
+                    # per instance and is not safe to share across threads.
+                    with RawStream(src, storage_dtype) as own:
+                        buf[lo - in_lo: lo - in_lo + (hi - lo)] = np.asarray(
+                            own[lo:hi], dtype=np.float64
+                        )
+                else:
+                    buf[lo - in_lo: lo - in_lo + (hi - lo)] = np.asarray(
+                        stream[lo:hi], dtype=np.float64
+                    )
             dec = signal.decimate(buf, q, ftype="fir", zero_phase=True)
-            seg = dec[margin: margin + cnt]
-            if seg.size:
-                out[c0: c0 + seg.size] = np.asarray(seg, dtype=np.float32)
+            return c0, np.asarray(dec[margin: margin + cnt], dtype=np.float32)
+
+        # scipy.signal.decimate releases the GIL in its C upfirdn kernel, so
+        # chunk-level threads reduce the CPU-side coarse-cache build that
+        # otherwise dominates GPU window measurement.  Every chunk keeps the
+        # exact same input (including margins), so output is bit-identical.
+        try:
+            workers = int(os.environ.get("KTS_COARSE_WORKERS", "4") or 4)
+        except ValueError:
+            workers = 4
+        workers = max(1, workers)
+        tasks = [(c0, min(chunk, n_out - c0))
+                 for c0 in range(0, n_out, chunk)]
+        if workers <= 1 or len(tasks) <= 1:
+            for c0, cnt in tasks:
+                out[c0:c0 + cnt] = _chunk(c0, cnt)[1]
+            return out
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for c0, seg in pool.map(lambda a: _chunk(*a), tasks):
+                out[c0:c0 + seg.size] = seg
         return out
     finally:
         if opened:

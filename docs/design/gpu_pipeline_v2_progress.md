@@ -469,3 +469,39 @@ NVRTC/PATH 修复后，C1305 完整 channel_sync：
 3. C1306/C1305 完整入口均有 hash 对照；
 4. 默认仍为 CPU refine，batch refine 是默认化候选。
 
+## 2026-11-04 — P4 profiling：coarse cache 是 GPU 空转主因
+
+对 `measure_window_delays`（C1306 48000 Hz，411 窗，batch refine exact）
+做 cProfile，总 23.6 s：
+
+| 阶段 | 累计时间 |
+|---|---:|
+| coarse_decimate（ref + tgt） | **15.6 s（66%）** |
+| GPU surface_windows | 2.6 s |
+| GPU refine_batch | 1.1 s |
+| 全速率 read_f64 / 文件读 | 2.9 s |
+| GPU session/import | 1.3 s |
+| 连续峰搜索 | 0.4 s |
+
+结论：当前 GPU active 低，不是 GPU kernel 慢，而是 **GPU 前面的 CPU
+coarse 抽取占了大头**；GPU 在 CPU 建 coarse 缓存时完全空闲。
+
+### 验证：分块 coarse 抽取线程化
+
+`coarse_decimate` 的分块本来互相独立、输出逐位一致。用
+`ThreadPoolExecutor` 并行分块（每 worker 自己打开 RawStream）：
+
+| 配置 | 单次 C1306 1 轨 coarse | 411 窗 measure |
+|---|---:|---:|
+| `KTS_COARSE_WORKERS=1` | 5.94 s | 20.2 s，GPU active 6.3% |
+| `KTS_COARSE_WORKERS=4` | **2.45 s** | **10.2 s，GPU active 13.1%** |
+| `KTS_COARSE_WORKERS=8` | **1.47 s** | — |
+
+- 三种配置输出数组 **逐位相等**；
+- 完整 C1306 batch exact 在系统高负载下仍保持 audio MOV 哈希一致；
+  window_measure 从 89.4 s 降到 52.9 s（同负载对照），wall 259→249 s；
+- 绝对 wall 受当时后台负载影响，不能与低负载的 119–120 s 直接比较。
+
+默认值设为 **`KTS_COARSE_WORKERS=4`**，可用环境变量覆盖；这是 GPU
+利用率提升的前置优化：先把 CPU coarse 建缓存时间压下去，再谈 GPU 双缓冲。
+
