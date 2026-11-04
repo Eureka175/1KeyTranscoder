@@ -372,3 +372,27 @@ GPU 路径终于真正执行；完整入口恢复到 **129.6 s**，比修复前 
 - 评估把 batch refine 的 opt-in 是否升级为默认；
 - 继续提升 GPU active（目前约 7%）。
 
+## 2026-11-04 — C1305 完整入口（NVRTC 修复后）
+
+C1305 80 min、4ch、batch refine exact：
+
+| 指标 | 值 |
+|---|---:|
+| wall | **212.3 s** |
+| status | applied |
+| audio MOV 哈希 | **与 CPU/exact 基线完全一致** |
+| speedup vs CPU | **1.42×** |
+
+对比：
+
+- C1305 之前的 GPU fast 完整入口约 199.6 s（不同代码/ PATH 状态）；
+- exact batch 212.3 s，输出 parity；
+- C1306 exact batch 118.9 s，默认 129.6 s，parity 一致。
+
+结论：
+
+- NVRTC/ PATH 修复后，GPU 窗口/残差/batch refine 在完整入口真正执行；
+- 输出哈希可保持；
+- C1305 上 exact batch 仍略慢，batch refine 继续 opt-in；
+- GPU active 仍只有约 **7%**，后续优化空间明确。
+
