@@ -346,3 +346,29 @@ nvrtc: error: failed to open nvrtc-builtins64_129.dll.
 GPU 路径终于真正执行；完整入口恢复到 **129.6 s**，比修复前 CPU 回退快 2.05×。
 下一步重测 batch refine 的完整入口性能和 parity。
 
+## 2026-11-04 — NVRTC 修复后：batch refine 完整入口通过
+
+默认 channel_sync（GPU 路径真正启用）：
+
+| 模式 | wall | audio MOV 哈希 | GPU active |
+|---|---:|---|---:|
+| 默认 CPU refine | 129.6 s | 基线一致 | 6.5% |
+| batch refine exact | **118.9 s** | **基线一致** | 6.9% |
+
+- batch exact 比默认快约 **8%**；
+- `refine_batch` 28 个 batch，无 fallback；
+- window_measure 33.5 s、residual 17.9 s；
+- clean 300 s long-take batch/off fixed raw 也完全相等。
+
+说明：
+
+1. 之前 full exact 519 s 是 **NVRTC DLL 不在 PATH → GPU 全部回退 CPU** 导致；
+2. 修复 backend PATH 后，GPU 路径真正执行；
+3. batch refine 在 fallback + NVRTC 修复后，完整入口既快又保持输出哈希。
+
+下一步：
+
+- 再跑 C1305 / L3 / 多次重复，确认稳定性；
+- 评估把 batch refine 的 opt-in 是否升级为默认；
+- 继续提升 GPU active（目前约 7%）。
+
