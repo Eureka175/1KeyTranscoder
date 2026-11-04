@@ -505,3 +505,37 @@ coarse 抽取占了大头**；GPU 在 CPU 建 coarse 缓存时完全空闲。
 默认值设为 **`KTS_COARSE_WORKERS=4`**，可用环境变量覆盖；这是 GPU
 利用率提升的前置优化：先把 CPU coarse 建缓存时间压下去，再谈 GPU 双缓冲。
 
+## 2026-11-04 — P2 双缓冲在 coarse4 之后重新有效
+
+P2 之前测“surface producer 双缓冲”无收益，是因为 coarse cache 占了大头，
+GPU surface 本身只有 2–3 s。coarse 分块线程化后，直接 C1306 411 窗测量
+（coarse 缓存预建）出现明显效果：
+
+| 模式 | wall | GPU active | windows |
+|---|---:|---:|---|
+| 单批 surface（默认旧） | 6.78 s | 18.4% | 基准 |
+| pipeline b32 | **3.50 s** | **22.0%** | 逐窗相等 |
+| pipeline b128 | 3.82 s | 19.8% | 相等 |
+| pipeline b8 | 5.13 s | 16.1% | 相等 |
+
+完整 C1306 exact（coarse4 + pipeline b32，同一高负载环境）：
+
+| 配置 | wall | window_measure | GPU active |
+|---|---:|---:|---:|
+| coarse4 + 单批 surface | 249 s | 89.4 s | 6.6% |
+| coarse4 + pipeline b32 | **200 s** | **49.8 s** | **7.1%** |
+
+- audio MOV 哈希仍与基线一致；
+- `KTS_GPU_SURFACE_PIPELINE` 默认改为 **1**；
+- `KTS_GPU_SURFACE_BATCH=32` 保持不变；
+- 绝对 wall 受后台负载影响，但相对收益稳定。
+
+结论：P2 设计本身没问题，之前缺的是先消除 CPU coarse 瓶颈。现在
+GPU pipeline 的三级默认组合为：
+
+```
+coarse chunks: 4 threads
+surface: pipeline (batch 32)
+refine: CPU per-window (batch refine still opt-in)
+```
+

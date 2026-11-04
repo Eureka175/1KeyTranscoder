@@ -1792,7 +1792,7 @@ def measure_window_delays(
         _surf_batch_hi = 0
         _pipeline_surfaces = (
             _align_eng is not None and n_windows > 0
-            and os.environ.get("KTS_GPU_SURFACE_PIPELINE", "0").strip().lower()
+            and os.environ.get("KTS_GPU_SURFACE_PIPELINE", "1").strip().lower()
             not in ("", "0", "off", "false", "no"))
         if _align_eng is not None and n_windows > 0:
             try:
