@@ -1611,7 +1611,19 @@ def measure_window_delays(
     min_cc = float(min_cc)
     _t_measure = time.perf_counter()
     _owns_align_session = True
+    _gpu_fallback_reason = ""
     _ctx = None
+
+    def _note_gpu_fallback(reason: str) -> None:
+        nonlocal _gpu_fallback_reason
+        _gpu_fallback_reason = str(reason)
+        if _ctx is not None:
+            try:
+                _ctx.metrics.notes.append(str(reason))
+            except Exception:                          # noqa: BLE001
+                pass
+        if os.environ.get("KTS_GPU_DEBUG"):
+            print("GPU_FALLBACK", reason, flush=True)
     _surf_stop = threading.Event()
     _surf_thread = None
     _refine_batch_eng = None
@@ -1706,7 +1718,9 @@ def measure_window_delays(
                     _align_eng.warmup()
                     if _ctx is not None:
                         _ctx.metrics.record_engine(created=True)
-            except Exception:                          # noqa: BLE001
+            except Exception as _exc:                  # noqa: BLE001
+                _note_gpu_fallback(
+                    f"window_engine:{type(_exc).__name__}:{_exc}")
                 _align_sess = _align_eng = None
 
         _refine_batch_eng = None
@@ -1800,7 +1814,9 @@ def measure_window_delays(
                     if (_surf_windows.ndim != 2
                             or _surf_windows.shape[0] != n_windows):
                         _surf_windows = None
-            except Exception:                          # noqa: BLE001
+            except Exception as _exc:                  # noqa: BLE001
+                _note_gpu_fallback(
+                    f"surface:{type(_exc).__name__}:{_exc}")
                 _surf_windows = None
                 _surf_q = None
 
@@ -1988,8 +2004,8 @@ def measure_window_delays(
                     for _st in _refine_batch_eng.stats:
                         _ctx.metrics.record_batch(_st)
             except Exception as _exc:                  # noqa: BLE001
-                if os.environ.get("KTS_GPU_REFINE_DEBUG"):
-                    print("batch_refine_error:", type(_exc).__name__, _exc)
+                _note_gpu_fallback(
+                    f"batch_refine:{type(_exc).__name__}:{_exc}")
                 # Correctness fallback: never leave provisional coarse
                 # confidence=0 rows when the GPU batch fails.
                 for _w, _start, _center, _abs_cc in _pending_refine:
@@ -2016,6 +2032,7 @@ def measure_window_delays(
             "workers_effective": 1,
             "gpu_align": {
                 "used": _align_eng is not None,
+                "reason": _gpu_fallback_reason,
                 "stats": ([s.as_dict() for s in _align_eng.stats]
                           if _align_eng is not None else []),
             },

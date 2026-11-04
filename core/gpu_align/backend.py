@@ -56,6 +56,26 @@ def _import_cupy() -> Any:
             # normally set CUDA_PATH themselves.  Only default when present.
             if os.path.isdir(r"C:\CUDA12"):
                 os.environ.setdefault("CUDA_PATH", r"C:\CUDA12")
+            # NVRTC (used by CuPy RawKernel) loads nvrtc-builtins64_*.dll
+            # from the CUDA bin directory.  A fresh process (e.g. the
+            # channel-sync regression harness) may not inherit that PATH,
+            # which previously made the window path silently fall back to
+            # CPU.  Add both CUDA_PATH/bin and the dev toolkit bin.
+            for _cuda_root in (os.environ.get("CUDA_PATH"),
+                               r"C:\CUDA12"):
+                if not _cuda_root:
+                    continue
+                _bin = os.path.join(_cuda_root, "bin")
+                if not os.path.isdir(_bin):
+                    continue
+                _parts = os.environ.get("PATH", "").split(os.pathsep)
+                if _bin not in _parts:
+                    os.environ["PATH"] = _bin + os.pathsep + os.environ.get(
+                        "PATH", "")
+                try:
+                    os.add_dll_directory(_bin)
+                except Exception:                      # noqa: BLE001
+                    pass
             import cupy as cp  # noqa: F401
             _CUPY = cp
         except Exception:                                  # noqa: BLE001

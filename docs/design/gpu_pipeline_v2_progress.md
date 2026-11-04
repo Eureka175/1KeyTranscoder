@@ -312,3 +312,37 @@ long-take 原地施加后的中间结果**，或 `prep(if not exists)` 跳过了
 - 需要判断 fallback 是否被频繁触发，以及 batch 失败的根因（OOM/引擎
   创建/批次大小），再决定是否继续启用 batch refine。
 
+## 2026-11-04 — 根因：完整入口 NVRTC DLL 不在 PATH，GPU 全部回退 CPU
+
+`KTS_GPU_DEBUG=1` 抓到了完整 channel_sync 的真实原因：
+
+```
+GPU_FALLBACK surface:CompileException:
+nvrtc: error: failed to open nvrtc-builtins64_129.dll.
+```
+
+- `channel_sync` 新进程没有继承 `C:\CUDA12\bin` 的 PATH；
+- CuPy 的 NVRTC RawKernel 找不到 `nvrtc-builtins64_129.dll`；
+- 窗口路径静默回退 CPU，所以 metrics 里 batches=0、GPU active=0%；
+- 这也解释了为什么早期 120 s、后来 265 s：环境 PATH 不同。
+
+修复 `core/gpu_align/backend.py`：
+
+- 导入 CuPy 前把 `CUDA_PATH/bin` 与 `C:\CUDA12\bin` 加入 PATH；
+- 同时 `os.add_dll_directory(bin)`；
+- 不再依赖调用方 shell 是否设置 CUDA PATH。
+
+### 修复后完整 C1306 默认入口
+
+| 指标 | 修复前 | 修复后 |
+|---|---:|---:|
+| wall | 264.6 s | **129.6 s** |
+| GPU active | 0.0% | **6.5%**（8.43 s） |
+| batches | 0 | **492** |
+| window_measure | 206.3 s | **41.8 s** |
+| residual_measure | 64.6 s | **20.3 s** |
+| audio MOV 哈希 | 基线一致 | **基线一致** |
+
+GPU 路径终于真正执行；完整入口恢复到 **129.6 s**，比修复前 CPU 回退快 2.05×。
+下一步重测 batch refine 的完整入口性能和 parity。
+
