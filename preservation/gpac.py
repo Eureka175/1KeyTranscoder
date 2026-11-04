@@ -498,17 +498,21 @@ class GpacContainerBackend:
         )
 
     def add_track_ref(self, mov: Path, tk_id: int, ref: str, ref_id: int) -> None:
+        base = _rel_base(mov)
         _run(
             [str(self.mp4box)] + self._ts_args()
             + ["-ref", f"{tk_id}:{ref}:{ref_id}", str(mov)],
             f"MP4Box -ref {tk_id}:{ref}:{ref_id}",
+            cwd=base,
         )
 
     def set_meta(self, mov: Path, meta_type: str) -> None:
+        base = _rel_base(mov)
         _run(
             [str(self.mp4box)] + self._ts_args()
             + ["-set-meta", meta_type, str(mov)],
             f"MP4Box -set-meta {meta_type}",
+            cwd=base,
         )
 
     def add_meta_item(
@@ -840,7 +844,8 @@ class GpacContainerBackend:
         for b in remove or []:
             cmd += ["-rb", b]
         cmd.append(str(mov))
-        _run(cmd, f"MP4Box -brand {major}")
+        base = _rel_base(mov)
+        _run(cmd, f"MP4Box -brand {major}", cwd=base)
 
     def flatten(self, mov: Path) -> None:
         """Re-store with all media data first (moov after mdat).
@@ -848,7 +853,9 @@ class GpacContainerBackend:
         Required before isobmf.insert_uuid_boxes(): insertions must never
         shift the mdat payload, or stco/co64 chunk offsets break.
         """
+        base = _rel_base(mov)
         _run(
             [str(self.mp4box)] + self._ts_args() + ["-flat", str(mov)],
             "MP4Box -flat",
+            cwd=base,
         )
