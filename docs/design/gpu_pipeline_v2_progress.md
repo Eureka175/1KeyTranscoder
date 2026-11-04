@@ -396,3 +396,18 @@ C1305 80 min、4ch、batch refine exact：
 - C1305 上 exact batch 仍略慢，batch refine 继续 opt-in；
 - GPU active 仍只有约 **7%**，后续优化空间明确。
 
+## 2026-11-04 — C1306 batch refine 完整入口两种精度
+
+NVRTC 修复后，完整 C1306 channel_sync 同基线对照：
+
+| 模式 | wall | audio MOV 哈希 | GPU active | batches |
+|---|---:|---|---:|---:|
+| 默认 CPU refine | 129.6 s | 一致 | 6.5% | 492 |
+| batch refine fp32 | **122.4 s** | **一致** | 6.3% | 520 |
+| batch refine exact fp64 | **118.9 s** | **一致** | 6.9% | 520 |
+
+- exact batch 最快；
+- fp32 batch 也保持输出一致且无 fallback；
+- C1305 exact batch 212.3 s，输出一致，仍略慢于旧 fast 199.6 s；
+- batch refine 目前仍 opt-in；下一步用 C1305/L3/重复运行验证后再考虑默认。
+
