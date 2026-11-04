@@ -88,6 +88,17 @@ VERSION_PROBES = (
 
 _COPY_CHUNK = 8 * 1024 * 1024
 
+NO_CUDA_NOTICE = """1KeyTranscoder CPU-only release package (no CUDA)
+
+This package is intentionally built for machines without an NVIDIA CUDA
+runtime.  It does not bundle CUDA, cuDNN, CuPy or any NVRTC DLL, and the
+entry point defaults to CPU audio alignment (KTS_GPU_ALIGN=0).
+
+The optional GPU acceleration code remains in the source tree so the same
+tree can also be used on CUDA-capable machines, but this artifact is
+validated for CPU-only operation and is not an official release.
+"""
+
 
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -300,7 +311,10 @@ def build(args: argparse.Namespace) -> int:
             log(f"    branch is {branch!r}, not 'main'")
 
     out_dir = Path(args.out_dir).resolve()
-    pkg_name = f"1KeyTranscoder-v{version}-{args.platform}-selfcontained"
+    variant = "-nocuda" if args.no_cuda else ""
+    pkg_name = (
+        f"1KeyTranscoder-v{version}-{args.platform}-selfcontained{variant}"
+    )
     stage = out_dir / pkg_name
     archive = out_dir / f"{pkg_name}.zip"
 
@@ -320,6 +334,26 @@ def build(args: argparse.Namespace) -> int:
         shutil.rmtree(stage)
     stage.mkdir(parents=True, exist_ok=True)
     copied = copy_into_staging(files, stage)
+    if args.no_cuda:
+        # CPU-only variant: keep the optional accelerator code out of the
+        # default execution path.  Explicit --gpu-align/KTS_GPU_ALIGN can
+        # still be used on a CUDA-capable machine, but this package must
+        # never require or auto-enable CUDA.
+        entry = stage / "1kt.py"
+        text = entry.read_text(encoding="utf-8")
+        patched = text.replace(
+            '_gpu_mode = _cli_gpu or _env_gpu or "fp32"',
+            '_gpu_mode = _cli_gpu or _env_gpu or "0"',
+        ).replace(
+            'os.environ.get("KTS_GPU_ALIGN", "fp32")',
+            'os.environ.get("KTS_GPU_ALIGN", "0")',
+        )
+        if patched == text:
+            raise RuntimeError("no-CUDA entry point patch did not match")
+        entry.write_text(patched, encoding="utf-8")
+        (stage / "NO_CUDA.txt").write_text(NO_CUDA_NOTICE, encoding="utf-8")
+        copied = sum(p.stat().st_size for p in stage.rglob("*") if p.is_file())
+        log("variant          : CPU-only (CUDA default off, no CUDA runtime)")
     log(f"staged           : {stage}")
     log(f"staged bytes     : {copied:,} ({copied / 1024 / 1024:.1f} MiB)")
 
@@ -356,10 +390,14 @@ def build(args: argparse.Namespace) -> int:
         "builder": "release/build_release.py",
         "runtime_versions": runtime,
         "entrypoint": "1kt.py",
+        "variant": "cpu-only" if args.no_cuda else "cuda-optional",
+        "cuda_required": False,
+        "cuda_default": not args.no_cuda,
         "excluded_by_design": [
             ".git/", "work/", "testsets/", "docs/", "olddocs/",
             "logs/", "metadata_forensics/", "tools/VCEEncC_9.12_x64/",
             "__pycache__/",
+            "CUDA/cuDNN/CuPy/NVRTC runtime (never bundled)",
         ],
         "files": file_records(stage),
     }
@@ -430,6 +468,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="List what would be packaged; write nothing.")
     ap.add_argument("--no-zip", action="store_true",
                     help="Build the staging tree only.")
+    ap.add_argument("--no-cuda", action="store_true",
+                    help="Build the CPU-only variant: no CUDA runtime is "
+                         "bundled and the entry point defaults to GPU off.")
     ap.add_argument("--allow-dirty", action="store_true",
                     help="Development build: proceed despite a dirty tree "
                          "or a version/tag mismatch (recorded in manifest).")
