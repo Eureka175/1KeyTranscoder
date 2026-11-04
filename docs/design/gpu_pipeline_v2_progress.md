@@ -539,3 +539,21 @@ surface: pipeline (batch 32)
 refine: CPU per-window (batch refine still opt-in)
 ```
 
+## 2026-11-05 — 默认组合的 C1305 复测（高后台负载，需重测）
+
+当前默认（`KTS_COARSE_WORKERS=4` + surface pipeline b32 + batch refine exact）
+跑 C1305 完整入口：
+
+| 指标 | 本次 | 之前（低负载） |
+|---|---:|---:|
+| wall | 380.8 s | 212.3 s |
+| window_measure | 29.8 s | — |
+| residual_measure | 38.2 s | — |
+| GPU active | 14.5 s / 3.8% | — |
+| audio MOV 哈希 | **与 CPU/exact 基线一致** | 一致 |
+
+本次运行期间后台 CPU/磁盘负载明显（浏览器/其他应用），总 wall 与之前
+212.3 s 不可直接比较；window/residual 合计只有 68 s，剩余 312 s 落在
+long-take 曲线/施加/音频域，显示是环境 I/O/CPU 争用而非 GPU 路径变慢。
+**结论：默认组合需要机器空闲时重测 C1305/C1306，暂不能以本次 wall 评判。**
+
