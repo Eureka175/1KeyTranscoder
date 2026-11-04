@@ -855,7 +855,14 @@ def encode_one_sony(
             ffprobe=ffprobe,
             has_audio=source_summary["audio_streams"] > 0,
             gyroflow=gyroflow,
-            fix_hw_timing=False,
+            # FFmpeg's x265 MOV intermediate carries mvhd timescale 1000;
+            # GPAC's -add import therefore quantizes every track duration to
+            # 1 ms.  For sources whose timeline is not an integer number of
+            # milliseconds (e.g. 450450/60000 = 7.5075 s) this leaves video
+            # at +0.5 ms and audio/rtmd at -0.5 ms, failing structural
+            # validation.  The stts-based repair is exact and idempotent for
+            # software intermediates too, not just hardware ones.
+            fix_hw_timing=True,
             check_level=check_level,
             codec=codec,
             encoded_path=encoded_mov,
@@ -971,9 +978,10 @@ def encode_one_dji_x265(
 ) -> str:
     """DJI preservation path for ffmpeg software backends (x265/svtav1).
 
-    Video-only encode (video intermediate is an FFmpeg MOV — no rigaya
-    millisecond quantization, so fix_hw_timing=False) + shared GPAC
-    rebuild (djmd/dbgi/tmcd native copies) + dji check.
+    Video-only encode (video intermediate is an FFmpeg MOV; its 1000 Hz
+    movie timescale makes GPAC quantize imported track durations to 1 ms,
+    so stts-based duration repair is enabled just like the hardware path)
+    + shared GPAC rebuild (djmd/dbgi/tmcd native copies) + dji check.
     video_entry: "hvc1" (HEVC) / "av01" (AV1).
 
     ``decode_plan`` supplies the hardware-first decode route; the djmd/dbgi/
@@ -1085,7 +1093,7 @@ def encode_one_dji_x265(
             gyroflow=gyroflow,
             vfr=detect_vfr(prepared.src_info),
             level=check_level,
-            fix_hw_timing=False,
+            fix_hw_timing=True,
             video_entry=video_entry,
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,

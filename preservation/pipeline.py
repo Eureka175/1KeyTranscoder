@@ -13,7 +13,8 @@ scaling machinery; the POC used libx265 ultrafast).
         -> reconstruct: payload verification, tref/cdsc, nrtm meta,
            brands
         -> flatten, uuid byte patch (GPAC cannot write uuid boxes)
-        -> (optional, hardware backends) stts-based duration repair
+        -> (optional) stts-based duration repair for 1000 Hz intermediate
+           movie timescales (rigaya and FFmpeg MOV muxers)
         -> (optional) meta item_type byte patch (Sony 00000000 vs
            GPAC 'mime')
         -> final/output.mov -> validate.compare -> optional Gyroflow
@@ -306,16 +307,17 @@ def run_sony_pipeline(
         step(f"  {skipped} uuid box(es) already carried over by GPAC")
     isobmf.insert_uuid_boxes(stage, final, inserts)
 
-    # 5b. byte-level duration repair for hardware-encoder intermediates.
-    # rigaya's mp4 muxer writes mvhd at timescale 1000 with a
-    # millisecond-quantized edit list; GPAC's import truncates every
-    # track duration by up to 0.5 ms (585585 -> 585540 @90000 on A7M4)
-    # and mangles the imported video mdhd. Re-derive each track's
-    # presentation duration from the exact stts table, then the movie
-    # duration. Pure 4/8-byte in-place patches; a no-op when values are
-    # already exact (x265/FFmpeg intermediates never need it).
+    # 5b. byte-level duration repair for intermediates whose movie
+    # timescale is 1000: rigaya's mp4 muxer and FFmpeg's MOV muxer both
+    # write mvhd at timescale 1000 with millisecond-quantized edit lists.
+    # GPAC's -add import therefore truncates every track duration by up to
+    # 0.5 ms (585585 -> 585540 @90000 on A7M4; 450450 -> 450420 @60000 on
+    # 59.94 fps XAVC) and can mangle the imported video mdhd. Re-derive
+    # each track's presentation duration from the exact stts table, then
+    # the movie duration. Pure 4/8-byte in-place patches; a no-op when
+    # values are already exact.
     if fix_hw_timing:
-        step("repairing durations from stts (hardware-intermediate path)...")
+        step("repairing durations from stts (millisecond-quantized intermediate)...")
         for desc in isobmf.patch_track_durations(
             final, movie_timescale, from_stts=True
         ):
