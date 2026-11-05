@@ -742,8 +742,8 @@ default then applies).
 | `ipratio` | 1.2 | 1.2 | 1.4 | 1.3 |
 | `pbratio` | 1.1 | 1.1 | 1.3 | 1.2 |
 | `const_vbv` | true | true | true | true |
-| `vbv_maxrate` | 100000 | 80000 | 40000 | 60000 |
-| `vbv_bufsize` | 300000 | 240000 | 120000 | 240000 |
+| `vbv_maxrate` | `AUTO` | `AUTO` | `AUTO` | `AUTO` |
+| `vbv_bufsize` | `AUTO` | `AUTO` | `AUTO` | `AUTO` |
 | `qpmin` | 15 | 16 | 16 | 15 |
 | `qpmax` | 38 | 40 | 45 | 50 |
 | `me` | `star` | `umh` | `star` | `hex` |
@@ -807,9 +807,18 @@ Notes on the table:
 ### A.3 Dynamic VBV ceilings (per profile × source class)
 
 From `x265_scaling.json`. Ceiling = `clamp(OB × target_ratio, OB × min_ratio, OB × max_ratio)`
-where `OB` is the source container bitrate; buffer = `round(ceiling × bufsize_factor)`, with
-`bufsize_factor` = 3.0 in every row. CRF remains the primary quality control; this is a local
-bitrate/size ceiling.
+where `OB` is the source container bitrate; buffer = `round(ceiling × bufsize_factor)`.
+`bufsize_factor` is per profile: **UHQ 1.5, HQ 2.0, SMALL 3.0, FAST 3.0**. The base
+`x265.json` profiles use `AUTO` for both VBV fields, so there is no hard-coded
+bitrate/buffer there; CRF remains the primary quality control, and the dynamic VBV
+is the local bitrate/size ceiling.
+
+| Profile | `bufsize_factor` |
+|---|---:|
+| UHQ | 1.5 |
+| HQ | 2.0 |
+| SMALL | 3.0 |
+| FAST | 3.0 |
 
 | Source class | UHQ (min/target/max) | HQ | SMALL | FAST |
 |---|---|---|---|---|
@@ -820,7 +829,7 @@ bitrate/size ceiling.
 
 Every row is marked `PROVISIONAL` in the file (and the `INTRA_LIKE` row
 `PROVISIONAL_UNCALIBRATED`, since no genuine All-I source is available). A class with no entry
-falls back to the profile's static VBV values from §A.1/A.2.
+leaves VBV disabled for that job; the base profiles no longer carry hard-coded VBV values.
 
 ### A.4 Normalisation rules
 

@@ -39,8 +39,8 @@
       "pbratio": 1.1,
 
       "const_vbv": true,
-      "vbv_maxrate": 100000,
-      "vbv_bufsize": 150000,
+      "vbv_maxrate": "AUTO",
+      "vbv_bufsize": "AUTO",
       "qpmin": 15,
       "qpmax": 38,
 
@@ -124,8 +124,8 @@
       "pbratio": 1.1,
 
       "const_vbv": true,
-      "vbv_maxrate": 80000,
-      "vbv_bufsize": 160000,
+      "vbv_maxrate": "AUTO",
+      "vbv_bufsize": "AUTO",
       "qpmin": 16,
       "qpmax": 40,
 
@@ -208,8 +208,8 @@
       "pbratio": 1.3,
 
       "const_vbv": true,
-      "vbv_maxrate": 40000,
-      "vbv_bufsize": 120000,
+      "vbv_maxrate": "AUTO",
+      "vbv_bufsize": "AUTO",
       "qpmin": 16,
       "qpmax": 45,
 
@@ -292,8 +292,8 @@
       "pbratio": 1.2,
 
       "const_vbv": true,
-      "vbv_maxrate": 60000,
-      "vbv_bufsize": 180000,
+      "vbv_maxrate": "AUTO",
+      "vbv_bufsize": "AUTO",
       "qpmin": 15,
       "qpmax": 50,
 

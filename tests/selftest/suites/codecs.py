@@ -49,9 +49,10 @@ def l1_x265() -> None:
     )
     buf = int(eff.values.get("vbv-bufsize", "0"))
     record("x265.CPB 钳位 ≤240000", buf <= 240000, f"bufsize={buf}")
+    _vbv_mode = eff.audit.get("vbv-bufsize", {}).get("mode")
     record("x265.CPB 审计链",
-           eff.audit.get("vbv-bufsize", {}).get("mode") == "cpb_clamp",
-           f"audit={eff.audit.get('vbv-bufsize', {}).get('mode')}")
+           _vbv_mode in ("dynamic_vbv", "cpb_clamp"),
+           f"audit={_vbv_mode}")
 
 
 def l1_av1() -> None:

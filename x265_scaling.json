@@ -48,30 +48,30 @@
   },
 
   "dynamic_vbv": {
-    "_comment": "vbv_maxrate_kbps = clamp(OB * target_ratio, OB * min_ratio, OB * max_ratio); vbv_bufsize_kbps = round(maxrate * bufsize_factor). OB = original container bitrate in kbps. CRF remains the primary quality control; maxrate is a local bitrate ceiling, bufsize is the VBV buffer constraint. Missing class entry falls back to the static base-profile VBV.",
+    "_comment": "vbv_maxrate_kbps = clamp(OB * target_ratio, OB * min_ratio, OB * max_ratio); vbv_bufsize_kbps = round(maxrate * bufsize_factor). OB = original container bitrate in kbps. CRF remains the primary quality control; maxrate is a local bitrate ceiling, bufsize is the VBV buffer constraint. Missing class entry leaves VBV disabled (x265.json vbv fields are AUTO; no hard-coded bufsize).",
     "UHQ": {
-      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.55, "target_ratio": 0.70, "max_ratio": 0.85, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "NORMAL_LONG_GOP":       {"min_ratio": 0.70, "target_ratio": 0.85, "max_ratio": 1.00, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.90, "target_ratio": 1.00, "max_ratio": 1.25, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "INTRA_LIKE":            {"min_ratio": 0.30, "target_ratio": 0.40, "max_ratio": 0.55, "bufsize_factor": 3.0, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.55, "target_ratio": 0.70, "max_ratio": 0.85, "bufsize_factor": 1.5, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.70, "target_ratio": 0.85, "max_ratio": 1.00, "bufsize_factor": 1.5, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.90, "target_ratio": 1.00, "max_ratio": 1.25, "bufsize_factor": 1.5, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.30, "target_ratio": 0.40, "max_ratio": 0.55, "bufsize_factor": 1.5, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
     },
     "HQ": {
-      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.35, "target_ratio": 0.50, "max_ratio": 0.65, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "NORMAL_LONG_GOP":       {"min_ratio": 0.60, "target_ratio": 0.75, "max_ratio": 0.90, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.85, "target_ratio": 1.00, "max_ratio": 1.15, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "INTRA_LIKE":            {"min_ratio": 0.25, "target_ratio": 0.35, "max_ratio": 0.45, "bufsize_factor": 3.0, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.35, "target_ratio": 0.50, "max_ratio": 0.65, "bufsize_factor": 2, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.60, "target_ratio": 0.75, "max_ratio": 0.90, "bufsize_factor": 2, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.85, "target_ratio": 1.00, "max_ratio": 1.15, "bufsize_factor": 2, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.25, "target_ratio": 0.35, "max_ratio": 0.45, "bufsize_factor": 2, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
     },
     "SMALL": {
-      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.20, "target_ratio": 0.30, "max_ratio": 0.40, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "NORMAL_LONG_GOP":       {"min_ratio": 0.40, "target_ratio": 0.55, "max_ratio": 0.70, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.75, "target_ratio": 0.90, "max_ratio": 1.05, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "INTRA_LIKE":            {"min_ratio": 0.15, "target_ratio": 0.25, "max_ratio": 0.35, "bufsize_factor": 3.0, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.20, "target_ratio": 0.30, "max_ratio": 0.40, "bufsize_factor": 3, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.40, "target_ratio": 0.55, "max_ratio": 0.70, "bufsize_factor": 3, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.75, "target_ratio": 0.90, "max_ratio": 1.05, "bufsize_factor": 3, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.15, "target_ratio": 0.25, "max_ratio": 0.35, "bufsize_factor": 3, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
     },
     "FAST": {
-      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.30, "target_ratio": 0.40, "max_ratio": 0.50, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "NORMAL_LONG_GOP":       {"min_ratio": 0.50, "target_ratio": 0.65, "max_ratio": 0.80, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.80, "target_ratio": 0.95, "max_ratio": 1.10, "bufsize_factor": 3.0, "status": "PROVISIONAL"},
-      "INTRA_LIKE":            {"min_ratio": 0.20, "target_ratio": 0.30, "max_ratio": 0.40, "bufsize_factor": 3.0, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
+      "HIGH_BITRATE_LONG_GOP": {"min_ratio": 0.30, "target_ratio": 0.40, "max_ratio": 0.50, "bufsize_factor": 3, "status": "PROVISIONAL"},
+      "NORMAL_LONG_GOP":       {"min_ratio": 0.50, "target_ratio": 0.65, "max_ratio": 0.80, "bufsize_factor": 3, "status": "PROVISIONAL"},
+      "LOW_BITRATE_LONG_GOP":  {"min_ratio": 0.80, "target_ratio": 0.95, "max_ratio": 1.10, "bufsize_factor": 3, "status": "PROVISIONAL"},
+      "INTRA_LIKE":            {"min_ratio": 0.20, "target_ratio": 0.30, "max_ratio": 0.40, "bufsize_factor": 3, "status": "PROVISIONAL_UNCALIBRATED - no genuine All-I source available"}
     }
   }
 }
