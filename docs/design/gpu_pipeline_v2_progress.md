@@ -557,3 +557,39 @@ refine: CPU per-window (batch refine still opt-in)
 long-take 曲线/施加/音频域，显示是环境 I/O/CPU 争用而非 GPU 路径变慢。
 **结论：默认组合需要机器空闲时重测 C1305/C1306，暂不能以本次 wall 评判。**
 
+## 2026-11-05 — GPU 优化恢复：干净基线 + coarse prefetch 负结果
+
+硬盘重新接回后，C1306 完整入口（batch exact，coarse4 + surface pipeline）
+干净基线：
+
+| 指标 | 值 |
+|---|---:|
+| wall | **107.2 s** |
+| GPU active | 8.74 s / **8.2%** |
+| window_measure | 25.8 s |
+| residual_measure | 16.5 s |
+| audio MOV 哈希 | 与基线一致 |
+
+对照：
+
+| 配置 | wall | window_measure | GPU active |
+|---|---:|---:|---:|
+| batch exact + prefetch 关闭 | **103.5 s** | 25.4 s | 7.9% |
+| batch exact + prefetch 全 target | 103.9 s | 26.8 s | 7.7% |
+| CPU refine（batch off） | 105.1 s | 25.7 s | 7.1% |
+
+结论：
+
+- **target coarse 预取没有收益**：预取线程与测量线程争 CPU，window 甚至略慢；
+  已撤销该实现，不进入默认路径。
+- 干净环境下 **batch refine 完整入口并没有比 CPU refine 更快**
+  （107.2 vs 105.1 s），因此 batch refine 继续 opt-in，不默认化。
+- 当前完整入口剩余时间中，window+residual 约 42 s，其余约 63 s 在
+  解码/曲线/施加/音频域；单纯继续优化 GPU window kernel 的收益有限。
+
+下一阶段重点改为：
+
+1. **measurement 与 unit 下游处理的 overlap**（当前是“全部测完再处理”）；
+2. residual 批量/并行参数；
+3. CPU/GPU 双缓冲调度器；
+4. 干净环境下 C1305 复测。
