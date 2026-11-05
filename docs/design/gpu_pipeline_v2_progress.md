@@ -646,3 +646,44 @@ C1306 完整入口（batch exact，coarse4 + surface pipeline）：
   unit 下游处理的 overlap；
 - batch refine 在干净基线上并不比 CPU refine 快（107 vs 105 s），
   继续 opt-in。
+
+## 2026-11-05 — residual 并发尝试：速度快但确定性不成立
+
+### 直接 residual 基准
+
+| workers | 单 target wall |
+|---|---:|
+| 4 | 7.26 s |
+| **8** | **4.15 s** |
+
+### 完整 C1306 结果
+
+- `KTS_RESIDUAL_WORKERS=8` 第一次哈希一致，第二次 **audio_3 哈希变化**；
+- 尝试给每个 worker 独立的 `ResidualCCEngine`（thread-local engine + 独立
+  stats），直接 residual 重复运行 grid 相等；
+- 但完整 C1306 workers=8 仍出现 **audio_2/audio_3 哈希变化**；
+- GPU active 虽然升到 13–16%，输出 parity 不成立。
+
+结论：
+
+> 当前 residual GPU 路径在多个 Python 线程调用同一 session/backend 时
+> 不能保证确定性；per-thread engine 也不够。该方向不能直接作为优化。
+
+所有 residual 线程/engine 改动已撤销，默认仍为 **4 workers**。
+
+### 下一步（必须的安全设计）
+
+1. **单 GPU residual dispatcher 线程**
+   - CPU worker 只做读取/resample/fine 的 CPU 部分；
+   - GPU coarse seed 通过队列交给唯一 dispatcher；
+   - 结果按窗序号回填，避免任何跨线程 CuPy 调用。
+2. 若 dispatcher 方案仍不能 parity，则 GPU residual 只保留单线程模式，
+   并发收益放弃。
+3. 在 residual 确定性修复前，不再尝试用加线程提高 GPU active。
+
+当前安全状态：
+
+- window/coarse/surface pipeline 优化保留；
+- residual 默认 4 workers；
+- batch refine opt-in；
+- 完整入口哈希基线一致。
