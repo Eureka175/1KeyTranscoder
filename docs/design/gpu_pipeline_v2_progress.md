@@ -593,3 +593,56 @@ long-take 曲线/施加/音频域，显示是环境 I/O/CPU 争用而非 GPU 路
 2. residual 批量/并行参数；
 3. CPU/GPU 双缓冲调度器；
 4. 干净环境下 C1305 复测。
+
+## 2026-11-05 — GPU 优化尝试结果：prefetch 无效，residual 线程数不安全
+
+### 干净基线
+
+C1306 完整入口（batch exact，coarse4 + surface pipeline）：
+
+| 指标 | 值 |
+|---|---:|
+| wall | **107.2 s** |
+| GPU active | 8.74 s / **8.2%** |
+| window_measure | 25.8 s |
+| residual_measure | 16.5 s |
+| audio MOV 哈希 | 基线一致 |
+
+### 尝试 1：target coarse prefetch（失败，已撤销）
+
+在所有 target 测量前并行预建 coarse 缓存，意图与 GPU 测量 overlap：
+
+| 配置 | wall | window_measure |
+|---|---:|---:|
+| prefetch 关闭 | 103.5 s | 25.4 s |
+| prefetch 开启 | 103.9 s | 26.8 s |
+
+预取线程和测量线程争 CPU，window 反而略微变慢；没有收益，代码已撤销。
+
+### 尝试 2：residual 线程数 4→8（速度更快但 parity 失败）
+
+直接 residual 基准：
+
+| workers | 单 target wall |
+|---|---:|
+| 4 | 7.26 s |
+| 8 | **4.15 s** |
+
+但完整 C1306 用 `KTS_RESIDUAL_WORKERS=8`：
+
+- 第一次 audio MOV 哈希仍一致；
+- 第二次 **audio_3.mov 哈希变化**（`12bb…` vs 基线 `2f58…`）；
+- 同时 `KTS_COARSE_WORKERS=8` 的组合也出现过 audio_2 哈希变化。
+
+说明：**residual GPU 路径在超过默认并发度后不是确定性的**，
+不能仅靠加线程提速；该 env 试验已撤销，默认仍为 4。
+
+### 当前结论
+
+- 完整入口干净基线 **107 s / GPU active 8.2%**；
+- window+residual 约 42 s，其余约 63 s 在解码/曲线/施加/音频域；
+- 单纯加 GPU window kernel 或 coarse 线程已到边际；
+- **下一步必须先解决 residual 并发确定性问题**，再做 measurement 与
+  unit 下游处理的 overlap；
+- batch refine 在干净基线上并不比 CPU refine 快（107 vs 105 s），
+  继续 opt-in。
