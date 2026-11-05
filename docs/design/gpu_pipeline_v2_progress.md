@@ -687,3 +687,52 @@ C1306 完整入口（batch exact，coarse4 + surface pipeline）：
 - residual 默认 4 workers；
 - batch refine opt-in；
 - 完整入口哈希基线一致。
+
+## 2026-11-05 — residual 单 dispatcher 修复：并发加速且保持 parity
+
+residual 窗口的 GPU coarse seed 之前由 CPU worker 线程直接调用同一个
+`ResidualCCEngine`。即使加锁/per-thread engine，跨线程 CuPy 调用仍会出现
+哈希变化。
+
+修复：
+
+- 新增 **single GPU dispatcher thread**；
+- dispatcher 独占唯一的 `ResidualCCEngine`；
+- CPU worker 只做读取/resample/fine，通过 queue 提交 `(a12,b12)` 并等待
+  结果；
+- GPU 调用从构造上串行，不再跨线程；
+- dispatcher 结束后统一记录 stats、关闭 engine；
+- CPU 侧可安全提高到 **8 workers**。
+
+验证：
+
+| 配置 | audio MOV 哈希 |
+|---|---|
+| dispatcher + workers4 | 一致 |
+| dispatcher + workers8（第一次） | 一致 |
+| dispatcher + workers8（第二次） | 一致 |
+| dispatcher 前 workers8 | 两次出现 audio_2/audio_3 变化 |
+
+完整 C1306、高后台负载环境：
+
+| 指标 | 值 |
+|---|---:|
+| wall | **208.9–225.7 s**（负载相关，不能与干净 107 s 直比） |
+| GPU active | **36.8 s / 17.6%** |
+| window_measure | 51.7–57.2 s |
+| residual_measure | 34.0 s |
+| batches | 552，无 fallback |
+
+GPU active 绝对时间从基线约 8.7 s 提到约 36.8 s，说明 residual GPU 路径
+不再因线程并发而回退/失效。
+
+默认改为：
+
+- `KTS_RESIDUAL_WORKERS=8`（可 env 覆盖）；
+- single dispatcher 无条件用于 GPU residual。
+
+下一步：
+
+1. 空闲机器重测 C1306/C1305，区分负载影响；
+2. measurement 与 unit 下游 processing 的 overlap；
+3. 继续观察 residual dispatcher 下 GPU active/温度/耗时。

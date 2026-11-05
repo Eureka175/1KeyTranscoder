@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import math
 import os
+import queue
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -798,6 +799,62 @@ def measure_residual_curve(
     except Exception:                                  # noqa: BLE001
         _align_engine = None
 
+    # The residual window pool runs on CPU threads, but CuPy calls from
+    # several threads against one session are not deterministic (measured:
+    # audio MOV hashes changed at >4 workers even with per-thread engines).
+    # Keep a single dispatcher thread that owns the only residual engine;
+    # CPU workers submit and wait, so GPU work is serialized by construction.
+    _gpu_q: Any = None
+    _gpu_thread = None
+    _gpu_eng = None
+    _gpu_worker_error = None
+
+    def _gpu_dispatcher() -> None:
+        nonlocal _gpu_eng, _gpu_worker_error
+        try:
+            from .gpu_align.residual_cc import ResidualCCEngine
+
+            if _align_engine is None:
+                return
+            _gpu_eng = ResidualCCEngine(
+                _align_engine.backend, policy=_align_engine.policy)
+            _gpu_eng._session = getattr(_align_engine, "_session", None)
+            while True:
+                item = _gpu_q.get()
+                if item is None:
+                    return
+                a12, b12, fut = item
+                try:
+                    fut.set_result(_gpu_eng.peak(
+                        a12, b12, dec=dec, search48=search48))
+                except BaseException as exc:           # noqa: BLE001
+                    fut.set_exception(exc)
+        except BaseException as exc:                   # noqa: BLE001
+            _gpu_worker_error = f"{type(exc).__name__}: {exc}"
+            # Drain queued jobs so no worker waits forever.
+            if _gpu_q is not None:
+                while True:
+                    try:
+                        item = _gpu_q.get_nowait()
+                    except queue.Empty:
+                        break
+                    if item is not None:
+                        item[2].set_result(None)
+
+    if _align_engine is not None:
+        _gpu_q = queue.Queue()
+        _gpu_thread = threading.Thread(
+            target=_gpu_dispatcher, name="residual-gpu-dispatcher",
+            daemon=True)
+        _gpu_thread.start()
+
+    def _gpu_peak(a12: np.ndarray, b12: np.ndarray) -> float | None:
+        if _gpu_q is None or _gpu_worker_error is not None:
+            return None
+        fut: Future = Future()
+        _gpu_q.put((a12, b12, fut))
+        return fut.result()
+
     def measure_one(s: int) -> dict[str, Any] | None:
         length = min(win, n - s)
         ref = _read_raw(anchor_raw, storage_dtype, s, length).astype(np.float64)
@@ -811,11 +868,9 @@ def measure_residual_curve(
         if n12 < 16:
             return None
         coarse = None
-        if _align_engine is not None:
+        if _gpu_q is not None:
             try:
-                with _align_lock:
-                    coarse = _align_engine.peak(
-                        a12, b12, dec=dec, search48=search48)
+                coarse = _gpu_peak(a12, b12)
             except Exception:                          # noqa: BLE001
                 coarse = None
         if coarse is None and gpu_cc:
@@ -865,7 +920,13 @@ def measure_residual_curve(
         }
 
     # S5: 残差窗互相独立，按窗并行；归并按 starts 顺序，结果与串行逐位一致。
-    workers = min(4, max(1, (os.cpu_count() or 4)))
+    # GPU coarse seed goes through one dispatcher thread (see above), so the
+    # CPU side may use more than 4 workers without sharing a CuPy engine.
+    try:
+        _rw = int(os.environ.get("KTS_RESIDUAL_WORKERS", "8") or 8)
+    except ValueError:
+        _rw = 8
+    workers = min(max(1, _rw), max(1, (os.cpu_count() or 4)))
     if len(starts) > 1 and workers > 1:
         with ThreadPoolExecutor(max_workers=workers) as ex:
             measured = list(ex.map(measure_one, starts))
@@ -873,14 +934,28 @@ def measure_residual_curve(
     else:
         rows = [m for m in (measure_one(s) for s in starts) if m is not None]
     n_windows = len(starts)
-    if _gpu_ctx is not None and _align_engine is not None:
+    if _gpu_q is not None:
+        _gpu_q.put(None)
+    if _gpu_thread is not None:
+        _gpu_thread.join()
+        _gpu_thread = None
+        _gpu_q = None
+    if _gpu_worker_error and _gpu_ctx is not None:
+        _gpu_ctx.metrics.notes.append(
+            f"residual_gpu_dispatcher:{_gpu_worker_error}")
+    if _gpu_ctx is not None and _gpu_eng is not None:
         try:
-            for _st in _align_engine.stats:
+            for _st in _gpu_eng.stats:
                 _gpu_ctx.metrics.record_batch(_st)
         except Exception:                          # noqa: BLE001
             pass
         _gpu_ctx.metrics.record_stage(
             "residual_measure", time.perf_counter() - _t_residual)
+    if _gpu_eng is not None:
+        try:
+            _gpu_eng.close()
+        except Exception:                          # noqa: BLE001
+            pass
     if _align_engine is not None and _owns_align_sess:
         try:
             _align_engine.close()
