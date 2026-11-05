@@ -736,3 +736,21 @@ GPU active 绝对时间从基线约 8.7 s 提到约 36.8 s，说明 residual GPU
 1. 空闲机器重测 C1306/C1305，区分负载影响；
 2. measurement 与 unit 下游 processing 的 overlap；
 3. 继续观察 residual dispatcher 下 GPU active/温度/耗时。
+
+### 2026-11-05 修正：workers8 仍不能默认，unit pipeline 未采用
+
+dispatcher 修复保留了；但完整 C1306 多次运行显示：
+
+- dispatcher + workers8：出现 audio_2 哈希变化（并非每次）；
+- dispatcher + workers4：本次复测哈希一致；
+- unit measurement/processing overlap 实现跑过一次哈希一致，但与
+  pipeline off 的 A/B 没有稳定 wall 收益，且并发下 parity 风险高，未采用。
+
+因此当前安全默认：
+
+- `KTS_RESIDUAL_WORKERS=4`；
+- unit-level pipeline 不启用；
+- GPU residual 单 dispatcher 保留（避免跨线程 engine 共享）。
+
+结论：residual dispatcher 是结构性修复，但“8 workers 默认化”被撤销；
+需要继续做 **per-run/per-call 的完整确定性验证**，不能仅凭一次哈希通过。
