@@ -58,6 +58,7 @@ PARAM_MAP = {
     "cqp": ("--cqp", "list"),
     "max_bitrate": ("--max-bitrate", "value"),
     "vbv_bufsize": ("--vbv-bufsize", "value"),
+    "multipass": ("--multipass", "value"),
     "aq": ("--aq", "flag"),
     "aq_strength": ("--aq-strength", "value"),
     "aq_temporal": ("--aq-temporal", "flag"),

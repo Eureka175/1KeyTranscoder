@@ -16,7 +16,7 @@
     "UHQ": {
       "description": "UHQ Slowest - Not Practical 285H@0.8fps",
       "preset": "slow",
-      "crf": 20,
+      "crf": 21,
       "no_strong_intra_smoothing": true,
       "rd": 4,
       "rdoq_level": 2,
@@ -40,7 +40,7 @@
 
       "const_vbv": true,
       "vbv_maxrate": 100000,
-      "vbv_bufsize": 300000,
+      "vbv_bufsize": 150000,
       "qpmin": 15,
       "qpmax": 38,
 
@@ -101,7 +101,7 @@
     "HQ": {
       "description": "HQ Slow - Production Ready 285H@2fps",
       "preset": "slow",
-      "crf": 21,
+      "crf": 23,
       "no_strong_intra_smoothing": true,
       "rd": 4,
       "rdoq_level": 1,
@@ -125,7 +125,7 @@
 
       "const_vbv": true,
       "vbv_maxrate": 80000,
-      "vbv_bufsize": 240000,
+      "vbv_bufsize": 160000,
       "qpmin": 16,
       "qpmax": 40,
 
@@ -185,7 +185,7 @@
     "SMALL": {
       "description": "Small - Production Ready 285H@3fps",
       "preset": "slow",
-      "crf": 23,
+      "crf": 25,
       "no_strong_intra_smoothing": true,
       "rd": 3,
       "rdoq_level": 1,
@@ -269,7 +269,7 @@
     "FAST": {
       "description": "Fast - Production Ready 285H@10fps",
       "preset": "fast",
-      "crf": 22,
+      "crf": 24,
       "no_strong_intra_smoothing": true,
       "rd": 2,
       "rdoq_level": 0,
@@ -293,7 +293,7 @@
 
       "const_vbv": true,
       "vbv_maxrate": 60000,
-      "vbv_bufsize": 240000,
+      "vbv_bufsize": 180000,
       "qpmin": 15,
       "qpmax": 50,
 

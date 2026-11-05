@@ -27,10 +27,10 @@
       "aq_temporal": true,
       "lookahead": 32,
       "lookahead_level": 3,
-      "bframes": 5,
-      "bref_mode": "middle",
+      "bframes": 16,
+      "bref_mode": "each",
       "ref": 5,
-      "tf_level": 4,
+      "tf_level": 0,
       "nonrefp": true,
       "mv_precision": "q-pel",
       "chroma_qp_offset": -2,
@@ -47,7 +47,8 @@
       "output_buf": 64,
       "cuda_schedule": "spin",
       "avoid_idle_clock": true,
-      "avhw": true
+      "avhw": true,
+      "multipass": "2pass-full"
     },
 
     "HQ": {
@@ -65,10 +66,10 @@
       "aq_temporal": true,
       "lookahead": 32,
       "lookahead_level": 3,
-      "bframes": 5,
+      "bframes": 12,
       "bref_mode": "each",
       "ref": 5,
-      "tf_level": 4,
+      "tf_level": 0,
       "nonrefp": true,
       "mv_precision": "q-pel",
       "chroma_qp_offset": -2,
@@ -85,7 +86,8 @@
       "output_buf": 64,
       "cuda_schedule": "spin",
       "avoid_idle_clock": true,
-      "avhw": true
+      "avhw": true,
+      "multipass": "2pass-full"
     },
 
     "SMALL": {
@@ -103,7 +105,7 @@
       "aq_temporal": true,
       "lookahead": 32,
       "lookahead_level": 3,
-      "bframes": 5,
+      "bframes": 16,
       "bref_mode": "each",
       "ref": 5,
       "tf_level": 4,
@@ -123,7 +125,8 @@
       "output_buf": 64,
       "cuda_schedule": "spin",
       "avoid_idle_clock": true,
-      "avhw": true
+      "avhw": true,
+      "multipass": "2pass-full"
     },
 
     "FAST": {
@@ -141,11 +144,11 @@
       "aq_temporal": true,
       "lookahead": 32,
       "lookahead_level": 2,
-      "bframes": 5,
+      "bframes": 8,
       "bref_mode": "each",
       "ref": 4,
-      "tf_level": 0,
-      "nonrefp": false,
+      "tf_level": 4,
+      "nonrefp": true,
       "mv_precision": "q-pel",
       "chroma_qp_offset": -1,
       "qp_init": [23, 25, 27],
@@ -161,7 +164,8 @@
       "output_buf": 64,
       "cuda_schedule": "spin",
       "avoid_idle_clock": true,
-      "avhw": true
+      "avhw": true,
+      "multipass": "2pass-quarter"
     }
   }
 }
