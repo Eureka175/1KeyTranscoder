@@ -13,7 +13,7 @@ import atexit
 import os
 import sys
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 __all__ = [
@@ -111,6 +111,11 @@ class GpuBackend:
     total_mem: int = 0
     _context: Any = None
     _closed: bool = False
+    # One execution lock per device.  CuPy calls from several Python threads
+    # against the same session are not deterministic; every engine takes this
+    # RLock around its GPU section.  RLock keeps nested engine calls safe.
+    lock: Any = field(default_factory=threading.RLock,
+                      repr=False, compare=False)
 
     @classmethod
     def create(cls, device_id: int = 0, budget_mb: int | None = None) -> "GpuBackend":

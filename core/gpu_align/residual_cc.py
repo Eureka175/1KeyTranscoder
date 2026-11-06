@@ -3,6 +3,7 @@
 """Batched residual coarse-correlation seeds (long-take residual windows)."""
 from __future__ import annotations
 
+import functools
 import math
 import time
 
@@ -14,6 +15,14 @@ from .precision import Precision, Policy, resolve_policy
 from .types import BatchStats
 
 __all__ = ["ResidualCCEngine"]
+
+
+def _serialized(method):
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self.backend.lock:
+            return method(self, *args, **kwargs)
+    return wrapper
 
 
 class ResidualCCEngine:
@@ -28,6 +37,7 @@ class ResidualCCEngine:
         self.budget_bytes = int(budget_bytes or backend.budget_bytes())
         self.stats: list[BatchStats] = []
 
+    @_serialized
     def peak(self, a12: np.ndarray, b12: np.ndarray, *, dec: int,
              search48: int) -> float | None:
         cp = self.cp

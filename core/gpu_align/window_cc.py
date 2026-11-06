@@ -15,6 +15,7 @@ Parity:
 """
 from __future__ import annotations
 
+import functools
 import math
 import time
 from typing import Any, Iterable
@@ -27,6 +28,15 @@ from .precision import Policy, Precision, resolve_policy
 from .types import BatchStats, WindowPeak
 
 __all__ = ["WindowCCEngine"]
+
+
+def _serialized(method):
+    """Run a GPU section under the backend's single execution lock."""
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self.backend.lock:
+            return method(self, *args, **kwargs)
+    return wrapper
 
 
 class WindowCCEngine:
@@ -122,6 +132,7 @@ class WindowCCEngine:
             ))
         return out
 
+    @_serialized
     def surface_windows(self, requests: Iterable[tuple[int, int]],
                         *, lag_lo_c: int, lag_hi_c: int
                         ) -> tuple[np.ndarray, int, int, np.ndarray]:
@@ -241,6 +252,7 @@ class WindowCCEngine:
             out.append(WindowPeak(int(-m), signed, abs(signed)))
         return out
 
+    @_serialized
     def batch_peaks(self, requests: Iterable[tuple[int, int, int, int]]
                     ) -> list[WindowPeak | None]:
         """requests: (start_c, count_c, lag_lo_samples, lag_hi_samples).

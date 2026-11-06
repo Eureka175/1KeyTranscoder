@@ -10,6 +10,7 @@ already have candidate lag centers (and can batch windows/units).
 """
 from __future__ import annotations
 
+import functools
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -21,6 +22,14 @@ from .precision import Precision, Policy, resolve_policy
 from .types import BatchStats
 
 __all__ = ["RefineRequest", "RefineBatchEngine"]
+
+
+def _serialized(method):
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self.backend.lock:
+            return method(self, *args, **kwargs)
+    return wrapper
 
 
 @dataclass
@@ -52,6 +61,7 @@ class RefineBatchEngine:
         return int(min(64, max(
             1, self.budget_bytes // max(1, (seg + width) * per))))
 
+    @_serialized
     def refine(self, requests: list[RefineRequest]) -> list[tuple[int, float]]:
         """Return (lag, |cc|) per request; invalid => (center, 0.0)."""
         out: list[tuple[int, float]] = [

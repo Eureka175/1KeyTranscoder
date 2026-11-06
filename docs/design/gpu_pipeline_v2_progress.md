@@ -808,3 +808,56 @@ run-level dispatcher 在 C1306 workers8 两次哈希一致；但 C1305 完整入
 
 下一步必须先定位 C1305 在 8 workers 下 residual 曲线变化的根源
 （窗口级 GPU/CPU 竞态或 stats 口径），再考虑并发提速。
+
+## 2026-11-06 — Stage 1/2：确定 C1305 是间歇性、跨阶段差异；加单 GPU 执行锁
+
+### Stage 1：重复 benchmark
+
+C1305 完整入口重复：
+
+| 配置 | 运行 | wall | audio_2 |
+|---|---:|---:|---|
+| workers4 | 1 | 215.2 s | 基线 d722 |
+| workers4 | 2 | 209.9 s | 基线 d722 |
+| workers8 | 1 | 229.9 s | **da90 变化** |
+| workers8 | 2 | 219.6 s | 基线 d722 |
+
+结论：
+
+- 不是“workers8 必坏”；
+- 是 **间歇性 run-to-run 差异**；
+- 差异不只在 residual，target2 的 window curve grid 在约 2911 s 后
+  已经不同；
+- 说明 window measurement（GPU surface / refine）本身存在跨线程竞态，
+  不是 residual 单点问题。
+
+### Stage 2：单 GPU 执行锁
+
+`GpuBackend` 增加 process/device 级 **RLock**：
+
+- 所有 `WindowCCEngine` 的 GPU 方法在锁内；
+- `RefineBatchEngine.refine` 在锁内；
+- `ResidualCCEngine.peak` 在锁内；
+- 这样 surface producer 线程、主线程 refine、residual dispatcher
+  不会同时进入同一 CUDA session/CuPy engine。
+
+验证：
+
+| 场景 | 结果 |
+|---|---|
+| C1305 lock + workers8（2 runs） | audio 哈希均基线 |
+| C1305 lock + workers4 | audio 哈希基线 |
+| C1306 lock + workers8 | audio 哈希基线 |
+| Unit | 1053 PASS / 2 既有语料环境 FAIL |
+
+当前默认仍保持：
+
+- residual workers4（8 的 parity 仍只算“目前通过”，不默认）；
+- 单 GPU 执行锁保留；
+- wall 因锁和负载约 220–231 s（C1305），需空载复测。
+
+### 下一步
+
+- Stage 3：C1305/C1306 各 3 次重复，确认锁是否真正消除间歇差异；
+- 若确认稳定，再评估把锁范围缩小到 surface/refine 临界区；
+- 之后才做 measurement/processing overlap。
