@@ -46,7 +46,7 @@ def l1_dji_metadata_policy() -> None:
 
 def _find_sample(*candidates: str) -> Path | None:
     for rel in candidates:
-        p = ROOT / rel if not rel.startswith("I:") else Path(rel)
+        p = Path(rel) if Path(rel).is_absolute() else ROOT / rel
         if p.is_file():
             return p
     return None
@@ -60,7 +60,8 @@ def l2_dji_metadata_policy() -> None:
     gpac = GpacContainerBackend()
     action = _find_sample(
         r"testsets\action4_4x3_long\DJI_20260922101750_0031_D.MP4",
-        r"I:\2026.09.24\Mavic4P\DJI_20260921164928_0296_D.MP4",
+        r"K:\1kt_moved_20261026\testsets\action4_4x3_long"
+        r"\DJI_20260922101750_0031_D.MP4",
     )
     if action is None:
         record("djipol-l2: Action 样本可用", False, "no sample file found")
