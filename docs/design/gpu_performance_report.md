@@ -168,7 +168,7 @@ C1305：
 3. long-take target processing 的 CPU 部分
 4. GPU window/residual kernel 本身（占比小）
 
-## 5. 下一步
+## 5. 下一步（优化前）
 
 1. **修复 C1305 no-pipeline 间歇性非确定性**
    - 与 pipeline 共用 canonical plan prewarm；
@@ -176,6 +176,60 @@ C1305：
 2. 在该修复后重新评估 pipeline 默认化；
 3. 若 pipeline 稳定，则按素材/耗时自适应选择；
 4. 继续优化 CPU/GPU overlap，而不是继续调 GPU kernel。
+
+## 6. 优化落地（本轮完成）
+
+### 6.1 并行音频 apply
+
+`reference_interp_write_inplace()` 的 chunk 处理改为线程池：
+
+- `KTS_APPLY_WORKERS` 控制，默认在 pipeline 模式下为 **4**；
+- pipeline 关闭时默认回到 **1**，避免 no-pipeline + 并行 apply 的 parity 风险；
+- 每个 chunk 独立读/写自己的文件区间；
+- 合成 23M 样本 bitwise 测试：workers1 与 workers4 输出 **SHA256 完全相同**。
+
+### 6.2 正式启用 pipeline
+
+- `KTS_GPU_UNIT_PIPELINE` 默认从 0 改为 **1**；
+- pipeline 的 canonical window-plan prewarm 保证 residual 计划顺序；
+- apply workers4 只在 pipeline 模式下默认开启。
+
+### 6.3 结果
+
+| 场景 | 旧默认 | 新默认 | 变化 |
+|---|---:|---:|---:|
+| C1306 | 108.44 s | **98.20 / 98.75 / 99.69 s** | 中位约 **-8.9%** |
+| C1305 | 196.11 s | **178.76 / 183.83 s** | 中位约 **-7.5%** |
+
+- C1306 pipeline+apply4：2 次，哈希全部基线；
+- C1305 pipeline+apply4：2 次，哈希全部基线；
+- C1306 默认（不设 env）：99.69 s，哈希基线；
+- 默认 commit 前的 no-pipeline + parallel apply C1305 曾出现 audio_3 变化，因此默认 apply4 只在 pipeline 模式下启用。
+
+### 6.4 当前默认
+
+```text
+KTS_GPU_UNIT_PIPELINE = 1
+KTS_APPLY_WORKERS      = 4 (pipeline 模式默认；pipeline off 时默认1)
+est_worker_cap         = 12
+fixed GPU budget       = on
+fresh FFT plan         = on
+residual workers       = 4
+```
+
+## 7. 最终结论
+
+本轮得到了可交付的净性能提升：
+
+- **C1306 约 -8.9%**
+- **C1305 约 -7.5%**
+- 所有验证运行 audio 哈希与基线一致。
+
+主要收益来自：
+
+1. 并行音频 apply（chunk 级线程池）；
+2. pipeline 与 canonical plan prewarm 使 apply 并行保持 parity；
+3. 没有改变 GPU kernel 或输出语义。
 
 ## 6. 测试修正
 

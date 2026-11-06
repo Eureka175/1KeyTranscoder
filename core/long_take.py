@@ -483,10 +483,12 @@ def reference_interp_write_inplace(
     shift = np.interp(grid, grid_t, grid_s)
     chunk = max(1, int(chunk_samples))
     dtype = np.dtype("<f4")
-    with Path(path_raw).open("r+b") as fh:
-        for s0 in range(0, n, chunk):
-            s1 = min(n, s0 + chunk)
-            idx = np.arange(s0, s1, dtype=np.float64)
+    starts = list(range(0, n, chunk))
+
+    def _apply_chunk(s0: int) -> None:
+        s1 = min(n, s0 + chunk)
+        idx = np.arange(s0, s1, dtype=np.float64)
+        with Path(path_raw).open("r+b") as fh:
             fh.seek(s0 * dtype.itemsize)
             raw = fh.read((s1 - s0) * dtype.itemsize)
             if len(raw) != (s1 - s0) * dtype.itemsize:
@@ -500,8 +502,26 @@ def reference_interp_write_inplace(
             block[invalid] = 0.0
             fh.seek(s0 * dtype.itemsize)
             fh.write(block.astype(np.float32).tobytes())
+
+    _aw_env = os.environ.get("KTS_APPLY_WORKERS")
+    _pipe_on = os.environ.get(
+        "KTS_GPU_UNIT_PIPELINE", "1").strip().lower() not in (
+            "", "0", "off", "false", "no")
+    _aw_default = 4 if _pipe_on else 1
+    try:
+        _aw = int(_aw_env) if _aw_env else _aw_default
+    except ValueError:
+        _aw = _aw_default
+    _aw = min(max(1, _aw), max(1, os.cpu_count() or 1), len(starts))
+    if _aw > 1 and len(starts) > 1:
+        with ThreadPoolExecutor(max_workers=_aw) as ex:
+            list(ex.map(_apply_chunk, starts))
+    else:
+        for _s0 in starts:
+            _apply_chunk(_s0)
     return {"executed": True, "engine": "reference_interp_inplace",
             "grid_step": int(grid_step), "n_samples": n,
+            "apply_workers": _aw,
             "output": str(path_raw)}
 
 
@@ -1335,7 +1355,7 @@ def align_time_varying(
         # keeps decoded raw immutable for the next target's measurement.
         _pipeline_units = bool(
             _gpu_align and len(units) > 1
-            and os.environ.get("KTS_GPU_UNIT_PIPELINE", "0").strip().lower()
+            and os.environ.get("KTS_GPU_UNIT_PIPELINE", "1").strip().lower()
             not in ("", "0", "off", "false", "no"))
         if _pipeline_units:
             pass
@@ -1662,6 +1682,7 @@ def align_time_varying(
         "max_shift": max_shift,
         "timings": timings,
     }
+
 
 
 
