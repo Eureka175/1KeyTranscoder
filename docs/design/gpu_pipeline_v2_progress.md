@@ -927,3 +927,42 @@ Stage 4 判定：**失败，需要先解决 raw/apply 的并发所有权，而�
 - Stage1/2/3：parity 修复和重复验证完成；
 - Stage4：不采用；
 - Stage5：固定基准/收尾。
+
+## 2026-11-06 — Stage 6：raw 隔离后 pipeline 仍然失败，正式关闭该方向
+
+在 Stage4 的基础上给 pipeline 加：
+
+- 处理模式禁用 **in-place apply**；
+- round1/round2 都写独立文件；
+- decoded raw 保持只读；
+- measurement 与 processing 不再共享可写 raw。
+
+完整 C1306：
+
+| 配置 | wall | audio_2 | audio_3 |
+|---|---:|---|---|
+| pipeline + raw 隔离 | 123.6 s | **c4d8…（基线 657b…）** | **32d3…（基线 2f58…）** |
+| 无 pipeline | 113.3–115.9 s | 基线 | 基线 |
+
+结论：
+
+- 问题不是 in-place raw 写入；
+- 即使 raw 完全只读、GPU 全局加锁，pipeline 仍改变输出；
+- 说明 measurement 与 processing 之间还有未建模的状态依赖
+  （GPU dispatcher 生命周期、apply 路径、报告/时序状态等）；
+- pipeline 方向在当前架构下 **关闭**，不设默认、不保留半成品实现。
+
+当前安全状态：
+
+- 单 GPU 执行锁保留；
+- unit pipeline 关闭；
+- residual workers 4；
+- C1305/C1306 基线在锁后稳定。
+
+### 后续真正需要的架构
+
+- 不是继续在同一个进程里重叠 measurement/processing；
+- 而是 **两个独立执行域**：
+  - measurement domain 只读 raw，拥有自己的 GPU service；
+  - processing domain 使用自己的输出快照/GPU service；
+  - 两者通过不可变输入和明确队列通信。
