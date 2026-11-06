@@ -21,6 +21,13 @@ HEAD：`2abd196`
 - 总耗时：**1168.4 s**
 - 报告：`work/autotest/autotest_report.json`
 
+### L3 full（优化后，2026-11-07 03:24–03:43）
+
+- 结果：**1295 PASS / 11 FAIL**
+- 总耗时：**1171.0 s**
+- 多出的 1 PASS 是 DJI Action fallback 测试修复；
+- 11 个 FAIL 全部仍是真实语料缺失，没有新增代码失败。
+
 失败分类：
 
 | 类别 | 数量 | 说明 |
