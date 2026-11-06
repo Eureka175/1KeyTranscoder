@@ -116,6 +116,29 @@ audio_2 = 28870a66...（基线 d7228acc...）
 
 ## 4. 性能优化尝试与决策
 
+### 4.0 channel-sync estimation worker cap
+
+C1306（同一晚，单次）：
+
+| `est_worker_cap` | wall |
+|---:|---:|
+| 8 | 108.64 s |
+| 12（当前默认） | 103.93 s |
+| 16 | **101.44 s** |
+
+C1305：
+
+| `est_worker_cap` | wall |
+|---:|---:|
+| 12（当前默认） | 181.30 s |
+| 16 | 184.83 s |
+
+结论：
+
+- cap16 对 C1306 更快，但对 C1305 更慢；
+- 当前默认 cap12 是综合更稳的点；
+- 不把 cap16 默认化。
+
 已尝试：
 
 1. **adaptive pipeline**（按首个 unit 测量耗时选择）
@@ -137,6 +160,13 @@ audio_2 = 28870a66...（基线 d7228acc...）
 > 瓶颈不在 GPU kernel，而在 CPU 阶段的 GPU idle；  
 > pipeline 能 overlap，但对 C1305 是负收益；  
 > 默认路径仍存在 C1305 间歇性 parity 问题，优先于纯性能。
+
+## 4.1 已知性能瓶颈排序
+
+1. channel-sync 帧级估计（cap12 已接近最优，cap16 不通用）
+2. 音频 apply / decode / I/O（GPU active 仅 4–8%）
+3. long-take target processing 的 CPU 部分
+4. GPU window/residual kernel 本身（占比小）
 
 ## 5. 下一步
 
