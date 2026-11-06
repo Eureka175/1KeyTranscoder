@@ -861,3 +861,38 @@ C1305 完整入口重复：
 - Stage 3：C1305/C1306 各 3 次重复，确认锁是否真正消除间歇差异；
 - 若确认稳定，再评估把锁范围缩小到 surface/refine 临界区；
 - 之后才做 measurement/processing overlap。
+
+## 2026-11-06 — Stage 3：单 GPU 锁后的 parity 重复验证
+
+C1305：
+
+| 配置 | 运行次数 | audio 哈希 | wall |
+|---|---:|---|---:|
+| lock + workers4 | 1 | 全部一致 | 220.8 s |
+| lock + workers8 | 3 | 全部一致 | 231.4 / 231.5 / 251.1 s |
+
+C1306：
+
+| 配置 | 运行次数 | audio 哈希 | wall |
+|---|---:|---|---:|
+| lock + workers8 | 2 | 全部一致 | 115.9 / 113.3 s |
+
+对比 Stage1 的 lock 前：
+
+- C1305 workers8 曾出现 1 次 audio_2 变化；
+- 加锁后 C1305 workers8 连续 3 次基线一致；
+- C1306 workers8 连续 2 次一致。
+
+结论：
+
+1. **单 GPU 执行锁消除了观察到的间歇性 parity 差异**；
+2. 锁让 C1305 的 wall 从约 219–229 s 升到约 231–251 s（负载相关，
+   部分可能是串行化/后台负载），没有净吞吐收益；
+3. 当前默认保持 **workers4 + lock**，不把 workers8 默认化；
+4. 架构上仍缺：测量与处理 overlap、锁范围细化、固定基准。
+
+Stage 3 验收：
+
+- parity：通过（已观察范围内）；
+- 性能：锁有开销，暂不追求 workers8；
+- 默认：workers4 不变。
