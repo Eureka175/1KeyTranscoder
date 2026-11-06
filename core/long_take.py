@@ -772,12 +772,12 @@ def measure_residual_curve(
     ]
 
     # Optional new GPU residual seed (fp32/fp64 per KTS_GPU_ALIGN).
-    # Reuse the run-level session/engine when channel_sync has one.
+    # Reuse the run-level dispatcher when channel_sync has one.
     _align_engine = None
     _align_sess = None
     _owns_align_sess = True
     _gpu_ctx = None
-    _align_lock = threading.Lock()
+    _shared_peak = None
     _t_residual = time.perf_counter()
     try:
         if sync_estimate.gpu_align_enabled():
@@ -785,9 +785,9 @@ def measure_residual_curve(
 
             _gpu_ctx = _gpu_runtime.current_run()
             if _gpu_ctx is not None:
-                _align_engine = _gpu_ctx.residual_engine()
+                _shared_peak = getattr(_gpu_ctx, "residual_peak", None)
                 _owns_align_sess = False
-            if _align_engine is None:
+            if _shared_peak is None:
                 from .gpu_align import AlignGpuSession
                 from .gpu_align.residual_cc import ResidualCCEngine
 
@@ -849,6 +849,8 @@ def measure_residual_curve(
         _gpu_thread.start()
 
     def _gpu_peak(a12: np.ndarray, b12: np.ndarray) -> float | None:
+        if _shared_peak is not None:
+            return _shared_peak(a12, b12, dec=dec, search48=search48)
         if _gpu_q is None or _gpu_worker_error is not None:
             return None
         fut: Future = Future()
@@ -868,7 +870,7 @@ def measure_residual_curve(
         if n12 < 16:
             return None
         coarse = None
-        if _gpu_q is not None:
+        if _shared_peak is not None or _gpu_q is not None:
             try:
                 coarse = _gpu_peak(a12, b12)
             except Exception:                          # noqa: BLE001
@@ -923,9 +925,9 @@ def measure_residual_curve(
     # GPU coarse seed goes through one dispatcher thread (see above), so the
     # CPU side may use more than 4 workers without sharing a CuPy engine.
     try:
-        _rw = int(os.environ.get("KTS_RESIDUAL_WORKERS", "4") or 4)
+        _rw = int(os.environ.get("KTS_RESIDUAL_WORKERS", "8") or 8)
     except ValueError:
-        _rw = 4
+        _rw = 8
     workers = min(max(1, _rw), max(1, (os.cpu_count() or 4)))
     if len(starts) > 1 and workers > 1:
         with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -943,12 +945,13 @@ def measure_residual_curve(
     if _gpu_worker_error and _gpu_ctx is not None:
         _gpu_ctx.metrics.notes.append(
             f"residual_gpu_dispatcher:{_gpu_worker_error}")
-    if _gpu_ctx is not None and _gpu_eng is not None:
-        try:
-            for _st in _gpu_eng.stats:
-                _gpu_ctx.metrics.record_batch(_st)
-        except Exception:                          # noqa: BLE001
-            pass
+    if _gpu_ctx is not None:
+        if _gpu_eng is not None:
+            try:
+                for _st in _gpu_eng.stats:
+                    _gpu_ctx.metrics.record_batch(_st)
+            except Exception:                      # noqa: BLE001
+                pass
         _gpu_ctx.metrics.record_stage(
             "residual_measure", time.perf_counter() - _t_residual)
     if _gpu_eng is not None:
@@ -1613,6 +1616,7 @@ def align_time_varying(
         "max_shift": max_shift,
         "timings": timings,
     }
+
 
 
 

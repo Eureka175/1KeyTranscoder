@@ -10,7 +10,9 @@ begin a run keep the old per-call session behaviour.
 from __future__ import annotations
 
 import os
+import queue
 import threading
+from concurrent.futures import Future
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -23,6 +25,79 @@ from .session import AlignGpuSession
 __all__ = ["GpuRunContext", "begin_run", "end_run", "current_run"]
 
 
+class _ResidualDispatcher:
+    """One engine and one thread for every residual call in a run.
+
+    The CUDA/CuPy session is process-wide, but calls from several Python
+    threads against one engine are not deterministic (full C1306 hashes
+    changed).  A single dispatcher serializes GPU calls by construction and
+    removes the per-call engine/thread churn.
+    """
+
+    def __init__(self, ctx: "GpuRunContext") -> None:
+        self.ctx = ctx
+        self.q: queue.Queue = queue.Queue()
+        self.engine: Any = None
+        self.error: str | None = None
+        self.thread = threading.Thread(
+            target=self._run, name="gpu-residual-dispatcher", daemon=True)
+        self.thread.start()
+
+    def _run(self) -> None:
+        try:
+            sess = self.ctx.session()
+            if sess is None:
+                return
+            from .residual_cc import ResidualCCEngine
+
+            self.engine = ResidualCCEngine(sess.backend, policy=sess.policy)
+            self.ctx.metrics.record_engine(created=True)
+            while True:
+                item = self.q.get()
+                if item is None:
+                    return
+                a12, b12, dec, search48, fut = item
+                try:
+                    fut.set_result(self.engine.peak(
+                        a12, b12, dec=dec, search48=search48))
+                except BaseException as exc:           # noqa: BLE001
+                    fut.set_exception(exc)
+        except BaseException as exc:                   # noqa: BLE001
+            self.error = f"{type(exc).__name__}: {exc}"
+            self.ctx.metrics.notes.append(f"residual_dispatcher:{self.error}")
+            # Drain queued work so callers never wait forever.
+            while True:
+                try:
+                    item = self.q.get_nowait()
+                except queue.Empty:
+                    break
+                if item is not None:
+                    item[4].set_result(None)
+
+    def peak(self, a12: np.ndarray, b12: np.ndarray, *,
+             dec: int, search48: int) -> float | None:
+        if self.error is not None:
+            return None
+        fut: Future = Future()
+        self.q.put((a12, b12, int(dec), int(search48), fut))
+        return fut.result()
+
+    def close(self) -> None:
+        self.q.put(None)
+        self.thread.join()
+        if self.engine is not None:
+            try:
+                for st in self.engine.stats:
+                    self.ctx.metrics.record_batch(st)
+            except Exception:                          # noqa: BLE001
+                pass
+            try:
+                self.engine.close()
+            except Exception:                          # noqa: BLE001
+                pass
+            self.engine = None
+
+
 @dataclass
 class GpuRunContext:
     mode: str
@@ -30,6 +105,9 @@ class GpuRunContext:
     _session: AlignGpuSession | None = None
     _session_tried: bool = False
     _residual_engine: Any = None
+    _residual_dispatcher: _ResidualDispatcher | None = None
+    _residual_dispatcher_lock: threading.Lock = field(
+        default_factory=threading.Lock)
     coarse: dict[tuple, np.ndarray] = field(default_factory=dict)
     engines: list[Any] = field(default_factory=list)
     closed: bool = False
@@ -62,6 +140,18 @@ class GpuRunContext:
         self.metrics.record_engine(created=True)
         self.engines.append(eng)
         return eng
+
+    def residual_peak(self, a12: np.ndarray, b12: np.ndarray, *,
+                      dec: int, search48: int) -> float | None:
+        """Run one residual coarse seed through the run-level dispatcher."""
+        disp = self._residual_dispatcher
+        if disp is None:
+            with self._residual_dispatcher_lock:
+                disp = self._residual_dispatcher
+                if disp is None:
+                    disp = _ResidualDispatcher(self)
+                    self._residual_dispatcher = disp
+        return disp.peak(a12, b12, dec=dec, search48=search48)
 
     # -- coarse cache --------------------------------------------------
     @staticmethod
@@ -102,6 +192,13 @@ class GpuRunContext:
         if self.closed:
             return
         self.closed = True
+        disp = self._residual_dispatcher
+        if disp is not None:
+            try:
+                disp.close()
+            except Exception:                              # noqa: BLE001
+                pass
+            self._residual_dispatcher = None
         for eng in reversed(self.engines):
             try:
                 eng.close()

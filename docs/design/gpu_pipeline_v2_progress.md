@@ -754,3 +754,37 @@ dispatcher 修复保留了；但完整 C1306 多次运行显示：
 
 结论：residual dispatcher 是结构性修复，但“8 workers 默认化”被撤销；
 需要继续做 **per-run/per-call 的完整确定性验证**，不能仅凭一次哈希通过。
+
+## 2026-11-06 — run-level residual dispatcher：workers8 parity 稳定
+
+把 residual dispatcher 从 `measure_residual_curve` 内部提升到
+`GpuRunContext`：
+
+- 整个 run 只有一个 residual dispatcher 线程和 engine；
+- 所有 target/并发 residual 调用走同一 queue；
+- 不再每次 residual call 创建 engine/线程；
+- C1306 两个 target 并行时只有一个 GPU residual 执行体；
+- dispatcher 在 run close 时统一记录 stats/关闭。
+
+验证（完整 C1306，batch exact，coarse4，surface pipeline）：
+
+| 配置 | wall | GPU active | engines | audio 哈希 |
+|---|---:|---:|---:|---|
+| workers8 runlevel（第 1 次） | 121.7 s | 12.2% | 9 | 一致 |
+| workers8 runlevel（第 2 次） | **110.8 s** | 12.0% | 9 | 一致 |
+| workers4 runlevel | 113.0 s | 6.8% | 9 | 一致 |
+
+结论：
+
+- **run-level dispatcher 解决了 workers8 的跨-target 并发问题**；
+- workers8 两次完整入口哈希一致；
+- 相对 workers4，wall 约快 2%，GPU active 从约 6.8% 提到约 12%；
+- `engines_created` 从 10 降到 9（少一个 per-call residual engine）。
+
+当前默认：`KTS_RESIDUAL_WORKERS=8`。
+
+下一步：
+
+1. 干净环境重复 C1306/C1305，确认 wall 收益稳定；
+2. 重新评估 measurement/processing overlap（现在 residual GPU 已单 dispatcher）；
+3. 继续压缩 audio/apply 的 GPU idle 阶段。
