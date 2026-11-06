@@ -1076,3 +1076,41 @@ measurement 与 processing 共享的某种执行状态。
 - C1305 213.2 s / C1306 107.5 s no-pipeline 哈希一致。
 
 Stage 9 验收：pipeline 根因进一步收敛；安全默认保持不变。
+
+## 2026-11-07 — Stage 10：pipeline 差异定位到 residual engine 的 cuFFT plan 状态
+
+进一步缩小到 target2：
+
+- pipeline 与 no-pipeline 的 **curve 完全一致**；
+- target3 residual/polarity 一致；
+- **target2 residual 不一致**；
+- 修掉 round2 `settled` 指向 round1 文件的 bug 后，audio_3 恢复基线，
+  但 audio_2 仍不同。
+
+这说明：
+
+- residual measurement 本身受 **先创建了哪个 window engine/plan** 影响；
+- pipeline 中 target2 的 residual engine 在 target3 window engine 之前创建，
+  plan cache 状态与 no-pipeline 不同；
+- 这不是 raw、锁、batch 或线程问题。
+
+尝试：在 `ResidualCCEngine.__init__` 也清空 cuFFT plan cache。
+
+结果：no-pipeline 的 audio_3 变成 `12bb…`（基线 `2f58…`），
+说明 **直接清 plan 会改变既有输出**，不能作为修复。
+
+结论：
+
+> 必须建立 **canonical engine/plan initialization order**：
+> 所有 window engine 的 FFT plan 必须在任何 residual engine 创建前
+> 完成固定顺序的创建/prewarm；或者把 measurement/processing 放到
+> 独立 process/context。
+
+当前代码：
+
+- 未保留 residual plan-clear；
+- 未保留 pipeline；
+- window fresh plan 默认开启（该改动单独验证过 no-pipeline 基线）；
+- 默认仍为 no-pipeline。
+
+Stage 10 验收：pipeline 的具体差异来源已定位；安全默认保持不变。
