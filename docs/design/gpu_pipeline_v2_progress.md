@@ -1035,3 +1035,44 @@ Stage 7 验收：固定预算 parity 通过；pipeline 根因进一步定位。
 - fixed GPU budget、single GPU lock、residual workers4 保持不变。
 
 Stage 8 验收：no-pipeline 确定性契约完成；pipeline 方向仍阻塞。
+
+## 2026-11-07 — Stage 9：measurement 固定主线程后 pipeline 仍然失败
+
+为了避免“测量被移到 worker 线程导致 cuFFT/上下文变化”，重新实现
+pipeline：
+
+- measurement **始终在主线程**顺序执行；
+- 每测完一个 unit，立即把它的 processing 提交给 worker；
+- 主线程继续测下一个 unit；
+- processing 使用 out-of-place apply（raw 只读）；
+- fresh FFT plan、fixed budget、single GPU lock 全部开启。
+
+完整 C1306：
+
+| 配置 | wall | audio_2 | audio_3 |
+|---|---:|---|---|
+| pipeline（主线程 measurement） | 117.2 s | **c4d8…** | **32d3…** |
+| no pipeline | 107.5–119.1 s | 基线 657b… | 基线 2f58… |
+
+注意：c4d8/32d3 与之前 worker-thread measurement 的 pipeline 结果
+**完全相同**。说明差异不是“测量线程”本身，而是 pipeline 期间
+measurement 与 processing 共享的某种执行状态。
+
+结论：
+
+- 已经排除：VRAM/batch、in-place raw、GPU 锁、cuFFT plan cache、
+  measurement 线程；
+- pipeline 在当前单进程架构下仍然不可靠；
+- 实现已撤销，不进入默认路径；
+- 下一步只能是 **独立 process/GPU context 的 execution domain**。
+
+当前默认：
+
+- fixed budget；
+- fresh FFT plan；
+- single GPU lock；
+- workers4；
+- no pipeline；
+- C1305 213.2 s / C1306 107.5 s no-pipeline 哈希一致。
+
+Stage 9 验收：pipeline 根因进一步收敛；安全默认保持不变。
