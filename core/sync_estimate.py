@@ -1553,6 +1553,54 @@ def prewarm_gpu_align(mode: str | None = None) -> bool:
                 pass
 
 
+def prewarm_window_engine(ref_src: Any, tgt_src: Any, *,
+                          sample_rate: int,
+                          coarse_rate: int = 12000,
+                          storage_dtype: str = "f32") -> bool:
+    """Create/warm a real window engine for a future target.
+
+    Pipeline measurement needs the exact cuFFT plan-cache state that the
+    no-pipeline path has after all window engines exist.  Prewarming the
+    future target's engine before any residual engine is created reproduces
+    that state; the target's coarse cache is retained in the run context, so
+    the later measurement does not rebuild it.
+    """
+    sess = None
+    owns = False
+    try:
+        from .gpu_align.window_cc import WindowCCEngine
+        from .gpu_align import runtime as _gpu_runtime
+
+        ctx = _gpu_runtime.current_run()
+        if ctx is None:
+            return False
+        sess = ctx.session()
+        if sess is None:
+            return False
+        ref12 = coarse_decimate(
+            ref_src, sample_rate=sample_rate, coarse_rate=coarse_rate,
+            storage_dtype=storage_dtype)
+        tgt12 = coarse_decimate(
+            tgt_src, sample_rate=sample_rate, coarse_rate=coarse_rate,
+            storage_dtype=storage_dtype)
+        eng = WindowCCEngine(
+            sess.backend, ref12, tgt12, policy=sess.policy)
+        try:
+            eng.warmup()
+        finally:
+            try:
+                eng.close()
+            except Exception:                          # noqa: BLE001
+                pass
+        try:
+            ctx.metrics.record_engine(created=True)
+        except Exception:                              # noqa: BLE001
+            pass
+        return True
+    except Exception:                                  # noqa: BLE001
+        return False
+
+
 def measure_window_delays(
     ref_src: Any,
     tgt_src: Any,

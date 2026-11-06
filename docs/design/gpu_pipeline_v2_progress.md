@@ -1114,3 +1114,46 @@ Stage 9 验收：pipeline 根因进一步收敛；安全默认保持不变。
 - 默认仍为 no-pipeline。
 
 Stage 10 验收：pipeline 的具体差异来源已定位；安全默认保持不变。
+
+## 2026-11-07 — Stage 11：canonical window plan prewarm 使 pipeline 通过 parity
+
+### 根因修复
+
+pipeline 中 target2 residual engine 在 target3 window engine 之前创建，
+cuFFT plan cache 顺序不同。Stage 10 已定位；直接清 residual plan 会改变
+no-pipeline 既有输出，不能采用。
+
+改为：
+
+- 在第一个 unit 测量完成后、任何 processing/residual engine 创建前；
+- 对后续所有 target 调用 `sync_estimate.prewarm_window_engine()`；
+- 用真实 coarse 数据创建并 warmup 未来 window engine 的 FFT plan；
+- 之后才提交 unit processing；
+- measurement 仍在主线程，processing 在 worker。
+
+### 结果
+
+完整 C1306（fixed budget + fresh plan + single GPU lock + raw out-of-place）：
+
+| 运行 | wall | audio 哈希 |
+|---|---:|---|
+| pipeline + prewarm 第 1 次 | 119.8 s | 全部基线 |
+| pipeline + prewarm 第 2 次 | 127.2 s | 全部基线 |
+| no pipeline | 107.5–119.1 s | 全部基线 |
+
+结论：
+
+- **canonical window plan prewarm 修复了 pipeline 的 parity**；
+- C1306 连续两次全部哈希一致；
+- 但 pipeline 目前 **没有 wall 收益**（119.8/127.2 vs 107.5），
+  额外成本来自 prewarm 和 out-of-place apply；
+- 因此 pipeline **保持 opt-in**，默认关闭。
+
+### 当前状态
+
+- `KTS_GPU_UNIT_PIPELINE=1` 可启用；
+- 默认 0；
+- prewarm helper 只在 pipeline 模式使用；
+- C1305 pipeline 尚未做完整复测。
+
+Unit：1053 PASS / 2 既有语料环境 FAIL。

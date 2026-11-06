@@ -1289,6 +1289,7 @@ def align_time_varying(
     _anchor_coarse = None
     measured: dict[int, Any] = {}
     measured_err: dict[int, str] = {}
+    _pipeline_units = False
     if units:
         if _default_measure:
             _anchor_coarse = sync_estimate.coarse_decimate(
@@ -1329,7 +1330,16 @@ def align_time_varying(
         # FP64 benefits from the existing parallel-unit path.  Only
         # serialize fp32; fp64 keeps the proven parallel topology.
         _serialize_units = bool(_gpu_align and _gpu_mode == "fp32")
-        if (len(units) > 1 and _default_measure and not _serialize_units
+        # Measurement stays on the main thread; processing is submitted to a
+        # worker as soon as its own measurement completes.  Out-of-place apply
+        # keeps decoded raw immutable for the next target's measurement.
+        _pipeline_units = bool(
+            _gpu_align and len(units) > 1
+            and os.environ.get("KTS_GPU_UNIT_PIPELINE", "0").strip().lower()
+            not in ("", "0", "off", "false", "no"))
+        if _pipeline_units:
+            pass
+        elif (len(units) > 1 and _default_measure and not _serialize_units
                 and bool(prof.get("measure_parallel_units", True))):
             with ThreadPoolExecutor(max_workers=min(4, len(units))) as ex:
                 futs = {ex.submit(_measure_unit, m): int(m[0]) for m in units}
@@ -1344,7 +1354,8 @@ def align_time_varying(
                     measured[int(m[0])] = _measure_unit(m)
                 except Exception as exc:               # noqa: BLE001
                     measured_err[int(m[0])] = f"{type(exc).__name__}: {exc}"
-        _anchor_coarse = None
+        if not _pipeline_units:
+            _anchor_coarse = None
 
     results: dict[str, Any] = {}
     final_raw: dict[int, Path] = {}
@@ -1407,7 +1418,8 @@ def align_time_varying(
         for m in members:
             dst = tgt_dir / f"round1_{m}.{storages[m]}"
             stats: dict[str, Any]
-            if apply_engine == "reference" and storages[m] == "f32":
+            if (apply_engine == "reference" and storages[m] == "f32"
+                    and not _pipeline_units):
                 # 磁盘写入最小化: round-1 直接改写 decoded[m] 本身（f32 时
                 # 输出与输入同尺寸；参考插值的每个 chunk 只依赖自己的输入，
                 # 可安全原地写回）。失败会留下半改写文件 -> 该 target 失败，
@@ -1472,7 +1484,8 @@ def align_time_varying(
                     for m in members:
                         dst = tgt_dir / f"round2_{m}.{storages[m]}"
                         stats2: dict[str, Any]
-                        if apply_engine == "reference" and storages[m] == "f32":
+                        if (apply_engine == "reference" and storages[m] == "f32"
+                    and not _pipeline_units):
                             # 同文件 round-2（磁盘写入最小化）。若 round-1 也是
                             # 原地改写 decoded，失败后 decoded 不再是原始音频，
                             # 不能用内置执行器"总曲线"回退（会二次施加），
@@ -1515,6 +1528,7 @@ def align_time_varying(
                             settled[m] = (
                                 applied[m] if storages[m] == "f32"
                                 and apply_engine == "reference"
+                                and not _pipeline_units
                                 else dst)
                     if len(settled) == len(members):
                         applied = settled
@@ -1576,7 +1590,42 @@ def align_time_varying(
 
     # 各 unit 的下游流水线互相独立 → 并行；合并顺序固定为 units 顺序，
     # 因此 results / flipped / 报告字段与串行实现一致（timings 值不同）。
-    if len(units) > 1 and bool(prof.get("pipeline_parallel_units", True)):
+    if _pipeline_units:
+        unit_outs = []
+        with ThreadPoolExecutor(max_workers=min(4, len(units))) as ex:
+            futs: dict[int, Any] = {}
+            for _idx, m in enumerate(units):
+                repp = int(m[0])
+                try:
+                    measured[repp] = _measure_unit(m)
+                except Exception as exc:               # noqa: BLE001
+                    measured_err[repp] = f"{type(exc).__name__}: {exc}"
+                    continue
+                if _idx == 0 and _default_measure:
+                    # Canonical cuFFT plan state: create future targets'
+                    # window-engine plans before the first residual engine.
+                    for _future in units[1:]:
+                        try:
+                            sync_estimate.prewarm_window_engine(
+                                decoded[anchor], decoded[int(_future[0])],
+                                sample_rate=sample_rate,
+                                coarse_rate=int(prof["track_coarse_rate"]),
+                                storage_dtype=storage_common)
+                        except Exception:              # noqa: BLE001
+                            pass
+                futs[repp] = ex.submit(_process_unit, m)
+            _anchor_coarse = None
+            for m in units:
+                repp = int(m[0])
+                if repp in measured_err:
+                    unit_outs.append({
+                        "rep": repp, "result": None, "fixed": {},
+                        "flipped": [], "elapsed": 0.0,
+                        "error": measured_err[repp],
+                    })
+                else:
+                    unit_outs.append(futs[repp].result())
+    elif len(units) > 1 and bool(prof.get("pipeline_parallel_units", True)):
         with ThreadPoolExecutor(max_workers=min(4, len(units))) as ex:
             unit_outs = list(ex.map(_process_unit, units))
     else:
