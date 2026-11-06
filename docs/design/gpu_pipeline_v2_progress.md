@@ -896,3 +896,34 @@ Stage 3 验收：
 - parity：通过（已观察范围内）；
 - 性能：锁有开销，暂不追求 workers8；
 - 默认：workers4 不变。
+
+## 2026-11-06 — Stage 4：unit measurement/processing overlap 在 parity 上失败
+
+在单 GPU 锁之后重新实现 unit pipeline：
+
+- 测量 unit0 后立刻提交 unit0 处理；
+- 同时测量 unit1；
+- measurement 用 `_measure_lock` 串行；
+- GPU 侧由 backend RLock 串行。
+
+完整 C1306 结果：
+
+| 配置 | wall | audio_2 |
+|---|---:|---|
+| pipeline + lock | 114.5 s | **e9c4…（baseline 657b…）** |
+| 无 pipeline + lock | 113.3–115.9 s | 基线 |
+
+结论：
+
+- 即使 GPU 调用已全局加锁，**compute/apply overlap 仍然改变 audio_2**；
+- 说明问题不只 GPU 调用并发，而是 pipeline 期间 **CPU 状态下对 raw 的读写/调度** 也参与了结果差异；
+- 当前架构不能安全地做 measurement/processing overlap；
+- 实现已撤销，未进入默认路径。
+
+Stage 4 判定：**失败，需要先解决 raw/apply 的并发所有权，而不是继续加锁。**
+
+当前状态仍为：
+
+- Stage1/2/3：parity 修复和重复验证完成；
+- Stage4：不采用；
+- Stage5：固定基准/收尾。
