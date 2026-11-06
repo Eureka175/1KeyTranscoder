@@ -149,10 +149,15 @@ class GpuBackend:
         override = getattr(self, "_budget_override", None)
         if override:
             mb = int(override)
-        free = _free_mem_bytes(self.cp)
-        if free <= 0:
-            return mb * 1024 * 1024
-        return max(64 * 1024 * 1024, min(mb * 1024 * 1024, free * 3 // 5))
+        # Deliberately do NOT derive the batch budget from transient free VRAM.
+        # Batch size changes the floating-point reduction order; a pipeline
+        # stage that happens to hold a few hundred MiB must not change window
+        # curve output.  Use a fixed budget for the whole run (total memory is
+        # stable; env/override remain explicit operator choices).
+        total_mb = int(self.total_mem // (1024 * 1024)) if self.total_mem else 0
+        if total_mb > 0:
+            mb = min(int(mb), max(64, total_mb // 2))
+        return max(64 * 1024 * 1024, int(mb) * 1024 * 1024)
 
     def check_budget(self, need_bytes: int) -> None:
         budget = self.budget_bytes()

@@ -966,3 +966,39 @@ Stage 4 判定：**失败，需要先解决 raw/apply 的并发所有权，而�
   - measurement domain 只读 raw，拥有自己的 GPU service；
   - processing domain 使用自己的输出快照/GPU service；
   - 两者通过不可变输入和明确队列通信。
+
+## 2026-11-07 — Stage 7：固定 GPU 预算，排除“空闲显存改变 batch”假设
+
+改动：
+
+- `GpuBackend.budget_bytes()` 不再使用瞬时 free VRAM；
+- 改为固定预算：`KTS_GPU_ALIGN_BUDGET_MB` / override / 默认 2048 MiB，
+  并以总显存一半为上限；
+- 同一 run 的 batch size 不再因其他阶段占用显存而变化。
+
+验证：
+
+| 场景 | 哈希 | wall |
+|---|---|---|
+| C1306 no pipeline | 基线 | 119.1 s |
+| C1305 no pipeline | 基线 | 210.7 s |
+| C1306 pipeline + raw 隔离 | **c4d8 / 32d3（不同）** | 117.2 s |
+
+结论：
+
+- 固定预算本身是安全的，C1306/C1305 基线一致；
+- **pipeline 的差异不是 batch size/free VRAM 导致**；
+- 即使固定预算 + raw 只读 + GPU 锁，pipeline 仍稳定产生不同的
+  audio_2/audio_3；
+- 这已经证明 pipeline 需要 **独立的 GPU context/plan cache 和独立执行域**，
+  不是单进程内加锁能解决的。
+
+当前安全默认：
+
+- fixed GPU budget (2048 MiB default, half-total cap)；
+- single GPU lock；
+- residual workers 4；
+- unit pipeline off；
+- C1305/C1306 基线一致。
+
+Stage 7 验收：固定预算 parity 通过；pipeline 根因进一步定位。
