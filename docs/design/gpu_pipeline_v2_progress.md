@@ -788,3 +788,23 @@ dispatcher 修复保留了；但完整 C1306 多次运行显示：
 1. 干净环境重复 C1306/C1305，确认 wall 收益稳定；
 2. 重新评估 measurement/processing overlap（现在 residual GPU 已单 dispatcher）；
 3. 继续压缩 audio/apply 的 GPU idle 阶段。
+
+### 2026-11-06 修正：C1305 workers8 仍不通过，默认回到 4
+
+run-level dispatcher 在 C1306 workers8 两次哈希一致；但 C1305 完整入口：
+
+| 配置 | wall | audio_2 哈希 |
+|---|---:|---|
+| old exact batch（dispatcher 前） | 212.3 s | `d722…` 基线 |
+| run-level workers4 | 215.2 s | `d722…` **一致** |
+| run-level workers8 | 229.9 s | `da90…` **变化** |
+
+因此：
+
+- run-level dispatcher 保留（结构更干净，单 engine/单 queue）；
+- **residual workers 默认重新设为 4**；
+- workers8 只能作为实验开关，不能默认；
+- C1305 parity 是硬门。
+
+下一步必须先定位 C1305 在 8 workers 下 residual 曲线变化的根源
+（窗口级 GPU/CPU 竞态或 stats 口径），再考虑并发提速。

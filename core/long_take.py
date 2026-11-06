@@ -925,9 +925,9 @@ def measure_residual_curve(
     # GPU coarse seed goes through one dispatcher thread (see above), so the
     # CPU side may use more than 4 workers without sharing a CuPy engine.
     try:
-        _rw = int(os.environ.get("KTS_RESIDUAL_WORKERS", "8") or 8)
+        _rw = int(os.environ.get("KTS_RESIDUAL_WORKERS", "4") or 4)
     except ValueError:
-        _rw = 8
+        _rw = 4
     workers = min(max(1, _rw), max(1, (os.cpu_count() or 4)))
     if len(starts) > 1 and workers > 1:
         with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -1616,6 +1616,7 @@ def align_time_varying(
         "max_shift": max_shift,
         "timings": timings,
     }
+
 
 
 
