@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import functools
 import math
+import os
 import time
 from typing import Any, Iterable
 
@@ -49,6 +50,16 @@ class WindowCCEngine:
         self.cp = backend.cp
         self.policy = policy or resolve_policy()
         self.budget_bytes = int(budget_bytes or backend.budget_bytes())
+        # cuFFT plan selection can depend on the plan-cache state left by other
+        # engines (e.g. a residual FFT created before this window engine).
+        # For a strict deterministic contract, optionally start every window
+        # engine from an empty plan cache.
+        if os.environ.get("KTS_GPU_FFT_PLAN_FRESH", "1").strip().lower() \
+                not in ("", "0", "off", "false", "no"):
+            try:
+                self.cp.fft.config.get_plan_cache().clear()
+            except Exception:                          # noqa: BLE001
+                pass
         storage = (self.cp.float32 if self.policy.precision is Precision.FP32
                    else self.cp.float64)
         self._storage_is_fp32 = self.policy.precision is Precision.FP32
@@ -315,3 +326,4 @@ class WindowCCEngine:
             self.cp.get_default_memory_pool().free_all_blocks()
         except Exception:                                  # noqa: BLE001
             pass
+

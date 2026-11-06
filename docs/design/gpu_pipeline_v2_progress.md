@@ -1002,3 +1002,36 @@ Stage 4 判定：**失败，需要先解决 raw/apply 的并发所有权，而�
 - C1305/C1306 基线一致。
 
 Stage 7 验收：固定预算 parity 通过；pipeline 根因进一步定位。
+
+## 2026-11-07 — Stage 8：FFT plan 缓存约定；pipeline 仍不可靠
+
+改动：
+
+- `WindowCCEngine` 在 `KTS_GPU_FFT_PLAN_FRESH=1`（现默认 1）时清空
+  cuFFT plan cache 再建窗引擎；
+- 目的是让 window FFT 的 plan 选择不依赖之前 residual/refine 留下的缓存。
+
+验证：
+
+| 场景 | 哈希 | wall |
+|---|---|---|
+| C1306 no pipeline + fresh plan | 基线 | 107.5 s |
+| C1305 no pipeline + fresh plan | 基线 | 213.2 s |
+| C1306 pipeline + fresh plan 第一次 | 基线 | 110.4 s |
+| C1306 pipeline + fresh plan 第二次 | 基线 | 114.7 s |
+| C1306 pipeline + fresh plan 第三次 | **2023… / 32d3…（不同）** | 116.4 s |
+
+结论：
+
+- fresh FFT plan 对 **no-pipeline** 安全，且没有明显 wall 代价；
+- 但 pipeline 仍然不可靠：两次通过后第三次失败；
+- 不能把 pipeline 作为默认，也不能作为稳定 opt-in 承诺；
+- 单进程内 measurement/processing overlap 仍未满足 parity 契约。
+
+当前代码：
+
+- fresh FFT plan 默认开启；
+- unit pipeline 代码不保留（默认关闭且无半成品）；
+- fixed GPU budget、single GPU lock、residual workers4 保持不变。
+
+Stage 8 验收：no-pipeline 确定性契约完成；pipeline 方向仍阻塞。
