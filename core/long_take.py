@@ -1418,8 +1418,7 @@ def align_time_varying(
         for m in members:
             dst = tgt_dir / f"round1_{m}.{storages[m]}"
             stats: dict[str, Any]
-            if (apply_engine == "reference" and storages[m] == "f32"
-                    and not _pipeline_units):
+            if (apply_engine == "reference" and storages[m] == "f32"):
                 # 磁盘写入最小化: round-1 直接改写 decoded[m] 本身（f32 时
                 # 输出与输入同尺寸；参考插值的每个 chunk 只依赖自己的输入，
                 # 可安全原地写回）。失败会留下半改写文件 -> 该 target 失败，
@@ -1484,8 +1483,7 @@ def align_time_varying(
                     for m in members:
                         dst = tgt_dir / f"round2_{m}.{storages[m]}"
                         stats2: dict[str, Any]
-                        if (apply_engine == "reference" and storages[m] == "f32"
-                    and not _pipeline_units):
+                        if (apply_engine == "reference" and storages[m] == "f32"):
                             # 同文件 round-2（磁盘写入最小化）。若 round-1 也是
                             # 原地改写 decoded，失败后 decoded 不再是原始音频，
                             # 不能用内置执行器"总曲线"回退（会二次施加），
@@ -1528,7 +1526,6 @@ def align_time_varying(
                             settled[m] = (
                                 applied[m] if storages[m] == "f32"
                                 and apply_engine == "reference"
-                                and not _pipeline_units
                                 else dst)
                     if len(settled) == len(members):
                         applied = settled

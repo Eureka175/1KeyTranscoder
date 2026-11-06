@@ -1157,3 +1157,49 @@ no-pipeline 既有输出，不能采用。
 - C1305 pipeline 尚未做完整复测。
 
 Unit：1053 PASS / 2 既有语料环境 FAIL。
+
+## 2026-11-07 — Stage 12：pipeline 在 C1305/C1306 上 parity 通过，固定基准完成
+
+最终 pipeline：
+
+- measurement 主线程；
+- unit processing worker，重叠进行；
+- 首个 unit 测量后 prewarm 未来 target 的 window engine；
+- processing 允许 in-place apply（raw/unit 互不重叠）；
+- fixed budget + fresh plan + single GPU lock。
+
+固定基准（完整入口，batch exact）：
+
+| 素材 | 模式 | wall | audio 哈希 |
+|---|---|---:|---|
+| C1306 | no pipeline | 107.5 s | 基线 |
+| C1306 | pipeline | 113.2 s | 基线 |
+| C1306 | pipeline（out-of-place，历史） | 119.8 / 127.2 s | 基线 |
+| C1305 | no pipeline | 213.2 s | 基线 |
+| C1305 | pipeline | 228.4 s | 基线 |
+
+结论：
+
+- pipeline 在 C1306（2 次）和 C1305（1 次）上 **全部哈希一致**；
+- canonical window plan prewarm 是修复 pipeline parity 的关键；
+- pipeline 仍然比 no-pipeline 慢（prewarm/重叠调度成本）；
+- 因此默认保持 **no pipeline**，pipeline 作为 parity-safe 的可选路径。
+
+默认：
+
+```text
+KTS_GPU_UNIT_PIPELINE = 0
+fixed GPU budget      = on
+fresh FFT plan        = on
+single GPU lock       = on
+residual workers      = 4
+```
+
+Unit：1053 PASS / 2 既有语料环境 FAIL。
+
+目标验收：
+
+- 可重复 parity 基准：完成；
+- 单一 GPU 执行服务/确定性契约：完成；
+- measurement/processing overlap：完成（opt-in，parity-safe）；
+- C1305/C1306 固定基准哈希/wall：完成。

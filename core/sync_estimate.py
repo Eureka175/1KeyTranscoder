@@ -1577,12 +1577,20 @@ def prewarm_window_engine(ref_src: Any, tgt_src: Any, *,
         sess = ctx.session()
         if sess is None:
             return False
-        ref12 = coarse_decimate(
-            ref_src, sample_rate=sample_rate, coarse_rate=coarse_rate,
-            storage_dtype=storage_dtype)
-        tgt12 = coarse_decimate(
-            tgt_src, sample_rate=sample_rate, coarse_rate=coarse_rate,
-            storage_dtype=storage_dtype)
+        ref12 = ctx.coarse_get_or_build(
+            ctx.coarse_key(ref_src, sample_rate=sample_rate,
+                           coarse_rate=coarse_rate,
+                           storage_dtype=storage_dtype),
+            lambda: coarse_decimate(
+                ref_src, sample_rate=sample_rate, coarse_rate=coarse_rate,
+                storage_dtype=storage_dtype))
+        tgt12 = ctx.coarse_get_or_build(
+            ctx.coarse_key(tgt_src, sample_rate=sample_rate,
+                           coarse_rate=coarse_rate,
+                           storage_dtype=storage_dtype),
+            lambda: coarse_decimate(
+                tgt_src, sample_rate=sample_rate, coarse_rate=coarse_rate,
+                storage_dtype=storage_dtype))
         eng = WindowCCEngine(
             sess.backend, ref12, tgt12, policy=sess.policy)
         try:
