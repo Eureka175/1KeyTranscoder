@@ -85,6 +85,10 @@ GPU kernel 只占 wall 的很小部分；window+residual 合计：
 - C1306：约 45–49 s；
 - C1305：约 41–45 s。
 
+补充实测：long-take 单个 target 的 window measurement 只有 **约 3 s**
+（C1306 CH3 3.14 s / CH4 2.94 s）；`window_measure` 阶段的大头是
+channel-sync 的锚点/候选对估计，而不是 long-take 内逐 target 测量。
+
 剩余 60–150 s 在解码、音频 apply、曲线/调度、I/O 等 CPU 阶段。
 
 ### 3.2 pipeline 的收益依赖素材
