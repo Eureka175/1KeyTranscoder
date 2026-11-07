@@ -8,7 +8,7 @@
 > metadata preservation, a structured PCM audio pipeline, channel-delay repair, and an
 > archive-repair mode that can verify and fix already-produced deliverables.
 
-[![Version](https://img.shields.io/badge/version-0.9.0-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.4-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -16,6 +16,7 @@
 ## Contents
 
 - [Overview](#overview)
+- [What's new in 0.9.4](#whats-new-in-094-pre-release)
 - [What's new in 0.9.0](#whats-new-in-090-pre-release)
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -62,6 +63,25 @@ On top of that the project ships:
 
 Target use case: a single workstation turning multi-hour Sony / DJI shoots into archive
 copies that keep the motion and lens metadata tools such as Gyroflow and NLEs need.
+
+## What's new in 0.9.4 (pre-release)
+
+0.9.4 makes GPU audio alignment the default-capable path while keeping CPU fallback,
+and adds source-relative NVENC rate control.
+
+- **GPU alignment default**: fp32 CUDA when available, automatic CPU fallback;
+  deterministic fixed budget / fresh cuFFT plans / GPU lock / run-level residual
+  dispatcher.
+- **Faster unit processing**: unit pipeline and chunk-level parallel audio apply are
+  enabled by default; C1306 measured **98.20–99.69 s**, C1305 **178.76–183.83 s**
+  on the acceptance takes, with final-audio hashes unchanged.
+- **NVENC follows x265 VBV**: per-file `max_bitrate` / `vbv_bufsize` from the
+  `x265_scaling.json` dynamic table. QSV stays static; VCE still has no entry.
+- **Hardware scaling**: feasibility study only (bilinear proposed), no implementation.
+- **Tests**: unit 1058 PASS / 2 environment FAIL; toolchain 1079 PASS / 2 environment
+  FAIL; full L3 1295 PASS / 11 environment FAIL.
+
+See [v0.9.4 release notes](docs/release_notes_v0.9.4.md).
 
 ## What's new in 0.9.0 (pre-release)
 
@@ -465,6 +485,8 @@ Local-only, untracked directories: `tools/` (shared toolchain), `testsets/` (tes
   final report, patches, provenance.
 - [x265 profile design](docs/x265-profile-design.md) — why the four profiles exist and how
   they were calibrated.
+- [v0.9.4 release notes](docs/release_notes_v0.9.4.md) — GPU alignment default,
+  NVENC dynamic VBV, hardware-scaling feasibility.
 - [v0.9.0 release notes](docs/release_notes_v0.9.0.md) — audio/metadata
   performance (CUDA opt-in), bit-identical outputs.
 - [v0.8.11 release notes](docs/release_notes_v0.8.11.md) — default long-take audio
@@ -476,13 +498,13 @@ Local-only, untracked directories: `tools/` (shared toolchain), `testsets/` (tes
 
 ## Release
 
-Current source version: **0.9.0** (`VERSION`, tag `v0.9.0`, published as a
+Current source version: **0.9.4** (`VERSION`, tag `v0.9.4`, intended as a
 GitHub **pre-release**).
 
 - Self-contained packages are produced by `release/build_release.py`; see
   [Installation](#installation).
-- The v0.9.0 pre-release package is attached to
-  <https://github.com/Eureka175/1KeyTranscoder/releases/tag/v0.9.0>.
+- The v0.9.4 pre-release package is built as
+  `dist/1KeyTranscoder-v0.9.4-win64-selfcontained.zip`.
 - `VERSION`, the git tag and the builder must agree: the builder refuses
   mismatches unless a development build is explicitly requested.
 
