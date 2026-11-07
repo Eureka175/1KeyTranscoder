@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-[![Version](https://img.shields.io/badge/version-0.9.7-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.8-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#运行要求)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -51,8 +51,7 @@ python 1kt.py --input D:\footage --output D:\archive --encoder qsv --preset uhq
 - `--resize WxH`：精确输出分辨率（偶数尺寸），不修正源长宽比。
 - `--scale FACTOR`：按长边倍率缩放并保持源长宽比（`0.5`、`0.25`、`2` 等）；
   输出尺寸取偶数。
-- `--resize-algo`：`bilinear`、`bicubic`、`spline16`、`spline36`、`spline64`、
-  `lanczos3`、`lanczos4`；默认 **spline36**。
+- `--resize-algo`：`bilinear`、`bicubic`、`lanczos`；默认 **lanczos**。
 - `--resize` 与 `--scale` 互斥。都不指定时输出分辨率不变。
 - NVENC：`--vpp-resize` + `--output-res`。
 - QSV：同上，另加 `--vpp-resize-mode quality`。
@@ -98,7 +97,7 @@ python tests\full_autotest.py --level full
 
 ## 文档
 
-- [v0.9.7 发布说明](docs/release_notes_v0.9.7.md)
+- [v0.9.8 发布说明](docs/release_notes_v0.9.8.md)
 - [硬件缩放验证](docs/design/hardware_scaling_validation.md)
 - [硬件缩放可行性](docs/design/hardware_scaling_feasibility.md)
 - [音频计划指南](docs/audio_plan.md)
@@ -108,5 +107,6 @@ python tests\full_autotest.py --level full
 ## 许可
 
 LGPL-3.0-or-later。见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。
+
 
 

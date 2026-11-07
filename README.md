@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-[![Version](https://img.shields.io/badge/version-0.9.7-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.8-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -53,8 +53,7 @@ Presets: `uhq`, `hq`, `small`, `fast`.
   the source aspect ratio.
 - `--scale FACTOR`: multiplies the long edge and preserves the source aspect ratio
   (`0.5`, `0.25`, `2`, ...); output dimensions are rounded to even values.
-- `--resize-algo`: `bilinear`, `bicubic`, `spline16`, `spline36`, `spline64`,
-  `lanczos3`, `lanczos4`; default **spline36**.
+- `--resize-algo`: `bilinear`, `bicubic`, `lanczos`; default **lanczos**.
 - `--resize` and `--scale` are mutually exclusive. Without either option the output
   resolution is unchanged.
 - NVENC: `--vpp-resize` with `--output-res`.
@@ -105,7 +104,7 @@ environment-only checks report FAIL.
 
 ## Documentation
 
-- [Release notes v0.9.7](docs/release_notes_v0.9.7.md)
+- [Release notes v0.9.8](docs/release_notes_v0.9.8.md)
 - [Hardware scaling validation](docs/design/hardware_scaling_validation.md)
 - [Hardware scaling feasibility](docs/design/hardware_scaling_feasibility.md)
 - [Audio plan guide](docs/audio_plan.md)
@@ -115,5 +114,6 @@ environment-only checks report FAIL.
 ## License
 
 LGPL-3.0-or-later. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
 
 

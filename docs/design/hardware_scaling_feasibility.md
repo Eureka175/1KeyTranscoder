@@ -1,9 +1,9 @@
 # 硬件加速缩放可行性研究
 
 > 状态：**研究 + 已进入产品实现（2026-11-07）**  
-> 产品 CLI：`--resize WxH`（精确尺寸，不修正长宽比）、`--scale FACTOR`（长边倍率，保持长宽比）、`--resize-algo`（默认 `spline36`）。  
+> 产品 CLI：`--resize WxH`（精确尺寸，不修正长宽比）、`--scale FACTOR`（长边倍率，保持长宽比）、`--resize-algo`（默认 `lanczos`，仅 bilinear/bicubic/lanczos）。  
 > VCE：**不做入口**。  
-> 默认算法由早期的 bilinear 提案改为实测更稳的 **spline36**；算法对比见
+> 产品算法收窄为 bilinear/bicubic/lanczos，默认 **lanczos**；算法对比见
 > [`hardware_scaling_validation.md`](hardware_scaling_validation.md)。
 
 ## 1. 目标
@@ -194,7 +194,7 @@ Sony/DJI 保留管线要在缩放后继续保留：
 本轮不实现任何缩放代码。
 
 > 更新（2026-11-07）：上述“本轮不实现”指研究阶段。产品实现随后已落地：
-> `--resize WxH` + `--scale FACTOR` + `--resize-algo`（默认 spline36），NVENC/QSV/x265/SVT-AV1；
+> `--resize WxH` + `--scale FACTOR` + `--resize-algo`（默认 lanczos），NVENC/QSV/x265/SVT-AV1；
 > 详见 §8 与 [`hardware_scaling_validation.md`](hardware_scaling_validation.md)。
 
 ## 8. 实测验证结果（2026-11-07）
@@ -223,7 +223,7 @@ Sony/DJI 保留管线要在缩放后继续保留：
 
 - CLI：
   - `--resize WxH`（精确分辨率，不修正长宽比）与 `--scale FACTOR`（长边倍率，保持长宽比），显式 opt-in；
-  - `--resize-algo`，默认 **spline36**；
+  - `--resize-algo`，默认 **lanczos**（仅 bilinear/bicubic/lanczos）；
 - 后端命令：
   - NVENC：`--vpp-resize algo=<algo> --output-res WxH`；
   - QSV：额外 `--vpp-resize-mode quality`；

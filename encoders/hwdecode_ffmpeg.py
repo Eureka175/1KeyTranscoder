@@ -256,25 +256,17 @@ _SCALE_FILTER = {"cuda": "scale_cuda", "qsv": "vpp_qsv"}
 _SOFTWARE_SCALE_FLAGS = {
     "bilinear": "bilinear",
     "bicubic": "bicubic",
-    "spline16": "spline",
-    "spline36": "spline",
-    "spline64": "spline",
-    "lanczos3": "lanczos",
-    "lanczos4": "lanczos",
+    "lanczos": "lanczos",
 }
 _CUDA_INTERP = {
     "bilinear": "bilinear",
     "bicubic": "bicubic",
-    "spline16": "lanczos",
-    "spline36": "lanczos",
-    "spline64": "lanczos",
-    "lanczos3": "lanczos",
-    "lanczos4": "lanczos",
+    "lanczos": "lanczos",
 }
 
 
 def _software_scale_filter(spec: ResizeSpec) -> str:
-    flag = _SOFTWARE_SCALE_FLAGS.get(spec.algo, "spline")
+    flag = _SOFTWARE_SCALE_FLAGS.get(spec.algo, "lanczos")
     return f"scale=w={spec.width}:h={spec.height}:flags={flag}"
 
 

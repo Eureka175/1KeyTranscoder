@@ -3,8 +3,8 @@
 > 日期：2026-11-07  
 > 范围：NVENC HEVC / QSV HEVC，`--vpp-resize` + `--output-res`  
 > 结论：**NVENC 硬件缩放可用；QSV 的 bilinear 画质明显偏低，但
-> bicubic/spline36/lanczos3 可恢复；产品默认采用 spline36。**  
-> 状态：验证完成 + 产品已实现 `--resize` / `--scale` / `--resize-algo`（默认 spline36）。
+> bicubic/spline36/lanczos3 可恢复；产品默认采用 lanczos，算法仅保留 bilinear/bicubic/lanczos。**  
+> 状态：验证完成 + 产品已实现 `--resize` / `--scale` / `--resize-algo`（默认 lanczos）。
 
 ## 1. 验证环境
 
@@ -131,11 +131,11 @@
 
 1. **产品已实现 NVENC + QSV 硬件缩放**：
    - 显式 `--resize WxH`（精确，不修正长宽比）或 `--scale FACTOR`（长边倍率，保持长宽比）；
-   - 默认 `--resize-algo spline36`；
+   - 默认 `--resize-algo lanczos`；
    - `--output-res WxH`；QSV 额外 `--vpp-resize-mode quality`；
    - 不默认缩放，保持当前无缩放行为。
 2. **bilinear 不作为默认**：即使 NVENC 也明显偏软；QSV bilinear 不可用。
-3. **质量优先可选 lanczos3**；spline36 为默认稳定保底。
+3. **默认 lanczos**；仅保留 bilinear/bicubic/lanczos 三种算法。
 4. **VCE 保持无入口**；
 5. 做 HDR/10-bit/4:2:2 和 `--avhw` 路径的后续验证；
 6. 处理缩放后的 `tkhd`、Sony/DJI 元数据、时间线和动态 VBV 归一化

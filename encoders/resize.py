@@ -6,12 +6,12 @@ Product policy:
 
 * ``--resize WxH``   exact output resolution (no aspect-ratio correction);
 * ``--scale FACTOR`` long-edge multiplier, preserving aspect ratio;
-* ``--resize-algo``  kernel, default spline36 for NVENC and QSV;
+* ``--resize-algo``  kernel: bilinear / bicubic / lanczos, default lanczos;
 * no option -> no scaling, so the default transcode path is unchanged.
 
 Tool syntax verified on NVEncC 9.31 / QSVEncC 8.26:
 
-    --vpp-resize algo=spline36
+    --vpp-resize algo=lanczos
     --output-res 1920x1080
 
 QSV additionally uses ``--vpp-resize-mode quality``.  ``width=`` /
@@ -26,13 +26,9 @@ from typing import Union
 RESIZE_ALGOS = (
     "bilinear",
     "bicubic",
-    "spline16",
-    "spline36",
-    "spline64",
-    "lanczos3",
-    "lanczos4",
+    "lanczos",
 )
-DEFAULT_RESIZE_ALGO = "spline36"
+DEFAULT_RESIZE_ALGO = "lanczos"
 MAX_DIMENSION = 16384
 
 
@@ -151,3 +147,4 @@ def resize_args(kind: str, spec: ResizeSpec) -> list[str]:
         # quality path so --resize-algo behaves consistently.
         args += ["--vpp-resize-mode", "quality"]
     return args
+

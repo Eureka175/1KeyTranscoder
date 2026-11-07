@@ -1250,8 +1250,8 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_RESIZE_ALGO,
         choices=list(RESIZE_ALGOS),
         help=(
-            "硬件缩放算法 (默认 spline36). 仅在给出 --resize 或 --scale 时生效; "
-            "bilinear/bicubic/spline16/spline36/spline64/lanczos3/lanczos4。"
+            "缩放算法 (默认 lanczos). 仅在给出 --resize 或 --scale 时生效; "
+            "bilinear/bicubic/lanczos。"
         ),
     )
     parser.add_argument("--tool-nvencc", default=None,
@@ -3068,11 +3068,12 @@ def main() -> int:
                             file_logger=file_logger, dry_run=args.dry_run,
                             decode_plan=decode_plan,
                             resize=file_resize,
-                            # 元数据策略 = 不保留 (--no-metadata / DJI 非
-                            # Action 默认) 时, 普通转码命令只保留主视频+
-                            # 音频+字幕: 相机 data 轨与 attached_pic 无法
-                            # 忠实穿过 FFmpeg MOV 中间容器。
-                            drop_metadata_streams=no_metadata,
+                            # AV1 的 FFmpeg 中间容器是 MP4；MP4 muxer 不接受
+                            # Sony 的 codec=none/stts data 轨（Could not find
+                            # tag for codec none），因此 AV1 classic 路径必须
+                            # 丢弃 data/attached 流，否则整文件写入失败。
+                            drop_metadata_streams=(
+                                no_metadata or codec == "av1"),
                         )
                     if result == "failed":
                         record_failure(

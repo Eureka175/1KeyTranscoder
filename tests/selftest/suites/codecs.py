@@ -235,12 +235,13 @@ def l1_av1() -> None:
 
 
 def l1_hardware_resize() -> None:
-    """Hardware resize: spline36 default, explicit --output-res syntax."""
+    """Hardware resize: lanczos default, explicit --output-res syntax."""
     section("L1 hardware resize")
     from encoders.nvencc import NvencBackend
     from encoders.qsvencc import QsvBackend
     from encoders.resize import (
         DEFAULT_RESIZE_ALGO,
+        RESIZE_ALGOS,
         ResizeSpec,
         ScaleFactor,
         parse_resize_size,
@@ -249,8 +250,11 @@ def l1_hardware_resize() -> None:
         resize_args,
     )
 
-    record("resize.default algo is spline36",
-           DEFAULT_RESIZE_ALGO == "spline36", DEFAULT_RESIZE_ALGO)
+    record("resize.default algo is lanczos",
+           DEFAULT_RESIZE_ALGO == "lanczos", DEFAULT_RESIZE_ALGO)
+    record("resize.algo choices narrowed",
+           tuple(RESIZE_ALGOS) == ("bilinear", "bicubic", "lanczos"),
+           "bilinear/bicubic/lanczos")
     record("resize.parse WxH",
            parse_resize_size("1920x1080") == (1920, 1080))
     record("resize.scale factor 0.5 -> 1080p",
@@ -288,7 +292,7 @@ def l1_hardware_resize() -> None:
     record("resize.nvenc tool advertises resize", nv.supports_resize)
     record("resize.qsv tool advertises resize", qs.supports_resize)
 
-    spec = ResizeSpec(1920, 1080, "spline36")
+    spec = ResizeSpec(1920, 1080, "lanczos")
     ncmd, _, _ = nv.command(
         ROOT / "in.mp4", ROOT / "out.mov", {}, "4:2:0", 10,
         resize=spec)
@@ -298,11 +302,11 @@ def l1_hardware_resize() -> None:
     njoined = " ".join(str(x) for x in ncmd)
     qjoined = " ".join(str(x) for x in qcmd)
     record("resize.nvenc command args",
-           "--vpp-resize algo=spline36" in njoined
+           "--vpp-resize algo=lanczos" in njoined
            and "--output-res 1920x1080" in njoined
            and "--vpp-resize-mode" not in njoined)
     record("resize.qsv command args",
-           "--vpp-resize algo=spline36" in qjoined
+           "--vpp-resize algo=lanczos" in qjoined
            and "--output-res 1920x1080" in qjoined
            and "--vpp-resize-mode quality" in qjoined)
     plain, _, _ = nv.command(
@@ -346,7 +350,7 @@ def l1_hardware_resize() -> None:
            _cmd_with_filter(qsv_plan, spec))
     sw_plan = plan_software("test", codec="hevc", chroma="4:2:0", depth=10)
     record("resize.x265 software fallback filter",
-           "scale=w=1920:h=1080:flags=spline"
+           "scale=w=1920:h=1080:flags=lanczos"
            in _cmd_with_filter(sw_plan, spec),
            _cmd_with_filter(sw_plan, spec))
 
@@ -358,3 +362,4 @@ def _resize_kind_supported(kind: str) -> bool:
         return True
     except ValueError:
         return False
+
