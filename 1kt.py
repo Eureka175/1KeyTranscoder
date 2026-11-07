@@ -3068,12 +3068,14 @@ def main() -> int:
                             file_logger=file_logger, dry_run=args.dry_run,
                             decode_plan=decode_plan,
                             resize=file_resize,
-                            # AV1 的 FFmpeg 中间容器是 MP4；MP4 muxer 不接受
-                            # Sony 的 codec=none/stts data 轨（Could not find
-                            # tag for codec none），因此 AV1 classic 路径必须
-                            # 丢弃 data/attached 流，否则整文件写入失败。
-                            drop_metadata_streams=(
-                                no_metadata or codec == "av1"),
+                            # Classic software paths share one stream policy
+                            # regardless of codec: video + audio + subtitles.
+                            # FFmpeg's MP4 muxer cannot write a codec=none/stts
+                            # data track (AV1 intermediate is MP4), so keeping
+                            # it would make AV1 fail while x265 succeeds.  The
+                            # dedicated Sony/DJI preservation paths are the only
+                            # metadata carriers.
+                            drop_metadata_streams=True,
                         )
                     if result == "failed":
                         record_failure(

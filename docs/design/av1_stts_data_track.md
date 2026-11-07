@@ -37,10 +37,17 @@ metadata from the preservation bundle, so they are not affected by this path.
 
 ## Fix
 
-Classic AV1 now always drops data and attached-picture streams
-(`drop_metadata_streams=True`), while keeping the primary video, audio and
-subtitle streams. Verified on the affected 4K source: AV1 output succeeds with
-and without scaling.
+Classic software paths now share one stream policy regardless of codec:
+primary video + audio + subtitles. Data and attached-picture streams are
+dropped for both x265 and SVT-AV1 (`drop_metadata_streams=True`).
 
-This is the same policy already used for `--no-metadata`; AV1 classic output
-cannot preserve the data track through its MP4 intermediate.
+x265 previously kept this external-URL data track because its intermediate is
+MOV; AV1 cannot, because FFmpeg only supports AV1 in MP4 and the MP4 muxer
+cannot represent the track. Keeping codec-specific stream mapping made the two
+classic paths behave differently, so both now drop the same streams.
+
+Sony/DJI preservation paths are unaffected: they use a video-only intermediate
+and re-attach metadata from the preservation bundle.
+
+Verified on the affected 4K source: x265 and AV1 outputs now both contain
+video + audio only, with the same dimensions and frame count.

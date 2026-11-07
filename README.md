@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-[![Version](https://img.shields.io/badge/version-0.9.8-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.9-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -104,7 +104,7 @@ environment-only checks report FAIL.
 
 ## Documentation
 
-- [Release notes v0.9.8](docs/release_notes_v0.9.8.md)
+- [Release notes v0.9.9](docs/release_notes_v0.9.9.md)
 - [Hardware scaling validation](docs/design/hardware_scaling_validation.md)
 - [Hardware scaling feasibility](docs/design/hardware_scaling_feasibility.md)
 - [Audio plan guide](docs/audio_plan.md)
@@ -114,6 +114,7 @@ environment-only checks report FAIL.
 ## License
 
 LGPL-3.0-or-later. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
 
 
 

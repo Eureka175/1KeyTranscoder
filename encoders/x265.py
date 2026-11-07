@@ -180,11 +180,10 @@ def build_command(
         "-pix_fmt", ffmpeg_pix_fmt(src_info),
     ]
     if drop_metadata_streams:
-        # 元数据策略 = 不保留 (--no-metadata / DJI 非 Action 的默认策略):
-        # 只保留主视频 + 音频 + 字幕。相机 data 轨 (rtmd/djmd/dbgi/tmcd)
-        # 与 attached_pic (封面缩略图) 都属于"元数据"类载荷; 且 FFmpeg 的
-        # MOV 中间容器无法忠实承载它们 —— 实测 DJI: data 轨会被写成假的
-        # stts 轨, attached_pic 与 hwdownload 滤镜冲突直接 -22 失败。
+        # Classic software stream policy: primary video + audio + subtitles.
+        # Camera data tracks and attached pictures belong to the Sony/DJI
+        # preservation paths; keeping them here would make the x265 and AV1
+        # classic paths disagree on stream inventory.
         cmd += [
             "-map", "0:v:0",
             "-map", "0:a?",

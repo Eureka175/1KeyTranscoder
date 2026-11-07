@@ -128,8 +128,10 @@ def build_command(
         "-pix_fmt", av1_pix_fmt(src_info),
     ]
     if drop_metadata_streams:
-        # 元数据策略 = 不保留: 主视频 + 音频 + 字幕 (见 x265.build_command
-        # 同名参数的注释; DJI data 轨与 attached_pic 无法穿过 MOV 中间容器)。
+        # Classic software stream policy: primary video + audio + subtitles.
+        # AV1's intermediate is MP4, which cannot write codec=none/stts data
+        # tracks; x265 classic uses the same mapping so codec changes do not
+        # change the output stream inventory.
         cmd += [
             "-map", "0:v:0",
             "-map", "0:a?",
