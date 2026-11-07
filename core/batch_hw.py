@@ -2782,6 +2782,19 @@ def process_file_hw(
     # idempotent); abort() only matters for early failures.
     if audio_task is not None:
         audio_task.abort()
+    if result == "done":
+        # Sony/DJI paths already called this inside their encode function;
+        # the classic hardware path did not, which left channel-sync scratch
+        # directories behind after every successful file. Calling it here is
+        # idempotent and covers every hardware branch.
+        cleanup_work_dir(
+            work_dir=ctx.work_root / job_id_for(src),
+            job_id=job_id_for(src),
+            preserve_reports=ctx.preserve_reports,
+            keep_work=ctx.keep_work,
+            logger=logger,
+            file_logger=file_logger,
+        )
     if result == "failed" and ctx.failed_path is not None:
         record_failure(
             ctx.failed_path,

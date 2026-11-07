@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-[![Version](https://img.shields.io/badge/version-0.9.9-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.10-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#运行要求)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -97,7 +97,7 @@ python tests\full_autotest.py --level full
 
 ## 文档
 
-- [v0.9.9 发布说明](docs/release_notes_v0.9.9.md)
+- [v0.9.10 发布说明](docs/release_notes_v0.9.10.md)
 - [硬件缩放验证](docs/design/hardware_scaling_validation.md)
 - [硬件缩放可行性](docs/design/hardware_scaling_feasibility.md)
 - [音频计划指南](docs/audio_plan.md)
@@ -107,6 +107,7 @@ python tests\full_autotest.py --level full
 ## 许可
 
 LGPL-3.0-or-later。见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。
+
 
 
 
