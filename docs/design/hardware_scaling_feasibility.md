@@ -35,15 +35,19 @@ CPU 缩放和额外的显存/内存往返。
 - `NVEncC_9.31_x64/NVEncC64.exe`
 - `QSVEncC_8.26_x64/QSVEncC64.exe`
 
-两者都提供 `--vpp-resize`，参数里都有：
+两者都提供 `--vpp-resize` 选择插值算法（例如 `algo=bilinear`），
+输出目标尺寸由 `--output-res <W>x<H>` 指定：
 
 ```text
-width=<int>     target native width
-height=<int>    target native height
-algo=<string>   auto, bilinear, bicubic, ... lanczos*, ...
+--vpp-resize algo=bilinear
+--output-res 1920x1080
 ```
 
-NVENC 还提供 `--vpp-resize-mode auto|lowpower|quality`（QSV）。
+> 注意：`width=`/`height=` 不是 `--vpp-resize` 的参数（本轮实机验证已纠正）；
+> 它们属于其他 VPP 选项。必须使用 `--output-res` 指定目标尺寸。
+
+QSV 另提供 `--vpp-resize-mode auto|lowpower|quality`；本轮矩阵使用
+`quality`。NVENC 没有 `--vpp-resize-mode`。
 
 因此：
 
@@ -83,7 +87,8 @@ FFmpeg 侧另有：
 在 `NvencBackend.command()` 的参数追加：
 
 ```text
---vpp-resize algo=bilinear,width=<W>,height=<H>
+--vpp-resize algo=bilinear
+--output-res <W>x<H>
 ```
 
 需要验证：
@@ -97,8 +102,9 @@ FFmpeg 侧另有：
 ### 4.3 QSV
 
 ```text
---vpp-resize algo=bilinear,width=<W>,height=<H>
+--vpp-resize algo=bilinear
 --vpp-resize-mode quality   （或 lowpower，需要实测）
+--output-res <W>x<H>
 ```
 
 QSV 的 `--vpp-resize-mode` 会影响质量/功耗，需要单独标定。
@@ -183,3 +189,21 @@ Sony/DJI 保留管线要在缩放后继续保留：
 5. 缩放与动态 VBV 的码率归一化单独设计。
 
 本轮不实现任何缩放代码。
+
+## 8. 实测验证结果（2026-11-07）
+
+验证矩阵与长测已完成，详见
+[`hardware_scaling_validation.md`](hardware_scaling_validation.md)。
+
+关键结论：
+
+- **NVENC**：24 次矩阵全部通过；4K30/4K60、8/10-bit、4:2:2 到 4:2:0
+  均正常；缩放后 VMAF 94.9–99.2，可进入产品实现；
+- **QSV**：功能通过，但 bilinear 缩放后 VMAF 明显下降
+  （1440p 85.8–89.7 / 1080p 84.8–89.3 / 720p 74.6–84.4），
+  `--vpp-resize-mode quality` 未改善；**暂不建议接入**；
+- 长测 8.9 分钟 4K60→1080p：NVENC 516.4 s、QSV 601.4 s，均完成，
+  帧数 32,002、时长 533.9 s、解码 PASS；QSV 10 秒样本 VMAF 78.30，
+  NVENC 94.37；
+- QSV 输出可能出现 VFR 时间戳，产品集成前必须处理时间线/容器语义；
+- 本轮未覆盖 HDR；只验证 bilinear。
