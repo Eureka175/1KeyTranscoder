@@ -31,6 +31,7 @@ REQUIRED_ENTRIES = (
     "1kt.py",
     "VERSION",
     "README.md",
+    "README.zh-CN.md",
     "LICENSE",
     "NOTICE",
     "licenses/GPL-3.0.txt",

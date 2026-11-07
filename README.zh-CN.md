@@ -1,0 +1,113 @@
+# 1KeyTranscoder
+
+[English](README.md) | **简体中文**
+
+[![Version](https://img.shields.io/badge/version-0.9.6-blue)](VERSION)
+[![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#运行要求)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+
+Windows 相机素材批量转码器。保留 Sony / DJI 元数据，修复多声道音频时差，
+支持硬件缩放，并可检查和修复已有成品。
+
+## 运行要求
+
+- Windows 10/11 x64。
+- Python 3.11+。
+- `numpy` / `scipy` 用于声道同步和音频分析。
+- NVIDIA NVENC、Intel QSV，或软件 x265 / SVT-AV1。
+- 自包含包已包含 FFmpeg、NVEncC、QSVEncC 和 GPAC。
+
+## 快速开始
+
+```powershell
+python 1kt.py --input D:\footage --output D:\archive --preset hq
+python 1kt.py --input D:\footage --output D:\archive --encoder nvenc
+python 1kt.py --input D:\footage --output D:\archive --encoder qsv --preset uhq
+```
+
+不指定 `--encoder` 时，按 **NVENC -> QSV -> x265** 顺序自动选择。
+硬件后端不会回退到软件编码。
+
+## 输入与后端
+
+| 输入 | 处理 |
+|---|---|
+| Sony XAVC（`rtmd`） | 保留 `rtmd`、`nrtm` 和厂商 `uuid` box |
+| DJI Action（`djmd`/`dbgi`/`tmcd`） | 保留运动与时间元数据 |
+| DJI Pocket / 无人机 | 默认不保留元数据；使用 `--preserve-metadata` |
+| 其它相机文件 | 标准转码 |
+
+| 后端 | 编码 |
+|---|---|
+| `nvenc`, `nvenc-av1` | NVEncC 的 HEVC / AV1 |
+| `qsv`, `qsv-av1` | QSVEncC 的 HEVC / AV1 |
+| `x265`, `svtav1` | 软件 HEVC / AV1 |
+
+预设：`uhq`、`hq`、`small`、`fast`。
+
+## 硬件缩放
+
+缩放为显式 opt-in，使用编码器的 GPU VPP 路径。
+
+```powershell
+# 默认算法：spline36
+python 1kt.py --input D:\footage --output D:\archive `
+    --encoder nvenc --scale 1920x1080
+
+# 指定算法
+python 1kt.py --input D:\footage --output D:\archive `
+    --encoder qsv --scale 2560x1440 --resize-algo lanczos4
+```
+
+- `--scale WxH`（别名 `--resize WxH`）：目标尺寸，宽高必须为偶数。
+- `--resize-algo`：`bilinear`、`bicubic`、`spline16`、`spline36`、`spline64`、
+  `lanczos3`、`lanczos4`；默认 **spline36**。
+- NVENC：`--vpp-resize algo=... --output-res WxH`。
+- QSV：同上，另加 `--vpp-resize-mode quality`。
+- 仅 NVENC/QSV 支持；Sony、DJI 保留管线均可使用。
+- 软件后端、`--repair`、`--channel-sync-transparent` 会拒绝 `--scale`。
+- 不指定 `--scale` 时输出分辨率不变。
+
+## 音频
+
+- 3–8 个独立 PCM 声道默认自动对齐（48/96 kHz）。
+- 长镜头在延迟非恒定时使用时变对齐。
+- `--audio-plan JSON` 选择、映射、排序、对齐和编码音频。
+- 压缩音频、PCM 与压缩音频混合的文件需要显式计划。
+
+## 检查与修复
+
+```powershell
+python 1kt.py ... --check basic
+python 1kt.py ... --check advanced
+python 1kt.py ... --check full
+python 1kt.py --input D:\deliverables --output D:\fixed --repair
+```
+
+`basic` 检查核心元数据和流信息；`advanced` 增加完整结构检查与 Gyroflow 校验；
+`full` 增加详细自检和 PSNR/SSIM 抽样。
+
+批处理支持断点续跑。失败文件写入 `logs/failed_files.json`，可用
+`--retry-list` 重试。
+
+## 测试
+
+```powershell
+python tests\full_autotest.py --level unit
+python tests\full_autotest.py --level toolchain
+python tests\full_autotest.py --level full
+```
+
+## 文档
+
+- [v0.9.6 发布说明](docs/release_notes_v0.9.6.md)
+- [硬件缩放验证](docs/design/hardware_scaling_validation.md)
+- [硬件缩放可行性](docs/design/hardware_scaling_feasibility.md)
+- [音频计划指南](docs/audio_plan.md)
+- [x265 档位设计](docs/x265-profile-design.md)
+- [硬件解码](docs/hardware-decode/README.md)
+
+## 许可
+
+LGPL-3.0-or-later。见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。

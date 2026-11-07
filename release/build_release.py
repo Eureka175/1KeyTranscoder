@@ -61,6 +61,7 @@ TOP_FILES = (
     "watchfolder.py",
     "start.bat",
     "README.md",
+    "README.zh-CN.md",
     "LICENSE",
     "NOTICE",
     "licenses/GPL-3.0.txt",
