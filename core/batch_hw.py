@@ -79,6 +79,7 @@ from encoders.qsvencc import QsvBackend
 
 from .config import find_hw_tool
 from .dashboard import DashboardStatus
+from .hw_vbv import apply_nvenc_dynamic_profile
 from .logging_utils import (
     PRE_CSV_FIELDS,
     STREAM_CSV_FIELDS,
@@ -2276,6 +2277,9 @@ class BatchCtx:
     #: binary that runs ``--avhw`` is the backend's deployed tool, so no tool
     #: path or provenance marker is carried here any more.
     check_level: str = "basic"
+    #: NVENC only: x265_scaling.json used for source-relative maxrate/VBV.
+    #: QSV stays on its static table; VCE has no entry point.
+    hw_scaling_path: Path | None = None
     ffmpeg: Path | None = None
     quality_opts: dict[str, Any] | None = None
     channel_sync: bool = False
@@ -2538,6 +2542,29 @@ def process_file_hw(
         else "no Sony marker -> native hardware decode attempted",
     )
 
+    # NVENC follows the x265 source-relative VBV contract: max_bitrate and
+    # vbv_bufsize are derived from OB + efficiency class.  QSV is deliberately
+    # left on its static table; VCE has no entry point.
+    hw_profile = ctx.profile
+    if backend.name.startswith("nvenc") and ctx.hw_scaling_path is not None:
+        hw_profile, vbv_audit = apply_nvenc_dynamic_profile(
+            ctx.profile, ctx.preset, src_info, ctx.hw_scaling_path)
+        if vbv_audit is not None:
+            file_logger.info(
+                "NVENC_VBV | class=%s | OB=%.1f kbps | "
+                "max_bitrate=%d kbps | vbv_bufsize=%d kbps | factor=%.2f",
+                vbv_audit["source_class"], vbv_audit["ob_kbps"],
+                vbv_audit["final_maxrate_kbps"],
+                vbv_audit["final_bufsize_kbps"],
+                vbv_audit["bufsize_factor"],
+            )
+            logger.info(
+                "[NVENC-VBV] %s | class=%s | max_bitrate=%d | vbv=%d",
+                src.name, vbv_audit["source_class"],
+                vbv_audit["final_maxrate_kbps"],
+                vbv_audit["final_bufsize_kbps"],
+            )
+
     # 注册了接手方 (显式音频计划) 时, Sony / DJI 保留路径**明确拒绝该文件**:
     # 那两条管线有自己的音频处理方式, 让它们照常跑就等于"计划被静默忽略"。
     # 失败原因直接给出, 不降级、不回退 (与软件路径 rc=2 的拒绝同义)。
@@ -2598,7 +2625,7 @@ def process_file_hw(
             source_summary=source_summary,
             src_info=src_info,
             vfr=vfr,
-            profile=ctx.profile,
+            profile=hw_profile,
             preset=ctx.preset,
             backend=backend,
             ffprobe=ctx.ffprobe,
@@ -2635,7 +2662,7 @@ def process_file_hw(
             source_summary=source_summary,
             src_info=src_info,
             vfr=vfr,
-            profile=ctx.profile,
+            profile=hw_profile,
             preset=ctx.preset,
             backend=backend,
             ffprobe=ctx.ffprobe,
@@ -2672,7 +2699,7 @@ def process_file_hw(
             source_summary=source_summary,
             src_info=src_info,
             vfr=vfr,
-            profile=ctx.profile,
+            profile=hw_profile,
             preset=ctx.preset,
             backend=backend,
             ffprobe=ctx.ffprobe,

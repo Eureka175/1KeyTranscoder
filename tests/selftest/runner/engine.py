@@ -74,6 +74,7 @@ def build_registry() -> dict[str, list[tuple[str, SuiteFn]]]:
             ("归档修复检查器/一键状态机",
              archive_repair.l1_archive_repair_checker),
             ("x265 P0", codecs.l1_x265),
+            ("NVENC dynamic VBV", codecs.l1_nvenc_dynamic_vbv),
             ("quality/versions", core.l1_quality),
             ("workdir lifecycle", workdir.l1_workdir),
             ("native decode routing", native_decode.l1_native_decode),

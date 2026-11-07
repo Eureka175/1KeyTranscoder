@@ -181,6 +181,15 @@ class ScalingEngine:
             "final_bufsize_kbps": bufsize_kbps,
         }
 
+    def dynamic_vbv(
+        self,
+        preset: str,
+        src: SourceInfo,
+        source_class: str,
+    ) -> dict[str, Any] | None:
+        """Public wrapper for hardware backends that reuse x265 VBV rules."""
+        return self._dynamic_vbv(preset, src, source_class)
+
     def build(
         self,
         profile: dict[str, Any],

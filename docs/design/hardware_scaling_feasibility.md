@@ -1,0 +1,185 @@
+# 硬件加速缩放可行性研究
+
+> 状态：**仅可行性研究，不实现。**  
+> 默认算法（未来若实现）：**bilinear**。  
+> VCE：**不做入口**。
+
+## 1. 目标
+
+评估在“保持现有转码语义”的前提下，能否把输出分辨率缩放放到硬件路径中，减少
+CPU 缩放和额外的显存/内存往返。
+
+本轮不添加 CLI、不改编码命令、不改配置。本文只记录证据、约束、集成点和测试计划。
+
+## 2. 当前架构的现状
+
+1. **源分辨率是隐式输出尺寸**
+   - 目前没有 `--scale` / `--output-size`，输出宽高等于源宽高；
+   - `SourceInfo.width/height` 只用于分类、缩放参数和日志，不用于改分辨率。
+
+2. **两条编码路径**
+   - x265 / SVT-AV1：FFmpeg 软解码/软编码；如要缩放，FFmpeg 的 `scale` 是软件
+     filter，不属于“硬件加速缩放”；
+   - NVENC / QSV：rigaya 的 `NVEncC64` / `QSVEncC64` 直接读取源文件，内部
+     `--vpp-resize` 是硬件 VPP 路径，不经过本项目写像素。
+
+3. **硬件路径没有输出尺寸参数**
+   - `encoders/nvencc.py` / `encoders/qsvencc.py` 的 `command()` 只接收源、
+     输出、profile、色度、位深等；
+   - `core/batch_hw.py` 的格式规划只处理 4:2:2 / 10-bit 的降级，不处理尺寸。
+
+## 3. 工具能力证据（本机实测帮助）
+
+本机工具版本：
+
+- `NVEncC_9.31_x64/NVEncC64.exe`
+- `QSVEncC_8.26_x64/QSVEncC64.exe`
+
+两者都提供 `--vpp-resize`，参数里都有：
+
+```text
+width=<int>     target native width
+height=<int>    target native height
+algo=<string>   auto, bilinear, bicubic, ... lanczos*, ...
+```
+
+NVENC 还提供 `--vpp-resize-mode auto|lowpower|quality`（QSV）。
+
+因此：
+
+- **NVENC 可以做单进程内硬件缩放 + 硬件编码，无需 CPU 回读；**
+- **QSV 同样可以做 VPP 缩放 + 编码；**
+- VCE 无入口，不在本次范围。
+
+FFmpeg 侧另有：
+
+- `scale_cuda`（CUDA 帧，`interp_algo=bilinear`）；
+- `scale_qsv` / `vpp_qsv`；
+- 但 x265/SVT-AV1 是软件编码，使用这些 filter 需要 hwupload/hwdownload，
+  只适合作为“硬件解码 + CPU 编码”的中间路径，不是当前硬件后端的主路径。
+
+## 4. 建议的集成点（未来）
+
+### 4.1 显式输入
+
+新增显式参数，不做隐式默认缩放：
+
+```text
+--scale WxH
+或
+--scale-width N --scale-height N
+```
+
+约束：
+
+- 宽高都必须是偶数（4:2:0 chroma）；
+- 不支持只给一边后猜另一边，除非显式 `--scale-fit`；
+- 默认算法 `bilinear`；
+- VCE 不识别这些参数；
+- 不与 `--no-downgrade` 冲突：尺寸缩放不是格式降级。
+
+### 4.2 NVENC
+
+在 `NvencBackend.command()` 的参数追加：
+
+```text
+--vpp-resize algo=bilinear,width=<W>,height=<H>
+```
+
+需要验证：
+
+- `--avhw` 读取路径下 VPP resize 是否保持帧完整性；
+- 4:2:2 / 10-bit 输入在 VPP 后的输出格式；
+- `--output-csp yuv422` 与 resize 的组合；
+- Sony `--avsw` 预防性软件解码路径是否仍适用；
+- VUI/颜色/HDR 元数据是否随缩放保持。
+
+### 4.3 QSV
+
+```text
+--vpp-resize algo=bilinear,width=<W>,height=<H>
+--vpp-resize-mode quality   （或 lowpower，需要实测）
+```
+
+QSV 的 `--vpp-resize-mode` 会影响质量/功耗，需要单独标定。
+
+### 4.4 软编码路径
+
+如果未来也要支持 x265/SVT-AV1 的输出缩放：
+
+- 优先使用 FFmpeg 软件 `scale`（确定性、无硬件依赖）；
+- 或 `scale_cuda` / `scale_qsv` + 显式 hwupload/hwdownload；
+- 不应把硬件缩放强行塞进当前 x265 命令生成器。
+
+## 5. 关键设计问题
+
+### 5.1 码率/VBV 与输出尺寸
+
+当前 NVENC 动态 VBV 按 **源 OB** 计算。若输出缩小：
+
+- 直接沿用源 OB 的 maxrate 会偏高，可能浪费码率；
+- 需要决定是否按输出像素率重新归一化，例如：
+
+```text
+target_ob = source_ob * (out_px / src_px)
+```
+
+- 但这会改变“NVENC 跟随 x265”的现有语义；
+- 建议作为缩放实现的独立决策，不混入本次 NVENC 动态 VBV 改动。
+
+### 5.2 帧完整性
+
+硬件缩放不能绕过现有的 `encoders.integrity.verify_encode`：
+
+- 缩放后的帧率、帧数、时长必须与源一致；
+- Sony 路径的 `rtmd` 时间线仍需保持；
+- 任何 `--avhw` 结果仍受帧完整性门控制。
+
+### 5.3 元数据
+
+Sony/DJI 保留管线要在缩放后继续保留：
+
+- `nrtm` / `djmd` / `dbgi` / `tmcd`；
+- `tkhd` 宽高、`elst`、`stts`；
+- 色彩原数据（primaries/transfer/matrix/range）。
+
+缩放会改变 `tkhd` 尺寸，必须由容器重建阶段正确处理，不能只改视频 ES。
+
+### 5.4 性能
+
+预期：
+
+- NVENC/QSV 的 VPP resize 在 GPU 内完成，比“解码到 CPU → 软件缩放 →
+  上传编码”便宜；
+- 但硬件 VPP 仍占 GPU 时间，可能降低编码吞吐；
+- 需要实测 4K→1080p、4K→1440p、8K→4K 等组合；
+- 需要测 `--jobs` 并发下的显存/GPU 占用。
+
+## 6. 风险
+
+1. 4:2:2 / 10-bit 输入在 VPP resize 后可能不被编码器接受；
+2. 硬件 reader（`--avhw`）与 VPP 的组合可能触发已知的 Sony 时间线丢帧问题；
+3. 非整数比例缩放会产生不同的色度采样/相位，需要与软件 `scale` 做画质对比；
+4. HDR/HLG/PQ 元数据可能不会被 VPP 自动继承；
+5. QSV `--vpp-resize-mode` 的 lowpower/quality 行为需要实机标定；
+6. 输出尺寸变化会影响容器 `tkhd`、Sony/DJI 元数据重建、检查器；
+7. 缩放后码率/VBV 若仍按源 OB，会偏离目标质量。
+
+## 7. 结论
+
+**技术上可行**：
+
+- NVENC：单进程内 `--vpp-resize` + 硬件编码，改造成本最低；
+- QSV：同样支持，需额外处理 `--vpp-resize-mode`；
+- 默认算法可固定为 **bilinear**；
+- 不建议走 FFmpeg `scale_cuda` 作为主路径。
+
+**建议的落地顺序**（未来）：
+
+1. 只做 NVENC `--scale`，固定 bilinear；
+2. 加完整性/元数据/画质回归；
+3. 再评估 QSV；
+4. VCE 保持无入口；
+5. 缩放与动态 VBV 的码率归一化单独设计。
+
+本轮不实现任何缩放代码。

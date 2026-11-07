@@ -2948,6 +2948,12 @@ def main() -> int:
             continue
 
         # hardware backend(s)
+        try:
+            hw_scaling_path = resolve_config_file(
+                script_dir, getattr(args, "scaling_config", None),
+                "x265_scaling.json")
+        except Exception:                              # noqa: BLE001
+            hw_scaling_path = None
         ctx = BatchCtx(
             preset=preset,
             profile=profile,
@@ -2977,6 +2983,7 @@ def main() -> int:
             hw_decode="auto",
             hw_decode_memo=decode_memo,
             check_level=args.check,
+            hw_scaling_path=hw_scaling_path,
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,
             channel_sync=channel_sync_enabled,

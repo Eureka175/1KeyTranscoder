@@ -55,6 +55,73 @@ def l1_x265() -> None:
            f"audit={_vbv_mode}")
 
 
+def l1_nvenc_dynamic_vbv() -> None:
+    """NVENC maxrate/VBV follow the x265 source-relative table.
+
+    QSV is intentionally excluded (its JSON must stay static) and VCE has
+    no entry point; this test only guards the NVENC mapping.
+    """
+    section("L1 NVENC dynamic maxrate/VBV")
+    import json
+    from core.config import load_scaling_config
+    from core.hw_vbv import apply_nvenc_dynamic_profile
+    from core.models import SourceInfo
+
+    src = SourceInfo(
+        path=Path("x.mp4"), size_bytes=1, duration_sec=1.0,
+        width=3840, height=2160, fps=59.94,
+        r_frame_rate="60000/1001", avg_frame_rate="60000/1001",
+        codec="hevc", profile="Main 10", pix_fmt="yuv420p10le",
+        bit_depth=10, chroma="4:2:0", ob_kbps=150000.0,
+        video_bitrate_kbps=150000.0, video_stream_count=1,
+        stream_info=(),
+    )
+    nvenc = json.loads((ROOT / "nvenc.json").read_text(encoding="utf-8"))
+    path = ROOT / "x265_scaling.json"
+    load_scaling_config(path)  # validate the shared table first
+
+    uhq, audit = apply_nvenc_dynamic_profile(
+        nvenc["profile"]["UHQ"], "UHQ", src, path)
+    record("nvenc.UHQ max_bitrate 跟随 x265 动态 VBV",
+           uhq["max_bitrate"] == 105000
+           and uhq["vbv_bufsize"] == 157500,
+           f"max={uhq.get('max_bitrate')} vbv={uhq.get('vbv_bufsize')}")
+    record("nvenc.UHQ 审计源分类", audit is not None
+           and audit["source_class"] == "HIGH_BITRATE_LONG_GOP",
+           f"audit={audit}")
+
+    hq, _ = apply_nvenc_dynamic_profile(
+        nvenc["profile"]["HQ"], "HQ", src, path)
+    record("nvenc.HQ max_bitrate/vbv 跟随动态表",
+           hq["max_bitrate"] == 75000 and hq["vbv_bufsize"] == 150000,
+           f"max={hq.get('max_bitrate')} vbv={hq.get('vbv_bufsize')}")
+
+    # Unknown OB -> static fallback, original profile values retained.
+    unknown = SourceInfo(**{**src.__dict__, "ob_kbps": 0.0,
+                            "video_bitrate_kbps": 0.0})
+    fallback, no_audit = apply_nvenc_dynamic_profile(
+        nvenc["profile"]["HQ"], "HQ", unknown, path)
+    record("nvenc 未知 OB 回退静态表",
+           no_audit is None
+           and fallback["max_bitrate"] == 80000
+           and fallback["vbv_bufsize"] == 240000,
+           f"max={fallback.get('max_bitrate')} "
+           f"vbv={fallback.get('vbv_bufsize')}")
+
+    qsv = json.loads((ROOT / "qsv.json").read_text(encoding="utf-8"))
+    qsv_static = {
+        "UHQ": (100000, 300000),
+        "HQ": (80000, 240000),
+        "SMALL": (40000, 120000),
+        "FAST": (60000, 240000),
+    }
+    record("qsv static maxrate/VBV 不变",
+           all((int(qsv["profile"][p]["max_bitrate"]),
+                int(qsv["profile"][p]["vbv_bufsize"])) == qsv_static[p]
+               for p in qsv_static),
+           "qsv.json must not follow dynamic VBV")
+
+
 def l1_av1() -> None:
     section("L1 AV1")
     from encoders.caps import _parse_nvenc, _parse_qsv
