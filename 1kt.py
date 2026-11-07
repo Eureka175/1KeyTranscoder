@@ -73,6 +73,12 @@ from core.workdir import gc_job_dir
 from core.version import version_string
 from encoders.svtav1 import SvtAv1Backend
 from encoders.x265 import X265Backend
+from encoders.resize import (
+    DEFAULT_RESIZE_ALGO,
+    RESIZE_ALGOS,
+    ResizeSpec,
+    parse_resize_size,
+)
 from preservation.gpac import GpacContainerBackend
 from preservation.gyroflow import find_gyroflow
 from preservation.pipeline import run_sony_pipeline
@@ -1213,6 +1219,23 @@ def parse_args() -> argparse.Namespace:
         "--scaling-config", default=None,
         help="Path to the scaling rules JSON (x265/svtav1 backends).",
     )
+    parser.add_argument(
+        "--scale", "--resize", dest="scale", default=None, metavar="WxH",
+        help=(
+            "显式硬件输出缩放到 WxH (偶数尺寸). 仅 NVENC/QSV 硬件后端; "
+            "默认不缩放. 缩放由编码器 VPP 在 GPU 内完成, 不产生 CPU 回读. "
+            "QSV 使用 --vpp-resize-mode quality。"
+        ),
+    )
+    parser.add_argument(
+        "--resize-algo",
+        default=DEFAULT_RESIZE_ALGO,
+        choices=list(RESIZE_ALGOS),
+        help=(
+            "硬件缩放算法 (默认 spline36). 仅在给出 --scale 时生效; "
+            "bilinear/bicubic/spline16/spline36/spline64/lanczos3/lanczos4。"
+        ),
+    )
     parser.add_argument("--tool-nvencc", default=None,
                         help="Explicit NVEncC64.exe path.")
     parser.add_argument("--tool-qsvencc", default=None,
@@ -2235,6 +2258,27 @@ def main() -> int:
               file=sys.stderr)
         return 2
 
+    # Hardware resize is explicit.  Parse it before any mode split so an
+    # invalid shape can never reach an encoder.
+    resize: ResizeSpec | None = None
+    if getattr(args, "scale", None):
+        try:
+            rw, rh = parse_resize_size(str(args.scale))
+        except ValueError as exc:
+            print(f"[FATAL] --scale: {exc}", file=sys.stderr)
+            return 2
+        resize = ResizeSpec(rw, rh, str(getattr(args, "resize_algo",
+                                                DEFAULT_RESIZE_ALGO)))
+        if getattr(args, "repair", False):
+            print("[FATAL] --scale is not supported in --repair mode.",
+                  file=sys.stderr)
+            return 2
+        if getattr(args, "channel_sync_transparent", False):
+            print("[FATAL] --scale is not supported with "
+                  "--channel-sync-transparent (video is stream-copied).",
+                  file=sys.stderr)
+            return 2
+
     # --repair: 归档成品修复模式 (与转码共用同一入口, 供批处理直接调用)。
     # 在解析编码器/工具链之前分流: 修复不需要编码器配置, 只需要
     # ffmpeg/ffprobe/GPAC, 由 archive_repair 自己解析。
@@ -2504,6 +2548,13 @@ def main() -> int:
             "the preservation paths)"
         )
 
+    if resize is not None and not is_hardware:
+        print(
+            "[FATAL] --scale/--resize is implemented for hardware backends "
+            "(nvenc/qsv) only; software x265/svtav1 scaling is not implemented.",
+            file=sys.stderr)
+        return 2
+
     if is_hardware:
         if args.experimental_multihw:
             print(EXPERIMENTAL_BANNER)
@@ -2525,6 +2576,17 @@ def main() -> int:
             backend_qsv = hw_backend_for("qsv", script_dir, args, work_root, logger)
         else:
             backend = hw_backend_for(encoder_name, script_dir, args, work_root, logger)
+
+        if resize is not None:
+            for _candidate in (backend, locals().get("backend_qsv")):
+                if _candidate is None:
+                    continue
+                if not getattr(_candidate, "supports_resize", False):
+                    print(
+                        f"[FATAL] --scale: {_candidate.name} build does not "
+                        f"advertise --vpp-resize/--output-res; refusing to "
+                        f"produce an unscaled file.", file=sys.stderr)
+                    return 2
 
     # 环境版本记录 (软件 + 驱动) -> 结构化 JSON/CSV, 供行为复现
     try:
@@ -2984,6 +3046,7 @@ def main() -> int:
             hw_decode_memo=decode_memo,
             check_level=args.check,
             hw_scaling_path=hw_scaling_path,
+            resize=resize,
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,
             channel_sync=channel_sync_enabled,

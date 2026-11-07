@@ -46,6 +46,7 @@ from core.color import ColorInfo
 
 from .caps import BackendCaps, CONSERVATIVE_CAPS
 from .hw import build_flag_args, color_flag_args, known_flags
+from .resize import ResizeSpec, resize_args
 
 # nvenc.json profile key -> (flag candidates, kind)
 PARAM_MAP = {
@@ -125,6 +126,7 @@ class NvencBackend:
         vfr: bool = False,
         color: ColorInfo | None = None,
         reader: str = "avsw",
+        resize: ResizeSpec | None = None,
     ) -> tuple[list[str], list[str], list[str]]:
         """Full argument list (before -o) for one encode attempt.
 
@@ -159,7 +161,17 @@ class NvencBackend:
             args += ["--output-csp", "yuv422"]
         if vfr:
             args += ["--avsync", "forcecfr"]
+        if resize is not None:
+            if not self.supports_resize:
+                raise ValueError(
+                    f"{self.name}: NVEncC build does not advertise "
+                    "--vpp-resize/--output-res; hardware scaling unsupported")
+            args += resize_args(self.kind, resize)
         return args, skipped, cnotes
+
+    @property
+    def supports_resize(self) -> bool:
+        return "vpp-resize" in self.known and "output-res" in self.known
 
     def command(
         self,
@@ -173,6 +185,7 @@ class NvencBackend:
         color: ColorInfo | None = None,
         reader: str = "avsw",
         container: str = "mov",
+        resize: ResizeSpec | None = None,
     ) -> tuple[list[str], list[str], list[str]]:
         """Full argv for one encode attempt.
 
@@ -184,7 +197,7 @@ class NvencBackend:
         instead of relying on the filename.
         """
         args, skipped, notes = self.build_args(
-            profile, chroma, depth, vfr, color, reader=reader
+            profile, chroma, depth, vfr, color, reader=reader, resize=resize
         )
         cmd = [str(self.tool), "-i", str(source), *args]
         if audio_copy:

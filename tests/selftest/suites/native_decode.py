@@ -49,13 +49,17 @@ class _FakeBackend:
         )
 
     def command(self, source, output, profile, chroma, depth, vfr=False,
-                audio_copy=False, color=None, reader="avsw", container="mov"):
+                audio_copy=False, color=None, reader="avsw", container="mov",
+                resize=None):
         cmd = [
             str(self.tool), "-i", str(source), f"--{reader}",
             "--video-track", "1", "-c", self.codec,
             "--output-depth", str(depth),
             "-f", container, "-o", str(output),
         ]
+        if resize is not None:
+            cmd += ["--vpp-resize", f"algo={resize.algo}",
+                    "--output-res", f"{resize.width}x{resize.height}"]
         return cmd, [], []
 
 

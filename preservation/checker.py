@@ -40,6 +40,7 @@ def run_checks(
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
     video_reencoded: bool = True,
+    expected_video_size: tuple[int, int] | None = None,
     log: Callable[[str], None],
 ) -> dict[str, Any]:
     """Run the level-gated post-encode checks; returns the report.
@@ -68,6 +69,7 @@ def run_checks(
         known_facts=known_facts,
         level=compare_level,
         codec=codec,
+        expected_video_size=expected_video_size,
     )
 
     if level != "basic":
@@ -129,6 +131,7 @@ def run_checks(
                 log_dir=selfcheck_dir,
                 gyroflow=gyroflow,
                 codec=codec,
+                expected_video_size=expected_video_size,
             )
             report["selfcheck"] = {
                 "overall": sc["overall"],

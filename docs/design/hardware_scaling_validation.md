@@ -1,9 +1,10 @@
 # 硬件缩放验证矩阵与长测报告
 
 > 日期：2026-11-07  
-> 范围：NVENC HEVC / QSV HEVC，`--vpp-resize algo=bilinear` + `--output-res`  
-> 结论：**NVENC 硬件缩放可用；QSV 功能可用但 bilinear 画质明显偏低，暂不建议作为默认路径。**  
-> 状态：仅验证，不包含产品 CLI 实现。
+> 范围：NVENC HEVC / QSV HEVC，`--vpp-resize` + `--output-res`  
+> 结论：**NVENC 硬件缩放可用；QSV 的 bilinear 画质明显偏低，但
+> bicubic/spline36/lanczos3 可恢复；产品默认采用 spline36。**  
+> 状态：验证完成 + 产品已实现 `--scale` / `--resize-algo`（默认 spline36）。
 
 ## 1. 验证环境
 
@@ -128,18 +129,18 @@
 
 ## 6. 建议
 
-1. **产品实现先做 NVENC**：
-   - 显式 `--scale WxH`（或等价输出尺寸参数）；
-   - **默认 `--vpp-resize algo=bicubic`**（见 §8 算法矩阵）；
-   - `--output-res WxH`；
+1. **产品已实现 NVENC + QSV 硬件缩放**：
+   - 显式 `--scale WxH` / `--resize`；
+   - 默认 `--resize-algo spline36`；
+   - `--output-res WxH`；QSV 额外 `--vpp-resize-mode quality`；
    - 不默认缩放，保持当前无缩放行为。
-2. **QSV**：bilinear 不可用；**bicubic / lanczos3 可作为候选**，
-   但当前长测仍是 bilinear，需补一次 bicubic 长测后再决定是否接入。
-3. **不要默认 bilinear**：除非常宽/低成本优先且接受明显软化。
+2. **bilinear 不作为默认**：即使 NVENC 也明显偏软；QSV bilinear 不可用。
+3. **质量优先可选 lanczos3**；spline36 为默认稳定保底。
 4. **VCE 保持无入口**；
 5. 做 HDR/10-bit/4:2:2 和 `--avhw` 路径的后续验证；
-6. 处理缩放后的 `tkhd`、Sony/DJI 元数据、时间线和动态 VBV 归一化；
-7. 本报告不改变 v0.9.4 包内容。
+6. 处理缩放后的 `tkhd`、Sony/DJI 元数据、时间线和动态 VBV 归一化
+   （产品实现已通过 Sony 37/37 与 QSV/NVENC 实测）；
+7. 本报告不改变 v0.9.4 已发布包内容；缩放代码在发布后进入 main。
 
 ## 7. 产物
 

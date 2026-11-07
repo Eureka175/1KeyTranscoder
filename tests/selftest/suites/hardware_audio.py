@@ -343,7 +343,8 @@ def l1_hardware_audio() -> None:
     # v0.8.7+ DJI metadata policy (2026-10-25): --no-metadata 是策略开关,
     # --preserve-metadata 是它的显式覆盖 (DJI Pocket/无人机默认不保留 metadata;
     # 需要保留时必须显式给出, 所以选项本身就属于策略契约的一部分)。
-    THIS_PHASE_ADDED = {"--no-metadata", "--preserve-metadata"}
+    THIS_PHASE_ADDED = {"--no-metadata", "--preserve-metadata",
+                        "--scale", "--resize", "--resize-algo"}
     # v0.8.8 (2026-10-26): 归档修复模式合入主程序。修复不再是一个只能手工
     # 跑的旁路脚本 —— 批处理只需要 `1kt.py --repair ...`。这组参数同样手写
     # 登记, 理由与上面相同: 新增参数必须显式改到这里。

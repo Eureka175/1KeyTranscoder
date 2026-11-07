@@ -146,6 +146,7 @@ def detailed_compare(
     log_dir: Path,
     gyroflow: Path | None = None,
     codec: str = "hevc",
+    expected_video_size: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     """Extensive ORIGINAL vs FINAL Sony metadata comparison.
 
@@ -281,8 +282,14 @@ def detailed_compare(
         (s for s in out_streams if s.get("codec_type") == "video"), None
     )
     if s_v and o_v:
+        expected_w, expected_h = (
+            (int(s_v.get("width")), int(s_v.get("height")))
+            if expected_video_size is None else expected_video_size
+        )
         for key in ("width", "height", "avg_frame_rate", "nb_read_packets"):
-            note(f"video.ffprobe.{key}", s_v.get(key), o_v.get(key))
+            src_value = expected_w if key == "width" else (
+                expected_h if key == "height" else s_v.get(key))
+            note(f"video.ffprobe.{key}", src_value, o_v.get(key))
         # color signalling must survive the re-encode
         for key in (
             "color_primaries", "color_transfer", "color_space",

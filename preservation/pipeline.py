@@ -95,6 +95,7 @@ def run_sony_pipeline(
     quality_csv: Path | None = None,
     audio_sources: list[Path] | None = None,
     audio_sources_getter: Callable[[], list[Path] | None] | None = None,
+    expected_video_size: tuple[int, int] | None = None,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """codec: "hevc" (XAVC 合规路径, 恢复 XAVC brand) 或 "av1"
@@ -406,6 +407,7 @@ def run_sony_pipeline(
         ffmpeg=ffmpeg,
         quality_opts=quality_opts,
         quality_csv=quality_csv,
+        expected_video_size=expected_video_size,
         log=step,
     )
 

@@ -122,6 +122,7 @@ def compare(
     known_facts: dict[str, Any] | None = None,
     level: str = "advanced",
     codec: str = "hevc",
+    expected_video_size: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     """level: 'basic' = essential core metadata only (timeline, tracks,
     rtmd payload/timing, tref, timecode — skips nrtm lens/xml details
@@ -130,7 +131,11 @@ def compare(
     codec: expected re-encoded video codec. 'hevc' keeps the XAVC
     compliance expectations (brand preserved); 'av1' expects metadata
     preservation without the XAVC brand (AV1 is not in the XAVC spec —
-    the brand difference is policy, not a preservation failure)."""
+    the brand difference is policy, not a preservation failure).
+
+    expected_video_size: explicit hardware-resize target.  Resolved
+    output dimensions are compared against this instead of the source
+    dimensions; None preserves the historical 1:1 check."""
     src = FileFacts(
         original, gpac, ffprobe, scratch / "original", known_facts, level
     )
@@ -207,9 +212,13 @@ def compare(
     # --- video ---
     sv, ov = src.stream("video"), out.stream("video")
     if out_v and src_v:
-        eq("video.resolution",
-           (sv.get("width"), sv.get("height")),
-           (ov.get("width"), ov.get("height")))
+        expected_resolution = (
+            (sv.get("width"), sv.get("height"))
+            if expected_video_size is None else expected_video_size
+        )
+        eq("video.resolution", expected_resolution,
+           (ov.get("width"), ov.get("height")),
+           f"{expected_resolution[0]}x{expected_resolution[1]}")
         eq("video.frame_count",
            sv.get("nb_frames"), ov.get("nb_frames"))
         eq("video.frame_rate",

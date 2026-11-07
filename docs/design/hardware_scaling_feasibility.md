@@ -1,8 +1,10 @@
 # 硬件加速缩放可行性研究
 
-> 状态：**仅可行性研究，不实现。**  
-> 默认算法（未来若实现）：**bilinear**。  
-> VCE：**不做入口**。
+> 状态：**研究 + 已进入产品实现（2026-11-07）**  
+> 产品 CLI：`--scale WxH`、`--resize-algo`（默认 `spline36`）。  
+> VCE：**不做入口**。  
+> 默认算法由早期的 bilinear 提案改为实测更稳的 **spline36**；算法对比见
+> [`hardware_scaling_validation.md`](hardware_scaling_validation.md)。
 
 ## 1. 目标
 
@@ -191,6 +193,10 @@ Sony/DJI 保留管线要在缩放后继续保留：
 
 本轮不实现任何缩放代码。
 
+> 更新（2026-11-07）：上述“本轮不实现”指研究阶段。产品实现随后已落地：
+> `--scale WxH` + `--resize-algo`（默认 spline36），NVENC/QSV 两后端；
+> 详见 §8 与 [`hardware_scaling_validation.md`](hardware_scaling_validation.md)。
+
 ## 8. 实测验证结果（2026-11-07）
 
 验证矩阵与长测已完成，详见
@@ -210,3 +216,35 @@ Sony/DJI 保留管线要在缩放后继续保留：
 - QSV 输出可能出现 VFR 时间戳，产品集成前必须处理时间线/容器语义；
 - 本轮未覆盖 HDR；算法矩阵覆盖 bilinear/bicubic/spline16/36/64/lanczos3/4
   （NVENC）和 bilinear/bicubic/spline36/lanczos3（QSV）。
+
+## 9. 产品实现（2026-11-07）
+
+已落地：
+
+- CLI：
+  - `--scale WxH`（别名 `--resize`），显式 opt-in；
+  - `--resize-algo`，默认 **spline36**；
+- 后端命令：
+  - NVENC：`--vpp-resize algo=<algo> --output-res WxH`；
+  - QSV：额外 `--vpp-resize-mode quality`；
+- 两后端 `supports_resize` 预检；若工具不声明 `--vpp-resize` /
+  `--output-res`，直接拒绝，不生成未缩放文件；
+- 软件 x265/SVT-AV1、`--repair`、`--channel-sync-transparent` 明确拒绝
+  `--scale`；
+- 缩放参数贯穿：
+  - 经典硬件路径；
+  - Sony 保留管线；
+  - DJI 保留管线；
+  - 硬件降级 ladder（格式降级时仍保持目标尺寸）；
+- 保留验证：
+  - Sony `validate.compare` / DJI `stream_facts` / full selfcheck 接受
+    `expected_video_size`，把目标尺寸而不是源尺寸作为期望值；
+  - 因此 Sony/DJI 缩放输出仍可通过 37/37 结构检查；
+- `--check full` 的 PSNR/SSIM 源-成品抽样在分辨率不同时显式 SKIP
+  （该抽样不适用于缩放输出），不改用虚假指标。
+
+实机验证：
+
+- NVENC/QSV 产品命令均成功输出 1920×1080；
+- Sony C1515 139s 4K60→1080p：**37/37 PRESERVED**，rtmd 保留；
+- 默认不缩放路径的命令与旧行为一致（无 vpp/output-res 参数）。

@@ -77,7 +77,9 @@ and adds source-relative NVENC rate control.
   on the acceptance takes, with final-audio hashes unchanged.
 - **NVENC follows x265 VBV**: per-file `max_bitrate` / `vbv_bufsize` from the
   `x265_scaling.json` dynamic table. QSV stays static; VCE still has no entry.
-- **Hardware scaling**: feasibility study only (bilinear proposed), no implementation.
+- **Hardware scaling**: implemented on `main` after the v0.9.4 package —
+  `--scale WxH` + `--resize-algo` (default spline36); not present in the
+  already-published v0.9.4 artifact.
 - **Tests**: unit 1058 PASS / 2 environment FAIL; toolchain 1079 PASS / 2 environment
   FAIL; full L3 1295 PASS / 11 environment FAIL.
 
@@ -239,6 +241,32 @@ python watchfolder.py --input D:\incoming --output D:\archive --encoder nvenc `
   WARNING; `--no-downgrade` skips instead.
 - AV1 output is always 4:2:0. Sony metadata is preserved but the XAVC brand is not written
   (AV1 is outside the XAVC specification).
+
+### Hardware scaling
+
+NVENC and QSV can resize in the encoder's GPU VPP path. Scaling is **opt-in**, and both
+backends default to **spline36** when it is enabled:
+
+```powershell
+# 4K -> 1080p, default spline36
+python 1kt.py --input D:\footage --output D:\archive --encoder nvenc `
+    --scale 1920x1080
+
+# explicit kernel
+python 1kt.py ... --encoder qsv --scale 2560x1440 --resize-algo lanczos3
+```
+
+- `--scale WxH` / `--resize` selects the target; even dimensions are required.
+- `--resize-algo` supports `bilinear`, `bicubic`, `spline16`, `spline36`,
+  `spline64`, `lanczos3`, `lanczos4`; default is **spline36**.
+- NVENC uses `--vpp-resize algo=... --output-res WxH`;
+  QSV adds `--vpp-resize-mode quality`.
+- Software backends reject `--scale` explicitly. `--repair` and
+  `--channel-sync-transparent` also reject it (video is not re-encoded there).
+- Without `--scale`, the command and output resolution are unchanged.
+- `--check full`'s PSNR/SSIM source-vs-output sample is skipped for a scaled output
+  (resolution differs); structural validation compares the encoded track against the
+  requested target size instead.
 
 ## Metadata preservation
 

@@ -292,6 +292,7 @@ def dji_rebuild(
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
     audio_sources: list[Path] | None = None,
+    expected_video_size: tuple[int, int] | None = None,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """Shared DJI rebuild tail (encoder-agnostic).
@@ -667,7 +668,13 @@ def run_dji_check(
 
         s_facts = stream_facts(original)
         o_facts = stream_facts(final)
-        eq("dji.video.ffprobe", s_facts["video"], o_facts["video"])
+        s_video = s_facts["video"]
+        if expected_video_size is not None and s_video:
+            s_video = (
+                int(expected_video_size[0]), int(expected_video_size[1]),
+                *s_video[2:],
+            )
+        eq("dji.video.ffprobe", s_video, o_facts["video"])
         eq("dji.audio.ffprobe", s_facts["audio"], o_facts["audio"])
         eq("dji.data.ffprobe_tags", s_facts["data"], o_facts["data"])
 

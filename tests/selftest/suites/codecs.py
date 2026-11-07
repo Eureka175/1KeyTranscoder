@@ -232,3 +232,67 @@ def l1_av1() -> None:
            and effd.get("lookahead") == "60",
            f"mbr={effd.get('mbr')} keyint={effd.get('keyint')} "
            f"lookahead={effd.get('lookahead')}")
+
+
+def l1_hardware_resize() -> None:
+    """Hardware resize: spline36 default, explicit --output-res syntax."""
+    section("L1 hardware resize")
+    from encoders.nvencc import NvencBackend
+    from encoders.qsvencc import QsvBackend
+    from encoders.resize import (
+        DEFAULT_RESIZE_ALGO,
+        ResizeSpec,
+        parse_resize_size,
+        resize_args,
+    )
+
+    record("resize.default algo is spline36",
+           DEFAULT_RESIZE_ALGO == "spline36", DEFAULT_RESIZE_ALGO)
+    record("resize.parse WxH",
+           parse_resize_size("1920x1080") == (1920, 1080))
+    for bad in ("1921x1080", "0x1080", "1920", "abcx1080"):
+        try:
+            parse_resize_size(bad)
+            ok = False
+        except ValueError:
+            ok = True
+        record(f"resize.reject {bad}", ok)
+
+    nv = NvencBackend(ROOT / "tools" / "NVEncC_9.31_x64" / "NVEncC64.exe")
+    qs = QsvBackend(ROOT / "tools" / "QSVEncC_8.26_x64" / "QSVEncC64.exe")
+    record("resize.nvenc tool advertises resize", nv.supports_resize)
+    record("resize.qsv tool advertises resize", qs.supports_resize)
+
+    spec = ResizeSpec(1920, 1080, "spline36")
+    ncmd, _, _ = nv.command(
+        ROOT / "in.mp4", ROOT / "out.mov", {}, "4:2:0", 10,
+        resize=spec)
+    qcmd, _, _ = qs.command(
+        ROOT / "in.mp4", ROOT / "out.mov", {}, "4:2:0", 10,
+        resize=spec)
+    njoined = " ".join(str(x) for x in ncmd)
+    qjoined = " ".join(str(x) for x in qcmd)
+    record("resize.nvenc command args",
+           "--vpp-resize algo=spline36" in njoined
+           and "--output-res 1920x1080" in njoined
+           and "--vpp-resize-mode" not in njoined)
+    record("resize.qsv command args",
+           "--vpp-resize algo=spline36" in qjoined
+           and "--output-res 1920x1080" in qjoined
+           and "--vpp-resize-mode quality" in qjoined)
+    plain, _, _ = nv.command(
+        ROOT / "in.mp4", ROOT / "out.mov", {}, "4:2:0", 10)
+    record("resize.no option -> no scaling args",
+           "--vpp-resize" not in " ".join(str(x) for x in plain))
+    record("resize.helper rejects VCE",
+           not _resize_kind_supported("vceenc"),
+           "VCE has no entry point")
+
+
+def _resize_kind_supported(kind: str) -> bool:
+    from encoders.resize import ResizeSpec, resize_args
+    try:
+        resize_args(kind, ResizeSpec(1280, 720))
+        return True
+    except ValueError:
+        return False

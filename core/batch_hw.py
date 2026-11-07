@@ -76,6 +76,7 @@ from encoders.hwdecode import (
 from encoders.integrity import verify_encode
 from encoders.nvencc import NvencBackend
 from encoders.qsvencc import QsvBackend
+from encoders.resize import ResizeSpec
 
 from .config import find_hw_tool
 from .dashboard import DashboardStatus
@@ -449,6 +450,7 @@ def hw_encode_with_fallback(
     hw_decode_memo: dict | None = None,
     seek_requested: bool = False,
     source_kind: str = SOURCE_UNKNOWN,
+    resize: ResizeSpec | None = None,
 ) -> tuple[list[str], tuple[str, int], float]:
     """Automatic three-tier downgrade ladder (NO prompt window).
 
@@ -573,6 +575,7 @@ def hw_encode_with_fallback(
             cur_input, output, profile, c, d, vfr, audio_copy, color,
             reader=reader,
             container=intermediate_container(backend.codec),
+            resize=resize,
         )
         if reader == "avhw":
             cmd = use_decode_binary(cmd, backend.tool, hw_tool)
@@ -1010,6 +1013,7 @@ def encode_one_sony_hw(
     show_progress: bool = True,
     throughput_cb: Callable[[float], None] | None = None,
     audio_task: "AudioSyncTask | None" = None,
+    resize: ResizeSpec | None = None,
 ) -> str:
     """Sony preservation path with a rigaya hardware encoder."""
     work_dir = work_root / job_id_for(src)
@@ -1028,6 +1032,7 @@ def encode_one_sony_hw(
             src, encoded_mov, profile, chroma, depth, vfr,
             audio_copy=False, color=src_info.color,
             container=intermediate_container(backend.codec),
+            resize=resize,
         )
         return cmd
 
@@ -1069,6 +1074,7 @@ def encode_one_sony_hw(
             no_downgrade=no_downgrade, gpac=gpac,
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
             source_kind=source_kind,
+            resize=resize,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -1154,6 +1160,8 @@ def encode_one_sony_hw(
             quality_csv=quality_csv,
             audio_sources=audio_sources,
             audio_sources_getter=audio_sources_getter,
+            expected_video_size=(
+                (resize.width, resize.height) if resize else None),
             log=pipe_log,
         )
     except Exception as exc:
@@ -1289,6 +1297,7 @@ def encode_one_hw_classic(
     throughput_cb: Callable[[float], None] | None = None,
     video_handoff: VideoHandoffHook | None = None,
     audio_task: "AudioSyncTask | None" = None,
+    resize: ResizeSpec | None = None,
 ) -> str:
     """Non-Sony material: video + audio only, single-tool single pass.
     At check_level='full' the PSNR/SSIM sample gates delivery (FAIL
@@ -1329,6 +1338,7 @@ def encode_one_hw_classic(
             src, part_dst, profile, planned[0], planned[1],
             vfr, audio_copy=audio_copy, color=src_info.color,
             container=intermediate_container(backend.codec),
+            resize=resize,
         )
         file_logger.info(
             "DRY-RUN | no encode performed | %s",
@@ -1353,6 +1363,7 @@ def encode_one_hw_classic(
             no_downgrade=no_downgrade, gpac=gpac,
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
             source_kind=source_kind,
+            resize=resize,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -1622,6 +1633,7 @@ def encode_one_dji_hw(
     show_progress: bool = True,
     throughput_cb: Callable[[float], None] | None = None,
     audio_task: "AudioSyncTask | None" = None,
+    resize: ResizeSpec | None = None,
 ) -> str:
     """DJI preservation path (Osmo Action / drones).
 
@@ -1666,6 +1678,7 @@ def encode_one_dji_hw(
             src, encoded_mov, profile, chroma, depth, vfr,
             audio_copy=False, color=src_info.color,
             container=intermediate_container(backend.codec),
+            resize=resize,
         )
         return cmd
 
@@ -1698,6 +1711,7 @@ def encode_one_dji_hw(
             no_downgrade=no_downgrade, gpac=gpac,
             hw_decode=hw_decode, hw_decode_memo=hw_decode_memo,
             source_kind=source_kind,
+            resize=resize,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
         )
@@ -1808,6 +1822,8 @@ def encode_one_dji_hw(
                 quality_opts=quality_opts,
                 quality_csv=quality_csv,
                 audio_sources=audio_sources,
+                expected_video_size=(
+                    (resize.width, resize.height) if resize else None),
                 log=pipe_log,
             )
     except Exception as exc:
@@ -2280,6 +2296,8 @@ class BatchCtx:
     #: NVENC only: x265_scaling.json used for source-relative maxrate/VBV.
     #: QSV stays on its static table; VCE has no entry point.
     hw_scaling_path: Path | None = None
+    #: Explicit hardware output resize. None = current behavior (no scaling).
+    resize: ResizeSpec | None = None
     ffmpeg: Path | None = None
     quality_opts: dict[str, Any] | None = None
     channel_sync: bool = False
@@ -2654,6 +2672,7 @@ def process_file_hw(
             throughput_cb=lambda fps: _record_throughput(
                 ctx, backend.name, fps),
             audio_task=audio_task,
+            resize=ctx.resize,
         )
     elif is_dji and (dji_keep_meta or ctx.preserve_metadata):
         result = encode_one_dji_hw(
@@ -2691,6 +2710,7 @@ def process_file_hw(
             throughput_cb=lambda fps: _record_throughput(
                 ctx, backend.name, fps),
             audio_task=audio_task,
+            resize=ctx.resize,
         )
     else:
         result = encode_one_hw_classic(
@@ -2726,6 +2746,7 @@ def process_file_hw(
                 ctx, backend.name, fps),
             video_handoff=ctx.video_handoff,
             audio_task=audio_task,
+            resize=ctx.resize,
         )
 
     # Release an async audio task even when the encoder failed before reaching
