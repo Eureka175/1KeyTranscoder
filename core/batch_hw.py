@@ -76,7 +76,7 @@ from encoders.hwdecode import (
 from encoders.integrity import verify_encode
 from encoders.nvencc import NvencBackend
 from encoders.qsvencc import QsvBackend
-from encoders.resize import ResizeSpec
+from encoders.resize import ResizeRequest, ResizeSpec, resolve_resize
 
 from .config import find_hw_tool
 from .dashboard import DashboardStatus
@@ -2296,8 +2296,8 @@ class BatchCtx:
     #: NVENC only: x265_scaling.json used for source-relative maxrate/VBV.
     #: QSV stays on its static table; VCE has no entry point.
     hw_scaling_path: Path | None = None
-    #: Explicit hardware output resize. None = current behavior (no scaling).
-    resize: ResizeSpec | None = None
+    #: Explicit output resize request (exact resolution or long-edge factor).
+    resize: ResizeRequest | None = None
     ffmpeg: Path | None = None
     quality_opts: dict[str, Any] | None = None
     channel_sync: bool = False
@@ -2537,6 +2537,34 @@ def process_file_hw(
             )
         return "failed"
 
+    file_resize: ResizeSpec | None = None
+    if ctx.resize is not None:
+        try:
+            file_resize = resolve_resize(
+                ctx.resize, src_info.width, src_info.height)
+        except ValueError as exc:
+            logger.error("[RESIZE-FAIL] %s | %s", src, exc)
+            file_logger.error("RESIZE FAILED | %s", exc)
+            if ctx.status is not None:
+                ctx.status.finish(src, "failed")
+            if ctx.failed_path is not None:
+                record_failure(
+                    ctx.failed_path,
+                    source=src, preset=ctx.preset, backend_name=backend.name,
+                    stage="resize", error=str(exc), log_path=str(file_log),
+                )
+            return "failed"
+        file_logger.info(
+            "RESIZE | source=%dx%d target=%dx%d algo=%s",
+            src_info.width, src_info.height,
+            file_resize.width, file_resize.height, file_resize.algo,
+        )
+        logger.info(
+            "[RESIZE] %s | %dx%d -> %dx%d | %s",
+            src.name, src_info.width, src_info.height,
+            file_resize.width, file_resize.height, file_resize.algo,
+        )
+
     quality_csv = (
         ctx.logs_root / "quality_samples.csv"
         if ctx.check_level == "full"
@@ -2672,7 +2700,7 @@ def process_file_hw(
             throughput_cb=lambda fps: _record_throughput(
                 ctx, backend.name, fps),
             audio_task=audio_task,
-            resize=ctx.resize,
+            resize=file_resize,
         )
     elif is_dji and (dji_keep_meta or ctx.preserve_metadata):
         result = encode_one_dji_hw(
@@ -2710,7 +2738,7 @@ def process_file_hw(
             throughput_cb=lambda fps: _record_throughput(
                 ctx, backend.name, fps),
             audio_task=audio_task,
-            resize=ctx.resize,
+            resize=file_resize,
         )
     else:
         result = encode_one_hw_classic(
@@ -2746,7 +2774,7 @@ def process_file_hw(
                 ctx, backend.name, fps),
             video_handoff=ctx.video_handoff,
             audio_task=audio_task,
-            resize=ctx.resize,
+            resize=file_resize,
         )
 
     # Release an async audio task even when the encoder failed before reaching
@@ -3055,3 +3083,5 @@ def run_multihw_pool(
                 ctrl_q.note_sample(sum(fps_q), "qsv")
 
     return counters
+
+

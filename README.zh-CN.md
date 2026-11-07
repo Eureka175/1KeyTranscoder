@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-[![Version](https://img.shields.io/badge/version-0.9.6-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.7-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#运行要求)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -46,28 +46,25 @@ python 1kt.py --input D:\footage --output D:\archive --encoder qsv --preset uhq
 
 预设：`uhq`、`hq`、`small`、`fast`。
 
-## 硬件缩放
+## 缩放
 
-缩放为显式 opt-in，使用编码器的 GPU VPP 路径。
-
-```powershell
-# 默认算法：spline36
-python 1kt.py --input D:\footage --output D:\archive `
-    --encoder nvenc --scale 1920x1080
-
-# 指定算法
-python 1kt.py --input D:\footage --output D:\archive `
-    --encoder qsv --scale 2560x1440 --resize-algo lanczos4
-```
-
-- `--scale WxH`（别名 `--resize WxH`）：目标尺寸，宽高必须为偶数。
+- `--resize WxH`：精确输出分辨率（偶数尺寸），不修正源长宽比。
+- `--scale FACTOR`：按长边倍率缩放并保持源长宽比（`0.5`、`0.25`、`2` 等）；
+  输出尺寸取偶数。
 - `--resize-algo`：`bilinear`、`bicubic`、`spline16`、`spline36`、`spline64`、
   `lanczos3`、`lanczos4`；默认 **spline36**。
-- NVENC：`--vpp-resize algo=... --output-res WxH`。
+- `--resize` 与 `--scale` 互斥。都不指定时输出分辨率不变。
+- NVENC：`--vpp-resize` + `--output-res`。
 - QSV：同上，另加 `--vpp-resize-mode quality`。
-- 仅 NVENC/QSV 支持；Sony、DJI 保留管线均可使用。
-- 软件后端、`--repair`、`--channel-sync-transparent` 会拒绝 `--scale`。
-- 不指定 `--scale` 时输出分辨率不变。
+- x265 / SVT-AV1 默认硬件解码，并在该路径使用 `scale_cuda` 或 `vpp_qsv` 缩放；
+  无硬件解码时回退 FFmpeg CPU 缩放。
+- `--repair`、`--channel-sync-transparent` 会拒绝这两个选项。
+
+```powershell
+python 1kt.py ... --encoder nvenc --scale 0.5     # 4K -> 1080p
+python 1kt.py ... --encoder qsv --scale 2         # 1080p -> 4K
+python 1kt.py ... --encoder x265 --resize 1920x1080
+```
 
 ## 音频
 
@@ -101,7 +98,7 @@ python tests\full_autotest.py --level full
 
 ## 文档
 
-- [v0.9.6 发布说明](docs/release_notes_v0.9.6.md)
+- [v0.9.7 发布说明](docs/release_notes_v0.9.7.md)
 - [硬件缩放验证](docs/design/hardware_scaling_validation.md)
 - [硬件缩放可行性](docs/design/hardware_scaling_feasibility.md)
 - [音频计划指南](docs/audio_plan.md)
@@ -111,3 +108,5 @@ python tests\full_autotest.py --level full
 ## 许可
 
 LGPL-3.0-or-later。见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。
+
+

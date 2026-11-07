@@ -76,6 +76,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .resize import ResizeSpec
+
 SUBSTRATE_SW = "sw"
 SUBSTRATE_FFMPEG_HW = "ffmpeg_hw"
 
@@ -248,6 +250,99 @@ _SURFACE = {
 # Per-hwaccel device-side filters that can write a *different* surface format
 # before download. Tried in order when a direct hwdownload is refused.
 _SCALE_FILTER = {"cuda": "scale_cuda", "qsv": "vpp_qsv"}
+
+# x265 receives CPU frames. The hardware decode filters are the resize point
+# when the decode plan is hardware; otherwise FFmpeg's CPU scaler is used.
+_SOFTWARE_SCALE_FLAGS = {
+    "bilinear": "bilinear",
+    "bicubic": "bicubic",
+    "spline16": "spline",
+    "spline36": "spline",
+    "spline64": "spline",
+    "lanczos3": "lanczos",
+    "lanczos4": "lanczos",
+}
+_CUDA_INTERP = {
+    "bilinear": "bilinear",
+    "bicubic": "bicubic",
+    "spline16": "lanczos",
+    "spline36": "lanczos",
+    "spline64": "lanczos",
+    "lanczos3": "lanczos",
+    "lanczos4": "lanczos",
+}
+
+
+def _software_scale_filter(spec: ResizeSpec) -> str:
+    flag = _SOFTWARE_SCALE_FLAGS.get(spec.algo, "spline")
+    return f"scale=w={spec.width}:h={spec.height}:flags={flag}"
+
+
+def _inject_filter_options(text: str, options: dict[str, str]) -> str:
+    """Add missing k=v options to a filter string, preserving existing ones."""
+    name, sep, rest = text.partition("=")
+    parts = [p for p in rest.split(":") if p] if sep else []
+    keys = {p.split("=", 1)[0] for p in parts}
+    for key, value in options.items():
+        if key not in keys:
+            parts.append(f"{key}={value}")
+    return name + ("=" + ":".join(parts) if parts else "")
+
+
+def _scaled_hw_filters(
+    hwaccel: str, transfer_filters: list[str], fmt: str, spec: ResizeSpec,
+) -> list[str] | None:
+    """Place a GPU resize in the probed download chain.
+
+    A device-side transfer already exists for formats that need conversion;
+    inject dimensions into it.  A direct ``hwdownload`` needs a new device
+    scale filter in front.  ``None`` means no hardware resize filter is known.
+    """
+    scale_name = _SCALE_FILTER.get(hwaccel)
+    if not scale_name:
+        return None
+    if hwaccel == "cuda":
+        opts = {
+            "w": str(spec.width), "h": str(spec.height),
+            "interp_algo": _CUDA_INTERP.get(spec.algo, "lanczos"),
+        }
+    else:
+        opts = {
+            "w": str(spec.width), "h": str(spec.height),
+            "scale_mode": "hq",
+        }
+
+    chain = list(transfer_filters)
+    if chain and chain[0].split("=", 1)[0] == scale_name:
+        chain[0] = _inject_filter_options(chain[0], opts)
+        return chain
+
+    # Direct hwdownload path: add the GPU scale immediately before download.
+    # ``format=fmt`` keeps the probed system format (and bit depth) intact.
+    opts["format"] = fmt
+    return [_inject_filter_options(scale_name, opts)] + chain
+
+
+def _filters_for_plan(
+    plan: "DecodePlan", resize: ResizeSpec | None,
+) -> list[str]:
+    if resize is None:
+        return plan.ffmpeg_filter_args()
+    if not plan.hardware:
+        return ["-vf", _software_scale_filter(resize)]
+
+    transfer = plan.transfer
+    base = list(transfer.filters) if transfer is not None else []
+    fmt = (
+        transfer.format if transfer is not None and transfer.format
+        else plan.target_format
+    )
+    scaled = _scaled_hw_filters(plan.hwaccel, base, fmt, resize)
+    if scaled is not None:
+        return ["-vf", ",".join(scaled)]
+    # Unknown hardware filter: scale after the CPU download.
+    return ["-vf", ",".join(base + [_software_scale_filter(resize)])]
+
 
 # codec -> {hwaccel: decoder name}
 _DECODERS = {
@@ -978,7 +1073,8 @@ def record_runtime_failure(
 # --- applying a plan to an existing argv ------------------------------------
 
 def apply_decode_plan(
-    cmd: list[str], plan: DecodePlan, source: Path | str
+    cmd: list[str], plan: DecodePlan, source: Path | str,
+    resize: ResizeSpec | None = None,
 ) -> list[str]:
     """Splice a decode plan into an already-built FFmpeg argv.
 
@@ -994,9 +1090,11 @@ def apply_decode_plan(
         is merged into an existing ``-vf`` if the backend already set one
         (the x265 video-only command does not, but a future backend might).
 
-    A software plan is a no-op, so callers can apply unconditionally.
+    A software plan is a no-op when ``resize`` is None; with a resize it
+    appends the CPU scale filter.  Hardware plans place the resize in the
+    device-side transfer chain when a GPU filter exists.
     """
-    if not plan.hardware:
+    if not plan.hardware and resize is None:
         return list(cmd)
 
     src_texts = {str(source)}
@@ -1024,7 +1122,7 @@ def apply_decode_plan(
     out[idx:idx] = insert
     after = idx + len(insert) + 2          # past "-i", source
 
-    filt = plan.ffmpeg_filter_args()
+    filt = _filters_for_plan(plan, resize)
     if filt:
         existing = None
         for j in range(after, len(out) - 1):

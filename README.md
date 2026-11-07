@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-[![Version](https://img.shields.io/badge/version-0.9.6-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.7-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -47,28 +47,28 @@ Hardware backends never fall back to software encoding.
 
 Presets: `uhq`, `hq`, `small`, `fast`.
 
-## Hardware scaling
+## Scaling
 
-Scaling is opt-in and uses the encoder's GPU VPP path.
-
-```powershell
-# Default kernel: spline36
-python 1kt.py --input D:\footage --output D:\archive `
-    --encoder nvenc --scale 1920x1080
-
-# Explicit kernel
-python 1kt.py --input D:\footage --output D:\archive `
-    --encoder qsv --scale 2560x1440 --resize-algo lanczos4
-```
-
-- `--scale WxH` (alias `--resize WxH`): target output size; even dimensions required.
+- `--resize WxH`: exact output resolution (even dimensions); does not preserve
+  the source aspect ratio.
+- `--scale FACTOR`: multiplies the long edge and preserves the source aspect ratio
+  (`0.5`, `0.25`, `2`, ...); output dimensions are rounded to even values.
 - `--resize-algo`: `bilinear`, `bicubic`, `spline16`, `spline36`, `spline64`,
   `lanczos3`, `lanczos4`; default **spline36**.
-- NVENC: `--vpp-resize algo=... --output-res WxH`.
+- `--resize` and `--scale` are mutually exclusive. Without either option the output
+  resolution is unchanged.
+- NVENC: `--vpp-resize` with `--output-res`.
 - QSV: same plus `--vpp-resize-mode quality`.
-- Scaling is available on NVENC/QSV only. Sony and DJI preservation paths are supported.
-- Software backends, `--repair`, and `--channel-sync-transparent` reject `--scale`.
-- Without `--scale`, output resolution is unchanged.
+- x265 / SVT-AV1 default to hardware decode and scale in that path through
+  `scale_cuda` or `vpp_qsv`; FFmpeg CPU scaling is the fallback when hardware
+  decode is unavailable.
+- `--repair` and `--channel-sync-transparent` reject both options.
+
+```powershell
+python 1kt.py ... --encoder nvenc --scale 0.5     # 4K -> 1080p
+python 1kt.py ... --encoder qsv --scale 2         # 1080p -> 4K
+python 1kt.py ... --encoder x265 --resize 1920x1080
+```
 
 ## Audio
 
@@ -105,7 +105,7 @@ environment-only checks report FAIL.
 
 ## Documentation
 
-- [Release notes v0.9.6](docs/release_notes_v0.9.6.md)
+- [Release notes v0.9.7](docs/release_notes_v0.9.7.md)
 - [Hardware scaling validation](docs/design/hardware_scaling_validation.md)
 - [Hardware scaling feasibility](docs/design/hardware_scaling_feasibility.md)
 - [Audio plan guide](docs/audio_plan.md)
@@ -115,3 +115,5 @@ environment-only checks report FAIL.
 ## License
 
 LGPL-3.0-or-later. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+

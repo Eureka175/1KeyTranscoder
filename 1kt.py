@@ -76,8 +76,12 @@ from encoders.x265 import X265Backend
 from encoders.resize import (
     DEFAULT_RESIZE_ALGO,
     RESIZE_ALGOS,
+    ResizeRequest,
     ResizeSpec,
+    ScaleFactor,
     parse_resize_size,
+    parse_scale_factor,
+    resolve_resize,
 )
 from preservation.gpac import GpacContainerBackend
 from preservation.gyroflow import find_gyroflow
@@ -512,6 +516,7 @@ def encode_one(
     file_logger: logging.Logger,
     dry_run: bool,
     decode_plan: Any = None,
+    resize: ResizeSpec | None = None,
     drop_metadata_streams: bool = False,
 ) -> str:
     """Classic single-pass (x265/svtav1 software backends). At
@@ -546,7 +551,7 @@ def encode_one(
     if decode_plan is not None:
         from encoders.hwdecode_ffmpeg import apply_decode_plan
 
-        cmd = apply_decode_plan(cmd, decode_plan, src)
+        cmd = apply_decode_plan(cmd, decode_plan, src, resize=resize)
         file_logger.info("DECODE_ROUTE | %s", decode_plan.log_line())
     # 显式音频计划: 视频产物必须独立, 否则 Composer 没有可编排的视频输入。
     # 派生只去掉音频 token, 不碰任何编码参数 (视频 bitstream 因此不变)。
@@ -736,6 +741,7 @@ def encode_one_sony(
     file_logger: logging.Logger,
     dry_run: bool,
     decode_plan: Any = None,
+    resize: ResizeSpec | None = None,
 ) -> str:
     """Sony preservation path (rtmd) for ffmpeg software backends
     (x265 / svtav1; --check levels apply like on hardware backends).
@@ -764,7 +770,7 @@ def encode_one_sony(
     if decode_plan is not None:
         from encoders.hwdecode_ffmpeg import apply_decode_plan
 
-        cmd = apply_decode_plan(cmd, decode_plan, src)
+        cmd = apply_decode_plan(cmd, decode_plan, src, resize=resize)
         file_logger.info("DECODE_ROUTE | %s", decode_plan.log_line())
     log_encode_header(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
@@ -876,6 +882,8 @@ def encode_one_sony(
             quality_opts=quality_opts,
             quality_csv=quality_csv,
             audio_sources=audio_sources,
+            expected_video_size=(
+                (resize.width, resize.height) if resize else None),
             log=pipe_log,
         )
     except Exception as exc:
@@ -981,6 +989,7 @@ def encode_one_dji_x265(
     file_logger: logging.Logger,
     dry_run: bool,
     decode_plan: Any = None,
+    resize: ResizeSpec | None = None,
 ) -> str:
     """DJI preservation path for ffmpeg software backends (x265/svtav1).
 
@@ -1012,7 +1021,7 @@ def encode_one_dji_x265(
     if decode_plan is not None:
         from encoders.hwdecode_ffmpeg import apply_decode_plan
 
-        cmd = apply_decode_plan(cmd, decode_plan, src)
+        cmd = apply_decode_plan(cmd, decode_plan, src, resize=resize)
         file_logger.info("DECODE_ROUTE | %s", decode_plan.log_line())
     log_encode_header(
         logger=logger, file_logger=file_logger, src=src, preset=preset,
@@ -1105,6 +1114,8 @@ def encode_one_dji_x265(
             quality_opts=quality_opts,
             quality_csv=quality_csv,
             audio_sources=audio_sources,
+            expected_video_size=(
+                (resize.width, resize.height) if resize else None),
             log=pipe_log,
         )
     except Exception as exc:
@@ -1219,12 +1230,19 @@ def parse_args() -> argparse.Namespace:
         "--scaling-config", default=None,
         help="Path to the scaling rules JSON (x265/svtav1 backends).",
     )
-    parser.add_argument(
-        "--scale", "--resize", dest="scale", default=None, metavar="WxH",
+    scale_group = parser.add_mutually_exclusive_group()
+    scale_group.add_argument(
+        "--resize", dest="resize", default=None, metavar="WxH",
         help=(
-            "显式硬件输出缩放到 WxH (偶数尺寸). 仅 NVENC/QSV 硬件后端; "
-            "默认不缩放. 缩放由编码器 VPP 在 GPU 内完成, 不产生 CPU 回读. "
-            "QSV 使用 --vpp-resize-mode quality。"
+            "精确输出分辨率 WxH（偶数尺寸，不修正长宽比）。"
+            "支持 NVENC/QSV/x265/SVT-AV1；默认不缩放。"
+        ),
+    )
+    scale_group.add_argument(
+        "--scale", dest="scale", default=None, type=float, metavar="FACTOR",
+        help=(
+            "按长边倍率缩放并保持长宽比，例如 0.5 / 2 / 0.25。"
+            "支持 NVENC/QSV/x265/SVT-AV1；默认不缩放。"
         ),
     )
     parser.add_argument(
@@ -1232,7 +1250,7 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_RESIZE_ALGO,
         choices=list(RESIZE_ALGOS),
         help=(
-            "硬件缩放算法 (默认 spline36). 仅在给出 --scale 时生效; "
+            "硬件缩放算法 (默认 spline36). 仅在给出 --resize 或 --scale 时生效; "
             "bilinear/bicubic/spline16/spline36/spline64/lanczos3/lanczos4。"
         ),
     )
@@ -2260,21 +2278,32 @@ def main() -> int:
 
     # Hardware resize is explicit.  Parse it before any mode split so an
     # invalid shape can never reach an encoder.
-    resize: ResizeSpec | None = None
-    if getattr(args, "scale", None):
+    resize_request: ResizeRequest | None = None
+    resize_value = getattr(args, "resize", None)
+    scale_value = getattr(args, "scale", None)
+    resize_algo = str(getattr(args, "resize_algo", DEFAULT_RESIZE_ALGO))
+    if resize_value is not None:
         try:
-            rw, rh = parse_resize_size(str(args.scale))
+            rw, rh = parse_resize_size(str(resize_value))
+        except ValueError as exc:
+            print(f"[FATAL] --resize: {exc}", file=sys.stderr)
+            return 2
+        resize_request = ResizeSpec(rw, rh, resize_algo)
+    elif scale_value is not None:
+        try:
+            factor = parse_scale_factor(str(scale_value))
         except ValueError as exc:
             print(f"[FATAL] --scale: {exc}", file=sys.stderr)
             return 2
-        resize = ResizeSpec(rw, rh, str(getattr(args, "resize_algo",
-                                                DEFAULT_RESIZE_ALGO)))
+        resize_request = ScaleFactor(factor, resize_algo)
+
+    if resize_request is not None:
         if getattr(args, "repair", False):
-            print("[FATAL] --scale is not supported in --repair mode.",
+            print("[FATAL] --resize/--scale is not supported in --repair mode.",
                   file=sys.stderr)
             return 2
         if getattr(args, "channel_sync_transparent", False):
-            print("[FATAL] --scale is not supported with "
+            print("[FATAL] --resize/--scale is not supported with "
                   "--channel-sync-transparent (video is stream-copied).",
                   file=sys.stderr)
             return 2
@@ -2548,13 +2577,6 @@ def main() -> int:
             "the preservation paths)"
         )
 
-    if resize is not None and not is_hardware:
-        print(
-            "[FATAL] --scale/--resize is implemented for hardware backends "
-            "(nvenc/qsv) only; software x265/svtav1 scaling is not implemented.",
-            file=sys.stderr)
-        return 2
-
     if is_hardware:
         if args.experimental_multihw:
             print(EXPERIMENTAL_BANNER)
@@ -2577,7 +2599,7 @@ def main() -> int:
         else:
             backend = hw_backend_for(encoder_name, script_dir, args, work_root, logger)
 
-        if resize is not None:
+        if resize_request is not None:
             for _candidate in (backend, locals().get("backend_qsv")):
                 if _candidate is None:
                     continue
@@ -2826,6 +2848,42 @@ def main() -> int:
                         if status is not None:
                             status.finish(src, "failed")
                         continue
+                    file_resize: ResizeSpec | None = None
+                    if resize_request is not None:
+                        try:
+                            file_resize = resolve_resize(
+                                resize_request,
+                                prepared.src_info.width,
+                                prepared.src_info.height,
+                            )
+                        except ValueError as exc:
+                            logger.error("[RESIZE-FAIL] %s | %s", src, exc)
+                            file_logger.error("RESIZE FAILED | %s", exc)
+                            record_failure(
+                                failed_path,
+                                source=src, preset=preset,
+                                backend_name=backend.name,
+                                stage="resize", error=str(exc),
+                                log_path=str(file_log),
+                            )
+                            counters["failed"] += 1
+                            if status is not None:
+                                status.finish(src, "failed")
+                            continue
+                        file_logger.info(
+                            "RESIZE | source=%dx%d target=%dx%d algo=%s",
+                            prepared.src_info.width, prepared.src_info.height,
+                            file_resize.width, file_resize.height,
+                            file_resize.algo,
+                        )
+                        logger.info(
+                            "[RESIZE] %s | %dx%d -> %dx%d | %s",
+                            src.name,
+                            prepared.src_info.width,
+                            prepared.src_info.height,
+                            file_resize.width, file_resize.height,
+                            file_resize.algo,
+                        )
                     codec = "av1" if getattr(backend, "name", "") == "svtav1" else "hevc"
                     video_entry = "av01" if codec == "av1" else "hvc1"
 
@@ -2865,6 +2923,23 @@ def main() -> int:
                         for w in decode_plan.warnings:
                             logger.info("[DECODE] %s | %s", src.name, w)
                             file_logger.info("DECODE_NOTE | %s", w)
+
+                    if file_resize is not None and decode_plan is None:
+                        # Scaling must not disappear when capability probing is
+                        # unavailable: fall back to a software decode + CPU
+                        # scale rather than emit an unscaled file.
+                        from encoders.hwdecode_ffmpeg import plan_software
+
+                        decode_plan = plan_software(
+                            "decode_caps_unavailable_for_resize",
+                            "decode capability probe unavailable; using "
+                            "software decode + CPU scaling",
+                            codec=prepared.src_info.codec,
+                            chroma=prepared.src_info.chroma,
+                            depth=prepared.src_info.bit_depth,
+                        )
+                        file_logger.info(
+                            "DECODE_ROUTE | %s", decode_plan.log_line())
 
                     if (
                         codec == "av1"
@@ -2954,6 +3029,7 @@ def main() -> int:
                             logger=logger, file_logger=file_logger,
                             dry_run=args.dry_run,
                             decode_plan=decode_plan,
+                            resize=file_resize,
                         )
                     elif is_dji and not no_metadata:
                         result = encode_one_dji_x265(
@@ -2971,6 +3047,7 @@ def main() -> int:
                             logger=logger, file_logger=file_logger,
                             dry_run=args.dry_run,
                             decode_plan=decode_plan,
+                            resize=file_resize,
                         )
                     else:
                         result = encode_one(
@@ -2990,6 +3067,7 @@ def main() -> int:
                             logger=logger,
                             file_logger=file_logger, dry_run=args.dry_run,
                             decode_plan=decode_plan,
+                            resize=file_resize,
                             # 元数据策略 = 不保留 (--no-metadata / DJI 非
                             # Action 默认) 时, 普通转码命令只保留主视频+
                             # 音频+字幕: 相机 data 轨与 attached_pic 无法
@@ -3046,7 +3124,7 @@ def main() -> int:
             hw_decode_memo=decode_memo,
             check_level=args.check,
             hw_scaling_path=hw_scaling_path,
-            resize=resize,
+            resize=resize_request,
             ffmpeg=ffmpeg,
             quality_opts=quality_opts,
             channel_sync=channel_sync_enabled,
@@ -3109,3 +3187,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

@@ -2,9 +2,12 @@
 # -*- coding: utf-8 -*-
 """Hardware resize helpers shared by the rigaya backends.
 
-Current product policy: hardware scaling is explicit (``--scale WxH``),
-default kernel ``spline36`` for both NVENC and QSV.  No scaling is done
-when the option is absent, so the default transcode path is unchanged.
+Product policy:
+
+* ``--resize WxH``   exact output resolution (no aspect-ratio correction);
+* ``--scale FACTOR`` long-edge multiplier, preserving aspect ratio;
+* ``--resize-algo``  kernel, default spline36 for NVENC and QSV;
+* no option -> no scaling, so the default transcode path is unchanged.
 
 Tool syntax verified on NVEncC 9.31 / QSVEncC 8.26:
 
@@ -16,7 +19,9 @@ QSV additionally uses ``--vpp-resize-mode quality``.  ``width=`` /
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
+from typing import Union
 
 RESIZE_ALGOS = (
     "bilinear",
@@ -28,17 +33,37 @@ RESIZE_ALGOS = (
     "lanczos4",
 )
 DEFAULT_RESIZE_ALGO = "spline36"
+MAX_DIMENSION = 16384
 
 
 @dataclass(frozen=True)
 class ResizeSpec:
+    """Explicit output resolution; aspect ratio is NOT corrected."""
+
     width: int
     height: int
     algo: str = DEFAULT_RESIZE_ALGO
 
 
+@dataclass(frozen=True)
+class ScaleFactor:
+    """Long-edge multiplier; output keeps the source aspect ratio."""
+
+    factor: float
+    algo: str = DEFAULT_RESIZE_ALGO
+
+
+ResizeRequest = Union[ResizeSpec, ScaleFactor]
+
+
+def _even(value: float) -> int:
+    """Nearest even integer, at least 2."""
+    n = int(round(value / 2.0)) * 2
+    return max(2, n)
+
+
 def parse_resize_size(text: str) -> tuple[int, int]:
-    """Parse ``WxH`` and reject odd/zero/absurd dimensions."""
+    """Parse exact ``WxH`` and reject odd/zero/absurd dimensions."""
     if not text or "x" not in text.lower():
         raise ValueError(f"invalid resize size {text!r}; expected WxH")
     left, right = text.lower().split("x", 1)
@@ -53,9 +78,57 @@ def parse_resize_size(text: str) -> tuple[int, int]:
         raise ValueError(
             f"resize size {width}x{height} must use even width/height "
             "for 4:2:0 chroma")
-    if width > 16384 or height > 16384:
-        raise ValueError("resize dimensions above 16384 are unsupported")
+    if width > MAX_DIMENSION or height > MAX_DIMENSION:
+        raise ValueError(
+            f"resize dimensions above {MAX_DIMENSION} are unsupported")
     return width, height
+
+
+def parse_scale_factor(text: str) -> float:
+    """Parse a positive finite long-edge multiplier."""
+    try:
+        factor = float(text)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"invalid scale factor {text!r}; expected a positive number"
+        ) from exc
+    if not math.isfinite(factor) or factor <= 0:
+        raise ValueError("scale factor must be a positive finite number")
+    return factor
+
+
+def resolve_resize(
+    request: ResizeRequest,
+    source_width: int,
+    source_height: int,
+) -> ResizeSpec:
+    """Resolve a scale request against the actual source dimensions.
+
+    ``ResizeSpec`` is returned unchanged.  ``ScaleFactor`` multiplies the
+    long edge and derives the short edge from the source aspect ratio,
+    then rounds both dimensions to even values for 4:2:0 encoding.
+    """
+    if isinstance(request, ResizeSpec):
+        return request
+    if source_width <= 0 or source_height <= 0:
+        raise ValueError("source dimensions are invalid for --scale")
+
+    factor = request.factor
+    if not math.isfinite(factor) or factor <= 0:
+        raise ValueError("scale factor must be a positive finite number")
+
+    if source_width >= source_height:
+        target_w = _even(source_width * factor)
+        target_h = _even(target_w * source_height / source_width)
+    else:
+        target_h = _even(source_height * factor)
+        target_w = _even(target_h * source_width / source_height)
+
+    if target_w > MAX_DIMENSION or target_h > MAX_DIMENSION:
+        raise ValueError(
+            f"--scale {factor:g} produces {target_w}x{target_h}, above "
+            f"{MAX_DIMENSION}")
+    return ResizeSpec(target_w, target_h, request.algo)
 
 
 def resize_args(kind: str, spec: ResizeSpec) -> list[str]:

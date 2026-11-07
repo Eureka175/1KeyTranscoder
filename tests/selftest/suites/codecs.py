@@ -242,7 +242,10 @@ def l1_hardware_resize() -> None:
     from encoders.resize import (
         DEFAULT_RESIZE_ALGO,
         ResizeSpec,
+        ScaleFactor,
         parse_resize_size,
+        parse_scale_factor,
+        resolve_resize,
         resize_args,
     )
 
@@ -250,6 +253,21 @@ def l1_hardware_resize() -> None:
            DEFAULT_RESIZE_ALGO == "spline36", DEFAULT_RESIZE_ALGO)
     record("resize.parse WxH",
            parse_resize_size("1920x1080") == (1920, 1080))
+    record("resize.scale factor 0.5 -> 1080p",
+           resolve_resize(ScaleFactor(0.5), 3840, 2160).width == 1920
+           and resolve_resize(ScaleFactor(0.5), 3840, 2160).height == 1080)
+    record("resize.scale factor 0.25 -> 960x540",
+           resolve_resize(ScaleFactor(0.25), 3840, 2160).width == 960
+           and resolve_resize(ScaleFactor(0.25), 3840, 2160).height == 540)
+    record("resize.scale factor 2 -> 4K",
+           resolve_resize(ScaleFactor(2.0), 1920, 1080).width == 3840
+           and resolve_resize(ScaleFactor(2.0), 1920, 1080).height == 2160)
+    portrait = resolve_resize(ScaleFactor(0.5), 2160, 3840)
+    record("resize.scale portrait keeps aspect",
+           (portrait.width, portrait.height) == (1080, 1920))
+    record("resize.exact ignores aspect",
+           resolve_resize(ResizeSpec(1600, 900), 3840, 2160).width == 1600
+           and resolve_resize(ResizeSpec(1600, 900), 3840, 2160).height == 900)
     for bad in ("1921x1080", "0x1080", "1920", "abcx1080"):
         try:
             parse_resize_size(bad)
@@ -257,6 +275,13 @@ def l1_hardware_resize() -> None:
         except ValueError:
             ok = True
         record(f"resize.reject {bad}", ok)
+    for bad in ("0", "-1", "nan", "inf"):
+        try:
+            parse_scale_factor(bad)
+            ok = False
+        except ValueError:
+            ok = True
+        record(f"resize.reject scale {bad}", ok)
 
     nv = NvencBackend(ROOT / "tools" / "NVEncC_9.31_x64" / "NVEncC64.exe")
     qs = QsvBackend(ROOT / "tools" / "QSVEncC_8.26_x64" / "QSVEncC64.exe")
@@ -287,6 +312,43 @@ def l1_hardware_resize() -> None:
     record("resize.helper rejects VCE",
            not _resize_kind_supported("vceenc"),
            "VCE has no entry point")
+
+    from encoders.hwdecode_ffmpeg import (
+        DecodePlan,
+        Transfer,
+        apply_decode_plan,
+        plan_software,
+    )
+
+    def _cmd_with_filter(plan, spec):
+        cmd = ["ffmpeg", "-i", "in.mp4", "-c:v", "libx265", "out.mov"]
+        return " ".join(apply_decode_plan(cmd, plan, "in.mp4", resize=spec))
+
+    cuda_plan = DecodePlan(
+        substrate="ffmpeg_hw", decoder="hevc_cuvid", hwaccel="cuda",
+        target_format="nv12",
+        transfer=Transfer(
+            format="nv12", filters=["hwdownload,format=nv12"], direct=True),
+    )
+    qsv_plan = DecodePlan(
+        substrate="ffmpeg_hw", decoder="hevc_qsv", hwaccel="qsv",
+        target_format="nv12",
+        transfer=Transfer(
+            format="nv12", filters=["hwdownload,format=nv12"], direct=True),
+    )
+    record("resize.x265 cuda hw filter",
+           "scale_cuda" in _cmd_with_filter(cuda_plan, spec)
+           and "w=1920" in _cmd_with_filter(cuda_plan, spec),
+           _cmd_with_filter(cuda_plan, spec))
+    record("resize.x265 qsv hw filter",
+           "vpp_qsv" in _cmd_with_filter(qsv_plan, spec)
+           and "scale_mode=hq" in _cmd_with_filter(qsv_plan, spec),
+           _cmd_with_filter(qsv_plan, spec))
+    sw_plan = plan_software("test", codec="hevc", chroma="4:2:0", depth=10)
+    record("resize.x265 software fallback filter",
+           "scale=w=1920:h=1080:flags=spline"
+           in _cmd_with_filter(sw_plan, spec),
+           _cmd_with_filter(sw_plan, spec))
 
 
 def _resize_kind_supported(kind: str) -> bool:

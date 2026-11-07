@@ -4,7 +4,7 @@
 > 范围：NVENC HEVC / QSV HEVC，`--vpp-resize` + `--output-res`  
 > 结论：**NVENC 硬件缩放可用；QSV 的 bilinear 画质明显偏低，但
 > bicubic/spline36/lanczos3 可恢复；产品默认采用 spline36。**  
-> 状态：验证完成 + 产品已实现 `--scale` / `--resize-algo`（默认 spline36）。
+> 状态：验证完成 + 产品已实现 `--resize` / `--scale` / `--resize-algo`（默认 spline36）。
 
 ## 1. 验证环境
 
@@ -130,7 +130,7 @@
 ## 6. 建议
 
 1. **产品已实现 NVENC + QSV 硬件缩放**：
-   - 显式 `--scale WxH` / `--resize`；
+   - 显式 `--resize WxH`（精确，不修正长宽比）或 `--scale FACTOR`（长边倍率，保持长宽比）；
    - 默认 `--resize-algo spline36`；
    - `--output-res WxH`；QSV 额外 `--vpp-resize-mode quality`；
    - 不默认缩放，保持当前无缩放行为。
@@ -225,3 +225,4 @@ QSV 算法，目标为 1080p/720p。共 **44 次编码，全部成功**。
 
 
 本次没有修改产品代码，没有重新打包。
+

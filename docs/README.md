@@ -35,7 +35,7 @@ F:\1KeyTranscoder\
 ├── 1kt.py                  主入口（CLI + 编排；硬件批量逻辑在 core/batch_hw.py）
 ├── watchfolder.py          轮询批处理入口（转调 1kt.py）
 ├── start.bat               双击启动
-├── VERSION                 版本号唯一来源（0.9.6）
+├── VERSION                 版本号唯一来源（0.9.7）
 ├── LICENSE                 GNU LGPL v3 正文（本项目许可；GitHub 由它识别）
 ├── NOTICE                  项目版权 + SPDX: LGPL-3.0-or-later + 文本索引
 ├── licenses/GPL-3.0.txt    GNU GPL v3 全文（LGPL-3.0 并入引用；不放在
@@ -125,7 +125,8 @@ F:\1KeyTranscoder\
 
 | 文件 | 说明 |
 |---|---|
-| [`release_notes_v0.9.6.md`](release_notes_v0.9.6.md) | **v0.9.6 发布说明（当前版本 · Pre-release）**：硬件缩放进入产品，NVENC/QSV 默认 spline36；`--scale` / `--resize-algo`；Sony/DJI 目标尺寸校验；README 英文 + 简体中文。✅ **本地 tag `v0.9.6`（prerelease）** |
+| [`release_notes_v0.9.7.md`](release_notes_v0.9.7.md) | **v0.9.7 发布说明（当前版本 · Pre-release）**：`--resize WxH` 精确分辨率（不修正长宽比）；`--scale FACTOR` 长边倍率并保持长宽比；x265/SVT-AV1 默认硬件解码并在解码路径缩放；README 英文 + 简体中文。✅ **本地 tag `v0.9.7`（prerelease）** |
+| [`release_notes_v0.9.6.md`](release_notes_v0.9.6.md) | *上一版（v0.9.6 · Pre-release）*：硬件缩放进入产品，NVENC/QSV 默认 spline36；`--scale WxH` / `--resize-algo`；Sony/DJI 目标尺寸校验；README 英文 + 简体中文。✅ **已随 tag `v0.9.6`（prerelease）** |
 | [`release_notes_v0.9.4.md`](release_notes_v0.9.4.md) | *上一版（v0.9.4 · Pre-release）*：GPU 音频对齐默认化、unit pipeline + 并行音频 apply 默认启用、NVENC 动态 maxrate/VBV 跟随 x265、QSV 静态不变、VCE 无入口；硬件缩放仅可行性研究（bilinear 提议）。✅ **已随 tag `v0.9.4`（prerelease）** |
 | [`release_notes_v0.9.0.md`](release_notes_v0.9.0.md) | *上一版（v0.9.0 · Pre-release）*：音频对齐与透明重封装性能优化（C1305 689.9 → 204.1 s / -70.4%，C1306 296.3 → 148.0 s / -50.1%，CUDA opt-in 默认关闭；50 GiB 透明模式 12.8 → 9.63 min、写入 -66%），默认路径输出与 v0.8.11 逐位一致。✅ **已随 tag `v0.9.0`（prerelease）** |
 | [`release_notes_v0.8.11.md`](release_notes_v0.8.11.md) | *上一版（v0.8.11 · Pre-release）*：默认长镜头音频对齐：默认长镜头音频对齐（reference round-3 `drift_rebuild` + `fine_delay`、stereo 组、极性、多声道 A6）+ **透明模式 50 GiB byte-level fast restore**（一次顺序读写、真实端到端 12.8 min、Sony checker 37/37、7 源矩阵 PASS）+ `--audio-plan` 权限最高与相关修复。✅ **已随 tag `v0.8.11`（prerelease）** |
@@ -378,3 +379,5 @@ F:\1KeyTranscoder\
 > `official/Appendix-Film-Grain-Synthesis.md`、`src/CHANGELOG.md`、
 > `src/CommonQuestions.md`），权威副本保留在 `svt-av1/` 根下。
 > 带 `# Source: <URL>` 首行的抓取件**未动**——那是出处证据，不是冗余。
+
+
