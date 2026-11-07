@@ -102,9 +102,10 @@
 
 ## 5. 重要风险
 
-1. **QSV 缩放画质不可接受**
-   - 不建议默认启用；
-   - 需要排查 Intel VPP resize 实现/驱动/色彩转换，或改用其他 VPP 组合。
+1. **QSV bilinear 画质不可接受**
+   - QSV bilinear 相对高质量缩放 VMAF 只有 70–86；
+   - 但 QSV **bicubic/lanczos3** 可到 92–96，需后续补 bicubic 长测；
+   - 不建议把 QSV bilinear 作为默认。
 
 2. **QSV 输出时间戳可能是 VFR**
    - 4K30 源本身 VFR；QSV VPP 输出时间戳出现间隔；
@@ -115,37 +116,111 @@
    - 本批源均为 bt709 SDR；
    - HLG/PQ 素材的 VPP 色彩处理、主显示/HDR 元数据尚未验证。
 
-4. **仅测 bilinear**
-   - 未测 bicubic/lanczos 等算法；
-   - 默认 bilinear 的结论不自动适用于其他算法。
+4. **算法矩阵只覆盖部分源/尺寸**
+   - 覆盖 4K30 8-bit、4K60 10-bit、1080p/720p；
+   - 未覆盖 4:2:2、4K→1440p、HDR、`--avhw`；
+   - 算法结论仍需在这些组合上复验。
 
 5. **软件 vs 硬件缩放语义**
-   - 本报告的 VMAF 参考是 FFmpeg 软件 bilinear；
+   - 尺寸矩阵的 VMAF 参考是 FFmpeg 软件 bilinear；
+   - 算法矩阵提供“同名软件核贴合度”和“相对 lanczos 高质量参考”两个口径；
    - 未来产品缩放需要明确与软件 `scale` 的像素级/相位差异接受度。
 
 ## 6. 建议
 
-1. **产品实现只先做 NVENC**：
+1. **产品实现先做 NVENC**：
    - 显式 `--scale WxH`（或等价输出尺寸参数）；
-   - `--vpp-resize algo=bilinear` + `--output-res WxH`；
+   - **默认 `--vpp-resize algo=bicubic`**（见 §8 算法矩阵）；
+   - `--output-res WxH`；
    - 不默认缩放，保持当前无缩放行为。
-2. **QSV 暂不接入**，直到解决画质问题；
-3. **VCE 保持无入口**；
-4. 做 HDR/10-bit/4:2:2 和 `--avhw` 路径的后续验证；
-5. 处理缩放后的 `tkhd`、Sony/DJI 元数据、时间线和动态 VBV 归一化；
-6. 本报告不改变 v0.9.4 包内容。
+2. **QSV**：bilinear 不可用；**bicubic / lanczos3 可作为候选**，
+   但当前长测仍是 bilinear，需补一次 bicubic 长测后再决定是否接入。
+3. **不要默认 bilinear**：除非常宽/低成本优先且接受明显软化。
+4. **VCE 保持无入口**；
+5. 做 HDR/10-bit/4:2:2 和 `--avhw` 路径的后续验证；
+6. 处理缩放后的 `tkhd`、Sony/DJI 元数据、时间线和动态 VBV 归一化；
+7. 本报告不改变 v0.9.4 包内容。
 
 ## 7. 产物
 
 ```text
 F:\_1kt_hwscale_test\
-├─ matrix_results.json      # 24 次矩阵
-├─ long_results.json        # 2 次长测
-├─ enc\                     # 矩阵输出
+├─ matrix_results.json      # 24 次 bilinear 尺寸矩阵
+├─ algo_results.json        # 44 次算法对比
+├─ long_results.json        # 2 次长测（bilinear）
+├─ enc\  enc_algo\          # 输出
 ├─ long\                    # 长测输出
-├─ metrics\                 # VMAF/SSIM/PSNR
-├─ logs\                    # 每次编码日志
+├─ metrics\  metrics_algo\  # VMAF/SSIM/PSNR
+├─ logs\  logs_algo\        # 每次编码日志
 └─ src\                     # 测试副本（不在源目录）
 ```
+
+## 8. 算法对比：bilinear / bicubic / spline / lanczos
+
+在 4K30 8-bit 和 4K60 10-bit 两个源上，比较 7 个 NVENC 算法和 4 个
+QSV 算法，目标为 1080p/720p。共 **44 次编码，全部成功**。
+
+`VMAF_lz` 表示相对 **软件 lanczos 高质量缩放** 的 VMAF（越高越接近高质量
+缩放）；`VMAF_match` 表示相对同名软件缩放核的贴合度。
+
+### 8.1 NVENC，1080p
+
+| 算法 | 4K30 8-bit VMAF_lz | 4K60 10-bit VMAF_lz | 8-bit wall |
+|---|---:|---:|---:|
+| bilinear | 92.03 | 91.83 | 6.90 s |
+| bicubic | **97.96** | 94.90 | 3.68 s |
+| spline16 | 97.96 | 94.92 | 3.68 s |
+| spline36 | **98.08** | **94.97** | 3.77 s |
+| spline64 | 98.04 | 94.96 | 3.70 s |
+| lanczos3 | **98.44** | **95.18** | 3.74 s |
+| lanczos4 | 98.18 | 95.07 | 3.58 s |
+
+### 8.2 QSV，1080p
+
+| 算法 | 4K30 8-bit VMAF_lz | 4K60 10-bit VMAF_lz | 8-bit wall |
+|---|---:|---:|---:|
+| bilinear | **79.63** | **86.07** | 16.82 s |
+| bicubic | **95.81** | 92.89 | **8.40 s** |
+| spline36 | **95.96** | **92.97** | 17.52 s |
+| lanczos3 | **96.34** | **93.16** | 10.23 s |
+
+720p 结论相同：
+
+- NVENC bilinear 约 92.26 / 92.31，其他算法 97.3–98.0 / 94.9–95.2；
+- QSV bilinear 约 70.25 / 81.68，bicubic 95.35 / 92.80，
+  spline36 95.60 / 92.87，lanczos3 96.02 / 93.07。
+
+### 8.3 解读
+
+- **bilinear**：
+  - NVENC 明显偏软，相对高质量缩放的 VMAF 低约 3–6；
+  - QSV 的 bilinear 是异常低点（70–86），不建议使用；
+  - 只有“最低成本/接受软化”时才有意义。
+- **bicubic**：
+  - NVENC/QSV 都显著优于 bilinear；
+  - QSV bicubic 在 1080p/720p 都接近/达到 92–96；
+  - QSV 速度通常还是最快（8-bit 1080p 8.4 s）；
+  - 振铃风险低于 lanczos，适合作为默认。
+- **spline16/36/64**：
+  - NVENC 与 bicubic 接近，spline36 略高；
+  - QSV spline36 画质略高于 bicubic，但 1080p 墙钟约 17.5 s，
+    明显慢于 bicubic 8.4 s；
+  - spline64 在 10-bit 上更慢，收益很小。
+- **lanczos3/4**：
+  - VMAF_lz 最高；
+  - lanczos3 在 QSV 720p 约 16.3 s，bicubic 约 8.3 s；
+  - 更锐，但高压缩/低码率下振铃/过冲风险也更高；
+  - 适合作为“质量优先”选项，不建议无条件默认。
+
+### 8.4 推荐
+
+| 用途 | 推荐 |
+|---|---|
+| 默认 | **bicubic** |
+| 质量优先/细节优先 | **lanczos3** |
+| 介于两者之间 | spline36 |
+| 软件/低成本/接受软化 | bilinear（NVENC only；QSV 不用） |
+| spline16/64 | 无明确收益，不建议默认 |
+
 
 本次没有修改产品代码，没有重新打包。

@@ -177,14 +177,15 @@ Sony/DJI 保留管线要在缩放后继续保留：
 
 - NVENC：单进程内 `--vpp-resize` + 硬件编码，改造成本最低；
 - QSV：同样支持，需额外处理 `--vpp-resize-mode`；
-- 默认算法可固定为 **bilinear**；
+- 实测默认算法推荐 **bicubic**（不是 bilinear）；质量优先可用 **lanczos3**；
+  bilinear 在 QSV 上画质明显偏低，只适合最低成本/接受软化的场景；
 - 不建议走 FFmpeg `scale_cuda` 作为主路径。
 
 **建议的落地顺序**（未来）：
 
-1. 只做 NVENC `--scale`，固定 bilinear；
+1. 只做 NVENC `--scale`，默认 bicubic；
 2. 加完整性/元数据/画质回归；
-3. 再评估 QSV；
+3. 再评估 QSV（bicubic/lanczos3，需补长测）；
 4. VCE 保持无入口；
 5. 缩放与动态 VBV 的码率归一化单独设计。
 
@@ -197,13 +198,15 @@ Sony/DJI 保留管线要在缩放后继续保留：
 
 关键结论：
 
-- **NVENC**：24 次矩阵全部通过；4K30/4K60、8/10-bit、4:2:2 到 4:2:0
-  均正常；缩放后 VMAF 94.9–99.2，可进入产品实现；
-- **QSV**：功能通过，但 bilinear 缩放后 VMAF 明显下降
-  （1440p 85.8–89.7 / 1080p 84.8–89.3 / 720p 74.6–84.4），
-  `--vpp-resize-mode quality` 未改善；**暂不建议接入**；
+- **NVENC**：24 次 bilinear 尺寸矩阵全部通过；4K30/4K60、8/10-bit、
+  4:2:2 到 4:2:0 均正常；算法矩阵进一步显示 bicubic/spline/lanczos3
+  明显优于 bilinear；
+- **QSV**：bilinear 功能通过但画质明显下降（相对高质量参考 VMAF 70–86）；
+  **bicubic/lanczos3 可提升到 92–96**，算法层面有可用性，但长测仍是
+  bilinear，需补 bicubic 长测后再判断；
 - 长测 8.9 分钟 4K60→1080p：NVENC 516.4 s、QSV 601.4 s，均完成，
   帧数 32,002、时长 533.9 s、解码 PASS；QSV 10 秒样本 VMAF 78.30，
   NVENC 94.37；
 - QSV 输出可能出现 VFR 时间戳，产品集成前必须处理时间线/容器语义；
-- 本轮未覆盖 HDR；只验证 bilinear。
+- 本轮未覆盖 HDR；算法矩阵覆盖 bilinear/bicubic/spline16/36/64/lanczos3/4
+  （NVENC）和 bilinear/bicubic/spline36/lanczos3（QSV）。
