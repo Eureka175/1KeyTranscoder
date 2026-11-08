@@ -319,6 +319,14 @@ def run_sony_pipeline(
     # values are already exact.
     if fix_hw_timing:
         step("repairing durations from stts (millisecond-quantized intermediate)...")
+        # GPAC may normalize the encoded video track to a different media
+        # timescale (AVC 50000 -> 5000).  Restore the source timescale first;
+        # the duration patch below then works in the restored track units.
+        if bundle.video_timescale > 0:
+            for desc in isobmf.patch_track_timescale(
+                final, bundle.video_timescale
+            ):
+                step(f"  {desc}")
         for desc in isobmf.patch_track_durations(
             final, movie_timescale, from_stts=True
         ):

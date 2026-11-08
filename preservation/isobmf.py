@@ -237,6 +237,133 @@ def _stts_sum(f, trak: Box) -> int | None:
     return None
 
 
+def patch_track_timescale(path: Path, target_timescale: int) -> list[str]:
+    """Restore the source video media timescale after GPAC import.
+
+    GPAC can choose a different media timescale for an imported encoded
+    video track (AVC Sony source 50000 -> hardware intermediate/GPAC 5000)
+    even though the real timebase is equivalent. The track timescale is
+    part of the preservation contract, so rewrite the video track's
+    timescale and scale every track-timescale field in place.
+
+    Only byte-level values are changed; box sizes/offsets are untouched.
+    Returns human-readable patch descriptions; no-op when already exact.
+    """
+    if target_timescale <= 0:
+        return []
+    roots = root_boxes(path)
+    moov = next((b for b in roots if b.type == "moov"), None)
+    if moov is None:
+        raise RuntimeError(f"no moov box in {path}")
+
+    patched: list[str] = []
+    with path.open("r+b") as f:
+        for trak in _children(f, moov):
+            if trak.type != "trak" or _trak_handler(f, trak) != "vide":
+                continue
+            mdia = next(
+                (c for c in _children(f, trak) if c.type == "mdia"), None)
+            if mdia is None:
+                continue
+            mdhd = next(
+                (c for c in _children(f, mdia) if c.type == "mdhd"), None)
+            if mdhd is None:
+                continue
+            f.seek(mdhd.data_offset)
+            ver = f.read(1)[0]
+            ts_off = mdhd.data_offset + (20 if ver == 1 else 12)
+            f.seek(ts_off)
+            current = struct.unpack(">I", f.read(4))[0]
+            if current == target_timescale:
+                continue
+            if not current or target_timescale % current:
+                raise RuntimeError(
+                    f"video timescale {current} cannot be rescaled to "
+                    f"{target_timescale} as an integer factor")
+            factor = target_timescale // current
+
+            # mdhd timescale and duration
+            f.seek(ts_off)
+            f.write(struct.pack(">I", target_timescale))
+            dur_off = ts_off + 4
+            f.seek(dur_off)
+            if ver == 1:
+                old_dur = struct.unpack(">Q", f.read(8))[0]
+                f.seek(dur_off)
+                f.write(struct.pack(">Q", old_dur * factor))
+            else:
+                old_dur = struct.unpack(">I", f.read(4))[0]
+                f.seek(dur_off)
+                f.write(struct.pack(">I", old_dur * factor))
+
+            stbl = None
+            for minf in _children(f, mdia):
+                if minf.type != "minf":
+                    continue
+                stbl = next(
+                    (c for c in _children(f, minf) if c.type == "stbl"),
+                    None)
+                if stbl is not None:
+                    break
+            if stbl is not None:
+                for box in _children(f, stbl):
+                    if box.type == "stts":
+                        f.seek(box.data_offset + 4)
+                        count = struct.unpack(">I", f.read(4))[0]
+                        for i in range(count):
+                            off = box.data_offset + 8 + i * 8
+                            f.seek(off)
+                            _, delta = struct.unpack(">II", f.read(8))
+                            f.seek(off + 4)
+                            f.write(struct.pack(">I", delta * factor))
+                    elif box.type == "ctts":
+                        f.seek(box.data_offset)
+                        cver = f.read(1)[0]
+                        f.seek(box.data_offset + 4)
+                        count = struct.unpack(">I", f.read(4))[0]
+                        for i in range(count):
+                            off = box.data_offset + 8 + i * 8
+                            f.seek(off + 4)
+                            if cver == 1:
+                                val = struct.unpack(">i", f.read(4))[0]
+                                f.seek(off + 4)
+                                f.write(struct.pack(">i", val * factor))
+                            else:
+                                val = struct.unpack(">I", f.read(4))[0]
+                                f.seek(off + 4)
+                                f.write(struct.pack(">I", val * factor))
+
+            # edit-list media_time is expressed in the track timescale;
+            # segment_duration stays in movie timescale and is not touched.
+            edts = next(
+                (c for c in _children(f, trak) if c.type == "edts"), None)
+            if edts is not None:
+                elst = next(
+                    (c for c in _children(f, edts) if c.type == "elst"),
+                    None)
+                if elst is not None:
+                    f.seek(elst.data_offset)
+                    ever = f.read(1)[0]
+                    f.seek(elst.data_offset + 4)
+                    count = struct.unpack(">I", f.read(4))[0]
+                    if count == 1:
+                        mt_size = 8 if ever == 1 else 4
+                        mt_off = elst.data_offset + 8 + (8 if ever == 1 else 4)
+                        f.seek(mt_off)
+                        if mt_size == 8:
+                            val = struct.unpack(">q", f.read(8))[0]
+                            f.seek(mt_off)
+                            f.write(struct.pack(">q", val * factor))
+                        else:
+                            val = struct.unpack(">i", f.read(4))[0]
+                            f.seek(mt_off)
+                            f.write(struct.pack(">i", val * factor))
+
+            patched.append(
+                f"trak:vide: timescale {current} -> {target_timescale}")
+    return patched
+
+
 def patch_track_durations(
     path: Path,
     movie_timescale: int,

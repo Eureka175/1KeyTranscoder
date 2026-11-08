@@ -302,11 +302,11 @@ def l1_hardware_resize() -> None:
     njoined = " ".join(str(x) for x in ncmd)
     qjoined = " ".join(str(x) for x in qcmd)
     record("resize.nvenc command args",
-           "--vpp-resize algo=lanczos" in njoined
+           "--vpp-resize algo=lanczos3" in njoined
            and "--output-res 1920x1080" in njoined
            and "--vpp-resize-mode" not in njoined)
     record("resize.qsv command args",
-           "--vpp-resize algo=lanczos" in qjoined
+           "--vpp-resize algo=lanczos3" in qjoined
            and "--output-res 1920x1080" in qjoined
            and "--vpp-resize-mode quality" in qjoined)
     plain, _, _ = nv.command(
@@ -362,4 +362,5 @@ def _resize_kind_supported(kind: str) -> bool:
         return True
     except ValueError:
         return False
+
 

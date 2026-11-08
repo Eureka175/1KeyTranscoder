@@ -138,8 +138,13 @@ def resize_args(kind: str, spec: ResizeSpec) -> list[str]:
         raise ValueError(f"hardware resize unsupported for backend {kind!r}")
     if spec.algo not in RESIZE_ALGOS:
         raise ValueError(f"unsupported resize algorithm {spec.algo!r}")
+    # Public name is the generic "lanczos"; both rigaya tools spell the
+    # concrete kernel as lanczos3.  NVEncC accepts "lanczos" as an alias,
+    # QSVEncC does not (it rejects the whole encode), so use the shared
+    # explicit spelling for both backends.
+    tool_algo = "lanczos3" if spec.algo == "lanczos" else spec.algo
     args = [
-        "--vpp-resize", f"algo={spec.algo}",
+        "--vpp-resize", f"algo={tool_algo}",
         "--output-res", f"{spec.width}x{spec.height}",
     ]
     if kind == "qsvencc":
