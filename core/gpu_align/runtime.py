@@ -47,6 +47,13 @@ class _ResidualDispatcher:
         try:
             sess = self.ctx.session()
             if sess is None:
+                # No CUDA device: fail closed and drain any queued callers.
+                # Returning without draining deadlocks every residual_peak()
+                # caller (long-take's worker threads wait on a Future forever).
+                self.error = "GPU session unavailable"
+                self.ctx.metrics.notes.append(
+                    f"residual_dispatcher:{self.error}")
+                self._drain()
                 return
             from .residual_cc import ResidualCCEngine
 
@@ -65,14 +72,17 @@ class _ResidualDispatcher:
         except BaseException as exc:                   # noqa: BLE001
             self.error = f"{type(exc).__name__}: {exc}"
             self.ctx.metrics.notes.append(f"residual_dispatcher:{self.error}")
-            # Drain queued work so callers never wait forever.
-            while True:
-                try:
-                    item = self.q.get_nowait()
-                except queue.Empty:
-                    break
-                if item is not None:
-                    item[4].set_result(None)
+            self._drain()
+
+    def _drain(self) -> None:
+        """Never leave a residual caller waiting on a dead dispatcher."""
+        while True:
+            try:
+                item = self.q.get_nowait()
+            except queue.Empty:
+                break
+            if item is not None:
+                item[4].set_result(None)
 
     def peak(self, a12: np.ndarray, b12: np.ndarray, *,
              dec: int, search48: int) -> float | None:
@@ -144,6 +154,10 @@ class GpuRunContext:
     def residual_peak(self, a12: np.ndarray, b12: np.ndarray, *,
                       dec: int, search48: int) -> float | None:
         """Run one residual coarse seed through the run-level dispatcher."""
+        # Fail closed before queueing: on a machine with no CUDA device the
+        # dispatcher has no engine, and a queued Future would wait forever.
+        if self.session() is None:
+            return None
         disp = self._residual_dispatcher
         if disp is None:
             with self._residual_dispatcher_lock:

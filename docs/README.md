@@ -35,7 +35,7 @@ F:\1KeyTranscoder\
 ├── 1kt.py                  主入口（CLI + 编排；硬件批量逻辑在 core/batch_hw.py）
 ├── watchfolder.py          轮询批处理入口（转调 1kt.py）
 ├── start.bat               双击启动
-├── VERSION                 版本号唯一来源（0.9.11）
+├── VERSION                 版本号唯一来源（0.9.12）
 ├── LICENSE                 GNU LGPL v3 正文（本项目许可；GitHub 由它识别）
 ├── NOTICE                  项目版权 + SPDX: LGPL-3.0-or-later + 文本索引
 ├── licenses/GPL-3.0.txt    GNU GPL v3 全文（LGPL-3.0 并入引用；不放在
@@ -125,7 +125,8 @@ F:\1KeyTranscoder\
 
 | 文件 | 说明 |
 |---|---|
-| [`release_notes_v0.9.11.md`](release_notes_v0.9.11.md) | **v0.9.11 发布说明（当前版本 · Pre-release）**：QSV `lanczos` 映射为 `lanczos3`；Sony AVC 保留路径恢复视频 timescale/stts。✅ **本地 tag `v0.9.11`（prerelease）** |
+| [`release_notes_v0.9.12.md`](release_notes_v0.9.12.md) | **v0.9.12 发布说明（当前版本 · Pre-release）**：修复无 CUDA 设备时 channel-sync GPU residual 队列死锁，自动回退 CPU。✅ **本地 tag `v0.9.12`（prerelease）** |
+| [`release_notes_v0.9.11.md`](release_notes_v0.9.11.md) | *上一版（v0.9.11 · Pre-release）*：QSV `lanczos3`；Sony AVC timescale/stts 修复。✅ **已随 tag `v0.9.11`（prerelease）** |
 | [`release_notes_v0.9.10.md`](release_notes_v0.9.10.md) | *上一版（v0.9.10 · Pre-release）*：补全 classic 硬件路径 per-job GC；成功后 `.1ktwork/` 仅保留 `caps/`。✅ **已随 tag `v0.9.10`（prerelease）** |
 | [`release_notes_v0.9.9.md`](release_notes_v0.9.9.md) | *上一版（v0.9.9 · Pre-release）*：classic x265/AV1 流策略统一为视频+音频+字幕；修复 AV1 `stts` data 轨导致的路径分叉。✅ **已随 tag `v0.9.9`（prerelease）** |
 | [`release_notes_v0.9.8.md`](release_notes_v0.9.8.md) | *上一版（v0.9.8 · Pre-release）*：缩放算法收窄为 bilinear/bicubic/lanczos，全部路径默认 lanczos；初步修复 classic AV1 带 Sony `stts` data 轨的 MP4 写入失败。✅ **已随 tag `v0.9.8`（prerelease）** |
@@ -383,6 +384,7 @@ F:\1KeyTranscoder\
 > `official/Appendix-Film-Grain-Synthesis.md`、`src/CHANGELOG.md`、
 > `src/CommonQuestions.md`），权威副本保留在 `svt-av1/` 根下。
 > 带 `# Source: <URL>` 首行的抓取件**未动**——那是出处证据，不是冗余。
+
 
 
 
