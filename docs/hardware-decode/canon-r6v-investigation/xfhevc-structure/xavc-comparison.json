@@ -1,0 +1,182 @@
+{
+  "role": "XF-HEVC 与 XAVC 逐项结构对照",
+  "xavc_reference_source": "项目自身代码与文档：preservation/isobmf.py, models.py, core/batch_hw.py, docs/hardware-decode/xavc-hs-frame-count.md",
+  "xavc_reference": {
+    "_source": "项目自身代码与文档：preservation/isobmf.py, models.py, core/batch_hw.py, docs/hardware-decode/xavc-hs-frame-count.md",
+    "brand": {
+      "major": "XAVC",
+      "compatible": "含 XAVC* 系列"
+    },
+    "video_codec": {
+      "codec": "hevc (XAVC HS) 或 h264 (XAVC S)",
+      "sample_entry": "hvc1 (HEVC) / avc1 (H.264)"
+    },
+    "timed_metadata_track": {
+      "sample_entry": "rtmd",
+      "handler_type": "meta",
+      "constant_sample_size": 19456,
+      "payload": "Sony 私有二进制（含 IMU / 镜头 / 对焦）",
+      "tref": "rtmd -> 视频轨 (cdsc)"
+    },
+    "file_level_meta": {
+      "handler_type": "nrtm",
+      "contains": "Lens profile item + NonRealTimeMeta XML"
+    },
+    "vendor_uuid": {
+      "PROF": "50524F4621D24FCEBB88695CFAC9C740",
+      "USMT": "55534D5421D24FCEBB88695CFAC9C740",
+      "placement": "PROF x1 (root), USMT x4 (3 个 trak 尾 + moov 尾)"
+    },
+    "audio": "LPCM，tag 实际为 ipcm",
+    "chapters": "无"
+  },
+  "comparison": [
+    {
+      "item": "容器品牌",
+      "xfhevc": "major=XFVC, compat=XFVC/mp42/iso2",
+      "xavc": "major=XAVC, compat=含 XAVC* 系列",
+      "relation": "DIFFERENT",
+      "note": "厂商标识不同；两者都不是标准通用 brand"
+    },
+    {
+      "item": "moov 位置",
+      "xfhevc": "moov 在 mdat 之前（faststart）",
+      "xavc": "moov-at-EOF",
+      "relation": "DIFFERENT",
+      "note": "影响 GPAC/MP4Box 处理与流式播发"
+    },
+    {
+      "item": "视频编码",
+      "xfhevc": "HEVC Rext 4:2:2 10bit",
+      "xavc": "HEVC Main10 4:2:0 / H.264 4:2:2 10bit",
+      "relation": "DIFFERENT",
+      "note": "XF-HEVC 是 4:2:2；XAVC HS 是 4:2:0"
+    },
+    {
+      "item": "视频采样入口",
+      "xfhevc": "hvc1",
+      "xavc": "hvc1 (HEVC) / avc1 (H.264)",
+      "relation": "SAME/SIMILAR",
+      "note": "都用标准 hvc1"
+    },
+    {
+      "item": "视频 profile",
+      "xfhevc": "general_profile_idc=4 (Rext, 4:2:2 10bit)",
+      "xavc": "Main 10 (XAVC HS)",
+      "relation": "DIFFERENT",
+      "note": "4:2:2 需要 Rext"
+    },
+    {
+      "item": "GOP 结构",
+      "xfhevc": "stss 有值，GOP=15 帧（Long-GOP IPB）",
+      "xavc": "stss 从不缺失 ⇒ 全部 LongGOP",
+      "relation": "SAME/SIMILAR",
+      "note": "都是 LongGOP"
+    },
+    {
+      "item": "ctts",
+      "xfhevc": "存在，103 条，offset = 0 / 3003（=3×1001）",
+      "xavc": "存在（151/151），最大 offset 5005/3003",
+      "relation": "SAME/SIMILAR",
+      "note": "都有 B 帧重排序"
+    },
+    {
+      "item": "edit list",
+      "xfhevc": "elst media_time = 1001（1 帧）",
+      "xavc": "elst media_time = 2002 或 1001",
+      "relation": "SAME/SIMILAR",
+      "note": "都用 elst 表达起始偏移"
+    },
+    {
+      "item": "前导图像数",
+      "xfhevc": "2（首个同步样本前）",
+      "xavc": "3（XAVC HS）/ 2（XAVC S）",
+      "relation": "SAME CLASS",
+      "note": "同为 open-GOP 流形态 ⇒ rigaya 缺陷同源"
+    },
+    {
+      "item": "定时 metadata 轨",
+      "xfhevc": "cndm，1064 B 定长/帧，KLV 编码",
+      "xavc": "rtmd，19456 B 定长/帧，Sony 私有二进制",
+      "relation": "ANALOGOUS",
+      "note": "机制相同（定时 metadata 轨），名称/载荷完全不同"
+    },
+    {
+      "item": "metadata 轨 tref",
+      "xfhevc": "cndm → cdsc → 视频轨 id=1",
+      "xavc": "rtmd → cdsc → 视频轨",
+      "relation": "SAME",
+      "note": "都用 cdsc 关联视频轨"
+    },
+    {
+      "item": "metadata 轨 handler",
+      "xfhevc": "meta",
+      "xavc": "meta",
+      "relation": "SAME",
+      "note": "相同"
+    },
+    {
+      "item": "文件级 meta",
+      "xfhevc": "moov 级 uuid box（Canon 私有容器）",
+      "xavc": "nrtm meta box（Lens profile + NonRealTimeMeta XML）",
+      "relation": "ANALOGOUS",
+      "note": "都有文件级 metadata，但载体与内容不同"
+    },
+    {
+      "item": "厂商 uuid",
+      "xfhevc": "1 个：{85C0B687-820F-11E0-8111-F4CE462B6A48}（65,810 B）",
+      "xavc": "PROF x1 (root) + USMT x4 (trak/moov 尾)",
+      "relation": "ANALOGOUS",
+      "note": "都是厂商私有 uuid box，GUID 与结构不同"
+    },
+    {
+      "item": "时间码",
+      "xfhevc": "独立 tmcd 轨，4 B/帧，值 249959 起逐帧 +1",
+      "xavc": "时间码在 rtmd 轨的 tag 上",
+      "relation": "DIFFERENT",
+      "note": "Canon 用标准 tmcd 轨；Sony 把时间码放 rtmd"
+    },
+    {
+      "item": "音频",
+      "xfhevc": "4 × 单声道 pcm_s24be / ipcm，48 kHz / 24 bit",
+      "xavc": "LPCM，tag 实际为 ipcm",
+      "relation": "SAME/SIMILAR",
+      "note": "tag 层相同（ipcm）；XF-HEVC 是 big-endian 24-bit 单声道 ×4"
+    },
+    {
+      "item": "音频轨道数",
+      "xfhevc": "4 条独立单声道轨",
+      "xavc": "视机型（XAVC 常为 2 或 4 声道 LPCM）",
+      "relation": "DIFFERENT",
+      "note": "XF-HEVC 的 4CH 是 4×mono 而非 1×4CH"
+    },
+    {
+      "item": "chapters",
+      "xfhevc": "无",
+      "xavc": "无",
+      "relation": "SAME",
+      "note": ""
+    },
+    {
+      "item": "块偏移 box",
+      "xfhevc": "co64（全部 7 轨）",
+      "xavc": "未记录",
+      "relation": "UNKNOWN",
+      "note": "XAVC 侧未记录 co64/stco，需补测"
+    },
+    {
+      "item": "并行工具",
+      "xfhevc": "SPS: tiles 2 列 × 1 行，entropy_coding_sync=0",
+      "xavc": "未记录",
+      "relation": "UNKNOWN",
+      "note": "XF-HEVC 用 tiles 而非 WPP"
+    }
+  ],
+  "summary": {
+    "same_or_similar": 9,
+    "analogous": 3,
+    "different": 6,
+    "unknown": 2
+  },
+  "key_conclusion": "两者的**结构范式相同、具体标识与载荷不同**：都是 (1) 厂商私有 brand，(2) LongGOP + ctts + elst 的 open-GOP 时间轴，(3) 一条用 cdsc 关联视频轨的定时 metadata 轨（meta handler），(4) 文件级厂商 metadata（Canon 在 uuid box 里，Sony 在 nrtm meta 里），(5) 厂商私有 uuid box。rigaya 的丢帧缺陷命中的是第 (2) 项 —— 流形态，而非品牌。"
+}

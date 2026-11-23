@@ -109,7 +109,7 @@ def main() -> int:
     )
 
     # 2. built-in validation evidence (preservation report in logs)
-    logs_root = source.parent.parent / "logs" / "preserve_reports"
+    logs_root = work_root / "logs" / "preserve_reports"
     report_path: Path | None = None
     for cand in logs_root.glob("*.json"):
         if source.stem in cand.name:

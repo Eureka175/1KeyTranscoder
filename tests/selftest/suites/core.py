@@ -140,8 +140,11 @@ def l1_hw() -> None:
     record("hw.plan nvenc 422/10 保真",
            plan_initial_format(caps422, "nvencc", "4:2:2", 10)
            == (("4:2:2", 10), False))
-    record("hw.plan qsv 422/10 转 420",
+    record("hw.plan qsv 422/10 跟随能力（不再强制 420）",
            plan_initial_format(caps422, "qsvencc", "4:2:2", 10)
+           == (("4:2:2", 10), False))
+    record("hw.plan qsv 422/10 无能力时降级 420",
+           plan_initial_format(caps420, "qsvencc", "4:2:2", 10)
            == (("4:2:0", 10), True))
     record("hw.plan 420/10 支持",
            plan_initial_format(caps420, "nvencc", "4:2:0", 10)
@@ -651,3 +654,44 @@ def l1_integrity_geometry() -> None:
     record("integrity.geometry 4:2:2 frame bytes = 4 bytes/pixel (10-bit)",
            y + 2 * c == 1920 * 1080 * 4,
            f"frame={y + 2 * c}")
+
+
+def l1_dashboard_timing() -> None:
+    """Dashboard must report real worker start/elapsed, not queue admission."""
+    import json
+    import time
+
+    from core.dashboard import DashboardStatus
+
+    section("L1 dashboard timing")
+    with tempfile.TemporaryDirectory(prefix="1kt_dash_") as td:
+        path = Path(td) / "dashboard.json"
+        status = DashboardStatus(path)
+        status.admit("A.MP4", "FAST", "nvenc")
+        status.admit("B.MP4", "FAST", "nvenc")
+        status.start("A.MP4", "FAST", "nvenc")
+        time.sleep(0.12)
+        status.update("A.MP4", "encoding", "420/10")
+        time.sleep(0.12)
+        status.finish("A.MP4", "done")
+        time.sleep(0.12)
+        status.start("B.MP4", "FAST", "nvenc")
+        time.sleep(0.05)
+        status.finish("B.MP4", "done")
+        status.set_meta({"total": 2})
+        status.mark_finished()
+        rows = {r["name"]: r for r in json.loads(
+            path.read_text(encoding="utf-8"))["rows"]}
+    a, b = rows["A.MP4"], rows["B.MP4"]
+    record("dashboard 各任务 started 是实际开始时间（不同）",
+           isinstance(a["started"], (int, float))
+           and isinstance(b["started"], (int, float))
+           and a["started"] != b["started"],
+           f"A={a['started']} B={b['started']}")
+    record("dashboard 后启动任务的 queue_sec 为真实排队时间",
+           b["queue_sec"] is not None and b["queue_sec"] >= 0.05,
+           f"queue={b['queue_sec']}")
+    record("dashboard elapsed 只计算实际运行时间",
+           a["elapsed"] is not None and b["elapsed"] is not None
+           and a["elapsed"] > b["elapsed"],
+           f"A={a['elapsed']} B={b['elapsed']}")

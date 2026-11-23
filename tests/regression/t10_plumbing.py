@@ -206,7 +206,7 @@ def check_idempotency() -> dict:
     r = subprocess.run(cmd, cwd=str(REPO), stdin=subprocess.DEVNULL,
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                        text=True, encoding="utf-8", errors="replace")
-    log = (outp.parent / "logs" / "total.log")
+    log = (outp / "logs" / "total.log")
     text = log.read_text(encoding="utf-8", errors="replace") if log.is_file() \
         else (r.stdout or "")
     after = _sha(dst)
@@ -259,7 +259,7 @@ def check_broken_inputs() -> dict:
                            text=True, encoding="utf-8", errors="replace",
                            timeout=900)
         dst = outdir / fname
-        logf = indir.parent / "logs" / "total.log"
+        logf = outdir / "logs" / "total.log"
         logtxt = (logf.read_text(encoding="utf-8", errors="replace")
                   if logf.is_file() else "")
         nfiles = None

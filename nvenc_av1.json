@@ -8,7 +8,7 @@
     "sample_rate": 10,
     "max_duration_sec": 60,
     "psnr_min_db": 25.0,
-    "ssim_min": 0.80,
+    "ssim_min": 0.8,
     "garbage_psnr_db": 12.0,
     "max_garbage_frac": 0.02
   },
@@ -17,7 +17,6 @@
       "preset": "quality",
       "tune": "uhq",
       "profile": "high",
-      "level": "6.1",
       "output_depth": 10,
       "qvbr": 26,
       "max_bitrate": 100000,
@@ -33,14 +32,12 @@
       "gop_len": 0,
       "tile_columns": 2
     },
-
     "HQ": {
       "preset": "quality",
       "tune": "hq",
       "profile": "high",
-      "level": "6.1",
       "output_depth": 10,
-      "qvbr": 30,
+      "qvbr": 31,
       "max_bitrate": 80000,
       "vbv_bufsize": 240000,
       "aq": true,
@@ -54,14 +51,12 @@
       "gop_len": 0,
       "tile_columns": 2
     },
-
     "SMALL": {
       "preset": "quality",
       "tune": "hq",
       "profile": "high",
-      "level": "6.1",
       "output_depth": 10,
-      "qvbr": 38,
+      "qvbr": 40,
       "max_bitrate": 40000,
       "vbv_bufsize": 120000,
       "aq": true,
@@ -75,14 +70,12 @@
       "gop_len": 0,
       "tile_columns": 2
     },
-
     "FAST": {
       "preset": "default",
       "tune": "hq",
       "profile": "high",
-      "level": "6.1",
       "output_depth": 10,
-      "qvbr": 34,
+      "qvbr": 35,
       "max_bitrate": 60000,
       "vbv_bufsize": 240000,
       "aq": true,

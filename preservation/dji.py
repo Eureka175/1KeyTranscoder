@@ -392,6 +392,7 @@ def dji_rebuild(
         ffmpeg=ffmpeg,
         quality_opts=quality_opts,
         quality_csv=quality_csv,
+        expected_video_size=expected_video_size,
         log=log,
     )
     report["job_dir"] = str(work_dir)
@@ -422,6 +423,7 @@ def run_dji_check(
     ffmpeg: Path | None = None,
     quality_opts: dict[str, Any] | None = None,
     quality_csv: Path | None = None,
+    expected_video_size: tuple[int, int] | None = None,
     video_reencoded: bool = True,
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
@@ -442,6 +444,8 @@ def run_dji_check(
 
     video_entry: expected sample entry of the re-encoded video track
     ("hvc1" HEVC / "av01" AV1).
+    expected_video_size: explicit resize target; the structural video
+    dimension check expects this geometry instead of the source geometry.
 
     Critical items: data-track payloads (djmd/dbgi/tmcd) byte-identical,
     track inventory, audio streams, video frame count/fps (CFR only),

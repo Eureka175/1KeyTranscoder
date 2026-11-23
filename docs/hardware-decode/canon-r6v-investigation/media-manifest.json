@@ -1,0 +1,201 @@
+{
+  "schema": "canon-r6v-investigation/media-manifest/1",
+  "media_dir": "F:\\CANON_R6V_OG_7K2997P_4CH_XFVC",
+  "note": "目录名中的 OG / 7K / 2997P / 4CH / XFVC 全部**不得**用于推断媒体属性。实际属性一律来自 ffprobe 与 HEVC SPS 位流。",
+  "source_files": [
+    {
+      "key": "A0013C699",
+      "path": "F:\\CANON_R6V_OG_7K2997P_4CH_XFVC\\A_0013C699H260510_003337W5_CANON.MP4",
+      "bytes": 323904650,
+      "sha256": "0383003f775095bb99e3729cdc7439b5a297f6e74ca3fd04653a551eeb8e11a3",
+      "duration_s": 5.138467,
+      "container_samples": 154,
+      "sidecar": {
+        "name": "A_0013C699H260510_003337W5_CANON.CPF",
+        "bytes": 63452,
+        "sha256": "beb049833861c38e426a9214af3bc28b1b94c373d08e022a0c4bf2140bf2139c",
+        "format": "binary (not XML; no readable strings extracted)"
+      }
+    },
+    {
+      "key": "A0013C700",
+      "path": "F:\\CANON_R6V_OG_7K2997P_4CH_XFVC\\A_0013C700H260510_003349NQ_CANON.MP4",
+      "bytes": 1411158014,
+      "sha256": "1a31c8d3116a4bba2c248a6fe47ca7ec1c92ffe7f5597be5b72b3416ebe4970",
+      "duration_s": 22.889533,
+      "container_samples": 686,
+      "sidecar": {
+        "name": "A_0013C700H260510_003349NQ_CANON.CPF",
+        "bytes": 63452,
+        "sha256": "beb049833861c38e426a9214af3bc28b1b94c373d08e022a0c4bf2140bf2139c",
+        "format": "binary (not XML; no readable strings extracted)"
+      }
+    }
+  ],
+  "sidecar_observation": "两条 CPF 的 SHA-256 完全相同（beb04983…）—— 它们是同一份内容，不是按片段区分的 sidecar。内容为二进制，未解析出可用文本。",
+  "video": {
+    "codec_name": "hevc",
+    "codec_tag_string": "hvc1",
+    "profile_ffprobe": "Rext",
+    "sps_general_profile_idc": 4,
+    "sps_profile_meaning": "HEVC Format Range Extensions",
+    "sps_chroma_format_idc": 2,
+    "chroma": "4:2:2",
+    "sps_bit_depth_luma_minus8": 2,
+    "sps_bit_depth_chroma_minus8": 2,
+    "bit_depth": 10,
+    "pix_fmt": "yuv422p10le",
+    "width": 6912,
+    "height": 4608,
+    "sample_aspect_ratio": "1:1",
+    "display_aspect_ratio": "3:2",
+    "r_frame_rate": "30000/1001",
+    "avg_frame_rate": "30000/1001",
+    "time_base": "1/30000",
+    "level": 183,
+    "sps_general_level_idc": 183,
+    "field_order": "progressive (general_frame_only_constraint_flag=1)",
+    "color_range": "pc",
+    "color_space": "bt709",
+    "color_transfer": null,
+    "color_primaries": null,
+    "has_b_frames": 1,
+    "refs": 1,
+    "gop_structure": {
+      "kind": "Long-GOP IPB (NOT intra-only)",
+      "i_frames": {
+        "A0013C699": 11,
+        "A0013C700": 46
+      },
+      "p_frames": {
+        "A0013C699": 41,
+        "A0013C700": 640
+      },
+      "b_frames": {
+        "A0013C699": 102,
+        "A0013C700": null
+      },
+      "gop_size_frames": 15,
+      "gop_size_seconds": 0.5005,
+      "keyframe_indices_A0013C699": [
+        2,
+        17,
+        32,
+        47,
+        62,
+        77,
+        92,
+        107,
+        122,
+        137,
+        152
+      ],
+      "note": "目录名含 'OG'（通常指 open-GOP / 原始），但实测为 Long-GOP IPB，GOP 恒为 15 帧。B 帧存在，因此必然需要解码重排序。"
+    },
+    "timeline_structure": {
+      "leading_pictures_before_first_sync": 2,
+      "first_packet_decode_order": {
+        "index": 0,
+        "pict_type": "I (IDR, keyframe)",
+        "pts_time": 0.066733,
+        "dts_time": -0.033367
+      },
+      "display_order_head": [
+        {
+          "pts_time": 0.0,
+          "pict_type": "B"
+        },
+        {
+          "pts_time": 0.033367,
+          "pict_type": "B"
+        },
+        {
+          "pts_time": 0.066733,
+          "pict_type": "I"
+        }
+      ],
+      "first_dts_negative": true,
+      "dts_monotonic": true,
+      "pts_strictly_increasing": true,
+      "note": "首个 DTS 为负（-0.033367），显示序在 IDR 之前有 2 个前导 B 帧。这正是项目自身文档 docs/hardware-decode/xavc-hs-frame-count.md 记录的 RC-1 触发形态：rigaya --avhw 把'第一个喂入 packet 的 PTS'当作呈现起点，丢弃呈现序排在首个关键帧之前的图像。"
+    }
+  },
+  "audio": {
+    "stream_count": 4,
+    "topology": "4 x mono",
+    "not": [
+      "1 x 4CH",
+      "2 x 2CH"
+    ],
+    "codec_name": "pcm_s24be",
+    "codec_tag_string": "ipcm",
+    "channels_each": 1,
+    "channel_layout": null,
+    "sample_rate": 48000,
+    "sample_fmt": "s32",
+    "bits_per_raw_sample": 24,
+    "bit_rate_each": 1152000,
+    "start_time": "0.000000",
+    "duration": {
+      "A0013C699": "5.138458",
+      "A0013C700": "22.889521"
+    },
+    "note": "目录名中的 4CH 指'四条通道'，但容器里是 **4 条独立单声道流**，不是一条四声道流。channel_layout 缺失（ffprobe 未报告）。"
+  },
+  "data_streams": {
+    "count": 2,
+    "streams": [
+      {
+        "index": 5,
+        "codec_tag_string": "tmcd",
+        "codec_type": "data",
+        "time_base": "1/30000",
+        "nb_frames": {
+          "A0013C699": 154,
+          "A0013C700": 686
+        },
+        "tags": {
+          "timecode": {
+            "A0013C699": "02:19:00;11",
+            "A0013C700": "02:19:05;15"
+          }
+        },
+        "meaning": "SMPTE 时间码轨"
+      },
+      {
+        "index": 6,
+        "codec_tag_string": "cndm",
+        "codec_type": "data",
+        "time_base": "1/30000",
+        "nb_frames": {
+          "A0013C699": 154,
+          "A0013C700": 686
+        },
+        "bit_rate": "255104",
+        "meaning": "Canon 专有 metadata 轨。**不是** Sony 的 rtmd/nrtm/PROF/USMT。"
+      }
+    ],
+    "sony_markers_present": false,
+    "sony_markers_checked": [
+      "rtmd",
+      "nrtm",
+      "PROF",
+      "USMT"
+    ],
+    "dji_markers_present": false,
+    "chapters": 0
+  },
+  "container": {
+    "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+    "major_brand": "XFVC",
+    "minor_version": "1",
+    "compatible_brands": "XFVCmp42iso2",
+    "nb_streams": 7,
+    "creation_time": {
+      "A0013C699": "2026-05-10T00:33:38.000000Z",
+      "A0013C700": "2026-05-10T00:33:50Z"
+    },
+    "make": "",
+    "model": ""
+  }
+}

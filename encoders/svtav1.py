@@ -9,8 +9,10 @@ All SVT-AV1-specific knowledge lives here:
 
 The backend receives already-resolved EffectiveParams from
 core.scaling. It does NOT calculate scaling factors, classify sources,
-or apply bitrate rules. AV1 policy: uniform 4:2:0 output (SVT-AV1's
-only chroma formats); the caller emits the 4:2:2-downgrade warning.
+or apply bitrate rules. AV1 policy: uniform 4:2:0 **10-bit** output
+(SVT-AV1's available chroma formats; the shared format policy in
+encoders/format_policy.py makes this identical to NVENC AV1/QSV AV1);
+the caller emits the same FORMAT-PLAN downgrade warning as hardware.
 """
 
 from __future__ import annotations
@@ -97,9 +99,26 @@ def build_svt_params(effective: EffectiveParams) -> tuple[str, dict[str, Any]]:
 
 
 def av1_pix_fmt(src_info: SourceInfo) -> str:
-    """Uniform 4:2:0 output; keep the source bit depth (8 -> yuv420p,
-    10 -> yuv420p10le). SVT-AV1 supports only these two formats."""
-    return "yuv420p10le" if src_info.bit_depth > 8 else "yuv420p"
+    """Output pixel format via the shared format policy.
+
+    All AV1 backends in this project are 4:2:0-only.  The policy plans
+    4:2:0/10-bit for *every* source (8-bit included), matching hardware
+    AV1 and making the three AV1 outputs byte-for-byte comparable in
+    format; non-4:2:0 sources are downgraded and reported by the caller
+    with the same FORMAT-PLAN contract as hardware.
+    """
+    from .format_policy import plan_output_format, pix_fmt_name
+
+    plan = plan_output_format(
+        backend="svtav1", codec="av1",
+        chroma=src_info.chroma, depth=src_info.bit_depth,
+    )
+    if plan.chroma != "4:2:0":
+        raise ValueError(
+            "SVT-AV1 output only supports 4:2:0 "
+            f"(requested {plan.chroma})"
+        )
+    return pix_fmt_name(plan.chroma, plan.depth)
 
 
 def build_command(

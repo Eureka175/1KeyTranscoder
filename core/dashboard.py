@@ -38,6 +38,11 @@ class DashboardStatus:
         The scheduler admits every source before any worker starts, so the
         dashboard shows the whole queued population instead of only the files
         that happen to be in the current wave.
+
+        ``admitted`` is the queue-entry timestamp.  ``started`` stays ``None``
+        until a worker actually begins this source: using the admission time
+        as ``started`` made every task's elapsed time include its queue wait
+        and made all rows share one start timestamp.
         """
         with self._lock:
             key = str(src)
@@ -52,12 +57,22 @@ class DashboardStatus:
                 "detail": "",
                 "frames": 0,
                 "fps": 0.0,
-                "started": time.time(),
+                "admitted": time.time(),
+                "started": None,
+                "elapsed": None,
+                "queue_sec": None,
             }
 
     def start(self, src, preset: str, backend: str) -> None:
+        """Mark the real worker start of one source.
+
+        Called by the worker immediately before probing/encoding, not by the
+        scheduler when the file enters the queue.  Queue time is retained as
+        ``queue_sec``; ``elapsed`` is measured from this timestamp.
+        """
         with self._lock:
             key = str(src)
+            now = time.time()
             row = self.rows.get(key)
             if row is None:
                 row = {
@@ -69,14 +84,22 @@ class DashboardStatus:
                     "detail": "",
                     "frames": 0,
                     "fps": 0.0,
-                    "started": time.time(),
+                    "admitted": now,
+                    "started": None,
+                    "elapsed": None,
+                    "queue_sec": None,
                 }
                 self.rows[key] = row
-            else:
-                # Keep the admission timestamp so dashboard elapsed includes
-                # queue time; workers must not reset it.
-                row["preset"] = preset
-                row["backend"] = backend
+            row["preset"] = preset
+            row["backend"] = backend
+            if row.get("started") is None:
+                row["started"] = now
+                admitted = row.get("admitted")
+                row["queue_sec"] = (
+                    round(now - admitted, 1)
+                    if isinstance(admitted, (int, float))
+                    else None
+                )
 
     def update(
         self,
@@ -98,15 +121,30 @@ class DashboardStatus:
                 row["frames"] = frames
             if fps:
                 row["fps"] = fps
+            started = row.get("started")
+            if isinstance(started, (int, float)):
+                row["elapsed"] = round(time.time() - started, 1)
 
     def finish(self, src, result: str) -> None:
         with self._lock:
             row = self.rows.get(str(src))
             if row is None:
                 return
+            now = time.time()
             row["status"] = result
             row["detail"] = ""
-            row["elapsed"] = round(time.time() - row["started"], 1)
+            started = row.get("started")
+            if isinstance(started, (int, float)):
+                row["elapsed"] = round(now - started, 1)
+            else:
+                # Never started (e.g. an admission that was cancelled before
+                # a worker picked it up): there is no encode time to report.
+                row["elapsed"] = None
+            admitted = row.get("admitted")
+            if isinstance(started, (int, float)) and isinstance(
+                admitted, (int, float)
+            ):
+                row["queue_sec"] = round(started - admitted, 1)
 
     def set_meta(self, meta: dict[str, Any]) -> None:
         with self._lock:

@@ -462,6 +462,51 @@ class GpacContainerBackend:
 
     # -- reconstruction ---------------------------------------------------
 
+    def concat(
+        self,
+        sources: list[Path],
+        dst: Path,
+        *,
+        unalign: bool = False,
+        flat: bool = False,
+    ) -> None:
+        """Losslessly concatenate ISOBMFF sources with MP4Box ``-cat``.
+
+        All tracks (video, audio, djmd/dbgi/tmcd data tracks) are carried
+        by MP4Box's native concatenation, so this stays an existing-tool
+        operation rather than a second container writer.  Sources must
+        already be parameter-compatible; callers validate that first.
+
+        ``unalign=True`` adds ``-unalign-cat``: do not align the next
+        source's samples at the previous movie duration.  This is what
+        keeps every track sample-continuous (the camera's audio track is
+        a few milliseconds longer than its video track, so aligned
+        concatenation leaves a one-frame gap at every split boundary and
+        the joined video looks VFR).
+
+        ``flat=True`` adds ``-flat``: media data first, non-interleaved.
+        Measured on GPAC 26.02: without it ``-new`` writes a full-size
+        temporary file next to the output (2x peak disk); with it MP4Box
+        writes the destination directly (no temp, 1x peak disk) and the
+        video track's samples stay contiguous, which is also the faster
+        layout for the encoder's sequential reader.
+        """
+        if len(sources) < 2:
+            raise ValueError("concat requires at least two sources")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        base = _rel_base(dst)
+        cmd = [str(self.mp4box)] + self._ts_args()
+        if flat:
+            cmd.append("-flat")
+        for src in sources:
+            cmd += ["-cat", str(src)]
+        if unalign:
+            cmd.append("-unalign-cat")
+        cmd += ["-new", _opt(dst, base)]
+        _run(cmd, "MP4Box -cat concat", cwd=base)
+        if not dst.is_file() or dst.stat().st_size == 0:
+            raise GpacError(f"MP4Box -cat produced no output: {dst}")
+
     def mux_new(self, dst: Path, adds: list[str], *,
                 flat: bool = False,
                 brand: str | None = None,

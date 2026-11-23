@@ -1,0 +1,1007 @@
+{
+  "role": "cndm 轨 KLV 结构完整解析",
+  "sample_size_bytes": 1064,
+  "sample_count": 154,
+  "private_header_bytes": 28,
+  "private_header_hex": "010000000c0000000001b50b67d0030000000000020000000c040000",
+  "local_set_count": 6,
+  "triplet_total": 120,
+  "local_sets": [
+    {
+      "ul": "060e2b3402530101-0c02010101010000",
+      "offset": 28,
+      "length": 24,
+      "value_sha256_8": "e93ae29d",
+      "triplet_count": 5,
+      "triplets": [
+        {
+          "tag": "0x8000",
+          "offset": 48,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x8001",
+          "offset": 54,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0xD7D58005",
+          "offset": 58,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x8006",
+          "offset": 66,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x02",
+          "offset": 69,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        }
+      ]
+    },
+    {
+      "ul": "060e2b3402530101-0c02010102010000",
+      "offset": 72,
+      "length": 163,
+      "value_sha256_8": "5b61f5ec",
+      "triplet_count": 26,
+      "triplets": [
+        {
+          "tag": "0x8100",
+          "offset": 92,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x10",
+          "offset": 95,
+          "length": 6,
+          "value_sha256_8": "6774548d",
+          "value_head_hex": "0e2b34040101"
+        },
+        {
+          "tag": "0x0B",
+          "offset": 103,
+          "length": 5,
+          "value_sha256_8": "dfe7ae1c",
+          "value_head_hex": "1001010104"
+        },
+        {
+          "tag": "0x00",
+          "offset": 110,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x8115",
+          "offset": 112,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x02",
+          "offset": 115,
+          "length": 3,
+          "value_sha256_8": "407236df",
+          "value_head_hex": "208119"
+        },
+        {
+          "tag": "0x00",
+          "offset": 120,
+          "length": 4,
+          "value_sha256_8": "f59ac1fa",
+          "value_head_hex": "00000320",
+          "uint_be": 800,
+          "uint_le": 537067520
+        },
+        {
+          "tag": "0x8101",
+          "offset": 126,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x01",
+          "offset": 129,
+          "length": 2,
+          "value_sha256_8": "e30f7e51",
+          "value_head_hex": "8102",
+          "uint_be": 33026,
+          "uint_le": 641
+        },
+        {
+          "tag": "0x00",
+          "offset": 133,
+          "length": 1,
+          "value_sha256_8": "a8100ae6",
+          "value_head_hex": "ff",
+          "uint_be": 255,
+          "uint_le": 255
+        },
+        {
+          "tag": "0x811A",
+          "offset": 136,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x01",
+          "offset": 139,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x8104",
+          "offset": 141,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x8B51",
+          "offset": 145,
+          "length": 5,
+          "value_sha256_8": "3cbc6d88",
+          "value_head_hex": "00025ce181"
+        },
+        {
+          "tag": "0x06",
+          "offset": 154,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x08",
+          "offset": 156,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x75",
+          "offset": 159,
+          "length": 48,
+          "value_sha256_8": "33aa1f60",
+          "value_head_hex": "000003e98107000102811c000111811d0001008109000800"
+        },
+        {
+          "tag": "0x02",
+          "offset": 209,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x64",
+          "offset": 211,
+          "length": 13,
+          "value_sha256_8": "7c005685",
+          "value_head_hex": "000101810e00020000811f0002"
+        },
+        {
+          "tag": "0x00",
+          "offset": 227,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x810F",
+          "offset": 229,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x02",
+          "offset": 232,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x1A",
+          "offset": 236,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x10",
+          "offset": 238,
+          "length": 6,
+          "value_sha256_8": "6774548d",
+          "value_head_hex": "0e2b34040101"
+        },
+        {
+          "tag": "0x01",
+          "offset": 246,
+          "length": 4,
+          "value_sha256_8": "4b44e68b",
+          "value_head_hex": "01010102",
+          "uint_be": 16843010,
+          "uint_le": 33620225
+        },
+        {
+          "tag": "0x02",
+          "offset": 252,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        }
+      ]
+    },
+    {
+      "ul": "060e2b3402530101-0c0201017f010000",
+      "offset": 255,
+      "length": 214,
+      "value_sha256_8": "3287484e",
+      "triplet_count": 62,
+      "triplets": [
+        {
+          "tag": "0xE000",
+          "offset": 275,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x10",
+          "offset": 278,
+          "length": 6,
+          "value_sha256_8": "6774548d",
+          "value_head_hex": "0e2b34040101"
+        },
+        {
+          "tag": "0x0D",
+          "offset": 286,
+          "length": 14,
+          "value_sha256_8": "66684348",
+          "value_head_hex": "15000401000000e1070004ffffff"
+        },
+        {
+          "tag": "0xFFE108",
+          "offset": 302,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x0F",
+          "offset": 306,
+          "length": 48,
+          "value_sha256_8": "af77d704",
+          "value_head_hex": "3432343030313736300000000000e109008a524632342d37"
+        },
+        {
+          "tag": "0x00",
+          "offset": 356,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 358,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 360,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 362,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 364,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 366,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 368,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 370,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 372,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 374,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 376,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 378,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 380,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 382,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 384,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 386,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 388,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 390,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 392,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 394,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 396,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 398,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x01",
+          "offset": 400,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 402,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 404,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 406,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 408,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 410,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 412,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 414,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 416,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 418,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 420,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 422,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 424,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 426,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 428,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 430,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 432,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x01",
+          "offset": 434,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x01",
+          "offset": 436,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x07",
+          "offset": 438,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 440,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 442,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 444,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 446,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 448,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 450,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 452,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 454,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 456,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 458,
+          "length": 1,
+          "value_sha256_8": "6e340b9c",
+          "value_head_hex": "00",
+          "uint_be": 0,
+          "uint_le": 0
+        },
+        {
+          "tag": "0x00",
+          "offset": 461,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0xE10D",
+          "offset": 464,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x04",
+          "offset": 467,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 469,
+          "length": 9,
+          "value_sha256_8": "bfc72097",
+          "value_head_hex": "60e115000440006168"
+        },
+        {
+          "tag": "0xE11A",
+          "offset": 480,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        }
+      ]
+    },
+    {
+      "ul": "060e2b3402530101-0c0201017f010000",
+      "offset": 489,
+      "length": 475,
+      "value_sha256_8": "a275f073",
+      "triplet_count": 18,
+      "triplets": [
+        {
+          "tag": "0xE000",
+          "offset": 509,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x10",
+          "offset": 512,
+          "length": 6,
+          "value_sha256_8": "6774548d",
+          "value_head_hex": "0e2b34040101"
+        },
+        {
+          "tag": "0x0D",
+          "offset": 520,
+          "length": 14,
+          "value_sha256_8": "101369e8",
+          "value_head_hex": "15000402000000e20400021200e2"
+        },
+        {
+          "tag": "0x05",
+          "offset": 536,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x02",
+          "offset": 538,
+          "length": 27,
+          "value_sha256_8": "c96aa2b5",
+          "value_head_hex": "00e20a0004006ee7cae20b000101e20c000101e20e000105"
+        },
+        {
+          "tag": "0x01",
+          "offset": 567,
+          "length": 2,
+          "value_sha256_8": "025f7d5b",
+          "value_head_hex": "e211",
+          "uint_be": 57873,
+          "uint_le": 4578
+        },
+        {
+          "tag": "0x00",
+          "offset": 571,
+          "length": 16,
+          "value_sha256_8": "abe590c6",
+          "value_head_hex": "060e2b340401010d0e15000102000000"
+        },
+        {
+          "tag": "0xE212",
+          "offset": 589,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x10",
+          "offset": 592,
+          "length": 6,
+          "value_sha256_8": "6774548d",
+          "value_head_hex": "0e2b34040101"
+        },
+        {
+          "tag": "0x0D",
+          "offset": 600,
+          "length": 14,
+          "value_sha256_8": "d8663a9a",
+          "value_head_hex": "15000202000000e21b000101e21e"
+        },
+        {
+          "tag": "0x00",
+          "offset": 616,
+          "length": 3,
+          "value_sha256_8": "429a673c",
+          "value_head_hex": "131000"
+        },
+        {
+          "tag": "0xE21F",
+          "offset": 621,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0xBD17",
+          "offset": 625,
+          "length": 64,
+          "value_sha256_8": "d22c274d",
+          "value_head_hex": "574054bc7540184019bbeb3f73401abb0a3f633f3ebaca3e"
+        },
+        {
+          "tag": "0x7A",
+          "offset": 692,
+          "length": 56,
+          "value_sha256_8": "0a73366d",
+          "value_head_hex": "dcb1eb2c7a388fb6f023ae3623ba1429473414bb6635331b"
+        },
+        {
+          "tag": "0xE220",
+          "offset": 751,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x7E",
+          "offset": 754,
+          "length": 46,
+          "value_sha256_8": "59ff4d84",
+          "value_head_hex": "1ebbc32aee2e10bbc32af02e05bbc32aee2df9bbc32aee2d"
+        },
+        {
+          "tag": "0xEE2D",
+          "offset": 820,
+          "length": 127,
+          "value_sha256_8": "ba969bf2",
+          "value_head_hex": "bbc02aec2d6fbbbf2aea2d5fbbbf2ae82d50bbbf2ae62d41"
+        },
+        {
+          "tag": "0x20",
+          "offset": 950,
+          "length": 32,
+          "value_sha256_8": "109e77c6",
+          "value_head_hex": "202020202020e22a0010312e302e30002020202020202020"
+        }
+      ]
+    },
+    {
+      "ul": "060e2b3402530101-0c0201017f010000",
+      "offset": 984,
+      "length": 20,
+      "value_sha256_8": "23fe1172",
+      "triplet_count": 4,
+      "triplets": [
+        {
+          "tag": "0xE000",
+          "offset": 1004,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x10",
+          "offset": 1007,
+          "length": 6,
+          "value_sha256_8": "6774548d",
+          "value_head_hex": "0e2b34040101"
+        },
+        {
+          "tag": "0x15",
+          "offset": 1017,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x04",
+          "offset": 1019,
+          "length": 3,
+          "value_sha256_8": "709e80c8",
+          "value_head_hex": "000000"
+        }
+      ]
+    },
+    {
+      "ul": "060e2b3402530101-0c0201017f010000",
+      "offset": 1024,
+      "length": 20,
+      "value_sha256_8": "5f844776",
+      "triplet_count": 5,
+      "triplets": [
+        {
+          "tag": "0xE000",
+          "offset": 1044,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x10",
+          "offset": 1047,
+          "length": 6,
+          "value_sha256_8": "6774548d",
+          "value_head_hex": "0e2b34040101"
+        },
+        {
+          "tag": "0x15",
+          "offset": 1057,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x04",
+          "offset": 1060,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        },
+        {
+          "tag": "0x00",
+          "offset": 1062,
+          "length": 0,
+          "value_sha256_8": "e3b0c442",
+          "value_head_hex": "",
+          "ascii": ""
+        }
+      ]
+    }
+  ],
+  "frames_compared": 4,
+  "note": "cndm = Canon 私有头 + KLV Local Set 序列。Local Set 的 UL 以 060e2b3402 53 01 01 开头（SMPTE 注册的 Canon 标签）。"
+}

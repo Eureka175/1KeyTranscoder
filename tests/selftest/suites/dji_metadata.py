@@ -43,6 +43,62 @@ def l1_dji_metadata_policy() -> None:
     record("djipol: 识别失败默认不保留 (fail-closed)",
            is_action_series(None) is False, "None -> False")
 
+    # --- unified metadata policy shared by hardware + software paths ------
+    from preservation.policy import resolve_metadata_plan
+
+    class _FakeGpac:
+        def __init__(self, tool: str | None) -> None:
+            self.tool = tool
+
+        def info(self, source: Path) -> str:
+            return f"tool: {self.tool}\n" if self.tool else ""
+
+    def _streams(tag: str | None) -> list[dict]:
+        if tag is None:
+            return [{"codec_type": "video", "codec_tag_string": "hvc1"}]
+        return [{"codec_type": "data", "codec_tag_string": tag}]
+
+    def _plan(tag: str | None, tool: str | None, **kwargs):
+        return resolve_metadata_plan(
+            streams=_streams(tag),
+            gpac=_FakeGpac(tool),
+            src=Path("x.mp4"),
+            dji_keep_default=lambda gpac, src: (is_action_series(tool), tool),
+            **kwargs,
+        )
+
+    checks = [
+        ("generic", _plan(None, None), ("generic", False, "generic")),
+        ("sony 默认保留", _plan("rtmd", None),
+         ("sony", True, "sony_rtmd")),
+        ("sony --no-metadata 跳过", _plan("rtmd", None, no_metadata=True),
+         ("sony", False, "no_metadata")),
+        ("dji Action 默认保留", _plan("djmd", "DJI OsmoAction4"),
+         ("dji", True, "dji_action_default")),
+        ("dji Pocket 默认跳过", _plan("djmd", "DJI OsmoPocket3"),
+         ("dji", False, "dji_default_skip")),
+        ("dji Pocket --preserve-metadata 保留",
+         _plan("djmd", "DJI OsmoPocket3", preserve_metadata=True),
+         ("dji", True, "dji_preserve_opt")),
+        ("dji --no-metadata 优先于默认跳过",
+         _plan("djmd", "DJI OsmoPocket3", no_metadata=True),
+         ("dji", False, "no_metadata")),
+        ("dji 分段连接强制保留",
+         _plan("djmd", None, forced_join=True,
+               join_tool="DJI OsmoAction4"),
+         ("dji", True, "dji_join_preserve")),
+        ("dji 分段连接 + --no-metadata 跳过",
+         _plan("djmd", "DJI OsmoAction4", forced_join=True,
+               join_tool="DJI OsmoAction4", no_metadata=True),
+         ("dji", False, "no_metadata")),
+    ]
+    for label, plan, (fam, keep, reason) in checks:
+        record(f"metapol: {label}",
+               plan.family == fam and plan.preserve is keep
+               and plan.reason == reason,
+               f"family={plan.family} keep={plan.preserve} "
+               f"reason={plan.reason}")
+
 
 def _find_sample(*candidates: str) -> Path | None:
     for rel in candidates:

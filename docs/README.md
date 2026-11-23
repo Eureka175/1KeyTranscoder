@@ -7,6 +7,7 @@
 | **搞清楚代码到底怎么跑**（端到端数据流） | [`design/architecture.md`](design/architecture.md) ★ 新维护者从这里开始 |
 | 看**当前该怎么用**这个工具 | 根 [`../README.md`](../README.md) |
 | 看**评估汇总与决策记录** | [[`FINAL_REPORT.md`](FINAL_REPORT.md)](FINAL_REPORT.md)（注意其头部状态横幅） |
+| 看 **4K 编码器全矩阵实测（硬件 / x265 / SVT-AV1，2026-11-16）** | [`evaluation/4k-encoder-eval-2026-11-16/README.md`](evaluation/4k-encoder-eval-2026-11-16/README.md) ★ 报告/指标/图表/校验和 |
 | 查**某后端为什么这样选、参数怎么定的** | [`evaluation/`](evaluation/)（先看该目录索引表里的"状态"列） |
 | 查**某个子系统的设计**（硬件后端 / channel-sync / 4:2:2） | [`design/`](design/) |
 | 搞清楚 **x265 四个档位为什么这样设计**（生产目标 / 计算剪枝 / NVENC 锚点） | [`x265-profile-design.md`](x265-profile-design.md) ★ 档位设计方法论 |
@@ -125,7 +126,9 @@ F:\1KeyTranscoder\
 
 | 文件 | 说明 |
 |---|---|
-| [`release_notes_v0.9.12.md`](release_notes_v0.9.12.md) | **v0.9.12 发布说明（当前版本 · Pre-release）**：修复无 CUDA 设备时 channel-sync GPU residual 队列死锁，自动回退 CPU。✅ **本地 tag `v0.9.12`（prerelease）** |
+| [`release_notes_v0.9.22.md`](release_notes_v0.9.22.md) | **v0.9.22 发布说明（当前版本 · Pre-release）**：硬件完整性校验默认异步（队列 1/不占 `--jobs`）、`--no-metadata` 跳过校验、缩放后 `--check full` 按交付尺寸计算 PSNR/SSIM。✅ **随 tag `v0.9.22`（prerelease）** |
+| [`release_notes_v0.9.21.md`](release_notes_v0.9.21.md) | *上一版（v0.9.21 · Pre-release）*：DJI 分段连接渐进式 staging。✅ **本地 tag `v0.9.21`（prerelease）** |
+| [`release_notes_v0.9.12.md`](release_notes_v0.9.12.md) | *上一版（v0.9.12 · Pre-release）*：修复无 CUDA 设备时 channel-sync GPU residual 队列死锁，自动回退 CPU。✅ **已随 tag `v0.9.12`（prerelease）** |
 | [`release_notes_v0.9.11.md`](release_notes_v0.9.11.md) | *上一版（v0.9.11 · Pre-release）*：QSV `lanczos3`；Sony AVC timescale/stts 修复。✅ **已随 tag `v0.9.11`（prerelease）** |
 | [`release_notes_v0.9.10.md`](release_notes_v0.9.10.md) | *上一版（v0.9.10 · Pre-release）*：补全 classic 硬件路径 per-job GC；成功后 `.1ktwork/` 仅保留 `caps/`。✅ **已随 tag `v0.9.10`（prerelease）** |
 | [`release_notes_v0.9.9.md`](release_notes_v0.9.9.md) | *上一版（v0.9.9 · Pre-release）*：classic x265/AV1 流策略统一为视频+音频+字幕；修复 AV1 `stts` data 轨导致的路径分叉。✅ **已随 tag `v0.9.9`（prerelease）** |
@@ -143,6 +146,9 @@ F:\1KeyTranscoder\
 | `../docs/hardware-decode/` | **v0.7.0 hardware-decode integration 交付物**（本轮已并入 `main`，`v0.7.0 ∈ ancestors(main)`）：[`README.md`](hardware-decode/README.md) 入口、[`integration-test-matrix.md`](hardware-decode/integration-test-matrix.md) 测试矩阵、[`final-report.md`](hardware-decode/final-report.md) 最终判定、`patches/` 与 `toolchain-provenance.json`。⚠️ 矩阵现分**两道闸门**：production 76 例在已部署二进制上可运行；research 7 例（patched 构建身份/provenance 与 stock-vs-patched 对照）因 `tools/avhw/` 缺失而 **BLOCKED**，**不得记为 PASS** |
 | [`plans/hardware-codec-policy-redesign.md`](plans/hardware-codec-policy-redesign.md) | **硬件编解码策略与执行管线重构规划书**（含实施状态与 `SUPERSEDED` 标注）。当前生效架构：`x265`/`svtav1` = FFmpeg 硬解 + FFmpeg 编码；`nvenc`/`qsv` = rigaya 原生读端，**Sony → `--avsw`（预防性）、非 Sony → `--avhw`（完整性闸门保护）**。**不存在** FFmpeg → y4m → rigaya stdin 的生产路径 |
 | [plans/v1.0-async-rollout-plan.md](plans/v1.0-async-rollout-plan.md) | **v1.0 异步/调度长期实施计划**：P1 连续补槽、P2 音视频 overlap、A/B 任务、验收门与状态记录。 |
+| [plans/long-test-20261118.md](plans/long-test-20261118.md)
+| [plans/long-test-20261119.md](plans/long-test-20261119.md) | **2026-11-19 08:00–20:00 全矩阵测试计划**：12:00 前不跑 NVENC；软件 morning + NVENC/QSV 硬件 afternoon + 对齐/分析/归档。 |
+ | **2026-11-18 08:00–20:00 长程测试任务书**：12 h 时间表、对齐/硬件/软件矩阵、元数据/容器校验、断点续跑、失败降级与交付物。 |
 | [design/gpu_align_arch_state.md](design/gpu_align_arch_state.md) | **GPU 音频对齐架构状态/移交**：分支提交、模块、环境开关、实测汇总、限制与下一步。 |
 | [design/gpu_frame_batch_report.md](design/gpu_frame_batch_report.md) | 帧级 `estimate_pair` GPU 批处理实验：实现、单对 hybrid 1.2×、完整入口未通过、默认关闭。 |
 | [design/gpu_pipeline_v2_architecture.md](design/gpu_pipeline_v2_architecture.md) | **GPU Pipeline v2 新架构**：持久 session、coarse 缓存复用、多 target 合批、双缓冲流水线、GPU 利用率目标 >50%。 |
@@ -188,6 +194,9 @@ F:\1KeyTranscoder\
 | [`av1_implementation_assessment.md`](evaluation/av1_implementation_assessment.md) | **AV1 三后端（svtav1/nvenc-av1/qsv-av1）实现评估**：Sony/DJI 保留管线（不打 XAVC tag）+ 端到端实测 + 标定状态 | ✅ **权威（路由/管线）** |
 | [`hevc_implementation_assessment.md`](evaluation/hevc_implementation_assessment.md) | HEVC 实现生产就绪度评估（重写版）：全量代码重读 + 官方文档/社区实测调研 + 本机复测，判定"有条件生产就绪"与上线条件 | ⚠️ 部分过期（§9 AV1 衔接段已被推翻） |
 | [`x265_production_assessment.md`](evaluation/x265_production_assessment.md) | x265 实现生产就绪评估（重写版）：官方文档逐参数核查 + 本机实证 + 生产判定与条件清单 | ⚠️ 部分过期（P0 有 2 项已完成未回填） |
+| [`4k-encoder-eval-2026-11-16/README.md`](evaluation/4k-encoder-eval-2026-11-16/README.md) | **4K 编码器全矩阵实测归档（2026-11-16）**：4 硬件编码器 × 4 挡位 × 6 条 30 s 片段（96 输出）+ x265/SVT-AV1 软件对照；含逐片段率-质量、码控撞墙、解码路径、可复现脚本与 SHA-256 校验 | ✅ **权威（实测）** |
+| [`4k-encoder-eval-2026-11-18/README.md`](evaluation/4k-encoder-eval-2026-11-18/README.md) | **4K 编码器长测归档（2026-11-18）**：7 条片段（含室内高噪点）、4 硬件编码器 × 4 挡、x265 FAST/HQ、SVT-AV1 FAST/HQ/SMALL；含 QSV 新 ICQ 效果、码控撞墙、对齐矩阵与 SHA-256 校验 | ✅ **权威（长测）** |
+| [`4k-encoder-eval-2026-11-19/README.md`](evaluation/4k-encoder-eval-2026-11-19/README.md) | **4K 编码器长测归档（2026-11-19）**：12:00 前不跑 NVENC 的全矩阵复测；硬件 112 输出、软件 42 输出、对齐 18/18；含 11-18 复现性与图表包 | ✅ **权威（长测）** |
 
 > **已移入归档的评估文档**（2026-09-12）：`av1_feasibility_report.md`（❌ 已过期）、
 > `svt_av1_archival_assessment.md`、`av1_hw_tuning_guide.md`（各 ⚠️ 部分过期）。
@@ -384,6 +393,7 @@ F:\1KeyTranscoder\
 > `official/Appendix-Film-Grain-Synthesis.md`、`src/CHANGELOG.md`、
 > `src/CommonQuestions.md`），权威副本保留在 `svt-av1/` 根下。
 > 带 `# Source: <URL>` 首行的抓取件**未动**——那是出处证据，不是冗余。
+
 
 
 

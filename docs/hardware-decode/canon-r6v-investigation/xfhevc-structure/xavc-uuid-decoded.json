@@ -1,0 +1,476 @@
+{
+  "role": "用 ExifTool atom 表解读 XAVC 的 uuid box",
+  "reference": "ExifTool QuickTime.pm uuid 分派表 + Profile/UserMedia 表",
+  "offset_note": "uuid box = 8 字节 box 头 + 16 字节 GUID + 内容。ExifTool 的 'Start => 16' 是**相对 box 起点**，即内容从整个 box 的偏移 24 开始 = whole[24:] —— 与下面一致。",
+  "sources": {
+    "XAVC_422_A7M5": {
+      "path": "F:\\1KeyTranscoder\\testsets\\a7m5_2ch_10bit422\\20260921_C1316.MP4",
+      "boxes": [
+        {
+          "context": "root",
+          "guid": "{50524F46-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 183,
+          "kind": "PROF -> QuickTime::Profile",
+          "decoded": {
+            "body_hex": "0000000000000004000000144650524600000000200000000000000000000034565052460000000000000001687663310000249900000002000186a0000186a0003bf0a6003bf0a60f000870000100010000002c41505246000000000000000274776f73000000000000000000000600000006000000bb80000000020000002350524558000000005650524600000001687663310008000000bd0800000000",
+            "atoms": [
+              {
+                "type": "FPRF",
+                "size": 20,
+                "offset": 8,
+                "fields": {
+                  "FileProfileVersion": 0,
+                  "FileFunctionFlags": "0x20000000",
+                  "flags_decoded": [
+                    "Additional tracks"
+                  ],
+                  "field3": 0
+                }
+              },
+              {
+                "type": "VPRF",
+                "size": 52,
+                "offset": 28,
+                "fields": {
+                  "VideoProfileVersion": 0,
+                  "v1": "0x00000001",
+                  "codec": "hvc1",
+                  "frame_count_or_id": 9369,
+                  "v3": 2,
+                  "scale_a": 100000,
+                  "scale_b": 100000,
+                  "fps_num": 3928230,
+                  "fps_den": 3928230,
+                  "v8": "0x0F000870",
+                  "v9": "0x00010001"
+                }
+              },
+              {
+                "type": "APRF",
+                "size": 44,
+                "offset": 80,
+                "fields": {
+                  "AudioProfileVersion": 0,
+                  "v1": "0x00000002",
+                  "codec": "twos",
+                  "u32be_3": 0,
+                  "u32be_4": 0,
+                  "samples": 1536,
+                  "samples2": 1536,
+                  "sample_rate": 48000
+                }
+              },
+              {
+                "type": "PREX",
+                "size": 35,
+                "offset": 124,
+                "body_hex": "000000005650524600000001687663310008000000bd0800000000"
+              }
+            ]
+          }
+        },
+        {
+          "context": "trak:vide",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 52,
+          "kind": "USMT -> QuickTime::UserMedia",
+          "decoded": {
+            "body_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+            "atoms": [
+              {
+                "type": "MTDT",
+                "size": 28,
+                "offset": 0,
+                "fields": {
+                  "atom_size": 28,
+                  "version_hi16": 1,
+                  "flags_lo16": "0x0012",
+                  "u32be": [
+                    "0x00010012",
+                    "0x0000000A",
+                    "0x55C40000",
+                    "0x00000001",
+                    "0x00000000"
+                  ],
+                  "hex": "000100120000000a55c400000000000100000000",
+                  "status": "UNRESOLVED —— ExifTool 的 UserMedia/MetaData 表描述的是 tag-byte 形式，与本例的定长布局不符"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "context": "trak:soun",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 52,
+          "kind": "USMT -> QuickTime::UserMedia",
+          "decoded": {
+            "body_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+            "atoms": [
+              {
+                "type": "MTDT",
+                "size": 28,
+                "offset": 0,
+                "fields": {
+                  "atom_size": 28,
+                  "version_hi16": 1,
+                  "flags_lo16": "0x0012",
+                  "u32be": [
+                    "0x00010012",
+                    "0x0000000A",
+                    "0x55C40000",
+                    "0x00000001",
+                    "0x00000000"
+                  ],
+                  "hex": "000100120000000a55c400000000000100000000",
+                  "status": "UNRESOLVED —— ExifTool 的 UserMedia/MetaData 表描述的是 tag-byte 形式，与本例的定长布局不符"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "context": "trak:meta",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 52,
+          "kind": "USMT -> QuickTime::UserMedia",
+          "decoded": {
+            "body_hex": "0000001c4d544454000100120000000a55c400000000001000000000",
+            "atoms": [
+              {
+                "type": "MTDT",
+                "size": 28,
+                "offset": 0,
+                "fields": {
+                  "atom_size": 28,
+                  "version_hi16": 1,
+                  "flags_lo16": "0x0012",
+                  "u32be": [
+                    "0x00010012",
+                    "0x0000000A",
+                    "0x55C40000",
+                    "0x00000010",
+                    "0x00000000"
+                  ],
+                  "hex": "000100120000000a55c400000000001000000000",
+                  "status": "UNRESOLVED —— ExifTool 的 UserMedia/MetaData 表描述的是 tag-byte 形式，与本例的定长布局不符"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "context": "moov",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 46,
+          "kind": "USMT -> QuickTime::UserMedia",
+          "decoded": {
+            "body_hex": "000000164d5444540001000c0000000bd5c4000001e0",
+            "atoms": [
+              {
+                "type": "MTDT",
+                "size": 22,
+                "offset": 0,
+                "fields": {
+                  "atom_size": 22,
+                  "version_hi16": 1,
+                  "flags_lo16": "0x000C",
+                  "u32be": [
+                    "0x0001000C",
+                    "0x0000000B",
+                    "0xD5C40000"
+                  ],
+                  "hex": "0001000c0000000bd5c4000001e0",
+                  "status": "UNRESOLVED —— ExifTool 的 UserMedia/MetaData 表描述的是 tag-byte 形式，与本例的定长布局不符"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "XAVC_HS420_A7M5": {
+      "path": "F:\\1KeyTranscoder\\testsets\\a7m5_4ch_long\\20260919_C1305.MP4",
+      "boxes": [
+        {
+          "context": "root",
+          "guid": "{50524F46-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 183,
+          "kind": "PROF -> QuickTime::Profile",
+          "decoded": {
+            "body_hex": "0000000000000004000000144650524600000000200000000000000000000034565052460000000000000001687663310000229900000002000124f8000124f8003bf0a6003bf0a60f000870000100010000002c4150524600000000000000006970636d000000180000000000000480000004800000bb80000000010000002350524558000000005650524600000001687663310020000000b00000000000",
+            "atoms": [
+              {
+                "type": "FPRF",
+                "size": 20,
+                "offset": 8,
+                "fields": {
+                  "FileProfileVersion": 0,
+                  "FileFunctionFlags": "0x20000000",
+                  "flags_decoded": [
+                    "Additional tracks"
+                  ],
+                  "field3": 0
+                }
+              },
+              {
+                "type": "VPRF",
+                "size": 52,
+                "offset": 28,
+                "fields": {
+                  "VideoProfileVersion": 0,
+                  "v1": "0x00000001",
+                  "codec": "hvc1",
+                  "frame_count_or_id": 8857,
+                  "v3": 2,
+                  "scale_a": 75000,
+                  "scale_b": 75000,
+                  "fps_num": 3928230,
+                  "fps_den": 3928230,
+                  "v8": "0x0F000870",
+                  "v9": "0x00010001"
+                }
+              },
+              {
+                "type": "APRF",
+                "size": 44,
+                "offset": 80,
+                "fields": {
+                  "AudioProfileVersion": 0,
+                  "v1": "0x00000000",
+                  "codec": "ipcm",
+                  "u32be_3": 24,
+                  "u32be_4": 0,
+                  "samples": 1152,
+                  "samples2": 1152,
+                  "sample_rate": 48000
+                }
+              },
+              {
+                "type": "PREX",
+                "size": 35,
+                "offset": 124,
+                "body_hex": "000000005650524600000001687663310020000000b00000000000"
+              }
+            ]
+          }
+        },
+        {
+          "context": "root",
+          "guid": "{BE7ACFCB-97A9-42E8-9C71-999491E3AFAC}",
+          "whole_size": 4035,
+          "kind": "other",
+          "payload_head": "3c3f787061636b657420626567696e3d22efbbbf222069643d2257354d304d70"
+        },
+        {
+          "context": "trak:vide",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 52,
+          "kind": "USMT -> QuickTime::UserMedia",
+          "decoded": {
+            "body_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+            "atoms": [
+              {
+                "type": "MTDT",
+                "size": 28,
+                "offset": 0,
+                "fields": {
+                  "atom_size": 28,
+                  "version_hi16": 1,
+                  "flags_lo16": "0x0012",
+                  "u32be": [
+                    "0x00010012",
+                    "0x0000000A",
+                    "0x55C40000",
+                    "0x00000001",
+                    "0x00000000"
+                  ],
+                  "hex": "000100120000000a55c400000000000100000000",
+                  "status": "UNRESOLVED —— ExifTool 的 UserMedia/MetaData 表描述的是 tag-byte 形式，与本例的定长布局不符"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "context": "trak:soun",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 52,
+          "kind": "USMT -> QuickTime::UserMedia",
+          "decoded": {
+            "body_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+            "atoms": [
+              {
+                "type": "MTDT",
+                "size": 28,
+                "offset": 0,
+                "fields": {
+                  "atom_size": 28,
+                  "version_hi16": 1,
+                  "flags_lo16": "0x0012",
+                  "u32be": [
+                    "0x00010012",
+                    "0x0000000A",
+                    "0x55C40000",
+                    "0x00000001",
+                    "0x00000000"
+                  ],
+                  "hex": "000100120000000a55c400000000000100000000",
+                  "status": "UNRESOLVED —— ExifTool 的 UserMedia/MetaData 表描述的是 tag-byte 形式，与本例的定长布局不符"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "context": "trak:soun",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 52,
+          "kind": "USMT -> QuickTime::UserMedia",
+          "decoded": {
+            "body_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+            "atoms": [
+              {
+                "type": "MTDT",
+                "size": 28,
+                "offset": 0,
+                "fields": {
+                  "atom_size": 28,
+                  "version_hi16": 1,
+                  "flags_lo16": "0x0012",
+                  "u32be": [
+                    "0x00010012",
+                    "0x0000000A",
+                    "0x55C40000",
+                    "0x00000001",
+                    "0x00000000"
+                  ],
+                  "hex": "000100120000000a55c400000000000100000000",
+                  "status": "UNRESOLVED —— ExifTool 的 UserMedia/MetaData 表描述的是 tag-byte 形式，与本例的定长布局不符"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "context": "trak:soun",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 52,
+          "kind": "USMT -> QuickTime::UserMedia",
+          "decoded": {
+            "body_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+            "atoms": [
+              {
+                "type": "MTDT",
+                "size": 28,
+                "offset": 0,
+                "fields": {
+                  "atom_size": 28,
+                  "version_hi16": 1,
+                  "flags_lo16": "0x0012",
+                  "u32be": [
+                    "0x00010012",
+                    "0x0000000A",
+                    "0x55C40000",
+                    "0x00000001",
+                    "0x00000000"
+                  ],
+                  "hex": "000100120000000a55c400000000000100000000",
+                  "status": "UNRESOLVED —— ExifTool 的 UserMedia/MetaData 表描述的是 tag-byte 形式，与本例的定长布局不符"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "context": "trak:soun",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 52,
+          "kind": "USMT -> QuickTime::UserMedia",
+          "decoded": {
+            "body_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+            "atoms": [
+              {
+                "type": "MTDT",
+                "size": 28,
+                "offset": 0,
+                "fields": {
+                  "atom_size": 28,
+                  "version_hi16": 1,
+                  "flags_lo16": "0x0012",
+                  "u32be": [
+                    "0x00010012",
+                    "0x0000000A",
+                    "0x55C40000",
+                    "0x00000001",
+                    "0x00000000"
+                  ],
+                  "hex": "000100120000000a55c400000000000100000000",
+                  "status": "UNRESOLVED —— ExifTool 的 UserMedia/MetaData 表描述的是 tag-byte 形式，与本例的定长布局不符"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "context": "trak:meta",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 52,
+          "kind": "USMT -> QuickTime::UserMedia",
+          "decoded": {
+            "body_hex": "0000001c4d544454000100120000000a55c400000000001000000000",
+            "atoms": [
+              {
+                "type": "MTDT",
+                "size": 28,
+                "offset": 0,
+                "fields": {
+                  "atom_size": 28,
+                  "version_hi16": 1,
+                  "flags_lo16": "0x0012",
+                  "u32be": [
+                    "0x00010012",
+                    "0x0000000A",
+                    "0x55C40000",
+                    "0x00000010",
+                    "0x00000000"
+                  ],
+                  "hex": "000100120000000a55c400000000001000000000",
+                  "status": "UNRESOLVED —— ExifTool 的 UserMedia/MetaData 表描述的是 tag-byte 形式，与本例的定长布局不符"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "context": "moov",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "whole_size": 46,
+          "kind": "USMT -> QuickTime::UserMedia",
+          "decoded": {
+            "body_hex": "000000164d5444540001000c0000000bd5c4000001e0",
+            "atoms": [
+              {
+                "type": "MTDT",
+                "size": 22,
+                "offset": 0,
+                "fields": {
+                  "atom_size": 22,
+                  "version_hi16": 1,
+                  "flags_lo16": "0x000C",
+                  "u32be": [
+                    "0x0001000C",
+                    "0x0000000B",
+                    "0xD5C40000"
+                  ],
+                  "hex": "0001000c0000000bd5c4000001e0",
+                  "status": "UNRESOLVED —— ExifTool 的 UserMedia/MetaData 表描述的是 tag-byte 形式，与本例的定长布局不符"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

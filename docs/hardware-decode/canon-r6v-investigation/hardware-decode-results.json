@@ -1,0 +1,95 @@
+{
+  "schema": "canon-r6v-investigation/hardware-decode/1",
+  "machine": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 285H (6P+10E, 16C/16T)",
+    "nvidia": "GeForce RTX 5070 Laptop GPU, driver 616.92, NVENC API 13.1",
+    "intel_igpu": "Intel(R) Arc(TM) 140T GPU (16GB), driver 32.0.101.8974",
+    "nvencc": "NVEncC (x64) 9.31 (r4047) by rigaya",
+    "qsvencc": "QSVEncC (x64) 8.26 (r4504) by rigaya (Intel Media SDK API v2.16)"
+  },
+  "paths": {
+    "ffmpeg_software": {
+      "role": "reference",
+      "result": "PASS — 154/154 与 686/686，0 解码错误"
+    },
+    "ffmpeg_hevc_cuvid": {
+      "role": "FFmpeg + NVDEC（产品 x265 / svtav1 后端使用的解码路径）",
+      "planner_decision": {
+        "substrate": "ffmpeg_hw",
+        "decoder": "hevc_cuvid",
+        "hwaccel": "cuda",
+        "surface_format_nominal": "p210le",
+        "target_format": "yuv422p10le",
+        "transfer": [
+          "scale_cuda=format=yuv422p10le",
+          "hwdownload,format=yuv422p10le"
+        ],
+        "direct": false,
+        "reason": "hardware_compatible",
+        "argv_input_prefix": [
+          "-init_hw_device",
+          "cuda=cu:0",
+          "-hwaccel",
+          "cuda",
+          "-hwaccel_device",
+          "cuda",
+          "-hwaccel_output_format",
+          "cuda",
+          "-c:v",
+          "hevc_cuvid"
+        ],
+        "source": "encoders.hwdecode_ffmpeg.plan_decode（项目自身）"
+      },
+      "result": "PASS — 24/24 帧与软解逐帧位相同（两条素材）",
+      "speed": "40 帧窗口内比软解快约 35%（12-13 s vs 16-21 s）",
+      "note": "关键：cuvid 的 CUDA surface 不能直接 hwdownload 成任何常用格式；必须经 scale_cuda 转成 yuv422p10le 再下载。项目自己的_transfer_candidates/resolve_transfer 已经探到这条路，plan_decode 产出可直接执行的 argv。"
+    },
+    "ffmpeg_hevc_qsv": {
+      "role": "FFmpeg + Intel QSV",
+      "planner_decision": null,
+      "result": "未取得可用传输 —— caps.transfers 中没有 qsv 条目",
+      "detail": "plan_decode(hw_order=('qsv','cuda')) 最终仍落到 cuda，说明 QSV 的 transfer 探测没通过。",
+      "status": "PENDING"
+    },
+    "nvencc_avhw": {
+      "role": "rigaya 原生硬件 reader（产品 nvenc 后端默认路径）",
+      "reader_identity_observed": "avcuvid",
+      "result": "FAIL — 静默丢 2 帧",
+      "measurements": {
+        "A0013C699": {
+          "container": 154,
+          "avhw": 152,
+          "avsw": 154,
+          "loss": 2,
+          "rc": 0
+        },
+        "A0013C700": {
+          "container": 686,
+          "avhw": 684,
+          "avsw": 686,
+          "loss": 2,
+          "rc": 0
+        }
+      },
+      "evidence": "全片编码（无 --frames 限制）。产物容器 stsz 也就是 152/684，即丢帧发生在交付产物里，不是读数问题。两边 rc 均为 0，无任何 error/warning 文本，产物可正常播放。",
+      "logs": [
+        "work/canon_r6v/smoke_avhw.log（A699 152 帧）",
+        "work/canon_r6v/smoke_avsw.log（A699 154 帧）",
+        "work/canon_r6v/smoke_avhw_A700.log（A700 684 帧）"
+      ]
+    },
+    "qsvencc_avhw": {
+      "role": "rigaya QSV 硬件 reader",
+      "result": "未测",
+      "status": "PENDING",
+      "reason": "本轮时间预算用于 NVEncC 与 FFmpeg 路径；QSVEncC 对HEVC 4:2:2 10bit 的行为未实测。"
+    }
+  },
+  "critical_finding": {
+    "what": "rigaya --avhw 在这两条 Canon 素材上静默丢 2 帧，rc=0、产物可播。",
+    "root_cause_shape": "两条流的首个 packet（解码序）都是 IDR，其 DTS = -0.033367 为负；显示序在它之前有 2 个前导 B 帧。这与项目自身记录的 RC-1 完全同形：rigaya 把'第一个喂入 packet 的 PTS'当作呈现起点，释放掉所有低于它的缓冲图像，于是前导图像永不发射。",
+    "why_it_matters_for_this_project": "项目把这条缺陷的保护只绑在 Sony 分支上（core/batch_hw.py 的 is_sony_source + encoders/hwdecode.py 的 R_SONY_SOFTWARE）。Canon 被判为 non_sony，因此走 --avhw，不受该保护。而项目自己的文档把触发条件写成'流形态'而非 Sony 品牌属性（docs/hardware-decode/xavc-hs-frame-count.md：'预测式是流形态而非 codec/容器属性'，控制组含 DJI / x265 / synthetic / Sony-in-MKV）。Canon XF-HEVC 正好落在该形态里。",
+    "project_formula_check": "项目公式：丢弃量 = 首个同步样本之前呈现的图像数。本素材实测 leading pictures = 2，实测丢弃 = 2 —— 公式成立。",
+    "consequence_in_production": "两条素材在 nvenc 后端下都会被 --avhw 丢 2 帧。若完整性门禁（encoders.integrity.verify_encode）判定失败，产物会被删除并用--avsw 重跑同一档 —— 结果最终正确，但代价是一次被丢弃的完整编码，且 software_fallback 只在日志里可见。"
+  }
+}

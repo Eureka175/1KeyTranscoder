@@ -1,0 +1,51 @@
+{
+  "created": "2026-11-18T00:30:00+08:00",
+  "note": "original encoder configs before QSV ICQ alignment experiment",
+  "files": [
+    {
+      "file": "nvenc.json",
+      "sha256": "9d309dcf7c14fd0da316ec3c7f2ee3a3c3ba249ad933277896a8b55478f13a2a",
+      "bytes": 4416
+    },
+    {
+      "file": "nvenc_av1.json",
+      "sha256": "d4ca31085c350858d08aa379f38ee4faff077002fd40035d837f57ed2ccbd275",
+      "bytes": 3058
+    },
+    {
+      "file": "qsv.json",
+      "sha256": "aeb016b2b4671c84b46f5b17d4754823b1330f16f709ebc70a8b428dd5140837",
+      "bytes": 3964
+    },
+    {
+      "file": "qsv_aligned.json",
+      "sha256": "338c411decb61ae6ce05858a917565540ccf44a03bf0a36bf1ec756b77c49488",
+      "bytes": 4497
+    },
+    {
+      "file": "qsv_av1.json",
+      "sha256": "1e8e11c4014c9848e058688d220315fb228bef7a629f76bf0c7e5e76195c74cb",
+      "bytes": 3318
+    },
+    {
+      "file": "svtav1.json",
+      "sha256": "ca4aaa3acd1f95caa900043c08ab274b54c7bb203ce021f4591e0e547f14ddd2",
+      "bytes": 4980
+    },
+    {
+      "file": "svtav1_scaling.json",
+      "sha256": "be7e59f1b3990e67770c2dfd4c901bd40abeadf09a9c2fa0813a21a5be1b5429",
+      "bytes": 3968
+    },
+    {
+      "file": "x265.json",
+      "sha256": "704b96ecc97c75cf1dbfefe92382b0df0c6f7ef27c8a1c4555d3154010734a07",
+      "bytes": 7871
+    },
+    {
+      "file": "x265_scaling.json",
+      "sha256": "44533804460e91708eaa91463c75a167c51fe6cf8703698834397dfa4f033629",
+      "bytes": 5151
+    }
+  ]
+}

@@ -54,6 +54,68 @@ def l1_x265() -> None:
            _vbv_mode in ("dynamic_vbv", "cpb_clamp"),
            f"audit={_vbv_mode}")
 
+    # --- one shared output-format policy for every backend ---------------
+    from encoders.caps import BackendCaps, CodecCaps
+    from encoders.format_policy import plan_output_format
+    from encoders.svtav1 import av1_pix_fmt
+    from encoders.x265 import x265_pix_fmt
+    caps422 = BackendCaps(codecs={"hevc": CodecCaps(
+        bit10=True, csp_422=True, bit10_422=True)})
+    si422_10 = SourceInfo(
+        path=Path("422.mp4"), size_bytes=1, duration_sec=1.0,
+        width=3840, height=2160, fps=25.0,
+        r_frame_rate="25/1", avg_frame_rate="25/1",
+        codec="h264", profile="High 4:2:2", pix_fmt="yuv422p10le",
+        bit_depth=10, chroma="4:2:2", ob_kbps=200000.0,
+        video_bitrate_kbps=200000.0, video_stream_count=1,
+        stream_info=(),
+    )
+    si420_8 = SourceInfo(
+        path=Path("420_8.mp4"), size_bytes=1, duration_sec=1.0,
+        width=3840, height=2160, fps=30.0,
+        r_frame_rate="30/1", avg_frame_rate="30/1",
+        codec="h264", profile="High", pix_fmt="yuv420p",
+        bit_depth=8, chroma="4:2:0", ob_kbps=100000.0,
+        video_bitrate_kbps=100000.0, video_stream_count=1,
+        stream_info=(),
+    )
+    record("fmt.plan NVENC HEVC 422/10 保真",
+           plan_output_format(backend="nvenc", codec="hevc",
+                              chroma="4:2:2", depth=10, caps=caps422)
+           .as_tuple() == ("4:2:2", 10))
+    record("fmt.plan QSV HEVC 422/10 跟随能力（与 NVENC 对齐）",
+           plan_output_format(backend="qsvencc", codec="hevc",
+                              chroma="4:2:2", depth=10, caps=caps422)
+           .as_tuple() == ("4:2:2", 10))
+    record("fmt.plan x265 HEVC 422/10 保真",
+           plan_output_format(backend="x265", codec="hevc",
+                              chroma="4:2:2", depth=10)
+           .as_tuple() == ("4:2:2", 10))
+    record("fmt.plan SVT-AV1 422/10 转 420/10（AV1 能力）",
+           plan_output_format(backend="svtav1", codec="av1",
+                              chroma="4:2:2", depth=10).as_tuple()
+           == ("4:2:0", 10))
+    record("fmt.x265 pix_fmt 422/10", x265_pix_fmt(si422_10)
+           == "yuv422p10le", f"got={x265_pix_fmt(si422_10)}")
+    record("fmt.x265 pix_fmt 420/8 默认统一 10bit", x265_pix_fmt(si420_8)
+           == "yuv420p10le", f"got={x265_pix_fmt(si420_8)}")
+    record("fmt.svtav1 pix_fmt 8-bit 源也统一 420/10",
+           av1_pix_fmt(si420_8) == "yuv420p10le",
+           f"got={av1_pix_fmt(si420_8)}")
+    from encoders.format_policy import (
+        configure_output_format,
+        reset_output_format,
+    )
+    try:
+        configure_output_format(depth=8, chroma="420")
+        manual = plan_output_format(
+            backend="x265", codec="hevc", chroma="4:2:2", depth=10)
+        record("fmt.manual depth/chroma override",
+               manual.as_tuple() == ("4:2:0", 8) and manual.manual,
+               str(manual))
+    finally:
+        reset_output_format()
+
 
 def l1_nvenc_dynamic_vbv() -> None:
     """NVENC maxrate/VBV follow the x265 source-relative table.
@@ -204,9 +266,9 @@ def l1_av1() -> None:
                          bit_depth=8, chroma="4:2:0", ob_kbps=100000.0,
                          video_bitrate_kbps=100000.0, video_stream_count=1,
                          stream_info=())
-    record("av1.svtav1 pix_fmt 420 策略",
+    record("av1.svtav1 pix_fmt 420/10 统一（含 8-bit 源）",
            av1_pix_fmt(si422) == "yuv420p10le"
-           and av1_pix_fmt(si420_8) == "yuv420p",
+           and av1_pix_fmt(si420_8) == "yuv420p10le",
            f"422->{av1_pix_fmt(si422)} 8bit420->{av1_pix_fmt(si420_8)}")
     from core.scaling import ScalingEngine
     from core.source_classifier import SourceClassifier

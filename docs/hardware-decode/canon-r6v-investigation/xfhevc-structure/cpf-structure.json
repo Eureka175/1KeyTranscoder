@@ -1,0 +1,191 @@
+{
+  "role": "Canon CPF sidecar 完整解码",
+  "files": {
+    "A0013C699": {
+      "bytes": 63452,
+      "sha256": "beb049833861c38e426a9214af3bc28b1b94c373d08e022a0c4bf2140bf2139c"
+    },
+    "A0013C700": {
+      "bytes": 63452,
+      "sha256": "beb049833861c38e426a9214af3bc28b1b94c373d08e022a0c4bf2140bf2139c"
+    }
+  },
+  "identical": true,
+  "layout": {
+    "total_bytes": 63452,
+    "data_region": [
+      0,
+      283
+    ],
+    "zero_padding_bytes": 63169,
+    "zero_padding_ratio": 0.99554
+  },
+  "tables": {
+    "table1_0_196": {
+      "entries": 54,
+      "keys_ascending": false,
+      "key_range": [
+        1,
+        229
+      ],
+      "nonzero_values": [
+        {
+          "key": 184,
+          "value": 184
+        },
+        {
+          "key": 229,
+          "value": 65
+        },
+        {
+          "key": 1,
+          "value": 1
+        },
+        {
+          "key": 15,
+          "value": 1
+        },
+        {
+          "key": 17,
+          "value": 95
+        },
+        {
+          "key": 33,
+          "value": 1
+        },
+        {
+          "key": 36,
+          "value": 16
+        },
+        {
+          "key": 37,
+          "value": 16
+        },
+        {
+          "key": 38,
+          "value": 16
+        },
+        {
+          "key": 56,
+          "value": 16
+        },
+        {
+          "key": 57,
+          "value": 16
+        },
+        {
+          "key": 58,
+          "value": 16
+        },
+        {
+          "key": 62,
+          "value": 16
+        },
+        {
+          "key": 63,
+          "value": 16
+        },
+        {
+          "key": 64,
+          "value": 16
+        },
+        {
+          "key": 77,
+          "value": 1
+        },
+        {
+          "key": 80,
+          "value": 1
+        }
+      ]
+    },
+    "table2_260_284": {
+      "entries": 12,
+      "pairs": [
+        {
+          "key": 128,
+          "value": 0
+        },
+        {
+          "key": 129,
+          "value": 0
+        },
+        {
+          "key": 130,
+          "value": 5
+        },
+        {
+          "key": 131,
+          "value": 3
+        },
+        {
+          "key": 132,
+          "value": 0
+        },
+        {
+          "key": 133,
+          "value": 0
+        },
+        {
+          "key": 134,
+          "value": 0
+        },
+        {
+          "key": 135,
+          "value": 0
+        },
+        {
+          "key": 136,
+          "value": 0
+        },
+        {
+          "key": 137,
+          "value": 0
+        },
+        {
+          "key": 138,
+          "value": 1
+        },
+        {
+          "key": 139,
+          "value": 0
+        }
+      ]
+    }
+  },
+  "text_fields": [
+    {
+      "region": [
+        196,
+        232
+      ],
+      "raw_hex": "60436161626e636f646e6520664c676f686769206a326b006c006d006e006f0000000000",
+      "encoding": "ASCII（两个并行流，1 字节步长交错）",
+      "key_stream": "`abcdefghijklmno",
+      "value_stream": "Canon Log 2",
+      "verified_byte_facts": {
+        "raw[0::2]_hex": "606162636465666768696a6b6c6d6e6f0000",
+        "raw[0::2]_ascii": "`abcdefghijklmno",
+        "raw[1::2]_hex": "43616e6f6e204c6f67203200000000000000",
+        "raw[1::2]_ascii": "Canon Log 2"
+      },
+      "status": "RESOLVED",
+      "note": "raw[0::2] 与 raw[1::2] 各自都是 **ASCII** 文本：键流 = '`abcdefghijklmno'（升序单字节键），值流 = 'Canon Log 2'（= CaptureGammaEquation，对应相机 log 曲线）。先前版本把值流按 UTF-16BE 解读并声称『1 字节键 + 2 字节 UTF-16BE 字符』，那是错的 —— 已更正。实测两个流都是单字节 ASCII，按 1 字节步长交错。"
+    }
+  ],
+  "findings": {
+    "verified": [
+      "未压缩未加密；数据只占前 283 字节，其余 63169 字节为零填充",
+      "两条素材的 CPF 逐字节完全相同",
+      "存在升序键/值并行数组（键 0x00..0x52、0x80..0x8b）",
+      "文本字段用 UTF-16BE 并以 2:1 交错存放",
+      "文本内容解出 'Canon Log 2'（= CaptureGammaEquation）"
+    ],
+    "not_verified": [
+      "键 0x00..0x8b 各自的字段语义",
+      "CPF 的官方用途（文件名首字节 0xB8B8E541 未识别）",
+      "CPF 与 MP4 之间的关系（两条不同素材共用同一 CPF）"
+    ],
+    "key_observation": "两条内容完全不同的素材（154 帧 / 686 帧，拍摄时刻不同）拥有逐字节相同的 CPF，且 CPF 只有 283 字节有效数据。因此 CPF **不是按片段记录的 metadata**，而是相机级/卡级设置快照。这与 Sony 每个片段一个独立 NRTM XML 的模型根本不同 —— Sony 的 sidecar 承载片段级丰富信息，Canon 的 CPF 不承载。"
+  }
+}

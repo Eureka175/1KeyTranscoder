@@ -18,6 +18,7 @@ import re
 import subprocess
 import time
 from pathlib import Path
+from typing import Callable
 
 from core.color import (
     ColorInfo,
@@ -28,7 +29,7 @@ from core.color import (
     UNSET,
 )
 
-from .caps import run_tool, supports
+from .caps import run_tool
 
 
 def known_flags(tool: Path) -> set[str]:
@@ -107,9 +108,11 @@ def build_flag_args(
             args += [flag, str(value)]
     return args, skipped
 
-# rigaya progress: "[12.3%] 1234 frames: 56.7 fps, 12345 kbps, ..."
+# rigaya progress:
+#   older: "[12.3%] 1234 frames: 56.7 fps, ..."
+#   9.31:  "[100.0%] 36/300 frames: 8.56 fps, ..."   (N/M when total known)
 _PROGRESS_RE = re.compile(
-    r"(\d+(?:\.\d+)?)%\]\s*(\d+) frames:\s*([\d.]+) fps"
+    r"\[\s*(\d+(?:\.\d+)?)%\]\s*(\d+)(?:/(\d+))?\s*frames:\s*([\d.]+)\s*fps"
 )
 _FINAL_RE = re.compile(
     r"encoded\s+(\d+)\s+frames,\s*([\d.]+)\s+fps"
@@ -143,12 +146,16 @@ def run_hw_tool(
     total_frames: int,
     label: str = "hw",
     progress: bool = True,
+    progress_cb: "Callable[[int, float], None] | None" = None,
 ) -> tuple[int | None, float]:
     """Run one hardware-encoder command with live progress.
 
     progress=False suppresses the per-session console progress line
     (used in parallel worker mode, where interleaved \\r lines would
     garble the work window; the dashboard shows status instead).
+    ``progress_cb(frame, fps)`` is called for every rigaya progress line;
+    the DJI progressive stager uses it to arm the next split group's
+    lossless join shortly before this encode finishes.
     Returns (return_code, elapsed_sec); return_code is None when the
     run was interrupted or failed to execute (callers treat None like
     a failure and clean up their own outputs).
@@ -196,7 +203,14 @@ def run_hw_tool(
                         last_fps = float(fm.group(2))
                     continue
                 last_frame = int(m.group(2))
-                last_fps = float(m.group(3))
+                last_fps = float(m.group(4))
+                if progress_cb is not None:
+                    try:
+                        progress_cb(last_frame, last_fps)
+                    except Exception:              # noqa: BLE001
+                        # Advisory only: a stager callback must never
+                        # abort an otherwise healthy encode.
+                        pass
                 if not progress:
                     continue
                 now = time.monotonic()
@@ -384,22 +398,22 @@ def plan_initial_format(
 ) -> tuple[tuple[str, int], bool]:
     """Capability-driven initial format.
 
-    Returns ((chroma, depth), needs_downgrade). Policies:
-    - AV1: hardware AV1 is 4:2:0 only on all vendors — any non-4:2:0
-      source always plans 4:2:0 conversion (lossy, warned).
-    - QSV: 4:2:2 sources always plan 4:2:0 conversion (direct 4:2:2
-      encode on Arc is the slow path ~1.0x vs 2.0x).
-    - NVENC: keeps 4:2:2 when capable."""
-    if codec == "av1":
-        return ("4:2:0", max(depth, 10)), chroma != "4:2:0"
-    if chroma == "4:2:2":
-        if backend_kind == "qsvencc":
-            return ("4:2:0", max(depth, 10)), True
-        if supports(caps, "4:2:2", depth, codec):
-            return (chroma, depth), False
-        return ("4:2:0", max(depth, 10)), True
-    if depth > 8:
-        if supports(caps, chroma, depth, codec):
-            return (chroma, depth), False
-        return ("4:2:0", 10), True
-    return (chroma, depth), False
+    Delegates to :mod:`encoders.format_policy` so hardware and software
+    backends share one policy.  Returns ``((chroma, depth),
+    needs_downgrade)`` for backwards compatibility with callers/tests.
+
+    Policy summary: AV1 is always 4:2:0/10-bit (all AV1 backends are
+    4:2:0-only); HEVC preserves the source chroma/depth when the backend
+    advertises it (NVENC/QSV: measured caps, x265: 4:2:0/4:2:2/4:4:4 at
+    8/10/12-bit) and otherwise plans 4:2:0/10-bit.  QSV no longer has a
+    forced 4:2:0 special case: it follows the same capability rule as
+    NVENC.  On a GPU whose caps advertise no 4:2:2 the result is still
+    4:2:0/10, but that is now a capability fact, not a backend policy.
+    """
+    from .format_policy import plan_output_format
+
+    plan = plan_output_format(
+        backend=backend_kind, codec=codec, chroma=chroma, depth=depth,
+        caps=caps,
+    )
+    return plan.as_tuple(), plan.downgrade

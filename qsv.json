@@ -7,14 +7,14 @@
     "sample_rate": 10,
     "max_duration_sec": 60,
     "psnr_min_db": 25.0,
-    "ssim_min": 0.80,
+    "ssim_min": 0.8,
     "garbage_psnr_db": 12.0,
     "max_garbage_frac": 0.02
   },
   "profile": {
     "UHQ": {
       "tu": "best",
-      "icq": 21,
+      "icq": 20,
       "profile": "main10",
       "tier": "high",
       "level": 6.1,
@@ -37,8 +37,16 @@
       "weight_b": "on",
       "gpb": "on",
       "aud": "on",
-      "qp_min": [18, 20, 22],
-      "qp_max": [32, 36, 40],
+      "qp_min": [
+        18,
+        20,
+        22
+      ],
+      "qp_max": [
+        32,
+        36,
+        40
+      ],
       "open_gop": true,
       "atc_sei": "auto",
       "hyper_mode": "adaptive",
@@ -47,10 +55,9 @@
       "output_buf_mb": 8,
       "lookahead": 40
     },
-
     "HQ": {
       "tu": "best",
-      "icq": 22,
+      "icq": 21,
       "profile": "main10",
       "tier": "high",
       "level": 6.1,
@@ -73,8 +80,16 @@
       "weight_b": "on",
       "gpb": "on",
       "aud": "on",
-      "qp_min": [20, 22, 24],
-      "qp_max": [35, 40, 45],
+      "qp_min": [
+        20,
+        22,
+        24
+      ],
+      "qp_max": [
+        35,
+        40,
+        45
+      ],
       "open_gop": true,
       "atc_sei": "auto",
       "hyper_mode": "adaptive",
@@ -83,10 +98,9 @@
       "output_buf_mb": 8,
       "lookahead": 20
     },
-
     "SMALL": {
       "tu": "best",
-      "icq": 26,
+      "icq": 23,
       "profile": "main10",
       "tier": "high",
       "level": 6.1,
@@ -109,8 +123,16 @@
       "weight_b": "on",
       "gpb": "on",
       "aud": "on",
-      "qp_min": [22, 24, 26],
-      "qp_max": [38, 42, 45],
+      "qp_min": [
+        22,
+        24,
+        26
+      ],
+      "qp_max": [
+        38,
+        42,
+        45
+      ],
       "open_gop": true,
       "atc_sei": "auto",
       "hyper_mode": "adaptive",
@@ -119,10 +141,9 @@
       "output_buf_mb": 8,
       "lookahead": 16
     },
-
     "FAST": {
       "tu": "balanced",
-      "icq": 24,
+      "icq": 22,
       "profile": "main10",
       "tier": "high",
       "level": 6.1,
@@ -145,8 +166,16 @@
       "weight_b": "on",
       "gpb": "on",
       "aud": "on",
-      "qp_min": [20, 22, 24],
-      "qp_max": [38, 42, 45],
+      "qp_min": [
+        20,
+        22,
+        24
+      ],
+      "qp_max": [
+        38,
+        42,
+        45
+      ],
       "open_gop": true,
       "atc_sei": "auto",
       "hyper_mode": "adaptive",

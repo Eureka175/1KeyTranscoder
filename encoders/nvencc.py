@@ -157,6 +157,23 @@ class NvencBackend:
         ):
             args += ["--atc-sei", str(profile["atc_sei"])]
         args += cargs
+        # The planned depth is authoritative for HEVC.  Profile JSONs carry
+        # "main10" as the default, which would silently promote an 8-bit
+        # plan back to 10-bit (FORMAT-PLAN would then be a lie).  Override
+        # with the profile matching the planned depth; keep AV1 untouched.
+        if self.codec == "hevc":
+            if chroma == "4:4:4":
+                # HEVC 4:4:4 needs the Main 4:4:4 profile and an explicit
+                # output CSP.  Using plain main10 here silently writes
+                # 4:2:0 while the format plan says 4:4:4.
+                args += ["--profile", "main444", "--output-csp", "yuv444"]
+            else:
+                args += ["--profile", "main" if depth <= 8 else "main10"]
+        if self.codec == "av1" and chroma != "4:2:0":
+            raise ValueError(
+                f"{self.name}: AV1 output only supports 4:2:0 "
+                f"(requested {chroma})"
+            )
         if chroma == "4:2:2":
             args += ["--output-csp", "yuv422"]
         if vfr:

@@ -1,0 +1,220 @@
+{
+  "role": "XF-HEVC 与 XAVC 的**实测**结构对照（同项目、同探针、同口径）",
+  "method": "两侧都用 work/canon_r6v/xfhevc_structure.py 探测同一套字段：ISOBMFF box 直读 + ffmpeg trace_headers。XAVC 侧素材来自本仓库 testsets/，不是引用文档。",
+  "sources": {
+    "XF-HEVC": "F:\\CANON_R6V_OG_7K2997P_4CH_XFVC\\A_0013C699H260510_003337W5_CANON.MP4",
+    "XAVC_422": "testsets\\a7m5_2ch_10bit422\\20260921_C1316.MP4",
+    "XAVC_HS_420": "F:\\1KeyTranscoder\\testsets\\a7m5_4ch_long\\20260919_C1305.MP4"
+  },
+  "columns": [
+    {
+      "label": "XF-HEVC (Canon R6 V)",
+      "source": "F:\\CANON_R6V_OG_7K2997P_4CH_XFVC\\A_0013C699H260510_003337W5_CANON.MP4",
+      "ftyp_major": "XFVC",
+      "ftyp_compat": [
+        "XFVC",
+        "mp42",
+        "iso2"
+      ],
+      "box_order": [
+        "ftyp",
+        "moov",
+        "mdat"
+      ],
+      "moov_before_mdat": true,
+      "moov_size": 524260,
+      "root_uuid_count": 1,
+      "root_uuid_labels": [
+        "{85C0B687-820F-11E0-8111-F4CE462B6A48}"
+      ],
+      "track_count": 7,
+      "mvhd_timescale": 30000,
+      "video_sample_entry": "hvc1",
+      "video_chunk_box": "co64",
+      "video_stts_delta": [
+        1001
+      ],
+      "video_samples": 154,
+      "video_stss_sync": 11,
+      "video_gop": 15,
+      "ctts_present": true,
+      "ctts_entries": 103,
+      "elst_media_time": 1001,
+      "meta_track_entry": "cndm",
+      "meta_track_handler": "meta",
+      "meta_track_tref": [
+        {
+          "type": "cdsc",
+          "track_ids": [
+            1
+          ]
+        }
+      ],
+      "tmcd_track_present": true,
+      "audio_count": 4,
+      "audio_entries": [
+        "ipcm"
+      ],
+      "audio_channels": [
+        1
+      ],
+      "hvcC_size": 210,
+      "colr": {
+        "colour_type": "nclx",
+        "colour_primaries": 2,
+        "transfer_characteristics": 2,
+        "matrix_coefficients": 1,
+        "full_range_flag": true
+      }
+    },
+    {
+      "label": "XAVC 4:2:2 10-bit (a7m5)",
+      "source": "testsets\\a7m5_2ch_10bit422\\20260921_C1316.MP4",
+      "ftyp_major": "XAVC",
+      "ftyp_compat": [
+        "XAVC",
+        "mp42",
+        "nras",
+        "iso6"
+      ],
+      "box_order": [
+        "ftyp",
+        "uuid",
+        "free",
+        "mdat",
+        "moov",
+        "meta"
+      ],
+      "moov_before_mdat": false,
+      "moov_size": 10280,
+      "root_uuid_count": 5,
+      "root_uuid_labels": [
+        "PROF",
+        "USMT"
+      ],
+      "track_count": 3,
+      "mvhd_timescale": 60000,
+      "video_sample_entry": "hvc1",
+      "video_chunk_box": "stco",
+      "video_stts_delta": [
+        1001
+      ],
+      "video_samples": 660,
+      "video_stss_sync": 11,
+      "video_gop": 60,
+      "ctts_present": true,
+      "ctts_entries": 660,
+      "elst_media_time": 2002,
+      "meta_track_entry": "rtmd",
+      "meta_track_handler": "meta",
+      "meta_track_tref": [
+        {
+          "type": "cdsc",
+          "track_ids": [
+            1
+          ]
+        }
+      ],
+      "tmcd_track_present": false,
+      "audio_count": 1,
+      "audio_entries": [
+        "twos"
+      ],
+      "audio_channels": [
+        2
+      ],
+      "hvcC_size": 467,
+      "colr": null
+    },
+    {
+      "label": "XAVC HS 4:2:0 10-bit (a7m5)",
+      "source": "F:\\1KeyTranscoder\\testsets\\a7m5_4ch_long\\20260919_C1305.MP4",
+      "ftyp_major": "XAVC",
+      "ftyp_compat": [
+        "XAVC",
+        "mp42",
+        "nras",
+        "iso6"
+      ],
+      "box_order": [
+        "ftyp",
+        "uuid",
+        "uuid",
+        "free",
+        "mdat",
+        "moov",
+        "meta"
+      ],
+      "moov_before_mdat": false,
+      "moov_size": 3711534,
+      "root_uuid_count": 9,
+      "root_uuid_labels": [
+        "PROF",
+        "USMT",
+        "{BE7ACFCB-97A9-42E8-9C71-999491E3AFAC}"
+      ],
+      "track_count": 6,
+      "mvhd_timescale": 60000,
+      "video_sample_entry": "hvc1",
+      "video_chunk_box": "co64",
+      "video_stts_delta": [
+        1001
+      ],
+      "video_samples": 288150,
+      "video_stss_sync": 4803,
+      "video_gop": 60,
+      "ctts_present": true,
+      "ctts_entries": 288150,
+      "elst_media_time": 2002,
+      "meta_track_entry": "rtmd",
+      "meta_track_handler": "meta",
+      "meta_track_tref": [
+        {
+          "type": "cdsc",
+          "track_ids": [
+            1
+          ]
+        }
+      ],
+      "tmcd_track_present": false,
+      "audio_count": 4,
+      "audio_entries": [
+        "ipcm"
+      ],
+      "audio_channels": [
+        1
+      ],
+      "hvcC_size": 669,
+      "colr": null
+    }
+  ],
+  "metadata_track_payload": {
+    "XF-HEVC_cndm": {
+      "sample_entry": "cndm",
+      "uniform_sample_size_bytes": 1064,
+      "sample_count": 154,
+      "encoding": "KLV (SMPTE 键长值)"
+    },
+    "XAVC_rtmd": {
+      "sample_entry": "rtmd",
+      "uniform_sample_size_bytes": 19456,
+      "sample_count": 660,
+      "encoding": "Sony 私有二进制",
+      "note": "与项目 preservation/models.py 注释的 19456 一致"
+    }
+  },
+  "resolved_unknowns": [
+    {
+      "item": "块偏移 box",
+      "before": "未知（XAVC 侧未记录）",
+      "measured": "XAVC 用 stco（32 位），XF-HEVC 用 co64（64 位）。XAVC 视频轨 stco chunks=11",
+      "impact": "任何按固定偏移/固定 box 长度假设解析两侧采样表的代码都需要同时支持 stco 与 co64。"
+    },
+    {
+      "item": "定长 metadata 样本大小",
+      "before": "XAVC 侧仅文档记录 19456",
+      "measured": "实测 stsz.sample_size = 19456（660 样本，定长）；XF-HEVC cndm = 1064 定长",
+      "impact": "两者都是定长采样，但大小差 18 倍，不能共用解析器。"
+    }
+  ]
+}

@@ -96,8 +96,8 @@ def l3_pipeline() -> None:
         expect("C6_classic_video_audio", False, "classic 输入未生成")
 
     # C7a 故障注入: 截断文件 -> failed + failed_files.json
-    # (logs_root = input_root.parent/logs; input_root=in/truncated -> in/logs)
-    failed_path = IN_DIR / "logs" / "failed_files.json"
+    # (logs_root = output_root/logs)
+    failed_path = out / "logs" / "failed_files.json"
     if failed_path.is_file():
         failed_path.unlink()
     out = OUT_DIR / "c7a_truncated"

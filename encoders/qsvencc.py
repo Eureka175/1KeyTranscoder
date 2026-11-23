@@ -120,9 +120,12 @@ class QsvBackend:
         color: ColorInfo | None = None,
         reader: str = "avsw",
         resize: ResizeSpec | None = None,
+        avsync: str | None = None,
     ) -> tuple[list[str], list[str], list[str]]:
         if reader not in ("avsw", "avhw"):
             raise ValueError(f"unknown decode reader: {reader!r}")
+        if avsync is not None and avsync not in ("forcecfr", "vfr"):
+            raise ValueError(f"unknown avsync mode: {avsync!r}")
         args, skipped = build_flag_args(profile, PARAM_MAP, self.known)
         cargs, cnotes = color_flag_args(color, self.known)
         args = [
@@ -140,12 +143,30 @@ class QsvBackend:
         ):
             args += ["--atc-sei", str(profile["atc_sei"])]
         args += cargs
+        # Planned depth is authoritative for HEVC; profile JSON defaults to
+        # main10 and would otherwise promote an 8-bit plan to 10-bit.
+        if self.codec == "hevc" and chroma == "4:4:4":
+            raise ValueError(
+                "QSV HEVC does not support 4:4:4 output on this backend; "
+                "use NVENC or x265 for 4:4:4"
+            )
+        if self.codec == "av1" and chroma != "4:2:0":
+            raise ValueError(
+                f"{self.name}: AV1 output only supports 4:2:0 "
+                f"(requested {chroma})"
+            )
+        if self.codec == "hevc":
+            args += ["--profile", "main" if depth <= 8 else "main10"]
         # 4:2:2 sources: planned 4:2:0 conversion (policy, see module
         # docstring) — chroma is already "4:2:0" when the planner ran.
         if chroma == "4:2:2":
             args += ["--output-csp", "yuv422"]
-        if vfr:
-            args += ["--avsync", "forcecfr"]
+        if vfr or avsync is not None:
+            # QSVEncC's forcecfr path rejects some VFR timelines with a
+            # duplicate/non-monotonic DTS at the MOV muxer.  Callers may
+            # retry the same rung with avsync="vfr"; plain vfr is accepted
+            # by the same binary and keeps the source timestamps.
+            args += ["--avsync", avsync or "forcecfr"]
         if resize is not None:
             if not self.supports_resize:
                 raise ValueError(
@@ -172,6 +193,7 @@ class QsvBackend:
         reader: str = "avsw",
         container: str = "mov",
         resize: ResizeSpec | None = None,
+        avsync: str | None = None,
     ) -> tuple[list[str], list[str], list[str]]:
         """Full argv for one encode attempt.
 
@@ -181,7 +203,8 @@ class QsvBackend:
         cannot drift apart again.
         """
         args, skipped, notes = self.build_args(
-            profile, chroma, depth, vfr, color, reader=reader, resize=resize
+            profile, chroma, depth, vfr, color, reader=reader, resize=resize,
+            avsync=avsync,
         )
         cmd = [str(self.tool), "-i", str(source), *args]
         if audio_copy:

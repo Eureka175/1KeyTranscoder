@@ -60,6 +60,8 @@ TOP_FILES = (
     "1kt.py",
     "watchfolder.py",
     "start.bat",
+    "archive_repair.py",
+    "dji_join.py",
     "README.md",
     "README.zh-CN.md",
     "LICENSE",

@@ -139,9 +139,13 @@ cdef/restoration/dlf on, pred-struct 2。
 - 已知限制: 噪点内容 UHQ/HQ/FAST 输出趋同 (平台 42.28), SMALL 才
   明显分离 — 硬件 QVBR 特性, JSON 注释已声明。
 
-**qsv-av1** (`qsv_av1.json`): icq **23/26/32/28** (原 24/26/30/28)。
-- UHQ 23 对齐 NVENC UHQ 带 (42.21 vs 42.28); SMALL 32 (体积优先);
-  FAST 28 (quality balanced)。icq 阶梯单调, 无平台问题。
+**qsv-av1** (`qsv_av1.json`): icq **22/25/31/27**（2026-11-18 用户要求下调
+一档以提高码率；原标定 **23/26/32/28** 已备份到
+`work/param_backup_20261118/qsv_av1.json`）。
+- 下调前标定：UHQ 23 对齐 NVENC UHQ 带 (42.21 vs 42.28)；SMALL 32
+  (体积优先)；FAST 28 (quality balanced)；icq 阶梯单调, 无平台问题。
+- 2026-11-18 实测（室内静态高噪点 4K60）：HQ icq 26→25，码率
+  8.43→11.45 Mbps（+36%）；新阶梯为 22/25/31/27。
 
 ### 5.3 film-grain 决策 (night_6s, crf 24)
 

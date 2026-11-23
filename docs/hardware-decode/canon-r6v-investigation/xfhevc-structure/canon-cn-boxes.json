@@ -1,0 +1,32 @@
+{
+  "role": "Canon CN* box 拆解（moov 级 uuid 内）",
+  "uuid_guid": "{85C0B687-820F-11E0-8111-F4CE462B6A48}",
+  "uuid_payload_bytes": 65786,
+  "boxes": [
+    {
+      "type": "CNCV",
+      "offset": 0,
+      "size": 38,
+      "payload": 30
+    },
+    {
+      "type": "CNTH",
+      "offset": 38,
+      "size": 65552,
+      "payload": 65544
+    },
+    {
+      "type": "CNOP",
+      "offset": 65590,
+      "size": 196,
+      "payload": 188
+    }
+  ],
+  "cncv_value": "CanonMP4_002/10.00.03/00.00.00",
+  "cnth": {
+    "size": 65552,
+    "has_jpeg": true
+  },
+  "status": "STRUCTURE_ONLY",
+  "note": "CNTH 内含 JPEG/EXIF 缩略图（可读串含机型与拍摄时间）；JPEG 之后还有数据区。各 CN* box 的字段语义未解出。"
+}

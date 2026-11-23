@@ -7,7 +7,7 @@
     "sample_rate": 10,
     "max_duration_sec": 60,
     "psnr_min_db": 25.0,
-    "ssim_min": 0.80,
+    "ssim_min": 0.8,
     "garbage_psnr_db": 12.0,
     "max_garbage_frac": 0.02
   },
@@ -17,7 +17,6 @@
       "tune": "uhq",
       "profile": "main10",
       "tier": "high",
-      "level": "6.1",
       "output_depth": 10,
       "qvbr": 23,
       "max_bitrate": 100000,
@@ -34,9 +33,21 @@
       "nonrefp": true,
       "mv_precision": "q-pel",
       "chroma_qp_offset": -2,
-      "qp_init": [20, 22, 24],
-      "qp_min": [18, 20, 22],
-      "qp_max": [32, 36, 40],
+      "qp_init": [
+        20,
+        22,
+        24
+      ],
+      "qp_min": [
+        18,
+        20,
+        22
+      ],
+      "qp_max": [
+        32,
+        36,
+        40
+      ],
       "gop_len": 0,
       "aud": true,
       "repeat_headers": true,
@@ -50,15 +61,13 @@
       "avhw": true,
       "multipass": "2pass-full"
     },
-
     "HQ": {
       "preset": "quality",
       "tune": "hq",
       "profile": "main10",
       "tier": "high",
-      "level": "6.1",
       "output_depth": 10,
-      "qvbr": 25,
+      "qvbr": 26,
       "max_bitrate": 80000,
       "vbv_bufsize": 240000,
       "aq": true,
@@ -73,9 +82,21 @@
       "nonrefp": true,
       "mv_precision": "q-pel",
       "chroma_qp_offset": -2,
-      "qp_init": [22, 24, 26],
-      "qp_min": [20, 22, 24],
-      "qp_max": [35, 40, 45],
+      "qp_init": [
+        22,
+        24,
+        26
+      ],
+      "qp_min": [
+        20,
+        22,
+        24
+      ],
+      "qp_max": [
+        35,
+        40,
+        45
+      ],
       "gop_len": 0,
       "aud": true,
       "repeat_headers": true,
@@ -89,15 +110,13 @@
       "avhw": true,
       "multipass": "2pass-full"
     },
-
     "SMALL": {
       "preset": "quality",
-      "tune": "hq",
+      "tune": "uhq",
       "profile": "main10",
       "tier": "high",
-      "level": "6.1",
       "output_depth": 10,
-      "qvbr": 28,
+      "qvbr": 30,
       "max_bitrate": 40000,
       "vbv_bufsize": 120000,
       "aq": true,
@@ -112,9 +131,21 @@
       "nonrefp": true,
       "mv_precision": "q-pel",
       "chroma_qp_offset": -1,
-      "qp_init": [25, 27, 29],
-      "qp_min": [22, 24, 26],
-      "qp_max": [38, 42, 45],
+      "qp_init": [
+        25,
+        27,
+        29
+      ],
+      "qp_min": [
+        22,
+        24,
+        26
+      ],
+      "qp_max": [
+        38,
+        42,
+        45
+      ],
       "gop_len": 0,
       "aud": true,
       "repeat_headers": true,
@@ -128,15 +159,13 @@
       "avhw": true,
       "multipass": "2pass-full"
     },
-
     "FAST": {
       "preset": "default",
       "tune": "hq",
       "profile": "main10",
       "tier": "high",
-      "level": "6.1",
       "output_depth": 10,
-      "qvbr": 26,
+      "qvbr": 27,
       "max_bitrate": 60000,
       "vbv_bufsize": 240000,
       "aq": true,
@@ -151,9 +180,21 @@
       "nonrefp": true,
       "mv_precision": "q-pel",
       "chroma_qp_offset": -1,
-      "qp_init": [23, 25, 27],
-      "qp_min": [20, 22, 24],
-      "qp_max": [38, 42, 45],
+      "qp_init": [
+        23,
+        25,
+        27
+      ],
+      "qp_min": [
+        20,
+        22,
+        24
+      ],
+      "qp_max": [
+        38,
+        42,
+        45
+      ],
       "gop_len": 0,
       "aud": true,
       "repeat_headers": true,

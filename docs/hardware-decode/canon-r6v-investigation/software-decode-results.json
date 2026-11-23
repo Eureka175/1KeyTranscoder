@@ -1,0 +1,41 @@
+{
+  "schema": "canon-r6v-investigation/software-decode/1",
+  "method": {
+    "decoder": "ffmpeg native HEVC (software), tools/ffmpeg.exe",
+    "ffmpeg_version": "2026-06-15-git-44d082edc8-full_build-www.gyan.dev",
+    "command": "ffmpeg -hide_banner -loglevel verbose -i <src> -map 0:v:0 -fps_mode passthrough -f null NUL",
+    "note": "这里是**全片**软解，不是 --count_frames。真值来自四者合并：完整解码过程 + 容器 stsz 样本数 + 逐帧输出 + EOF/flush 结束状态。"
+  },
+  "runs": {
+    "A0013C699": {
+      "rc": 0,
+      "packets_read": 154,
+      "frames_decoded": 154,
+      "decode_errors": 0,
+      "container_samples": 154,
+      "wall_seconds": 9.3,
+      "eof_flush": "正常结束（Exiting with exit code 0，无 delayed frame 警告）",
+      "first_pts": 0.0,
+      "last_pts": 5.1051,
+      "pts_gaps": "无断层；相邻间隔仅 0.033366/0.033367 两种（29.97p 的量化抖动）",
+      "log": "work/canon_r6v/sw_decode_A699.stderr.log"
+    },
+    "A0013C700": {
+      "rc": 0,
+      "packets_read": 686,
+      "frames_decoded": 686,
+      "decode_errors": 0,
+      "container_samples": 686,
+      "wall_seconds": 32.6,
+      "eof_flush": "正常结束",
+      "first_pts": 0.0,
+      "last_pts": 22.856167,
+      "log": "work/canon_r6v/sw_decode_A700.stderr.log"
+    }
+  },
+  "conclusion": "两条素材软件解码完整：包数=解码帧数=容器样本数，0 解码错误。",
+  "limitations": [
+    "软件解码的\"帧数\"是解码器产出计数，不是逐像素真值；逐像素真值见 frame-comparison.json。",
+    "非无损视频跨解码器的像素结果可能不同，因此所有比较都先统一到 canonical yuv422p10le 再取指纹。"
+  ]
+}

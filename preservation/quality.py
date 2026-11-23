@@ -7,6 +7,8 @@
   (psnr/ssim 在 ffmpeg 9 为 framesync 过滤器, 容器 timebase 失配
   (1/1000 vs 1/30000) 会错配帧 — setpts=N 双端对齐彻底规避);
   `format=yuv420p10le` 统一色度/位深 (422 源按 420 输出策略同口径);
+  成品分辨率与源不同时, 源参考先缩放到成品尺寸再比较 (交付几何口径),
+  报告写 `reference_scaled=true`; 帧数/硬件完整性检查不受缩放影响.
   psnr 同时写 stats_file 逐帧 CSV 做局部垃圾帧检测。
 - 阈值 (防花屏/出错, 不是质量门槛): psnr_avg >= psnr_min_db (25),
   ssim_all >= ssim_min (0.80), 垃圾帧 (psnr < garbage_psnr_db=12) 占比
@@ -193,6 +195,7 @@ def run_quality_sample(
             "ssim_all": extra.get("ssim_all"),
             "garbage_frames": extra.get("garbage_frames"),
             "garbage_frac": extra.get("garbage_frac"),
+            "reference_scaled": extra.get("reference_scaled", False),
             "thresholds": {
                 "psnr_min_db": eff["psnr_min_db"],
                 "ssim_min": eff["ssim_min"],
@@ -271,17 +274,13 @@ def run_quality_sample(
                      duration_sec=duration, frames=src_probe["frames"])
         write_report(rep)
         return rep
-    if (src_probe["width"], src_probe["height"]) != (
-        out_probe["width"], out_probe["height"]
-    ):
-        rep = result(
-            _SKIP,
-            f"resolution mismatch {src_probe['width']}x{src_probe['height']}"
-            f" vs {out_probe['width']}x{out_probe['height']}",
-            duration_sec=duration, frames=src_probe["frames"],
-        )
-        write_report(rep)
-        return rep
+    # Resize is a legitimate delivery choice, not a reason to skip the
+    # quality gate.  Compare at the delivered geometry by scaling the source
+    # reference to the final resolution before PSNR/SSIM.  (Frame-count and
+    # hardware-integrity checks remain geometry-independent.)
+    src_wh = (src_probe["width"], src_probe["height"])
+    out_wh = (out_probe["width"], out_probe["height"])
+    reference_scaled = src_wh != out_wh
     if (
         src_probe["frames"]
         and out_probe["frames"]
@@ -295,13 +294,24 @@ def run_quality_sample(
         )
         write_report(rep)
         return rep
+    if reference_scaled:
+        log(
+            f"quality sample: scaling reference {src_wh[0]}x{src_wh[1]} -> "
+            f"{out_wh[0]}x{out_wh[1]} for PSNR/SSIM (delivery geometry)"
+        )
+    else:
+        log(
+            f"quality sample: {original.name} ({duration:.1f}s, "
+            f"{src_probe['frames']} frames) psnr+ssim..."
+        )
 
-    log(
-        f"quality sample: {original.name} ({duration:.1f}s, "
-        f"{src_probe['frames']} frames) psnr+ssim..."
+    reference_filter = (
+        f"scale={out_wh[0]}:{out_wh[1]}:flags=lanczos,"
+        if reference_scaled else ""
     )
     graph = (
-        "[0:v]settb=AVTB,setpts=N,format=yuv420p10le,split=2[x1][x2];"
+        f"[0:v]settb=AVTB,setpts=N,{reference_filter}"
+        "format=yuv420p10le,split=2[x1][x2];"
         "[1:v]settb=AVTB,setpts=N,format=yuv420p10le,split=2[y1][y2];"
         "[x1][y1]psnr=stats_file=quality_psnr.csv[p];"
         "[x2][y2]ssim[s]"
@@ -377,6 +387,7 @@ def run_quality_sample(
         ssim_all=round(ssim_all, 5) if ssim_all is not None else None,
         garbage_frames=garbage,
         garbage_frac=round(garbage_frac, 5),
+        reference_scaled=reference_scaled,
     )
     write_report(rep)
     log(f"quality sample: {rep['status']} ({detail})")

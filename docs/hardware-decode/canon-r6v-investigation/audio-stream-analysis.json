@@ -1,0 +1,163 @@
+{
+  "schema": "canon-r6v-investigation/audio/1",
+  "sources": {
+    "A0013C699": {
+      "stream_indices": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "per_stream": [
+        {
+          "index": 1,
+          "codec": "pcm_s24be",
+          "tag": "ipcm",
+          "channels": 1,
+          "sample_rate": 48000,
+          "bits_per_raw_sample": 24,
+          "sample_fmt": "s32",
+          "bit_rate": 1152000,
+          "start_time": "0.000000",
+          "duration": "5.138458",
+          "disposition_default": 1
+        },
+        {
+          "index": 2,
+          "codec": "pcm_s24be",
+          "tag": "ipcm",
+          "channels": 1,
+          "sample_rate": 48000,
+          "bits_per_raw_sample": 24,
+          "sample_fmt": "s32",
+          "bit_rate": 1152000,
+          "start_time": "0.000000",
+          "duration": "5.138458",
+          "disposition_default": 1
+        },
+        {
+          "index": 3,
+          "codec": "pcm_s24be",
+          "tag": "ipcm",
+          "channels": 1,
+          "sample_rate": 48000,
+          "bits_per_raw_sample": 24,
+          "sample_fmt": "s32",
+          "bit_rate": 1152000,
+          "start_time": "0.000000",
+          "duration": "5.138458",
+          "disposition_default": 1
+        },
+        {
+          "index": 4,
+          "codec": "pcm_s24be",
+          "tag": "ipcm",
+          "channels": 1,
+          "sample_rate": 48000,
+          "bits_per_raw_sample": 24,
+          "sample_fmt": "s32",
+          "bit_rate": 1152000,
+          "start_time": "0.000000",
+          "duration": "5.138458",
+          "disposition_default": 1
+        }
+      ],
+      "duration_vs_video_s": 0.0
+    },
+    "A0013C700": {
+      "stream_indices": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "per_stream": [
+        {
+          "index": 1,
+          "codec": "pcm_s24be",
+          "tag": "ipcm",
+          "channels": 1,
+          "sample_rate": 48000,
+          "bits_per_raw_sample": 24,
+          "sample_fmt": "s32",
+          "bit_rate": 1152000,
+          "start_time": "0.000000",
+          "duration": "22.889521",
+          "disposition_default": 1
+        },
+        {
+          "index": 2,
+          "codec": "pcm_s24be",
+          "tag": "ipcm",
+          "channels": 1,
+          "sample_rate": 48000,
+          "bits_per_raw_sample": 24,
+          "sample_fmt": "s32",
+          "bit_rate": 1152000,
+          "start_time": "0.000000",
+          "duration": "22.889521",
+          "disposition_default": 1
+        },
+        {
+          "index": 3,
+          "codec": "pcm_s24be",
+          "tag": "ipcm",
+          "channels": 1,
+          "sample_rate": 48000,
+          "bits_per_raw_sample": 24,
+          "sample_fmt": "s32",
+          "bit_rate": 1152000,
+          "start_time": "0.000000",
+          "duration": "22.889521",
+          "disposition_default": 1
+        },
+        {
+          "index": 4,
+          "codec": "pcm_s24be",
+          "tag": "ipcm",
+          "channels": 1,
+          "sample_rate": 48000,
+          "bits_per_raw_sample": 24,
+          "sample_fmt": "s32",
+          "bit_rate": 1152000,
+          "start_time": "0.000000",
+          "duration": "22.889521",
+          "disposition_default": 1
+        }
+      ]
+    }
+  },
+  "conclusion_topology": "4 x mono (4 independent single-channel streams)",
+  "project_default_path": {
+    "setting": "AudioPlan = None (no explicit plan)",
+    "audio_copy_expression": "core/batch_hw.py: audio_copy = video_handoff is None",
+    "observed": "产品真实运行中 audio_copy=True；但不带 --audio-copy 的裸 rigaya 调用同样把这些音轨写进了产物（见 nvenc_A0013C699_avhw.mov 的日志），两者都保留 4 条轨道。",
+    "delivered_audio_stream_count": 4,
+    "all_source_audio_retained": true,
+    "channels_reordered": false,
+    "channels_dropped": false,
+    "channels_merged": false
+  },
+  "mutation_observed": {
+    "codec": "pcm_s24be -> pcm_s24le",
+    "codec_tag": "ipcm -> in24",
+    "channels": "1 -> 1 (unchanged)",
+    "sample_rate": "48000 -> 48000 (unchanged)",
+    "bits_per_raw_sample": "24 -> 24 (unchanged)",
+    "track_count": "4 -> 4 (unchanged)",
+    "log_evidence": "#1:pcm_s24be/1 channels -> pcm_s24le/mono/1152kbps, #2.. #4 同上",
+    "why": "rigaya 把 big-endian PCM 改写成 little-endian（MOV in24）。位深、声道数、采样率、轨道数均不变，所以是封装字节序改写，不是重采样或声道重排。",
+    "is_a_defect": "未判定。需要在产品最终交付容器上复核 —— 本调查只验证到硬件编码中间件（*.part.mov / nvenc_*.mov）这一层。"
+  },
+  "hw_vs_sw_path_difference": {
+    "checked": true,
+    "result": "本轮未做逐路径音频差异对比；--avhw 与 --avsw 使用同一 rigaya 音频处理代码，日志行一致。标记为未验证。",
+    "status": "PENDING"
+  },
+  "project_channel_sync_note": "1kt.py --channel-sync 的帮助文本明确针对'多流单声道 PCM 布局 (无线麦 CH1/CH2 + 有线 CH3/CH4)'，与本素材的 4 x mono 形态一致 —— 本次未启用该功能，也未做音频对齐验证。",
+  "limitations": [
+    "未在产品最终交付文件上复核音频（只到硬件编码中间件）。",
+    "--avhw 与 --avsw 的音频结果未做逐路径对比。",
+    "未验证 4 条单声道轨在最终容器中的 track 顺序是否与源一致。"
+  ]
+}

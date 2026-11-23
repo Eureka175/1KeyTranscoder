@@ -241,8 +241,9 @@ Sony/DJI 保留管线要在缩放后继续保留：
   - Sony `validate.compare` / DJI `stream_facts` / full selfcheck 接受
     `expected_video_size`，把目标尺寸而不是源尺寸作为期望值；
   - 因此 Sony/DJI 缩放输出仍可通过 37/37 结构检查；
-- `--check full` 的 PSNR/SSIM 源-成品抽样在分辨率不同时显式 SKIP
-  （该抽样不适用于缩放输出），不改用虚假指标。
+- `--check full` 的 PSNR/SSIM 源-成品抽样现在**按交付尺寸比较**：
+  源参考先用 `scale=<target>` 缩到成品分辨率，再与成品做 PSNR/SSIM；
+  `reference_scaled=true` 会写入质量报告。帧数/硬件完整性检查不受缩放影响。
 
 实机验证：
 

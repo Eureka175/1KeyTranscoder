@@ -99,6 +99,11 @@ HW_AUTOSELECT_FALLBACK = "x265"              # 1kt.py:1108
 返回值是 `(warnings, final_format)`；致命错误抛 `RuntimeError`，由调用方
 记入失败清单，**不会**静默改用 x265 重编。
 
+格式决策本身**只有一份实现**：`encoders/format_policy.py::plan_output_format()`。
+硬件降级梯、x265 的 `-pix_fmt`、SVT-AV1 的 AV1 420/10 规划都调用它；
+软件路径在编码前输出同样的 `[FORMAT-PLAN]` / `FORMAT_PLAN` 日志
+（2026-11-16 对齐）。因此“换个后端”不会改变是否降级，只改变编码器参数与速度。
+
 ---
 
 ## 3. 正常转码管线
@@ -130,8 +135,12 @@ HW_AUTOSELECT_FALLBACK = "x265"              # 1kt.py:1108
 ```
 
 `1kt.py` 自身仍是**薄编排器**：Sony/DJI 的硬件批量逻辑在
-`core/batch_hw.py`（1752 行），`1kt.py` 里保留的 `encode_one_*` 系列
-（`:338` / `:492` / `:707`）是 **x265 显式手动路径**，永不自动选中。
+`core/batch_hw.py`，`1kt.py` 里的 `encode_one_*` 系列是 **x265/SVT-AV1
+显式手动路径**，永不自动选中。**但"显式手动"不等于"低人一等"**：
+输出格式统一走 `encoders/format_policy.py`，元数据保留决策统一走
+`preservation/policy.py`，软件路径与硬件路径的 `FORMAT_PLAN` /
+`META_POLICY` 日志契约一致（2026-11-16 对齐）。两条路径的差别只剩
+中间文件与容器重建实现，不再是"是否保真/是否保留元数据"的差别。
 
 ---
 
@@ -168,6 +177,18 @@ HIGH_BITRATE_LONG_GOP norm >= high_min
 | 容器重建 | GPAC（`preservation/gpac.py`） | GPAC |
 | 低位解析 | `preservation/isobmf.py`（752 行，自建 ISO-BMF 读写） | 同 |
 
+### 5.0 决策必须同源（2026-11-16 对齐）
+
+`preservation/policy.py::resolve_metadata_plan()` 是 **唯一**的保留策略
+决策入口，硬件路径（`core/batch_hw.py`）与软件路径（`1kt.py`）都调用它：
+同一套 Sony/DJI 检测、同一优先级（`--no-metadata` > 分段连接强制保留 >
+`--preserve-metadata` > DJI Action 默认），同一组 `META_POLICY` 日志。
+后端只决定“保留载荷如何重建容器”，不决定“是否保留”。
+
+> 历史问题：这两段决策曾在 `batch_hw.py` 与 `1kt.py` 各写一份，属于
+> legacy 重复实现；已合并，见 `preservation/policy.py` 及 L1 用例
+> `metapol:`。
+
 ### 5.1 Sony 管线的幂等/续跑设计（`preservation/pipeline.py:79`）
 
 ```
@@ -190,8 +211,15 @@ HIGH_BITRATE_LONG_GOP norm >= high_min
 | `hevc` | 全量 | **恢复 XAVC brand**（合规路径） |
 | `av1` | 全量（rtmd/nrtm/uuid） | **按策略不打** —— AV1 不在 XAVC 规范内 |
 
-AV1 统一输出 4:2:0；4:2:2 源会 WARNING 后降采样。视频中间文件位置也不同：
-HEVC 用 `video/encoded.mov`，AV1 用 `.mp4`（ffmpeg 9 的 MOV muxer 不接受 AV1）。
+AV1 统一输出 4:2:0/**10-bit**（NVENC AV1 / QSV AV1 / SVT-AV1 三个后端
+格式一致，2026-11-16 对齐）；非 4:2:0 源会 WARNING 后降采样。  
+**2026-11-20 起统一输出策略**：所有编码路径默认输出 **10-bit**（不论源文件
+色深），色度默认**跟随输入**；后端不支持源色度时才能力降级到 4:2:0。
+显式覆盖：`--output-depth {8,10,12}`、`--output-chroma {420,422,444}`；
+**mono 源/输出明确不支持**。NVENC HEVC 的 4:4:4 规划会使用
+`--profile main444 --output-csp yuv444`；QSV/AV1 对不支持的手动色度明确报错。
+视频中间文件位置也不同：HEVC 用 `video/encoded.mov`，AV1 用 `.mp4`
+（ffmpeg 9 的 MOV muxer 不接受 AV1）。
 
 ---
 
@@ -1778,7 +1806,11 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 
 * 输出路径由 `core/paths.py::output_path_for()` 决定，`job_id_for()` 生成稳定
   任务标识（续跑依赖它）。
-* 每个文件一个工作目录，含中间件、日志与 `report.json`。
+* **日志根目录为 `<output>/logs/`**：`total.log`、CSV、`failed_files.json`、
+  `preserve_reports/` 与每文件日志都随输出目录自包含，不再写到输入目录父级。
+* 每个文件一个工作目录，含中间件、日志与 `report.json`。硬件编码器的原始
+  stdout（`encode.<label>.log`）属于工作目录：成功随 GC 清理，失败保留供排查，
+  **不写进成品目录**。
 * `--retry-list failed_files.json` 只重跑失败项（`load_retry_list()`）。
 * 失败记录 `record_failure()` → 结构化失败清单，供重试与统计。
 * `--fresh-log` 清空 `total.log`（默认**追加**）。
@@ -1929,7 +1961,7 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 
 | 路径 | 行数 | 职责 |
 |---|---|---|
-| `1kt.py` | 2060 | 主入口：参数解析、后端解析、编排、x265 手动路径 |
+| `1kt.py` | 2060 | 主入口：参数解析、后端解析、编排、x265/SVT-AV1 手动路径（与硬件共用格式/元数据策略） |
 | `watchfolder.py` | 92 | 轮询批处理转调 |
 | `core/batch_hw.py` | 1966 | 硬件批量：降级梯、三条源路径、并发池、失败记录、**硬件解码接线与完整性闸门调用** |
 | `core/channel_sync.py` | 1038 | 延时补偿主算法与阈值 |
@@ -1969,14 +2001,17 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | `core/version.py` | 30 | 版本字符串 |
 | `encoders/integrity.py` | 539 | **v0.7.0** 硬件解码完整性闸门（count / sequence 两级） |
 | `encoders/hwdecode.py` | 428 | **v0.7.0** 硬件解码能力路由 + 白名单 + reason codes |
-| `encoders/hw.py` | 395 | `plan_initial_format()`：能力 → 初始输出形态 |
-| `encoders/x265.py` | 300 | x265 后端 |
-| `encoders/svtav1.py` | 249 | SVT-AV1 后端 |
+| `encoders/hw.py` | 395 | `plan_initial_format()`：兼容包装，委托 `encoders/format_policy.py` |
+| `encoders/format_policy.py` | 161 | **唯一输出格式策略**：默认所有输出 10-bit；色度跟随输入，能力不支持时降 420；`--output-depth`/`--output-chroma` 手动覆盖；mono 明确拒绝；AV1 420-only |
+| `core/remux.py` | 300+ | **`--remux` 无损 Sony XAVC 容器重写**：原生轨道复制去除 128 MiB chunk 尾部空洞，保留 rtmd/nrtm/uuid/tref/brand，advanced 校验后才落盘 |
+| `encoders/x265.py` | 300 | x265 后端（`x265_pix_fmt()` 走统一策略） |
+| `encoders/svtav1.py` | 249 | SVT-AV1 后端（`av1_pix_fmt()` 统一 420/10） |
 | `encoders/caps.py` | 215 | `--check-features` 能力探测 |
 | `encoders/nvencc.py` | 162 | NVEncC 后端（读者由 `--hw-decode` 决定，默认 `--avsw`） |
 | `encoders/qsvencc.py` | 157 | QSVEncC 后端（同上） |
 | `encoders/base.py` | 80 | 后端接口 |
 | `preservation/isobmf.py` | 752 | ISO-BMF 底层读写 |
+| `preservation/policy.py` | 166 | **唯一元数据保留策略**：硬件/软件共用（Sony rtmd / DJI Action / --no-metadata / 分段连接） |
 | `preservation/dji.py` | 693 | DJI 保留 |
 | `preservation/selfcheck.py` | 556 | `--check full` 自检 |
 | `preservation/sony.py` | 499 | Sony 保留 |

@@ -1,0 +1,45 @@
+{
+  "role": "Canon tmcd 时间码解算",
+  "tmcd_track": {
+    "handler": "tmcd",
+    "sample_entry": "tmcd",
+    "sample_size": 4,
+    "sample_entry_tail": "00000000 00000003 00007530 000003e9 1e00",
+    "tail_decode": {
+      "0x00007530": 30000,
+      "0x000003E9": 1001,
+      "0x1E": 30,
+      "meaning": "timescale 30000 / frame duration 1001 / 名义帧率 30"
+    }
+  },
+  "sample_values": [
+    {
+      "clip": "A0013C699",
+      "first_frame": 249959,
+      "last_frame": 250112,
+      "first_df": "130:09:00;11",
+      "last_df": "130:09:05;14",
+      "hours_field": 130,
+      "hours_mod24": 10
+    },
+    {
+      "clip": "A0013C700",
+      "first_frame": 250113,
+      "last_frame": 250798,
+      "first_df": "130:09:05;15",
+      "last_df": "130:09:28;10",
+      "hours_field": 130,
+      "hours_mod24": 10
+    }
+  ],
+  "ffprobe_timecode": {
+    "A0013C699": "02:19:00;11",
+    "A0013C700": "02:19:05;15"
+  },
+  "verification": {
+    "A0013C699_matches_target_frame": true,
+    "A0013C700_matches_target_frame": true,
+    "note": "tmcd 的 4 字节大端值就是 **drop-frame 帧号**：df_to_frames(02:19:00;11) = 249959 = 实测首样本值（完全一致）；df_to_frames(02:19:05;15) = 250113 = A0013C700 首样本值（完全一致）。但 frames_to_df(249959) 正算得到 130:09:00;11，而 ffprobe 报 02:19:00;11 —— 两者相差 128 小时。考虑到两条素材是连续拍摄（A699 末帧 250112，A700 首帧 250113，正好相接），帧号是**跨片段累计的全局时间码**。小时字段的回绕规则（是否 mod 24 或别的偏移）未最终确认。"
+  },
+  "status": "PARTIAL"
+}

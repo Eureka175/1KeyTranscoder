@@ -1,0 +1,148 @@
+{
+  "schema": "canon-r6v-investigation/qsv-and-software/1",
+  "question": "QSV 路径与软件路径对这两条 Canon 素材是否可用？两者此前都只做过部分验证。",
+  "answers": {
+    "ffmpeg_qsv_decode": "不可用（Intel Arc 140T 无法为 HEVC 4:2:2 10-bit 分配硬件帧上下文）",
+    "ffmpeg_software_decode": "可用，且是唯一无争议的正确路径",
+    "qsvencc_avhw": "可运行，但静默丢 2 帧（与 NVEncC 同缺陷）",
+    "qsvencc_avsw": "可用且帧数正确"
+  },
+  "ffmpeg_qsv": {
+    "verdict": "REFUSED at surface allocation",
+    "probe_acceptance": {
+      "status": "measured",
+      "value": true,
+      "detail": "hevc_qsv accepted hevc 4:2:2/10bit (2 frames)",
+      "caveat": "这是假阳性：2 帧在 fixture 上解得动，但那 2 帧可由软件解码满足，硬件 surface 从未成功分配。绝不能把这条当成 QSV 可用。"
+    },
+    "resolve_transfer": {
+      "transfer": null,
+      "status": "measured",
+      "value": false,
+      "detail": "hevc_qsv cannot allocate a 4:2:2/10bit surface on qsv[0]: [AVHWFramesContext] Unsupported pixel format"
+    },
+    "verbatim_candidate_probe": [
+      {
+        "direct": true,
+        "fmt": "p210le",
+        "rc": -22,
+        "error": "[hwdownload] Invalid output format p210le for hwframe download."
+      },
+      {
+        "direct": true,
+        "fmt": "yuv422p10le",
+        "rc": -22,
+        "error": "[hwdownload] Invalid output format yuv422p10le for hwframe download."
+      },
+      {
+        "direct": false,
+        "fmt": "yuv422p10le",
+        "rc": -40,
+        "error": "[AVHWFramesContext] Unsupported pixel format"
+      },
+      {
+        "direct": false,
+        "fmt": "p210le",
+        "rc": -40,
+        "error": "[AVHWFramesContext] Unsupported pixel format"
+      }
+    ],
+    "classification": "这是 capability_refused（设备能力拒绝），不是丢帧、不是下载路径问题。失败发生在 hwframes 上下文创建阶段，所以 4 条候选路径全部失败。",
+    "project_code_already_distinguishes_this": "encoders/hwdecode_ffmpeg.py 的 resolve_transfer 明确区分'解码器根本持有不了该格式'（hwframescontext / unsupported pixel format）与'没有可用的下载路径'，并给出不同的 reason。项目这段逻辑是对的。",
+    "planner_end_result": "plan_decode(hw_order=('qsv','cuda')) 最终落到 hevc_cuvid/cuda —— 即 QSV 被拒后正确回退到 NVIDIA，而不是回退到软件。",
+    "reporting_defect": "但拒绝原因在 accepted 分支里丢失了：plan.detail 只写 cuda 被接受，不含 QSV 为什么被拒。rejections 列表不进入日志。运维上无法从日志知道 QSV 被拒的原因。",
+    "hwdecode_script": "work/canon_r6v/why_qsv.py（已移入待删目录 canon_r6v-legacy）"
+  },
+  "qsvencc": {
+    "reader_identity_avhw": "avqsv",
+    "reader_identity_avsw": "avsw",
+    "capability": "接受这条素材：日志 'Input Info avqsv: H.265/HEVC, 6912x4608, 30000/1001 fps'，输出 'H.265/HEVC(yuv422 10bit)'。没有能力拒绝。",
+    "frame_loss": {
+      "A0013C699": {
+        "container": 154,
+        "avhw_encoded": 152,
+        "avsw_encoded": 154,
+        "loss": 2
+      },
+      "A0013C700": {
+        "container": 686,
+        "avhw_encoded": 684,
+        "avsw_encoded": 686,
+        "loss": 2
+      }
+    },
+    "delivery_level_check": {
+      "A0013C699_avhw_container_samples": 152,
+      "A0013C699_avsw_container_samples": 154,
+      "note": "丢帧写进了产物容器，不是读数问题。"
+    },
+    "rc": 0,
+    "error_text": "无",
+    "significance": "这是本次调研最强的证据之一。NVEncC(avcuvid) 与 QSVEncC(avqsv) 是两个独立前端、两套独立代码、两颗独立 GPU（NVIDIA NVDEC / Intel QSV），却在这两条素材上丢了完全相同的 2 帧。同时 FFmpeg 的 hevc_cuvid 在同一颗 NVIDIA 硅上逐帧位相同、一帧不丢。因此：这不是 NVDEC 的缺陷，也不是 QSV 硬件的缺陷，而是 rigaya 两个前端共有的 reader 语义问题 —— 与项目自身文档 docs/hardware-decode/xavc-hs-frame-count.md 的 RC-1 结论一致：两个前端规则相同、代码不同。",
+    "speed": {
+      "A0013C699_avhw_s": 11.7,
+      "A0013C699_avsw_s": 22.1
+    }
+  },
+  "qsvencc_resources": {
+    "method": "转码期间每 0.7 s 采样一次，12 个样本",
+    "dedicated_vram_used_mib": 0,
+    "note": "QSVEncC 跑在 Intel Arc 140T iGPU 上，使用系统内存，不占用 NVIDIA 专用显存。",
+    "peak_ram_used_mb": 21121,
+    "ram_total_mb": 32253,
+    "peak_process_working_set_mb": 8808,
+    "comparison_to_nvenc": "NVEncC --avhw 在同样的 --jobs 1 下把专用显存打到 7846/8151 MiB（96%）并因 CUDA_ERROR_OUT_OF_MEMORY 失败；QSVEncC 不碰专用显存，所以没有那个 OOM 问题，代价是吃 8.8 GB 系统内存。在这台机器上，QSV 路径受资源限制的程度明显低于 NVENC 路径。",
+    "buffer_config_observed": "Buffer Memory d3d11, 49 work buffer; Async Depth 3"
+  },
+  "software_path": {
+    "ffmpeg_native_hevc": {
+      "A0013C699": {
+        "rc": 0,
+        "frames": 154,
+        "errors": 0,
+        "wall_s": 9.3
+      },
+      "A0013C700": {
+        "rc": 0,
+        "frames": 686,
+        "errors": 0,
+        "wall_s": 32.6
+      },
+      "verdict": "PASS"
+    },
+    "nvencc_avsw": {
+      "role": "rigaya 侧软件 reader，是所有对照的基准",
+      "A0013C699": {
+        "encoded": 154,
+        "expected": 154
+      },
+      "A0013C700": {
+        "encoded": 686,
+        "expected": 686
+      },
+      "verdict": "PASS"
+    },
+    "qsvencc_avsw": {
+      "A0013C699": {
+        "encoded": 154
+      },
+      "A0013C700": {
+        "encoded": 686
+      },
+      "verdict": "PASS"
+    },
+    "product_end_to_end_avsw": {
+      "note": "产品端到端在 --avhw OOM 被门禁拦下后回退到 --avsw，交付 154/154 帧、4 条音轨、tmcd 保留。",
+      "verdict": "PASS（帧数层）"
+    },
+    "conclusion": "软件路径在三条独立实现（ffmpeg native、NVEncC --avsw、QSVEncC --avsw）上帧数全部正确，是唯一无争议的可用路径。"
+  },
+  "updated_risk_statement": "在这台机器（8 GB 显存）上，两条 Canon 素材的实际结局是：NVENC --avhw 因显存不足失败（可被门禁拦下，安全）；QSVEncC --avhw 能跑完但会静默丢 2 帧（危险，且项目策略不保护 Canon）；FFmpeg 路径（x265/svtav1）走 hevc_cuvid 且逐帧位相同（安全且更快）。",
+  "limitations": [
+    "QSV 解码的 FFmpeg 侧只在 fixture 与 5 帧实素材上探测，未做逐帧比对（因为 surface 分配即失败，没有可比的输出）。",
+    "QSVEncC --avhw 的丢帧只做到帧数层，未做逐帧指纹定位。",
+    "未在 QSVEncC 上验证 --avhw 是否存在 seek 不等价问题。",
+    "未测 QSV 后端（--encoder qsv）的产品端到端。",
+    "QSVEncC 资源采样间隔 0.7 s、只有 12 个样本，峰值可能被低估。"
+  ]
+}

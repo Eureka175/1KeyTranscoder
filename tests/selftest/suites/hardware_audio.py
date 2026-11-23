@@ -127,9 +127,9 @@ def _dominant_hz(path: Path, position: int) -> float:
     return float(freqs[int(np.argmax(spectrum))]) if len(spectrum) else 0.0
 
 
-def _per_file_logs(input_dir: Path) -> str:
-    """该输入目录这一轮的 per-file 日志文本 (1kt.py 写在 input 的兄弟目录)。"""
-    logs_root = input_dir.parent / "logs"
+def _per_file_logs(output_dir: Path) -> str:
+    """该次运行输出目录下的 per-file 日志文本 (1kt.py 写在 output/logs)。"""
+    logs_root = output_dir / "logs"
     if not logs_root.is_dir():
         return ""
     texts = []
@@ -354,7 +354,16 @@ def l1_hardware_audio() -> None:
         "--repair-fix-layout", "--repair-no-container-fix",
         "--repair-no-groups", "--repair-accurate", "--repair-opt",
     }
-    ASYNC_ADDED = {"--async-pipeline", "--gpu-align"}
+    ASYNC_ADDED = {"--async-pipeline", "--gpu-align", "--async-integrity",
+                   "--no-async-integrity"}
+    # v0.9.14 (2026-11-15): DJI Action 分段连接合入主程序。--dji-join 是
+    # 输入集开关 (默认关闭), --dji-join-keep-temp 是它的暂存树保留开关。
+    # 与上面各阶段同一规矩: 手写登记, 新增参数必须显式改到这里。
+    DJI_JOIN_ADDED = {"--dji-join", "--dji-join-keep-temp"}
+    # v0.9.15 (2026-11-20): output format overrides. Defaults: 10-bit depth,
+    # source chroma; these two options are the explicit manual overrides.
+    # v0.9.19: --remux is a new input-transform mode (no encoder).
+    OUTPUT_FORMAT_ADDED = {"--output-depth", "--output-chroma", "--remux"}
     V080_BASELINE = {
         "--version", "--input", "--output", "--preset", "--encoder", "--config",
         "--scaling-config", "--tool-nvencc", "--tool-qsvencc",
@@ -370,11 +379,32 @@ def l1_hardware_audio() -> None:
            f"missing: {sorted((V080_BASELINE - THIS_PHASE_ADDED) - args_now)}")
     record("v08hw.cli 除 P4.6/P4.12 的 opt-in 与本阶段新增外, 没有其它参数",
            args_now - P46_ADDED - P412_ADDED - THIS_PHASE_ADDED
-           - REPAIR_ADDED - ASYNC_ADDED <= V080_BASELINE,
+           - REPAIR_ADDED - ASYNC_ADDED - DJI_JOIN_ADDED
+           - OUTPUT_FORMAT_ADDED <= V080_BASELINE,
            f"unexpected: "
-           f"{sorted(args_now - P46_ADDED - P412_ADDED - THIS_PHASE_ADDED - REPAIR_ADDED - ASYNC_ADDED - V080_BASELINE)}")
+           f"{sorted(args_now - P46_ADDED - P412_ADDED - THIS_PHASE_ADDED - REPAIR_ADDED - ASYNC_ADDED - DJI_JOIN_ADDED - OUTPUT_FORMAT_ADDED - V080_BASELINE)}")
+    record("v08hw.cli 输出格式覆盖参数存在且默认不指定",
+           OUTPUT_FORMAT_ADDED <= args_now
+           and entry.count("--output-depth") >= 1
+           and entry.count("--output-chroma") >= 1)
     record("v08hw.cli v0.8.8 归档修复模式已合入主程序 (--repair + 修复选项)",
            REPAIR_ADDED <= args_now)
+    # v0.9.14: DJI 分段连接必须是真开关 (默认关闭 + 真分派), 不能是空参数。
+    _dji_at = entry.find('"--dji-join",')
+    _dji_block = entry[_dji_at:_dji_at + 500] if _dji_at >= 0 else ""
+    record("v08hw.cli v0.9.14 DJI 分段连接开关存在且默认关闭 (--dji-join)",
+           DJI_JOIN_ADDED <= args_now
+           and 'action="store_true"' in _dji_block
+           and "default=False" in _dji_block,
+           f"at={_dji_at} block={_dji_block[:80]!r}")
+    record("v08hw.cli --dji-join 真正分派到 core.dji_join (输入集替换)",
+           "from core.dji_join import" in entry
+           and 'getattr(args, "dji_join", False)' in entry
+           and "_dji_join_prepare(" in entry
+           and "source_root = dji_pipeline.root" in entry
+           and "sources = dji_pipeline.sources" in entry
+           and "progress_cb=dji_progress" in entry
+           and "ensure_ready(src)" in entry)
     record("v08hw.cli --repair 实际分派到 archive_repair.run_repair (不是空开关)",
            "archive_repair.run_repair" in entry
            and 'getattr(args, "repair", False)' in entry)
@@ -582,7 +612,7 @@ def l3_hardware_audio() -> None:
         # `applied=1` / 输出 [pcm, opus] 已按新口径删除)。
         result, produced, text = _run_case(
             align_dir, d / f"align_{encoder}", encoder, align)
-        detail = _per_file_logs(align_dir)
+        detail = _per_file_logs(d / f"align_{encoder}")
         rejected_files = sorted((d / f"align_{encoder}").rglob("*.MP4"))
         record(f"v08hw.{encoder}+compressed 显式 alignment -> 显式拒绝 (非零退出)",
                result.returncode != 0
@@ -669,15 +699,26 @@ def l3_hardware_audio() -> None:
         hwdec_dir, d / "av1_nvenc", "nvenc-av1", select_one)
     result_av1_def, produced_av1_def, text_av1_def = _run_case(
         hwdec_dir, d / "av1_nvenc_def", "nvenc-av1", None)
-    same = (
-        result_av1_plan.returncode == result_av1_def.returncode
-        and not produced_av1_plan.is_file() and not produced_av1_def.is_file()
+    # The former KNOWN LIMITATION was the static AV1 level 6.1 in
+    # nvenc_av1.json: NVEncC rejected it at encoder init for some
+    # resolution/frame-rate combinations.  The config now lets NVENC
+    # choose the level, so both the planned and default runs must encode.
+    plan_ok = (
+        result_av1_plan.returncode == 0
+        and produced_av1_plan.is_file()
+        and (_video_of(produced_av1_plan) or {}).get("codec_name") == "av1"
     )
-    record("v08hw.av1 NVENC AV1 与计划无关地失败 (KNOWN LIMITATION, 非本阶段引入)",
-           same and "Failed to create encoder" in text_av1_plan
-           and "Failed to create encoder" in text_av1_def,
-           "both with and without --audio-plan: "
-           f"rc={result_av1_plan.returncode}/{result_av1_def.returncode}")
+    def_ok = (
+        result_av1_def.returncode == 0
+        and produced_av1_def.is_file()
+        and (_video_of(produced_av1_def) or {}).get("codec_name") == "av1"
+    )
+    record("v08hw.av1 NVENC AV1 有/无计划均真实编码成功",
+           plan_ok and def_ok,
+           "planned/default: "
+           f"rc={result_av1_plan.returncode}/{result_av1_def.returncode} "
+           f"produced={produced_av1_plan.is_file()}/{produced_av1_def.is_file()} "
+           f"plan_tail={text_av1_plan[-160:]} def_tail={text_av1_def[-160:]}")
 
     # ------------------------------------------------- Sony / DJI 拒绝 (§19)
     from core.batch_hw import audio_plan_refusal, is_sony_source

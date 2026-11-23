@@ -24,8 +24,9 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from core.batch_hw import (
     BatchCtx,
@@ -70,9 +71,14 @@ from core.probe import build_source_info, count_frames, probe_source
 from core.scaling import ScalingEngine
 from core.source_classifier import SourceClassifier
 from core.workdir import gc_job_dir
+from core.remux import remux_main
 from core.version import version_string
 from encoders.svtav1 import SvtAv1Backend
 from encoders.x265 import X265Backend
+from encoders.format_policy import (
+    configure_output_format,
+    plan_output_format,
+)
 from encoders.resize import (
     DEFAULT_RESIZE_ALGO,
     RESIZE_ALGOS,
@@ -86,6 +92,7 @@ from encoders.resize import (
 from preservation.gpac import GpacContainerBackend
 from preservation.gyroflow import find_gyroflow
 from preservation.pipeline import run_sony_pipeline
+from preservation.policy import log_metadata_plan, resolve_metadata_plan
 
 EXPERIMENTAL_BANNER = (
     "=" * 72
@@ -109,8 +116,14 @@ def run_ffmpeg(
     raw_log_path: Path,
     total_frames: int,
     file_logger: logging.Logger,
+    progress_cb: Callable[[int, int], None] | None = None,
 ) -> tuple[int | None, float]:
-    """Run one FFmpeg command with live progress."""
+    """Run one FFmpeg command with live progress.
+
+    ``progress_cb(current_frame, total_frames)`` is invoked for every
+    ``frame=`` line; the DJI progressive stager uses it to arm the next
+    split group's lossless join shortly before this encode finishes.
+    """
     import re
     import time
 
@@ -146,6 +159,13 @@ def run_ffmpeg(
                 if not frame_match:
                     continue
                 current_frame = int(frame_match.group(1))
+                if progress_cb is not None:
+                    try:
+                        progress_cb(current_frame, total_frames)
+                    except Exception:                  # noqa: BLE001
+                        # Progress is advisory: a stager failure must not
+                        # break an encode that is otherwise fine.
+                        pass
                 elapsed = time.monotonic() - started
                 bitrate = (
                     float(bitrate_match.group(1))
@@ -269,6 +289,10 @@ def prepare_source(
     )
 
     src_info = build_source_info(src, source_summary, source_streams)
+    if src_info.chroma == "mono":
+        raise ValueError(
+            "mono sources are not supported; use a 4:2:0/4:2:2/4:4:4 source"
+        )
     classification = classifier.classify(src_info)
     effective = engine.build(
         profile, preset, src_info, classification,
@@ -518,6 +542,7 @@ def encode_one(
     decode_plan: Any = None,
     resize: ResizeSpec | None = None,
     drop_metadata_streams: bool = False,
+    progress_cb: Callable[[int, int], None] | None = None,
 ) -> str:
     """Classic single-pass (x265/svtav1 software backends). At
     check_level='full' the PSNR/SSIM sample gates delivery; with
@@ -742,6 +767,7 @@ def encode_one_sony(
     dry_run: bool,
     decode_plan: Any = None,
     resize: ResizeSpec | None = None,
+    progress_cb: Callable[[int, int], None] | None = None,
 ) -> str:
     """Sony preservation path (rtmd) for ffmpeg software backends
     (x265 / svtav1; --check levels apply like on hardware backends).
@@ -790,7 +816,8 @@ def encode_one_sony(
         out_mov.parent.mkdir(parents=True, exist_ok=True)
         raw_log = out_mov.with_name(out_mov.name + ".ffmpeg.log")
         rc, _ = run_ffmpeg(
-            cmd, raw_log, source_summary["total_frames"], file_logger
+            cmd, raw_log, source_summary["total_frames"], file_logger,
+            progress_cb=progress_cb,
         )
         if rc is None:
             raise RuntimeError("video encode interrupted/failed to run")
@@ -990,6 +1017,7 @@ def encode_one_dji_x265(
     dry_run: bool,
     decode_plan: Any = None,
     resize: ResizeSpec | None = None,
+    progress_cb: Callable[[int, int], None] | None = None,
 ) -> str:
     """DJI preservation path for ffmpeg software backends (x265/svtav1).
 
@@ -1052,7 +1080,8 @@ def encode_one_dji_x265(
         encoded_mov.parent.mkdir(parents=True, exist_ok=True)
         raw_log = encoded_mov.with_name(encoded_mov.name + ".ffmpeg.log")
         rc, _ = run_ffmpeg(
-            cmd, raw_log, source_summary["total_frames"], file_logger
+            cmd, raw_log, source_summary["total_frames"], file_logger,
+            progress_cb=progress_cb,
         )
         if rc is None or rc != 0:
             raise RuntimeError(f"video encode failed (rc={rc})")
@@ -1222,6 +1251,27 @@ def parse_args() -> argparse.Namespace:
             "Sony 源保留 rtmd/nrtm/uuid 元数据但按策略不打 XAVC tag "
             "(AV1 不在 XAVC 规范内); AV1 统一输出 4:2:0, 4:2:2 源 "
             "WARNING 后降采样。"
+        ),
+    )
+    parser.add_argument(
+        "--output-depth",
+        type=int,
+        choices=[8, 10, 12],
+        default=None,
+        help=(
+            "输出位深覆盖：8/10/12。默认所有输出统一为 10-bit，"
+            "不论源文件色深；显式指定时按指定值输出（后端不支持则报错）。"
+        ),
+    )
+    parser.add_argument(
+        "--output-chroma",
+        type=str.lower,
+        choices=["420", "422", "444"],
+        default=None,
+        help=(
+            "输出色度采样覆盖：420/422/444。默认跟随输入色度"
+            "（后端不支持时才能力降级到 420）；显式指定时按指定值输出。"
+            "mono 输入/输出均不支持。"
         ),
     )
     parser.add_argument("--config", default=None,
@@ -1434,6 +1484,24 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--async-integrity",
+        dest="async_integrity",
+        action="store_true",
+        default=True,
+        help=(
+            "硬件解码完整性校验默认异步: 校验不占用 --jobs 编码槽位, "
+            "校验线程通过队列 1 串行执行; 所有硬件保留/普通路径生效. "
+            "仅在磁盘不足时阻塞下一文件编码. 可用 --no-async-integrity "
+            "退回同步校验."
+        ),
+    )
+    parser.add_argument(
+        "--no-async-integrity",
+        dest="async_integrity",
+        action="store_false",
+        help="关闭异步完整性校验 (退回原同步路径).",
+    )
+    parser.add_argument(
         "--gpu-align",
         choices=["off", "fp32", "fp64"],
         default=None,
@@ -1491,6 +1559,31 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--dji-join",
+        action="store_true",
+        default=False,
+        help=(
+            "DJI Action 分段录制无损连接 (**默认关闭**). 相机录到约 16 GB 时"
+            "会切出新文件 (DJI_YYYYMMDDHHMMSS_NNNN_D.MP4); 本开关先检测连续"
+            "分段, 用 MP4Box 按轨道无损连接成一条完整素材 (保留 djmd/dbgi/"
+            "tmcd 数据轨), 再交给普通编码管线. 不修改源文件; 连接结果放在 "
+            "--output 下的 .dji_join_work_* 暂存树, 成功后自动删除"
+            " (失败/--dji-join-keep-temp 时保留). 与 --repair / --retry-list / "
+            "--channel-sync-transparent 不兼容. 配合 --dry-run 时只检测并"
+            "报告分组, 不连接也不编码. 与 --no-metadata 同用时仍会连接分段, "
+            "但按普通转码路径跳过元数据保留 (显式关闭优先)."
+        ),
+    )
+    parser.add_argument(
+        "--dji-join-keep-temp",
+        action="store_true",
+        default=False,
+        help=(
+            "仅配合 --dji-join: 成功后也保留 .dji_join_work_* 暂存树"
+            " (排查/复用连接结果用). 默认成功后删除."
+        ),
+    )
+    parser.add_argument(
         "--headless",
         action="store_true",
         help="无人值守: 不弹进度看板窗口, 全部信息落日志.",
@@ -1518,6 +1611,14 @@ def parse_args() -> argparse.Namespace:
     # ---- 归档修复模式 (2026-10-26 合入主程序) ---------------------------
     # 为什么放进 1kt.py: 批处理链只需要调用一个程序 (转码 / 修复同入口),
     # 修复能力不再是一个只能手工跑的旁路脚本。修复不重新编码视频。
+    parser.add_argument(
+        "--remux", action="store_true",
+        help=(
+            "无损 remux 模式（不编码）：重写 Sony XAVC 容器，去掉相机按 128MB "
+            "录制 chunk 分配但未使用的尾部空间；视频/PCM/rtmd 原样复制，保留 "
+            "nrtm/Lens profile/uuid/tref 与 XAVC brand。输出目录会复制 XML 边车。"
+        ),
+    )
     parser.add_argument(
         "--repair", action="store_true",
         help="归档修复模式: 把 --input 下已产出 (转码后) 的成品一键修到 "
@@ -1712,6 +1813,9 @@ def _job_scratch(
             )
 
 
+_DASHBOARD_PROCS: list[subprocess.Popen] = []
+
+
 def spawn_dashboard(json_path: Path, script_dir: Path):
     """Open the nvidia-smi style dashboard in a separate console."""
     try:
@@ -1719,13 +1823,38 @@ def spawn_dashboard(json_path: Path, script_dir: Path):
         # 任一 DEVNULL/PIPE, Windows 就会让子进程继承非控制台句柄, 看板把
         # ANSI 输出写进 NUL, 新控制台窗口看起来"完全没有输出"。全部继承时
         # 子进程拿到的是新控制台自己的句柄 (实测 GetConsoleMode 成功)。
-        return subprocess.Popen(
-            [sys.executable, "-m", "core.dashboard_ui", str(json_path)],
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "core.dashboard_ui", str(json_path),
+             "--parent-pid", str(os.getpid())],
             cwd=str(script_dir),
             creationflags=subprocess.CREATE_NEW_CONSOLE,
         )
+        _DASHBOARD_PROCS.append(proc)
+        return proc
     except OSError:
         return None
+
+
+def shutdown_dashboard() -> None:
+    """Close dashboard consoles started by this process.
+
+    The dashboard runs in a separate console created with
+    CREATE_NEW_CONSOLE, so a Ctrl+C sent to the main console does not reach
+    it.  The top-level entry point calls this in a finally block; the
+    dashboard also watches --parent-pid as a backstop if the parent is
+    killed without unwinding.
+    """
+    procs, _DASHBOARD_PROCS[:] = list(_DASHBOARD_PROCS), []
+    for proc in procs:
+        try:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+        except OSError:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -1903,7 +2032,7 @@ def transparent_main(
     )
 
     output_root.mkdir(parents=True, exist_ok=True)
-    logs_root = input_root.parent / "logs"
+    logs_root = output_root / "logs"
     logs_root.mkdir(parents=True, exist_ok=True)
     total_log = logs_root / "total.log"
     work_root = output_root / ".1ktwork"
@@ -2241,11 +2370,143 @@ def transparent_main(
 
 
 # ---------------------------------------------------------------------------
+# DJI Action split-recording staging (--dji-join, default off)
+# ---------------------------------------------------------------------------
+#
+# 实现全部在 core.dji_join (与独立包装脚本共享同一份逻辑); 这里只决定
+# "何时连接" 以及 "把 staging 树交给哪条管线", 不重新实现检测/连接:
+#
+#   检测分段 -> 单趟 MP4Box -cat -unalign-cat -flat 无损连接
+#            -> 第一组就绪即开始编码; 其余组在上一组编码接近完成时后台连接
+#            -> 该组交付后立即删除其 joined 源 (--dji-join-keep-temp 除外)
+#
+# 源目录只读: 未分组的文件用硬链接 (跨卷时 symlink) 进入 staging, 已分组
+# 的源文件不会被移动/修改. 峰值落盘 = 当前组 + 下一组 joined (单趟输出,
+# 不再有 2x GPAC 临时文件或 3x 按轨中间产物).
+
+#: 本进程当前拥有的 staging 树. `keep` 默认 True: 意外退出 (Ctrl+C /
+#: 未捕获异常) 时保留连接结果而不是删除证据; 正常成功路径会显式清除.
+_DJI_STAGING: dict[str, Any] = {
+    "root": None, "stager": None, "keep": True,
+}
+
+
+def _dji_join_prepare(
+    *,
+    args: argparse.Namespace,
+    input_root: Path,
+    output_root: Path,
+    ffprobe: Path,
+    gpac: GpacContainerBackend,
+    log: Callable[[str], None],
+) -> tuple[Any | None, int | None]:
+    """Detect DJI Action split recordings and set up progressive staging.
+
+    Returns ``(stager, exit_code)``:
+
+    * ``(None, None)`` — no split recording detected; caller runs the
+      ordinary pipeline over ``input_root`` unchanged.
+    * ``(None, 0)`` — ``--dry-run``: detection only, caller stops.
+    * ``(stager, None)`` — caller must encode ``stager.sources`` instead of
+      rediscovering ``input_root``.  The first group is already joined; the
+      remaining groups are joined on demand (one group ahead of the encode)
+      and each joined source is reclaimed as soon as it is delivered.
+
+    A failed first join returns ``(None, 2)`` and keeps its partial staging
+    tree for inspection; later join failures are reported per group by the
+    encode loop and keep the remaining staging.
+    """
+    from core.dji_join import ProgressiveStager, detect_plan, write_reports
+
+    report_dir = output_root / "logs" / "dji_join"
+    sources = discover_sources(input_root)
+    log(f"[DJI-JOIN] scan | {len(sources)} source file(s) | {input_root}")
+    plan = detect_plan(input_root, sources, ffprobe, log=log)
+    if not plan.groups:
+        write_reports(report_dir=report_dir, plan=plan)
+        log("[DJI-JOIN] no contiguous split recording detected | "
+            "ordinary pipeline")
+        return None, None
+
+    log(
+        f"[DJI-JOIN] detected {plan.joined_count} split group(s) | "
+        f"{plan.grouped_source_count} segment(s) -> "
+        f"{plan.joined_count} joined source(s) | "
+        f"{len(plan.singles)} ungrouped DJI file(s)"
+    )
+    if getattr(args, "dry_run", False):
+        paths = write_reports(report_dir=report_dir, plan=plan)
+        log("[DJI-JOIN] dry-run | detection only (no join, no encode) | "
+            f"{paths['plan']}")
+        return None, 0
+
+    staging_root = output_root / (
+        f".dji_join_work_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        f"_{os.getpid()}"
+    )
+    stager = ProgressiveStager(
+        plan=plan,
+        staging_root=staging_root,
+        gpac=gpac,
+        ffprobe=ffprobe,
+        log=log,
+        keep_temp=bool(getattr(args, "dji_join_keep_temp", False)),
+    )
+    stager.report_dir = report_dir
+    try:
+        stager.prepare()
+    except Exception as exc:                       # noqa: BLE001
+        write_reports(report_dir=report_dir, plan=plan,
+                      staging_root=staging_root)
+        log(f"[DJI-JOIN] FATAL: join failed | {type(exc).__name__}: {exc}")
+        log(f"[DJI-JOIN] partial staging kept for inspection | {staging_root}")
+        return None, 2
+
+    paths = write_reports(
+        report_dir=report_dir,
+        plan=plan,
+        staging_root=staging_root,
+    )
+    log(
+        f"[DJI-JOIN] progressive staging ready | {len(plan.groups)} group(s), "
+        f"first joined | {len(stager.sources)} staged input(s) | "
+        f"peak on disk: current + next group only | {staging_root}"
+    )
+    log(f"[DJI-JOIN] reports | {paths['plan']} | "
+        f"{paths.get('joined', 'written at end')}")
+    return stager, None
+
+
+def _dji_join_cleanup() -> None:
+    """Remove the staging tree when this process no longer needs it.
+
+    The normal success path clears ``keep`` first; failures and interrupts
+    leave it set so the joined sources survive for diagnosis/retry.  The
+    progressive stager's worker is stopped before the tree is removed.
+    """
+    root = _DJI_STAGING.get("root")
+    if root is None or _DJI_STAGING.get("keep"):
+        return
+    stager = _DJI_STAGING.get("stager")
+    if stager is not None:
+        stager.close(keep=False)
+    else:
+        shutil.rmtree(root, ignore_errors=True)
+    _DJI_STAGING.update(root=None, stager=None)
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
 def main() -> int:
     args = parse_args()
+    # Output format policy is process-wide: default 10-bit depth, source
+    # chroma; --output-depth/--output-chroma are explicit manual overrides.
+    configure_output_format(
+        depth=getattr(args, "output_depth", None),
+        chroma=getattr(args, "output_chroma", None),
+    )
     # CUDA audio alignment is enabled by default in fp32; an explicit
     # --gpu-align or KTS_GPU_ALIGN override wins.  The env var is the single
     # source of truth so long_take/measure_window_delays see the same mode in
@@ -2307,6 +2568,56 @@ def main() -> int:
                   "--channel-sync-transparent (video is stream-copied).",
                   file=sys.stderr)
             return 2
+        if getattr(args, "remux", False):
+            print("[FATAL] --resize/--scale is not supported in --remux mode.",
+                  file=sys.stderr)
+            return 2
+
+    # --remux cannot run before the mode dispatch of repair / DJI join.
+    if getattr(args, "remux", False):
+        if getattr(args, "repair", False):
+            print("[FATAL] --remux cannot be combined with --repair.",
+                  file=sys.stderr)
+            return 2
+        if getattr(args, "dji_join", False) or getattr(
+            args, "dji_join_keep_temp", False
+        ):
+            print("[FATAL] --remux cannot be combined with --dji-join.",
+                  file=sys.stderr)
+            return 2
+
+    # --dji-join (默认关闭): DJI Action 分段连接后再走普通编码管线。
+    # 它改变的是"输入集"而不是编码参数, 因此与几个自己拥有输入语义的
+    # 模式互斥; 组合时明确拒绝, 不做"猜一个"的静默降级。
+    if getattr(args, "dji_join", False):
+        if getattr(args, "repair", False):
+            print("[FATAL] --dji-join is not supported in --repair mode "
+                  "(repair operates on already-produced archive files).",
+                  file=sys.stderr)
+            return 2
+        if getattr(args, "retry_list", None):
+            print("[FATAL] --dji-join cannot be combined with --retry-list: "
+                  "the retry list names the original (still split) sources, "
+                  "while --dji-join re-derives the input set.  Re-run without "
+                  "--dji-join against the joined sources instead.",
+                  file=sys.stderr)
+            return 2
+        if getattr(args, "channel_sync_transparent", False):
+            print("[FATAL] --dji-join is not supported with "
+                  "--channel-sync-transparent: this mode is an audio "
+                  "pre-processing pass whose output layout is derived from "
+                  "the source files; run the DJI join and the transparent "
+                  "pass as two separate invocations.",
+                  file=sys.stderr)
+            return 2
+    elif getattr(args, "dji_join_keep_temp", False):
+        print("[WARNING] --dji-join-keep-temp has no effect without "
+              "--dji-join.", file=sys.stderr)
+    if getattr(args, "async_integrity", False):
+        if getattr(args, "experimental_multihw", False):
+            print("[WARNING] --async-integrity is disabled with "
+                  "--experimental-multihw (single-backend scheduler only).",
+                  file=sys.stderr)
 
     # --repair: 归档成品修复模式 (与转码共用同一入口, 供批处理直接调用)。
     # 在解析编码器/工具链之前分流: 修复不需要编码器配置, 只需要
@@ -2329,6 +2640,35 @@ def main() -> int:
     except Exception as exc:
         print(f"[FATAL] {exc}", file=sys.stderr)
         return 2
+
+    # --remux: lossless Sony XAVC container rewrite (no encoder needed).
+    if getattr(args, "remux", False):
+        incompatible = [
+            ("--encoder", getattr(args, "encoder", None)),
+            ("--dji-join", getattr(args, "dji_join", False)),
+            ("--dji-join-keep-temp",
+             getattr(args, "dji_join_keep_temp", False)),
+            ("--retry-list", getattr(args, "retry_list", None)),
+            ("--repair", getattr(args, "repair", False)),
+            ("--channel-sync-transparent",
+             getattr(args, "channel_sync_transparent", False)),
+            ("--audio-plan", getattr(args, "audio_plan", None)),
+            ("--resize", getattr(args, "resize", None)),
+            ("--scale", getattr(args, "scale", None)),
+        ]
+        for flag, value in incompatible:
+            if value:
+                print(f"[FATAL] --remux cannot be combined with {flag}.",
+                      file=sys.stderr)
+                return 2
+        return remux_main(
+            args=args,
+            input_root=input_root,
+            output_root=output_root,
+            ffprobe=ffprobe,
+            gpac=gpac,
+            script_dir=script_dir,
+        )
 
     # --channel-sync-transparent: 剪辑前预处理独立流程 (跳过视频编码,
     # 不依赖编码器配置)
@@ -2465,7 +2805,7 @@ def main() -> int:
         return 2
 
     output_root.mkdir(parents=True, exist_ok=True)
-    logs_root = input_root.parent / "logs"
+    logs_root = output_root / "logs"
     logs_root.mkdir(parents=True, exist_ok=True)
 
     total_log = logs_root / "total.log"
@@ -2658,6 +2998,51 @@ def main() -> int:
     multiple_presets = len(requested) > 1        # always False; kept for the
     #                                              shared output-layout helper
 
+    # --dji-join (default off): join the first DJI Action split group, hand
+    # the staging tree to the ordinary pipeline, and let the stager produce
+    # each following group while the previous one is being encoded.
+    # Detection/joining lives in core.dji_join; this block only owns the
+    # input-set substitution and the staging lifecycle.
+    source_root = input_root
+    dji_pipeline = None
+    #: joined staging path -> join-time camera model tag (for META_POLICY logs)
+    dji_preserve_sources: dict[Path, str | None] = {}
+    if getattr(args, "dji_join", False):
+        dji_pipeline, dji_exit = _dji_join_prepare(
+            args=args,
+            input_root=input_root,
+            output_root=output_root,
+            ffprobe=ffprobe,
+            gpac=gpac,
+            # The logger already owns the console handler, so one call
+            # reaches console + total.log without duplicated lines.
+            log=lambda line: logger.info("%s", line),
+        )
+        if dji_exit is not None:
+            return dji_exit
+        if dji_pipeline is not None:
+            source_root = dji_pipeline.root
+            # Joined sources whose first segment was an Action-series camera:
+            # the joined file has no movie `tool` tag any more, so the
+            # preserve-by-default decision is carried explicitly (with the
+            # join-time model, for the per-file META_POLICY log line).  The
+            # stager adds each entry as that group's join completes.
+            dji_preserve_sources = dji_pipeline.preserve_sources
+            _DJI_STAGING.update(
+                root=dji_pipeline.root, stager=dji_pipeline, keep=True,
+            )
+            logger.info(
+                "DJI-JOIN input substitution | %d group(s), progressive | "
+                "staging=%s | preserve-by-default=%d | first group joined",
+                len(dji_pipeline.groups), dji_pipeline.root,
+                len(dji_preserve_sources),
+            )
+            if args.experimental_multihw:
+                logger.warning(
+                    "[DJI-JOIN] --experimental-multihw disabled for this run: "
+                    "progressive joining requires one ordered backend pool"
+                )
+
     if args.retry_list:
         retry_sources = load_retry_list(Path(args.retry_list))
         if not retry_sources:
@@ -2667,6 +3052,12 @@ def main() -> int:
         sources = retry_sources
         logger.info("RETRY LIST | %d file(s) from %s",
                     len(sources), args.retry_list)
+    elif dji_pipeline is not None:
+        sources = dji_pipeline.sources
+        logger.info(
+            "DJI-JOIN staged inputs | %d file(s) | %d join group(s) staged "
+            "on demand", len(sources), len(dji_pipeline.groups),
+        )
     else:
         sources = discover_sources(input_root)
 
@@ -2695,6 +3086,9 @@ def main() -> int:
                   file=sys.stderr)
             return 2
 
+    # Dashboard and run header must show the multihw setting that is actually
+    # in force: progressive DJI joining forces the ordered single-backend pool.
+    effective_multihw = bool(args.experimental_multihw and dji_pipeline is None)
     # dashboard (window unless headless; JSON always written)
     dashboard_json = logs_root / "dashboard.json"
     status = DashboardStatus(dashboard_json)
@@ -2705,7 +3099,7 @@ def main() -> int:
         {
             "encoders": (
                 "nvenc+qsv(experimental)"
-                if args.experimental_multihw
+                if effective_multihw
                 else backend.name
             ),
             "preset": args.preset,
@@ -2739,7 +3133,7 @@ def main() -> int:
             "hardware backends (nvenc/qsv).",
             jobs_value, backend.name,
         )
-    logger.info("Experimental multihw: %s", args.experimental_multihw)
+    logger.info("Experimental multihw: %s", effective_multihw)
     logger.info("Headless: %s", args.headless)
     logger.info("Keep work dirs: %s", args.keep_work)
     logger.info("============================================================")
@@ -2789,7 +3183,7 @@ def main() -> int:
             # mirror the hardware path)
             for src in sources:
                 dst = output_path_for(
-                    src, input_root, output_root, preset, multiple_presets
+                    src, source_root, output_root, preset, multiple_presets
                 )
                 # 中间产物的容器必须与实际写入的一致: SVT-AV1 走 ffmpeg,
                 # 而 ffmpeg 9 的 MOV muxer 不接受 AV1 -> 中间体只能是 MP4;
@@ -2798,7 +3192,7 @@ def main() -> int:
                 part_ext = ".part.mp4" if backend.name == "svtav1" else ".part.mov"
                 part_dst = dst.with_name(dst.stem + part_ext)
                 file_log = per_file_log_path(
-                    src, input_root, logs_root, preset
+                    src, source_root, logs_root, preset
                 )
                 file_logger = build_file_logger(file_log)
                 if status is not None:
@@ -2815,7 +3209,37 @@ def main() -> int:
                     counters["skipped"] += 1
                     if status is not None:
                         status.finish(src, "skipped")
+                    if dji_pipeline is not None:
+                        dji_pipeline.note_finished(src, "skipped")
                     continue
+                # Progressive DJI split joining: block until this joined
+                # group's source exists (the previous group's encode gates
+                # the next join), then start the next join when this encode
+                # is near its end.  Ungrouped files return immediately.
+                dji_progress = None
+                if dji_pipeline is not None:
+                    try:
+                        dji_pipeline.ensure_ready(src)
+                    except Exception as exc:           # noqa: BLE001
+                        logger.error("[DJI-JOIN] FATAL: %s", exc)
+                        file_logger.error("DJI JOIN FAILED | %s", exc)
+                        record_failure(
+                            failed_path,
+                            source=src, preset=preset,
+                            backend_name=backend.name,
+                            stage="dji-join", error=str(exc),
+                            log_path=str(file_log),
+                        )
+                        counters["failed"] += 1
+                        if status is not None:
+                            status.finish(src, "failed")
+                        dji_pipeline.note_finished(src, "failed")
+                        continue
+                    dji_progress = (
+                        lambda frames, total, _src=src: dji_pipeline.note_progress(
+                            _src, frames, total
+                        )
+                    )
                 # One job = one scratch directory. Bracketed around the whole
                 # dispatch so the exit path runs on an exception or Ctrl-C too,
                 # which a cleanup call at each return would have missed.
@@ -2847,7 +3271,14 @@ def main() -> int:
                         counters["failed"] += 1
                         if status is not None:
                             status.finish(src, "failed")
+                        if dji_pipeline is not None:
+                            dji_pipeline.note_finished(src, "failed")
                         continue
+                    if dji_pipeline is not None:
+                        # Probe succeeded: this joined group is now really
+                        # being encoded, so let the stager produce the next
+                        # group in the background.
+                        dji_pipeline.note_encode_started(src)
                     file_resize: ResizeSpec | None = None
                     if resize_request is not None:
                         try:
@@ -2869,6 +3300,8 @@ def main() -> int:
                             counters["failed"] += 1
                             if status is not None:
                                 status.finish(src, "failed")
+                            if dji_pipeline is not None:
+                                dji_pipeline.note_finished(src, "failed")
                             continue
                         file_logger.info(
                             "RESIZE | source=%dx%d target=%dx%d algo=%s",
@@ -2886,6 +3319,44 @@ def main() -> int:
                         )
                     codec = "av1" if getattr(backend, "name", "") == "svtav1" else "hevc"
                     video_entry = "av01" if codec == "av1" else "hvc1"
+                    # One format policy for every path (hardware and software).
+                    # The backend computes the same plan when it builds its
+                    # command; this log makes the software paths emit the same
+                    # FORMAT-PLAN contract as core/batch_hw.py.
+                    fmt_plan = plan_output_format(
+                        backend=getattr(backend, "name", ""),
+                        codec=codec,
+                        chroma=prepared.src_info.chroma,
+                        depth=prepared.src_info.bit_depth,
+                    )
+                    logger.info(
+                        "[FORMAT-PLAN] source=%s/%d -> encode=%s/%d | "
+                        "downgrade=%s | reason=%s",
+                        prepared.src_info.chroma, prepared.src_info.bit_depth,
+                        fmt_plan.chroma, fmt_plan.depth,
+                        fmt_plan.downgrade, fmt_plan.reason,
+                    )
+                    file_logger.info(
+                        "FORMAT_PLAN | source=%s/%d | encode=%s/%d | "
+                        "needs_downgrade=%s | reason=%s",
+                        prepared.src_info.chroma, prepared.src_info.bit_depth,
+                        fmt_plan.chroma, fmt_plan.depth,
+                        fmt_plan.downgrade, fmt_plan.reason,
+                    )
+                    if fmt_plan.downgrade:
+                        logger.warning(
+                            "[WARNING] %s | 输出格式降级: %s/%d -> %s/%d (%s)",
+                            src.name, prepared.src_info.chroma,
+                            prepared.src_info.bit_depth, fmt_plan.chroma,
+                            fmt_plan.depth, fmt_plan.reason,
+                        )
+                        file_logger.warning(
+                            "CHROMA_DOWNGRADE | %s | source=%s/%d -> "
+                            "encode=%s/%d | reason=%s", codec,
+                            prepared.src_info.chroma,
+                            prepared.src_info.bit_depth, fmt_plan.chroma,
+                            fmt_plan.depth, fmt_plan.reason,
+                        )
 
                     # --- hardware-first decode decision (independent of encoder) ---
                     # Sony / DJI / generic are NOT distinguished here: the policy is
@@ -2941,79 +3412,36 @@ def main() -> int:
                         file_logger.info(
                             "DECODE_ROUTE | %s", decode_plan.log_line())
 
-                    if (
-                        codec == "av1"
-                        and prepared.src_info.chroma not in ("4:2:0", "mono", "")
-                    ):
-                        logger.warning(
-                            "[WARNING] %s | AV1 统一输出 4:2:0: 源色度 %s 降采样"
-                            "为 4:2:0 (SVT-AV1 420 策略)",
-                            src.name, prepared.src_info.chroma,
-                        )
-                        file_logger.warning(
-                            "CHROMA_DOWNGRADE | av1 420 policy: source chroma "
-                            "%s -> 4:2:0", prepared.src_info.chroma,
-                        )
                     quality_csv = (
                         logs_root / "quality_samples.csv"
                         if args.check == "full" else None
                     )
-                    # --no-metadata: the metadata-preservation policy, NOT a decode
-                    # switch. Hardware-first decode was already decided above and
-                    # is unaffected. What changes is only whether the source family
-                    # gets its container-rebuild pipeline: with the flag set, Sony
-                    # and DJI files take the ordinary transcode path, so the
-                    # rtmd/nrtm/djmd/dbgi/tmcd tracks are not rebuilt and the
-                    # XAVC/DJI branding is not restored.
-                    #
-                    # Everything that protects output *correctness* still runs:
-                    # probe, encode return code, non-empty output, ffprobe
-                    # readability, audio stream copy, place_final's container
-                    # handling and the frame checks. Skipping preservation must
-                    # never be read as "skip validation".
-                    no_metadata = bool(getattr(args, "no_metadata", False))
-                    preserve_metadata = bool(
-                        getattr(args, "preserve_metadata", False))
-                    is_sony = any(
-                        st.get("codec_type") == "data"
-                        and st.get("codec_tag_string") == "rtmd"
-                        for st in prepared.streams
+                    # Metadata preservation policy is shared with the hardware
+                    # path (preservation/policy.py): same detectors, same
+                    # precedence for --no-metadata / --preserve-metadata /
+                    # split-join staging / DJI Action default, same log lines.
+                    # --no-metadata is the metadata policy, NOT a decode switch:
+                    # hardware-first decode was already decided above and is
+                    # unaffected; only the container-rebuild pipeline changes.
+                    # Skipping preservation must never be read as "skip
+                    # validation": probe, encode rc, non-empty output, ffprobe
+                    # readability, audio copy, place_final and frame checks all
+                    # still run.
+                    join_tool = dji_preserve_sources.get(src.resolve())
+                    metadata_plan = resolve_metadata_plan(
+                        streams=prepared.streams,
+                        gpac=gpac,
+                        src=src,
+                        no_metadata=bool(getattr(args, "no_metadata", False)),
+                        preserve_metadata=bool(
+                            getattr(args, "preserve_metadata", False)
+                        ),
+                        forced_join=src.resolve() in dji_preserve_sources,
+                        join_tool=join_tool,
                     )
-                    is_dji = is_dji_source(prepared.streams)
-                    dji_tool: str | None = None
-                    # DJI 默认元数据策略 (2026-10-25): 除 Action 系列外
-                    # (Pocket / 无人机) 默认**不保留** metadata, 走普通转码
-                    # 路径; 需要保留时显式 --preserve-metadata。
-                    if is_dji and not no_metadata and not preserve_metadata:
-                        from preservation.dji import keep_metadata_by_default
-
-                        keep_dji, dji_tool = keep_metadata_by_default(gpac, src)
-                        if not keep_dji:
-                            no_metadata = True
-                            logger.info(
-                                "[META_POLICY] %s | DJI 非 Action 机型 "
-                                "(tool=%r): 默认不保留元数据, 走普通转码路径 "
-                                "(可用 --preserve-metadata 覆盖)",
-                                src.name, dji_tool,
-                            )
-                            file_logger.info(
-                                "META_POLICY | dji_default_skip | tool=%r | "
-                                "container rebuild skipped", dji_tool,
-                            )
-                    if no_metadata:
-                        keep = ("sony" if is_sony
-                                else "dji" if is_dji
-                                else "generic")
-                        logger.info(
-                            "[META_POLICY] %s | no_metadata: %s preservation "
-                            "skipped, ordinary transcode path used",
-                            src.name, keep,
-                        )
-                        file_logger.info(
-                            "META_POLICY | no_metadata | source_family=%s | "
-                            "container rebuild skipped", keep,
-                        )
-                    if is_sony and not no_metadata:
+                    log_metadata_plan(metadata_plan, src=src, logger=logger,
+                                      file_logger=file_logger)
+                    if metadata_plan.is_sony and metadata_plan.preserve:
                         result = encode_one_sony(
                             src=src, dst=dst, prepared=prepared, profile=profile,
                             preset=preset, backend=backend, engine=engine,
@@ -3030,8 +3458,9 @@ def main() -> int:
                             dry_run=args.dry_run,
                             decode_plan=decode_plan,
                             resize=file_resize,
+                            progress_cb=dji_progress,
                         )
-                    elif is_dji and not no_metadata:
+                    elif metadata_plan.is_dji and metadata_plan.preserve:
                         result = encode_one_dji_x265(
                             src=src, dst=dst, prepared=prepared, profile=profile,
                             preset=preset, backend=backend, engine=engine,
@@ -3048,6 +3477,7 @@ def main() -> int:
                             dry_run=args.dry_run,
                             decode_plan=decode_plan,
                             resize=file_resize,
+                            progress_cb=dji_progress,
                         )
                     else:
                         result = encode_one(
@@ -3076,6 +3506,7 @@ def main() -> int:
                             # dedicated Sony/DJI preservation paths are the only
                             # metadata carriers.
                             drop_metadata_streams=True,
+                            progress_cb=dji_progress,
                         )
                     if result == "failed":
                         record_failure(
@@ -3088,6 +3519,8 @@ def main() -> int:
                     counters[result] += 1
                     if status is not None:
                         status.finish(src, result)
+                    if dji_pipeline is not None:
+                        dji_pipeline.note_finished(src, result)
             continue
 
         # hardware backend(s)
@@ -3103,7 +3536,7 @@ def main() -> int:
             ffprobe=ffprobe,
             gpac=gpac,
             gyroflow=gyroflow,
-            input_root=input_root,
+            input_root=source_root,
             output_root=output_root,
             logs_root=logs_root,
             work_root=work_root,
@@ -3134,9 +3567,22 @@ def main() -> int:
             channel_sync_opts=channel_sync_opts,
             async_pipeline=bool(getattr(args, "async_pipeline", False)),
             preserve_metadata=bool(getattr(args, "preserve_metadata", False)),
+            preserve_metadata_sources=dji_preserve_sources,
+            # --no-metadata is the metadata policy and must also bind on the
+            # hardware path: Sony/DJI fall through to video+audio only, while
+            # hardware-first decode and integrity checks stay untouched.
+            no_metadata=bool(getattr(args, "no_metadata", False)),
             dry_run=args.dry_run,
             failed_path=failed_path,
             status=status,
+            # Progressive DJI split joining (None unless --dji-join detected
+            # groups): the hardware worker ensures a joined source exists
+            # before probing it, forwards encoder progress so the next join
+            # can be armed, and releases the source after delivery.
+            dji_stager=dji_pipeline,
+            async_integrity=bool(
+                getattr(args, "async_integrity", True)
+            ) and not effective_multihw,
             video_handoff=_audio_plan_handoff(
                 audio_plan_request=audio_plan_request,
                 ffmpeg=ffmpeg,
@@ -3145,7 +3591,7 @@ def main() -> int:
             ),
         )
 
-        if args.experimental_multihw:
+        if effective_multihw:
             if len(multihw_backends) >= 2:
                 # jobs_value is passed here too: multihw obeys the same global
                 # resource budget as the single-backend pool rather than
@@ -3161,6 +3607,9 @@ def main() -> int:
                     ctx, backend, sources, logger, jobs_value
                 )
         else:
+            # Progressive DJI joining needs the joined groups to be encoded
+            # in plan order, so it deliberately uses the single-backend pool
+            # even when --experimental-multihw was requested (warned above).
             round_counters = run_hw_pool(
                 ctx, backend, sources, logger, jobs_value
             )
@@ -3169,6 +3618,34 @@ def main() -> int:
             counters[key] += value
 
     status.mark_finished()
+
+    # DJI split-join staging lifecycle: every joined source is reclaimed as
+    # soon as its encode is delivered; the remaining staging tree (hardlinks
+    # plus any failed/never-joined groups) is removed after a fully
+    # successful run.  A failed run, a join failure or
+    # --dji-join-keep-temp keeps it so the joins can be inspected/retried
+    # without re-reading every source again.
+    if dji_pipeline is not None:
+        paths = dji_pipeline.write_report()
+        logger.info("[DJI-JOIN] joined report | %s",
+                    paths.get("joined", paths["plan"]))
+        if (
+            getattr(args, "dji_join_keep_temp", False)
+            or counters["failed"]
+            or dji_pipeline.error is not None
+        ):
+            logger.info(
+                "[DJI-JOIN] staging kept | %s (failed=%d, keep-temp=%s, "
+                "join_error=%s)",
+                dji_pipeline.root, counters["failed"],
+                bool(getattr(args, "dji_join_keep_temp", False)),
+                bool(dji_pipeline.error is not None),
+            )
+            dji_pipeline.close(keep=True)
+        else:
+            _DJI_STAGING.update(keep=False)
+            _dji_join_cleanup()
+            logger.info("[DJI-JOIN] staging removed | %s", dji_pipeline.root)
 
     logger.info("============================================================")
     logger.info(
@@ -3189,5 +3666,17 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    _exit_code = 1
+    try:
+        _exit_code = main()
+    except KeyboardInterrupt:
+        _exit_code = 130
+    finally:
+        # A dashboard lives in its own console: close it explicitly when the
+        # main console is interrupted (Ctrl+C) or exits.
+        shutdown_dashboard()
+        # Unexpected exits keep the DJI join staging tree (keep=True); the
+        # normal success path has already cleared it.
+        _dji_join_cleanup()
+    sys.exit(_exit_code)
 

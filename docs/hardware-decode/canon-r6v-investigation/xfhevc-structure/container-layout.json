@@ -1,0 +1,1786 @@
+{
+  "source": "F:\\CANON_R6V_OG_7K2997P_4CH_XFVC\\A_0013C699H260510_003337W5_CANON.MP4",
+  "role": "XF-HEVC (Canon XF) 容器层结构",
+  "file_bytes": 323904650,
+  "top_level_layout": {
+    "order": [
+      "ftyp",
+      "moov",
+      "mdat"
+    ],
+    "moov_before_mdat": true,
+    "moov_size": 524260,
+    "mdat_size": 323380362,
+    "mdat_offset": 524288
+  },
+  "root_boxes": [
+    {
+      "type": "ftyp",
+      "size": 28,
+      "offset": 0,
+      "header": 8
+    },
+    {
+      "type": "moov",
+      "size": 524260,
+      "offset": 28,
+      "header": 8
+    },
+    {
+      "type": "mdat",
+      "size": 323380362,
+      "offset": 524288,
+      "header": 16
+    }
+  ],
+  "paddings": [],
+  "ftyp": {
+    "major_brand": "XFVC",
+    "minor_version": 1,
+    "compatible_brands": [
+      "XFVC",
+      "mp42",
+      "iso2"
+    ]
+  },
+  "mvhd": {
+    "version": 0,
+    "timescale": 30000,
+    "duration": 154154,
+    "duration_s": 5.138467,
+    "rate": 1.0,
+    "volume": 1.0,
+    "matrix": [
+      65536,
+      0,
+      0,
+      0,
+      65536,
+      0,
+      0,
+      0,
+      1073741824
+    ],
+    "next_track_id": 8
+  },
+  "moov_children": [
+    "uuid",
+    "udta",
+    "mvhd",
+    "trak",
+    "trak",
+    "trak",
+    "trak",
+    "trak",
+    "trak",
+    "trak",
+    "free"
+  ],
+  "note": "moov 在 mdat **之前**（moov_before_mdat=True），即 faststart 布局。Sony XAVC 素材是 moov-at-EOF —— 这是容器层第一处实质差异，会影响 GPAC / MP4Box 处理路径与流式播发。",
+  "box_tree": [
+    {
+      "type": "ftyp",
+      "size": 28,
+      "offset": 0,
+      "header": 8,
+      "leaf_bytes": 20
+    },
+    {
+      "type": "moov",
+      "size": 524260,
+      "offset": 28,
+      "header": 8,
+      "children": [
+        {
+          "type": "uuid:{85C0B687-820F-11E0-8111-F4CE462B6A48}",
+          "size": 65810,
+          "offset": 36,
+          "header": 24,
+          "uuid_guid": "{85C0B687-820F-11E0-8111-F4CE462B6A48}",
+          "children": [
+            {
+              "type": "CNCV",
+              "size": 38,
+              "offset": 60,
+              "header": 8,
+              "leaf_bytes": 30
+            },
+            {
+              "type": "CNTH",
+              "size": 65552,
+              "offset": 98,
+              "header": 8,
+              "children": [
+                {
+                  "type": "CNDA",
+                  "size": 28753,
+                  "offset": 106,
+                  "header": 8,
+                  "leaf_bytes": 28745
+                },
+                {
+                  "type": "\u0000\u0000\u0000\u0000",
+                  "size": 36791,
+                  "offset": 28859,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0000",
+                      "size": 36783,
+                      "offset": 28867,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "\u0000\u0000\u0000\u0000",
+                          "size": 36775,
+                          "offset": 28875,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0000",
+                              "size": 36767,
+                              "offset": 28883,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "CNOP",
+              "size": 196,
+              "offset": 65650,
+              "header": 8,
+              "children": [
+                {
+                  "type": "CNLG",
+                  "size": 16,
+                  "offset": 65658,
+                  "header": 8,
+                  "leaf_bytes": 8
+                },
+                {
+                  "type": "CNLC",
+                  "size": 16,
+                  "offset": 65674,
+                  "header": 8,
+                  "leaf_bytes": 8
+                },
+                {
+                  "type": "CNFB",
+                  "size": 60,
+                  "offset": 65690,
+                  "header": 8,
+                  "leaf_bytes": 52
+                },
+                {
+                  "type": "CNCM",
+                  "size": 56,
+                  "offset": 65750,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0000",
+                      "size": 48,
+                      "offset": 65758,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "\u0000\u0000\u0000\u0000",
+                          "size": 40,
+                          "offset": 65766,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0000",
+                              "size": 32,
+                              "offset": 65774,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "CNID",
+                  "size": 40,
+                  "offset": 65806,
+                  "header": 8,
+                  "leaf_bytes": 32
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "udta",
+          "size": 2056,
+          "offset": 65846,
+          "header": 8,
+          "children": [
+            {
+              "type": "manu",
+              "size": 20,
+              "offset": 65854,
+              "header": 8,
+              "children": [
+                {
+                  "type": "\u0015ÇCa",
+                  "size": 12,
+                  "offset": 65862,
+                  "header": 8,
+                  "leaf_bytes": 4
+                }
+              ]
+            },
+            {
+              "type": "modl",
+              "size": 29,
+              "offset": 65874,
+              "header": 8,
+              "children": [
+                {
+                  "type": "\u0015ÇCa",
+                  "size": 21,
+                  "offset": 65882,
+                  "header": 8,
+                  "leaf_bytes": 13
+                }
+              ]
+            },
+            {
+              "type": "urat",
+              "size": 16,
+              "offset": 65903,
+              "header": 8,
+              "children": [
+                {
+                  "type": "\u0000\u0000\u0000\u0000",
+                  "size": 8,
+                  "offset": 65911,
+                  "header": 8,
+                  "leaf_bytes": 0
+                }
+              ]
+            },
+            {
+              "type": "free",
+              "size": 1983,
+              "offset": 65919,
+              "header": 8,
+              "children": [
+                {
+                  "type": "\u0000\u0000\u0000\u0000",
+                  "size": 1975,
+                  "offset": 65927,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0000",
+                      "size": 1967,
+                      "offset": 65935,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "\u0000\u0000\u0000\u0000",
+                          "size": 1959,
+                          "offset": 65943,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0000",
+                              "size": 1951,
+                              "offset": 65951,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "mvhd",
+          "size": 108,
+          "offset": 67902,
+          "header": 8,
+          "children": [
+            {
+              "type": "æ%â",
+              "size": 100,
+              "offset": 67910,
+              "header": 8,
+              "leaf_bytes": 92
+            }
+          ]
+        },
+        {
+          "type": "trak",
+          "size": 2482,
+          "offset": 68010,
+          "header": 8,
+          "children": [
+            {
+              "type": "tkhd",
+              "size": 92,
+              "offset": 68018,
+              "header": 8,
+              "leaf_bytes": 84
+            },
+            {
+              "type": "edts",
+              "size": 36,
+              "offset": 68110,
+              "header": 8,
+              "children": [
+                {
+                  "type": "elst",
+                  "size": 28,
+                  "offset": 68118,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0001",
+                      "size": 20,
+                      "offset": 68126,
+                      "header": 8,
+                      "leaf_bytes": 12
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "mdia",
+              "size": 2346,
+              "offset": 68146,
+              "header": 8,
+              "children": [
+                {
+                  "type": "mdhd",
+                  "size": 32,
+                  "offset": 68154,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "æ%â",
+                      "size": 24,
+                      "offset": 68162,
+                      "header": 8,
+                      "leaf_bytes": 16
+                    }
+                  ]
+                },
+                {
+                  "type": "hdlr",
+                  "size": 33,
+                  "offset": 68186,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0000",
+                      "size": 25,
+                      "offset": 68194,
+                      "header": 8,
+                      "leaf_bytes": 17
+                    }
+                  ]
+                },
+                {
+                  "type": "minf",
+                  "size": 2273,
+                  "offset": 68219,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "vmhd",
+                      "size": 20,
+                      "offset": 68227,
+                      "header": 8,
+                      "leaf_bytes": 12
+                    },
+                    {
+                      "type": "dinf",
+                      "size": 36,
+                      "offset": 68247,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "dref",
+                          "size": 28,
+                          "offset": 68255,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 20,
+                              "offset": 68263,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "stbl",
+                      "size": 2209,
+                      "offset": 68283,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "stsd",
+                          "size": 331,
+                          "offset": 68291,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 323,
+                              "offset": 68299,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stts",
+                          "size": 24,
+                          "offset": 68622,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 16,
+                              "offset": 68630,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stss",
+                          "size": 60,
+                          "offset": 68646,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u000b",
+                              "size": 52,
+                              "offset": 68654,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "ctts",
+                          "size": 840,
+                          "offset": 68706,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000g",
+                              "size": 832,
+                              "offset": 68714,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsc",
+                          "size": 40,
+                          "offset": 69546,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0002",
+                              "size": 32,
+                              "offset": 69554,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsz",
+                          "size": 636,
+                          "offset": 69586,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0000",
+                              "size": 628,
+                              "offset": 69594,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "co64",
+                          "size": 104,
+                          "offset": 70222,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u000b",
+                              "size": 96,
+                              "offset": 70230,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "sdtp",
+                          "size": 166,
+                          "offset": 70326,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\b\b\u0000",
+                              "size": 158,
+                              "offset": 70334,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "trak",
+          "size": 531,
+          "offset": 70492,
+          "header": 8,
+          "children": [
+            {
+              "type": "tkhd",
+              "size": 92,
+              "offset": 70500,
+              "header": 8,
+              "leaf_bytes": 84
+            },
+            {
+              "type": "edts",
+              "size": 36,
+              "offset": 70592,
+              "header": 8,
+              "children": [
+                {
+                  "type": "elst",
+                  "size": 28,
+                  "offset": 70600,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0001",
+                      "size": 20,
+                      "offset": 70608,
+                      "header": 8,
+                      "leaf_bytes": 12
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "mdia",
+              "size": 395,
+              "offset": 70628,
+              "header": 8,
+              "children": [
+                {
+                  "type": "mdhd",
+                  "size": 32,
+                  "offset": 70636,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "æ%â",
+                      "size": 24,
+                      "offset": 70644,
+                      "header": 8,
+                      "leaf_bytes": 16
+                    }
+                  ]
+                },
+                {
+                  "type": "hdlr",
+                  "size": 33,
+                  "offset": 70668,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0000",
+                      "size": 25,
+                      "offset": 70676,
+                      "header": 8,
+                      "leaf_bytes": 17
+                    }
+                  ]
+                },
+                {
+                  "type": "minf",
+                  "size": 322,
+                  "offset": 70701,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "smhd",
+                      "size": 16,
+                      "offset": 70709,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "\u0000\u0000\u0000\u0000",
+                          "size": 8,
+                          "offset": 70717,
+                          "header": 8,
+                          "leaf_bytes": 0
+                        }
+                      ]
+                    },
+                    {
+                      "type": "dinf",
+                      "size": 36,
+                      "offset": 70725,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "dref",
+                          "size": 28,
+                          "offset": 70733,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 20,
+                              "offset": 70741,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "stbl",
+                      "size": 262,
+                      "offset": 70761,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "stsd",
+                          "size": 66,
+                          "offset": 70769,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 58,
+                              "offset": 70777,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stts",
+                          "size": 24,
+                          "offset": 70835,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 16,
+                              "offset": 70843,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsc",
+                          "size": 40,
+                          "offset": 70859,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0002",
+                              "size": 32,
+                              "offset": 70867,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsz",
+                          "size": 20,
+                          "offset": 70899,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0003",
+                              "size": 12,
+                              "offset": 70907,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "co64",
+                          "size": 104,
+                          "offset": 70919,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u000b",
+                              "size": 96,
+                              "offset": 70927,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "trak",
+          "size": 531,
+          "offset": 71023,
+          "header": 8,
+          "children": [
+            {
+              "type": "tkhd",
+              "size": 92,
+              "offset": 71031,
+              "header": 8,
+              "leaf_bytes": 84
+            },
+            {
+              "type": "edts",
+              "size": 36,
+              "offset": 71123,
+              "header": 8,
+              "children": [
+                {
+                  "type": "elst",
+                  "size": 28,
+                  "offset": 71131,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0001",
+                      "size": 20,
+                      "offset": 71139,
+                      "header": 8,
+                      "leaf_bytes": 12
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "mdia",
+              "size": 395,
+              "offset": 71159,
+              "header": 8,
+              "children": [
+                {
+                  "type": "mdhd",
+                  "size": 32,
+                  "offset": 71167,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "æ%â",
+                      "size": 24,
+                      "offset": 71175,
+                      "header": 8,
+                      "leaf_bytes": 16
+                    }
+                  ]
+                },
+                {
+                  "type": "hdlr",
+                  "size": 33,
+                  "offset": 71199,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0000",
+                      "size": 25,
+                      "offset": 71207,
+                      "header": 8,
+                      "leaf_bytes": 17
+                    }
+                  ]
+                },
+                {
+                  "type": "minf",
+                  "size": 322,
+                  "offset": 71232,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "smhd",
+                      "size": 16,
+                      "offset": 71240,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "\u0000\u0000\u0000\u0000",
+                          "size": 8,
+                          "offset": 71248,
+                          "header": 8,
+                          "leaf_bytes": 0
+                        }
+                      ]
+                    },
+                    {
+                      "type": "dinf",
+                      "size": 36,
+                      "offset": 71256,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "dref",
+                          "size": 28,
+                          "offset": 71264,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 20,
+                              "offset": 71272,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "stbl",
+                      "size": 262,
+                      "offset": 71292,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "stsd",
+                          "size": 66,
+                          "offset": 71300,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 58,
+                              "offset": 71308,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stts",
+                          "size": 24,
+                          "offset": 71366,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 16,
+                              "offset": 71374,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsc",
+                          "size": 40,
+                          "offset": 71390,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0002",
+                              "size": 32,
+                              "offset": 71398,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsz",
+                          "size": 20,
+                          "offset": 71430,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0003",
+                              "size": 12,
+                              "offset": 71438,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "co64",
+                          "size": 104,
+                          "offset": 71450,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u000b",
+                              "size": 96,
+                              "offset": 71458,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "trak",
+          "size": 531,
+          "offset": 71554,
+          "header": 8,
+          "children": [
+            {
+              "type": "tkhd",
+              "size": 92,
+              "offset": 71562,
+              "header": 8,
+              "leaf_bytes": 84
+            },
+            {
+              "type": "edts",
+              "size": 36,
+              "offset": 71654,
+              "header": 8,
+              "children": [
+                {
+                  "type": "elst",
+                  "size": 28,
+                  "offset": 71662,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0001",
+                      "size": 20,
+                      "offset": 71670,
+                      "header": 8,
+                      "leaf_bytes": 12
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "mdia",
+              "size": 395,
+              "offset": 71690,
+              "header": 8,
+              "children": [
+                {
+                  "type": "mdhd",
+                  "size": 32,
+                  "offset": 71698,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "æ%â",
+                      "size": 24,
+                      "offset": 71706,
+                      "header": 8,
+                      "leaf_bytes": 16
+                    }
+                  ]
+                },
+                {
+                  "type": "hdlr",
+                  "size": 33,
+                  "offset": 71730,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0000",
+                      "size": 25,
+                      "offset": 71738,
+                      "header": 8,
+                      "leaf_bytes": 17
+                    }
+                  ]
+                },
+                {
+                  "type": "minf",
+                  "size": 322,
+                  "offset": 71763,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "smhd",
+                      "size": 16,
+                      "offset": 71771,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "\u0000\u0000\u0000\u0000",
+                          "size": 8,
+                          "offset": 71779,
+                          "header": 8,
+                          "leaf_bytes": 0
+                        }
+                      ]
+                    },
+                    {
+                      "type": "dinf",
+                      "size": 36,
+                      "offset": 71787,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "dref",
+                          "size": 28,
+                          "offset": 71795,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 20,
+                              "offset": 71803,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "stbl",
+                      "size": 262,
+                      "offset": 71823,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "stsd",
+                          "size": 66,
+                          "offset": 71831,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 58,
+                              "offset": 71839,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stts",
+                          "size": 24,
+                          "offset": 71897,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 16,
+                              "offset": 71905,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsc",
+                          "size": 40,
+                          "offset": 71921,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0002",
+                              "size": 32,
+                              "offset": 71929,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsz",
+                          "size": 20,
+                          "offset": 71961,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0003",
+                              "size": 12,
+                              "offset": 71969,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "co64",
+                          "size": 104,
+                          "offset": 71981,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u000b",
+                              "size": 96,
+                              "offset": 71989,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "trak",
+          "size": 531,
+          "offset": 72085,
+          "header": 8,
+          "children": [
+            {
+              "type": "tkhd",
+              "size": 92,
+              "offset": 72093,
+              "header": 8,
+              "leaf_bytes": 84
+            },
+            {
+              "type": "edts",
+              "size": 36,
+              "offset": 72185,
+              "header": 8,
+              "children": [
+                {
+                  "type": "elst",
+                  "size": 28,
+                  "offset": 72193,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0001",
+                      "size": 20,
+                      "offset": 72201,
+                      "header": 8,
+                      "leaf_bytes": 12
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "mdia",
+              "size": 395,
+              "offset": 72221,
+              "header": 8,
+              "children": [
+                {
+                  "type": "mdhd",
+                  "size": 32,
+                  "offset": 72229,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "æ%â",
+                      "size": 24,
+                      "offset": 72237,
+                      "header": 8,
+                      "leaf_bytes": 16
+                    }
+                  ]
+                },
+                {
+                  "type": "hdlr",
+                  "size": 33,
+                  "offset": 72261,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0000",
+                      "size": 25,
+                      "offset": 72269,
+                      "header": 8,
+                      "leaf_bytes": 17
+                    }
+                  ]
+                },
+                {
+                  "type": "minf",
+                  "size": 322,
+                  "offset": 72294,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "smhd",
+                      "size": 16,
+                      "offset": 72302,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "\u0000\u0000\u0000\u0000",
+                          "size": 8,
+                          "offset": 72310,
+                          "header": 8,
+                          "leaf_bytes": 0
+                        }
+                      ]
+                    },
+                    {
+                      "type": "dinf",
+                      "size": 36,
+                      "offset": 72318,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "dref",
+                          "size": 28,
+                          "offset": 72326,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 20,
+                              "offset": 72334,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "stbl",
+                      "size": 262,
+                      "offset": 72354,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "stsd",
+                          "size": 66,
+                          "offset": 72362,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 58,
+                              "offset": 72370,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stts",
+                          "size": 24,
+                          "offset": 72428,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 16,
+                              "offset": 72436,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsc",
+                          "size": 40,
+                          "offset": 72452,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0002",
+                              "size": 32,
+                              "offset": 72460,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsz",
+                          "size": 20,
+                          "offset": 72492,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0003",
+                              "size": 12,
+                              "offset": 72500,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "co64",
+                          "size": 104,
+                          "offset": 72512,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u000b",
+                              "size": 96,
+                              "offset": 72520,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "trak",
+          "size": 475,
+          "offset": 72616,
+          "header": 8,
+          "children": [
+            {
+              "type": "tkhd",
+              "size": 92,
+              "offset": 72624,
+              "header": 8,
+              "leaf_bytes": 84
+            },
+            {
+              "type": "mdia",
+              "size": 375,
+              "offset": 72716,
+              "header": 8,
+              "children": [
+                {
+                  "type": "mdhd",
+                  "size": 32,
+                  "offset": 72724,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "æ%â",
+                      "size": 24,
+                      "offset": 72732,
+                      "header": 8,
+                      "leaf_bytes": 16
+                    }
+                  ]
+                },
+                {
+                  "type": "hdlr",
+                  "size": 33,
+                  "offset": 72756,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0000",
+                      "size": 25,
+                      "offset": 72764,
+                      "header": 8,
+                      "leaf_bytes": 17
+                    }
+                  ]
+                },
+                {
+                  "type": "minf",
+                  "size": 302,
+                  "offset": 72789,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "nmhd",
+                      "size": 12,
+                      "offset": 72797,
+                      "header": 8,
+                      "leaf_bytes": 4
+                    },
+                    {
+                      "type": "dinf",
+                      "size": 36,
+                      "offset": 72809,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "dref",
+                          "size": 28,
+                          "offset": 72817,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 20,
+                              "offset": 72825,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "stbl",
+                      "size": 246,
+                      "offset": 72845,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "stsd",
+                          "size": 50,
+                          "offset": 72853,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 42,
+                              "offset": 72861,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stts",
+                          "size": 24,
+                          "offset": 72903,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 16,
+                              "offset": 72911,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsc",
+                          "size": 40,
+                          "offset": 72927,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0002",
+                              "size": 32,
+                              "offset": 72935,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsz",
+                          "size": 20,
+                          "offset": 72967,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0004",
+                              "size": 12,
+                              "offset": 72975,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "co64",
+                          "size": 104,
+                          "offset": 72987,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u000b",
+                              "size": 96,
+                              "offset": 72995,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "trak",
+          "size": 513,
+          "offset": 73091,
+          "header": 8,
+          "children": [
+            {
+              "type": "tkhd",
+              "size": 92,
+              "offset": 73099,
+              "header": 8,
+              "leaf_bytes": 84
+            },
+            {
+              "type": "edts",
+              "size": 36,
+              "offset": 73191,
+              "header": 8,
+              "children": [
+                {
+                  "type": "elst",
+                  "size": 28,
+                  "offset": 73199,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0001",
+                      "size": 20,
+                      "offset": 73207,
+                      "header": 8,
+                      "leaf_bytes": 12
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "tref",
+              "size": 20,
+              "offset": 73227,
+              "header": 8,
+              "children": [
+                {
+                  "type": "cdsc",
+                  "size": 12,
+                  "offset": 73235,
+                  "header": 8,
+                  "leaf_bytes": 4
+                }
+              ]
+            },
+            {
+              "type": "mdia",
+              "size": 357,
+              "offset": 73247,
+              "header": 8,
+              "children": [
+                {
+                  "type": "mdhd",
+                  "size": 32,
+                  "offset": 73255,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "æ%â",
+                      "size": 24,
+                      "offset": 73263,
+                      "header": 8,
+                      "leaf_bytes": 16
+                    }
+                  ]
+                },
+                {
+                  "type": "hdlr",
+                  "size": 33,
+                  "offset": 73287,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0000",
+                      "size": 25,
+                      "offset": 73295,
+                      "header": 8,
+                      "leaf_bytes": 17
+                    }
+                  ]
+                },
+                {
+                  "type": "minf",
+                  "size": 284,
+                  "offset": 73320,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "nmhd",
+                      "size": 12,
+                      "offset": 73328,
+                      "header": 8,
+                      "leaf_bytes": 4
+                    },
+                    {
+                      "type": "dinf",
+                      "size": 36,
+                      "offset": 73340,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "dref",
+                          "size": 28,
+                          "offset": 73348,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 20,
+                              "offset": 73356,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "stbl",
+                      "size": 228,
+                      "offset": 73376,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "stsd",
+                          "size": 32,
+                          "offset": 73384,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 24,
+                              "offset": 73392,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stts",
+                          "size": 24,
+                          "offset": 73416,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0001",
+                              "size": 16,
+                              "offset": 73424,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsc",
+                          "size": 40,
+                          "offset": 73440,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0002",
+                              "size": 32,
+                              "offset": 73448,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "stsz",
+                          "size": 20,
+                          "offset": 73480,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0004(",
+                              "size": 12,
+                              "offset": 73488,
+                              "header": 8
+                            }
+                          ]
+                        },
+                        {
+                          "type": "co64",
+                          "size": 104,
+                          "offset": 73500,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u000b",
+                              "size": 96,
+                              "offset": 73508,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "free",
+          "size": 450684,
+          "offset": 73604,
+          "header": 8,
+          "children": [
+            {
+              "type": "\u0000\u0000\u0000\u0000",
+              "size": 450676,
+              "offset": 73612,
+              "header": 8,
+              "children": [
+                {
+                  "type": "\u0000\u0000\u0000\u0000",
+                  "size": 450668,
+                  "offset": 73620,
+                  "header": 8,
+                  "children": [
+                    {
+                      "type": "\u0000\u0000\u0000\u0000",
+                      "size": 450660,
+                      "offset": 73628,
+                      "header": 8,
+                      "children": [
+                        {
+                          "type": "\u0000\u0000\u0000\u0000",
+                          "size": 450652,
+                          "offset": 73636,
+                          "header": 8,
+                          "children": [
+                            {
+                              "type": "\u0000\u0000\u0000\u0000",
+                              "size": 450644,
+                              "offset": 73644,
+                              "header": 8
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "mdat",
+      "size": 323380362,
+      "offset": 524288,
+      "header": 16,
+      "leaf_bytes": 323380346
+    }
+  ]
+}

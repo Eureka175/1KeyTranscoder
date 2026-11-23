@@ -1,0 +1,152 @@
+[
+  {
+    "path": "alignment\\matrix.json",
+    "bytes": 24241,
+    "sha256": "dc15742713cd160c214191ddbbddee7d38776b65c44eeafbc36fa2890493327c"
+  },
+  {
+    "path": "alignment\\REPORT.md",
+    "bytes": 952,
+    "sha256": "e9f5ac8162a1085566d1fa1d2e30f6f8f48ede0a66b9aa24ced42df7d8f40ddf"
+  },
+  {
+    "path": "charts\\final\\00_contact_sheet.png",
+    "bytes": 779171,
+    "sha256": "d754af59ae9f027b0f0033f3b037b8356a6ab47bb835f1e2e0c42a99268ba8b5"
+  },
+  {
+    "path": "charts\\final\\01_rate_quality_by_clip.png",
+    "bytes": 430855,
+    "sha256": "53598eb680f36d25858974c82752562ff6cb02eb87f46339d0b04ffe3356eaa1"
+  },
+  {
+    "path": "charts\\final\\02_rate_quality_aggregate.png",
+    "bytes": 105918,
+    "sha256": "297ac34725369d456a3bde1878d17fa1ff50b72fdaf7976848f790a92eaed1e2"
+  },
+  {
+    "path": "charts\\final\\03_speed_quality.png",
+    "bytes": 134156,
+    "sha256": "edcbd866fc326d2bade9a6af427d0525014d14b831a7e4d2c5101461b60e0f7a"
+  },
+  {
+    "path": "charts\\final\\04_rate_control_wall.png",
+    "bytes": 177209,
+    "sha256": "60db705bd6784fa4aea3ec5368e064d3198b75b1c8776ad2d03c5c757e2ac45f"
+  },
+  {
+    "path": "charts\\final\\05_hq_heatmaps.png",
+    "bytes": 201739,
+    "sha256": "ed8276e25a0062a05a2b6774e57610573778c70214e1d26e3bef5ce58e216624"
+  },
+  {
+    "path": "charts\\final\\06_night_vs_day.png",
+    "bytes": 88613,
+    "sha256": "25d81752bdf717948f5144acfc22e6d5559207eded0d454a81789de19ce4b44c"
+  },
+  {
+    "path": "charts\\final\\07_preset_ladder.png",
+    "bytes": 211116,
+    "sha256": "f452834f63c80cf0a43ab6d7d8792c98499d53ffd0213fd7c76e93443d22dc8e"
+  },
+  {
+    "path": "charts\\final\\08_efficiency_vs_nvenc.png",
+    "bytes": 71625,
+    "sha256": "be4e82f02e95a470b943b9de0505a292fb9b9a967f8c466ba515acb21c21d67f"
+  },
+  {
+    "path": "charts\\final\\09_qsv_icq_effect.png",
+    "bytes": 147419,
+    "sha256": "17b1b40851c40f79df1d9248abee34575a082623b10f407898cae13b88665391"
+  },
+  {
+    "path": "charts\\final\\4K_20261118图表合集.pdf",
+    "bytes": 1382282,
+    "sha256": "29f8d501d8271f2fd13fbcbd35aa4307c88b74388cb09031108baa4e108b1c36"
+  },
+  {
+    "path": "charts\\final\\REPORT_CHARTS.md",
+    "bytes": 1524,
+    "sha256": "b95ea89a94769fe035151a962a362da2f95437aaff0f38ae4355ae83004bdc5e"
+  },
+  {
+    "path": "charts\\hardware_aggregate_rate_quality.png",
+    "bytes": 85051,
+    "sha256": "7de84ac8006d8d6acf6662d6c14d1c61507c45da72c74289b7cfac6a3cb0a8b1"
+  },
+  {
+    "path": "charts\\hardware_vmaf_by_clip.png",
+    "bytes": 44068,
+    "sha256": "1bc974565b13cb0c298b5a2394d1a40efcd4aad8f980e24957637a53591dc2a6"
+  },
+  {
+    "path": "charts\\software_all_encoders_rate_quality.png",
+    "bytes": 101720,
+    "sha256": "9303a897fe4e924675951c801c19e1d13ab774c07a52ab368d02787f4175abe6"
+  },
+  {
+    "path": "charts\\software_speed_hq.png",
+    "bytes": 34446,
+    "sha256": "f610110c3ef71b0f0223507fe1c73dfe72c38822021867e942960931592fce01"
+  },
+  {
+    "path": "metrics\\metrics_hardware.csv",
+    "bytes": 21685,
+    "sha256": "5515e4735189465a1241e621a191b806177f03233e6b7fb4d8cbb2928b9fc0e5"
+  },
+  {
+    "path": "metrics\\metrics_hardware.json",
+    "bytes": 101333,
+    "sha256": "1ee6872e57200af9fdd7bd19d46eec4c2924be382963d965d2d0d35bdbaa0982"
+  },
+  {
+    "path": "metrics\\metrics_software.csv",
+    "bytes": 3240,
+    "sha256": "be95bc524021f5d0d1cb5e61797a0767c997e633c9ac65f4e31dd1d840d894b0"
+  },
+  {
+    "path": "metrics\\metrics_software.json",
+    "bytes": 10415,
+    "sha256": "abc4e2cdfdf9f7bfa08fd9067b9965f61ccc9393a30fcee9296c87b2a3caa943"
+  },
+  {
+    "path": "provenance\\param_backup_MANIFEST.json",
+    "bytes": 1518,
+    "sha256": "22cec93a5f73560c413900d723b6e849bfba372c30323639b9b6e17a2af5cd25"
+  },
+  {
+    "path": "provenance\\rate_control_wall.txt",
+    "bytes": 16354,
+    "sha256": "ad4ec2e070a9fd7b17138b7996fdc8246b0bb100fb18d7e4eb063f47042ea439"
+  },
+  {
+    "path": "provenance\\test_clip_library_MANIFEST.json",
+    "bytes": 2825,
+    "sha256": "4e2c950a0ff0c55a8192ef52eed3d1ce97e5e7fd89e9487d44138a66233b808f"
+  },
+  {
+    "path": "README.md",
+    "bytes": 3458,
+    "sha256": "281fe4d86a6fa47b3a5324f92b0e1ac38c4fde1aa2bde303264eb05159976ba6"
+  },
+  {
+    "path": "REPORT_4K_EVALUATION.md",
+    "bytes": 3355,
+    "sha256": "4e8ab7f2dc17df737f177760e0c3068841f2df7328900585e79f559bf293a4f3"
+  },
+  {
+    "path": "REPORT_HARDWARE.md",
+    "bytes": 13614,
+    "sha256": "6f0156d748cdfab83b9e30c13a5b4107231d651ff39ceaebf368f82af87cc798"
+  },
+  {
+    "path": "REPORT_LONGTEST.md",
+    "bytes": 5983,
+    "sha256": "9d28a0b03b9ab3030cc27da0cb30dbade5dac03af58ced5064cb279d8fc725d7"
+  },
+  {
+    "path": "REPORT_SOFTWARE.md",
+    "bytes": 6887,
+    "sha256": "700a855900cb9f8a1d2dc79e09868a3c87e4957455d52964528125040152991f"
+  }
+]

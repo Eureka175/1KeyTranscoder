@@ -107,8 +107,10 @@ reset/单卡工作问题（与本机 Windows 单卡场景不直接相关，但�
 ### 3.2 QSV（Arc 140T，驱动 32.0.101.8974，QSVEncC 8.26 / Media SDK 2.16）
 
 **[官方]** Intel Arc 矩阵（Article 000098345）：HEVC **解码** 8/10/12bit + 4:2:2/4:4:4；
-**编码** 4:2:0 8/10bit（main/main10）。4:2:2 直编是慢路径（本机实测 1.0x vs 转换 2.0x）
-——项目"4:2:2 一律转 4:2:0"政策正确。
+**编码** 4:2:0 8/10bit（main/main10）。4:2:2 直编是慢路径（本机实测 1.0x vs 转换 2.0x）。
+2026-11-16 起项目改为**能力驱动**：caps 声明支持 4:2:2 时保留（归档保真优先，
+接受慢路径），caps 不支持时才转 4:2:0/10 并告警；本机 Arc 140T caps 为
+`422=False`，因此该机实际仍输出 4:2:0/10 — 这是能力事实，不是 QSV 固定政策。
 
 **[本机/官方]** 三份本地特征 dump（ARL u5 245K / BMG B580 / DG2 A380）互证：
 HEVC FF 编码 10bit ✅、ICQ ✅、CBR/VBR/QVBR/CQP ✅、**LA/LAHRD/LAICQ 全 x**
@@ -171,7 +173,7 @@ A7M4 C9037（XAVC-S 4:2:2 10bit）双后端 `--check full`：
 | 后端 | 吞吐 | 体积/码率 | 备注 |
 |---|---|---|---|
 | NVENC HQ（quality+tune hq，qvbr 25） | **22.9 fps** | 85.3 MB / 24.7 Mbps | 与历史 24.2-26.6fps 一致 |
-| QSV HQ（**quality best**，icq 22） | **51.6 fps** | 60.1 MB / 17.3 Mbps | `tu=best` 修复后复测；**旧 ~106fps 注记作废**（那是默认 balanced 下测的） |
+| QSV HQ（**quality best**，icq 21） | **51.6 fps** | 60.1 MB / 17.3 Mbps | `tu=best` 修复后复测；**旧 ~106fps 注记作废**（那是默认 balanced 下测的）；2026-11-18 起默认 icq 22→21，码率将明显上升 |
 
 ### 5.3 同档跨后端质量不对齐（SSIM/PSNR，指示性数据）
 

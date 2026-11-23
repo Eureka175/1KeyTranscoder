@@ -58,3 +58,9 @@ third_party/
 
 # 项目数据 (验证集/复核件/难点集, 130+ GiB; 物理位置在此目录, 不入库)
 /data/
+
+# Upstream-issue reproducer media: source/generated/synthetic MP4/MKV fixtures
+# stay local (regenerable by the tracked PowerShell scripts); facts/scripts are tracked.
+/upstream-issues/reproducer/source/
+/upstream-issues/reproducer/generated/
+/upstream-issues/reproducer/synthetic/

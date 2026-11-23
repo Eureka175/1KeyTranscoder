@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-[![Version](https://img.shields.io/badge/version-0.9.12-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.22-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -47,6 +47,57 @@ Hardware backends never fall back to software encoding.
 
 Presets: `uhq`, `hq`, `small`, `fast`.
 
+## DJI Action split recordings
+
+DJI Action cameras split long recordings near 16 GB. `--dji-join` (off by
+default) detects contiguous segments and joins them losslessly in one MP4Box
+pass (`-unalign-cat` keeps exact CFR video; `djmd`/`dbgi`/`tmcd` preserved),
+then runs the normal pipeline on the joined source.
+
+```powershell
+python 1kt.py --input D:\footage --output D:\archive --dji-join
+python 1kt.py ... --dji-join --dry-run           # detect groups only
+```
+
+Joining is progressive: the first group is joined before encoding starts, each
+next group is joined in the background while the previous one is encoding, and
+a delivered group's joined source is deleted immediately. Peak disk use is the
+current group plus the next one, not every group at once. `-flat` makes
+MP4Box write directly to the destination (no full-size temp file), so a 60 GB
+joined group costs ~60 GB, not ~120-180 GB. Staging lives under
+`<output>/.dji_join_work_*`; the tree is removed after a fully successful run
+and kept on failure or with `--dji-join-keep-temp` (which also keeps every
+joined group, so plan for the full sum). See
+[DJI split recordings](docs/dji-segments.md).
+
+## Sony XAVC remux (no re-encode)
+
+Sony cameras allocate each clip's media data in 128 MiB chunks; a short clip
+leaves unused tail space inside `mdat`. `--remux` rewrites the container
+losslessly:
+
+```powershell
+python 1kt.py --input "D:\SonyClips" --output "D:\SonyClips_remux" --remux
+```
+
+- Video / PCM audio / `rtmd` data track are copied bit-for-bit;
+- `nrtm`, Lens profile, vendor `uuid`, `tref/cdsc` and XAVC brands are preserved;
+- every output is validated against its source (`advanced`);
+- XML sidecars are copied; non-Sony files are rejected explicitly.
+
+Measured on 53 Sony clips: **19.67 GB -> 17.88 GB, 1.79 GB saved (9.09%)**,
+per-file savings 1.4%–40.2%.
+
+## Output format
+
+- Default output is **10-bit**, regardless of source depth; use
+  `--output-depth {8,10,12}` to override.
+- Chroma follows the source (4:2:0 / 4:2:2 / 4:4:4) where the backend supports
+  it; `--output-chroma {420,422,444}` overrides explicitly.
+- NVENC HEVC supports true 4:4:4 output; QSV/AV1 reject unsupported manual
+  chroma loudly.
+- **mono is not supported** (source or output); it fails with a clear error.
+
 ## Scaling
 
 - `--resize WxH`: exact output resolution (even dimensions); does not preserve
@@ -88,8 +139,12 @@ python 1kt.py --input D:\deliverables --output D:\fixed --repair
 `basic` checks core metadata and stream facts; `advanced` adds full structural
 and Gyroflow checks; `full` adds detailed self-checks and a PSNR/SSIM sample.
 
-Batches are resumable. Failed files are written to `logs/failed_files.json` for
-retry with `--retry-list`.
+Batches are resumable. Failed files are written to
+`<output>/logs/failed_files.json` for retry with `--retry-list`.
+Runtime logs (including per-file logs and the dashboard JSON) live under
+`<output>/logs/`, so each output directory is self-contained; the temporary
+NVENC/QSV raw encoder logs live in `<output>/.1ktwork/<job>/` and are removed
+on success.
 
 ## Tests
 
@@ -104,12 +159,23 @@ environment-only checks report FAIL.
 
 ## Documentation
 
+- [Release notes v0.9.22](docs/release_notes_v0.9.22.md)
+- [Release notes v0.9.21](docs/release_notes_v0.9.21.md)
+- [Release notes v0.9.20](docs/release_notes_v0.9.20.md)
+- [Release notes v0.9.19](docs/release_notes_v0.9.19.md)
+- [Release notes v0.9.18](docs/release_notes_v0.9.18.md)
+- [Release notes v0.9.17](docs/release_notes_v0.9.17.md)
+- [Release notes v0.9.16](docs/release_notes_v0.9.16.md)
+- [Release notes v0.9.15](docs/release_notes_v0.9.15.md)
+- [Release notes v0.9.14](docs/release_notes_v0.9.14.md)
 - [Release notes v0.9.12](docs/release_notes_v0.9.12.md)
+- [DJI Action split recordings](docs/dji-segments.md)
 - [Hardware scaling validation](docs/design/hardware_scaling_validation.md)
 - [Hardware scaling feasibility](docs/design/hardware_scaling_feasibility.md)
 - [Audio plan guide](docs/audio_plan.md)
 - [x265 profile design](docs/x265-profile-design.md)
 - [Hardware decode](docs/hardware-decode/README.md)
+- [4K encoder evaluation archive (2026-11-16, hardware + x265 / SVT-AV1)](docs/evaluation/4k-encoder-eval-2026-11-16/README.md)
 
 ## License
 

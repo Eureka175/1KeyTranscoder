@@ -10,7 +10,9 @@
 
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -18,6 +20,11 @@ from pathlib import Path
 CLEAR = "\033[H\033[2J"
 HIDE = "\033[?25l"
 SHOW = "\033[?25h"
+
+#: The queue can contain thousands of files.  The window only shows the
+#: first rows; the remainder is summarized as an ellipsis line so the
+#: dashboard stays readable and does not scroll the current work off screen.
+MAX_VISIBLE_ROWS = 20
 
 
 def _bar(ratio: float, width: int = 18) -> str:
@@ -51,7 +58,7 @@ def render(data: dict) -> None:
         f"{'DETAIL':<24} {'TIME':>7}"
     )
     lines.append("-" * 96)
-    for row in rows:
+    for row in rows[:MAX_VISIBLE_ROWS]:
         name = row.get("name", "")[:33]
         backend = row.get("backend", "-")[:7]
         status = row.get("status", "-")[:13]
@@ -62,6 +69,10 @@ def render(data: dict) -> None:
         time_s = f"{elapsed:.0f}s" if elapsed is not None else ""
         lines.append(
             f" {name:<34} {backend:<8} {status:<14} {detail:<24} {time_s:>7}"
+        )
+    if len(rows) > MAX_VISIBLE_ROWS:
+        lines.append(
+            f" ... 队列其余 {len(rows) - MAX_VISIBLE_ROWS} 个文件已省略"
         )
     lines.append("-" * 96)
     counts: dict[str, int] = {}
@@ -75,6 +86,55 @@ def render(data: dict) -> None:
     lines.append("=" * 96)
     sys.stdout.write(HIDE + "\n".join(lines) + "\n")
     sys.stdout.flush()
+
+
+def _pid_alive(pid: int) -> bool:
+    """Return whether *pid* is still running.
+
+    Used as a backstop for the case where the parent console is killed
+    without running its finally block.  On Windows the child dashboard is
+    in its own console, so it does not receive the parent's Ctrl+C event;
+    checking the parent PID is what makes the window close in that case.
+    """
+    if pid <= 0:
+        return True
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            kernel32 = ctypes.windll.kernel32
+            kernel32.OpenProcess.argtypes = [
+                wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            kernel32.GetExitCodeProcess.argtypes = [
+                wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+            kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel32.CloseHandle.restype = wintypes.BOOL
+            # SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION
+            handle = kernel32.OpenProcess(0x00100000 | 0x1000, False, pid)
+            if not handle:
+                return False
+            try:
+                code = wintypes.DWORD()
+                if not kernel32.GetExitCodeProcess(
+                        handle, ctypes.byref(code)):
+                    return False
+                return code.value == 259  # STILL_ACTIVE
+            finally:
+                kernel32.CloseHandle(handle)
+        except Exception:  # noqa: BLE001 - best-effort monitor
+            return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
 
 
 def _enable_windows_vt() -> None:
@@ -95,13 +155,22 @@ def _enable_windows_vt() -> None:
 
 def main() -> int:
     _enable_windows_vt()
-    if len(sys.argv) != 2:
-        print("usage: python -m core.dashboard_ui <json_path>")
+    ap = argparse.ArgumentParser(add_help=False)
+    ap.add_argument("json_path", nargs="?")
+    ap.add_argument("--parent-pid", type=int, default=0)
+    args, _unknown = ap.parse_known_args()
+    if not args.json_path:
+        print("usage: python -m core.dashboard_ui <json_path> "
+              "[--parent-pid PID]")
         return 2
-    path = Path(sys.argv[1])
-    print(f"[dashboard] watching {path} (Ctrl+C to close this window)")
+    path = Path(args.json_path)
+    parent_pid = args.parent_pid
+    print(f"[dashboard] watching {path} "
+          f"(Ctrl+C to close this window; parent pid={parent_pid or '-'})")
     try:
         while True:
+            if parent_pid and not _pid_alive(parent_pid):
+                break
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError):

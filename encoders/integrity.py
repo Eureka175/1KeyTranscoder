@@ -190,13 +190,24 @@ def _default_ffmpeg() -> Path | None:
 
 
 def independent_decoded_frames(path: Path, ffprobe: Path | None = None,
-                               timeout: int = 7200) -> int | None:
-    """Frames an independent decoder produces from ``path``."""
+                               timeout: int = 21600,
+                               threads: int = 0) -> int | None:
+    """Frames an independent decoder produces from ``path``.
+
+    ``-threads 0`` lets the decoder use all available cores.  Full software
+    decode of a long 4K output is the slowest part of the hardware-decode
+    integrity gate (a 160k-frame 4K clip used to occupy one core for hours);
+    auto-threading cuts that dramatically.  The timeout is deliberately
+    generous: timing out would make the gate discard a perfectly good
+    artifact.
+    """
     exe = ffprobe or _default_ffprobe()
     if exe is None:
         return None
     cmd = [
-        str(exe), "-v", "error", "-select_streams", "v:0", "-count_frames",
+        str(exe), "-v", "error", "-select_streams", "v:0",
+        "-threads", str(max(0, int(threads))),
+        "-count_frames",
         "-show_entries", "stream=nb_read_frames", "-print_format", "json",
         "-i", str(path),
     ]
@@ -280,6 +291,51 @@ class IntegrityVerdict:
             f"integrity gate [{state}] reason={self.reason} "
             f"counts={self.counts} {self.detail}"
         )
+
+
+def verify_container_counts(
+    source: Path, output: Path, ffprobe: Path | None = None
+) -> tuple[bool, dict]:
+    """Post-fallback check for a software-decoded re-encode.
+
+    There is no hardware reader identity to reconcile here, so compare the
+    source container's sample count with both the output container and an
+    independent decoder.  Used after a hardware-integrity failure forced the
+    same rung to be re-encoded with ``--avsw``.
+    """
+    counts: dict = {}
+    try:
+        expected, method = container_video_samples(Path(source))
+        counts["container_expected"] = expected
+        counts["container_method"] = method
+        out = Path(output)
+        counts["output_stream"] = (
+            container_video_samples(out)[0] if _is_isobmff(out) else None
+        )
+        counts["independent_decoded"] = independent_decoded_frames(
+            out, ffprobe=ffprobe)
+    except OSError as exc:
+        counts["error"] = str(exc)
+        return False, counts
+    if expected is None:
+        counts["skipped"] = "no source container reference count"
+        return True, counts
+    bad = [
+        f"{label}={counts[label]}"
+        for label in ("output_stream",)
+        if counts.get(label) != expected
+    ]
+    # ffprobe's decoded-frame count can differ from the container sample count
+    # by one for streams whose final sample is split/edit-listed.  The
+    # container is authoritative; allow a one-frame independent-decode delta
+    # rather than turning a valid software fallback into a false failure.
+    decoded = counts.get("independent_decoded")
+    if decoded is not None and abs(int(decoded) - int(expected)) > 1:
+        bad.append(f"independent_decoded={decoded}")
+    if bad:
+        counts["mismatch"] = bad
+        return False, counts
+    return True, counts
 
 
 def verify_encode(

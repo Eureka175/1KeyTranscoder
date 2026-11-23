@@ -1,0 +1,66 @@
+{
+  "schema": "canon-r6v-investigation/resource-usage/1",
+  "why_recorded": "产品端到端首次尝试 --jobs auto（2 workers）在 6912x4608 10-bit 4:2:2 上把 8 GB 显存与 32 GB 系统内存同时打到临界：显存仅剩 218 MiB、系统内存仅剩 6 MB。为定位这是并发问题还是素材本身的问题，以 --jobs 1 + 单条素材重跑，并全程采样。",
+  "monitor": {
+    "script": "work/canon_r6v/resource_monitor.py",
+    "interval_s": 2,
+    "samples": 47,
+    "csv": "work/canon_r6v/resource-peak-jobs1.csv"
+  },
+  "jobs_auto_run": {
+    "workers": 2,
+    "sources": 2,
+    "outcome": "手动终止（资源耗尽）",
+    "peak_gpu_used_mib": 7674,
+    "gpu_total_mib": 8151,
+    "min_free_gpu_mib": 218,
+    "min_free_ram_mb": 6
+  },
+  "jobs_1_run": {
+    "workers": 1,
+    "sources": 1,
+    "outcome": "完成，rc=0，30.4 s",
+    "peak_ram_used_mb": 25679,
+    "ram_total_mb": 32253,
+    "min_free_ram_mb": 6575,
+    "peak_gpu_used_mib": 7846,
+    "gpu_total_mib": 8151,
+    "gpu_peak_pct": 96.3,
+    "peak_proc_working_set_mb": 16491,
+    "peak_concurrent_relevant_processes": 3,
+    "phase_detail": {
+      "0-19s": "探测/能力快照，GPU 43 MiB，RAM used 9.8 GB",
+      "19-77s": "GPU 锁定在 7841-7846 MiB（96%），RAM 峰值 25.7 GB",
+      "100s+": "全部退出，GPU 0 MiB，RAM 回落到 9.8 GB"
+    },
+    "conclusion": "--jobs 1 能跑完，但显存峰值仍达 96%（7846/8151 MiB）。也就是说：单条 6912x4608 10-bit 4:2:2 素材已经贴在这个 8 GB GPU 的上限。--jobs 2 必然失败，这不是调参问题，而是资源剖面问题。"
+  },
+  "root_cause_of_hw_failure": {
+    "error": "cuvid: Failed cuvidCreateDecoder 2 (CUDA_ERROR_OUT_OF_MEMORY)",
+    "process": "NVEncC64.exe --avhw",
+    "exit_code": 1,
+    "frames_encoded": 0,
+    "log_line": "Input Buffers  CUDA, 46 frames",
+    "arithmetic": {
+      "frame_bytes_10bit_422_6912x4608": 127401984,
+      "frame_mib": 121.5,
+      "cuda_input_buffers": 46,
+      "buffer_pool_gib": 5.46,
+      "note": "46 = --output-buf 64 与 --lookahead 32 共同作用的结果。x265 软件路径之所以能过，是因为它用系统内存而不是显存。"
+    },
+    "why_my_earlier_manual_test_passed": "手工测试用 --preset performance（无 lookahead、无 bframes 深度），日志显示 'Input Buffers CUDA, 9 frames' 约 1.07 GiB，所以能过。换成产品 HQ preset 后 buffer 数涨到 46，就不够了。",
+    "is_a_product_bug": "不是逻辑缺陷：能力探测与完整性门禁都按设计工作，最终产物正确。但 --jobs auto 的容量推导演算没有把分辨率与色度采样纳入考虑，而项目研究语料只有 3840x2160 4:2:0 10-bit（单帧 15.2 MiB，是本发明材的 1/8）。这是容量模型的覆盖空白。"
+  },
+  "diagnosability_observation": {
+    "what": "默认不保留工作目录时，解码失败的唯一线索是 fallback_reason=decode_failed: tool exited rc=1；真正的原因（CUDA_ERROR_OUT_OF_MEMORY）只存在于被删除的 *.log 里。",
+    "impact": "现场无法区分显存不足、驱动问题与格式不支持——三者都会以同一个 reason code 出现。",
+    "mitigation_used_here": "--keep-work（本次单并发运行未加，靠手工复现拿到根因）",
+    "severity": "medium（不影响正确性，影响可运维性）"
+  },
+  "limitations": [
+    "监控只覆盖单条素材、nvenc 后端、HQ preset。",
+    "未测 QSV 后端的资源剖面。",
+    "未测 --jobs 1 下 A0013C700（686 帧、1.3 GB）的资源剖面。",
+    "峰值是 2 秒采样，瞬时尖峰可能被漏掉（真实峰值应 >= 记录值）。"
+  ]
+}

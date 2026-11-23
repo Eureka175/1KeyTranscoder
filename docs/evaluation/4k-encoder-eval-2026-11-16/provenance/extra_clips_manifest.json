@@ -1,0 +1,83 @@
+[
+  {
+    "name": "night_dance_iso_b",
+    "source": "F:\\Pictures\\2026\\202609\\20260919舞团\\20260919_C1306.MP4",
+    "start_sec": 600,
+    "length_sec": 30,
+    "ok": true,
+    "MB": 272.1,
+    "sec": 3.9
+  },
+  {
+    "name": "night_dance_iso_c",
+    "source": "F:\\Pictures\\2026\\202609\\20260919舞团\\20260919_C1305.MP4",
+    "start_sec": 1800,
+    "length_sec": 30,
+    "ok": true,
+    "MB": 270.8,
+    "sec": 3.4
+  },
+  {
+    "name": "day_pocket_202610",
+    "source": "F:\\Pictures\\2026\\202610\\20261025\\DJI_20261025160559_0088_D.MP4",
+    "start_sec": 20,
+    "length_sec": 30,
+    "ok": true,
+    "MB": 428.7,
+    "sec": 3.6
+  },
+  {
+    "name": "day_canon_b_202610",
+    "source": "F:\\Pictures\\2026\\202610\\20261025\\A_0001C049A261025_1633145C_CANON.MP4",
+    "start_sec": 60,
+    "length_sec": 30,
+    "ok": true,
+    "MB": 358.1,
+    "sec": 3.5
+  },
+  {
+    "name": "day_sony_20261018",
+    "source": "F:\\Pictures\\2026\\202610\\20261018\\20261018_C1456.MP4",
+    "start_sec": 10,
+    "length_sec": 30,
+    "ok": true,
+    "MB": 535.9,
+    "sec": 3.9
+  },
+  {
+    "name": "day_action4_202611_0025",
+    "source": "F:\\Pictures\\2026\\202611\\20261115\\DJI_20261115164247_0025_D.MP4",
+    "start_sec": 60,
+    "length_sec": 30,
+    "ok": true,
+    "MB": 380.1,
+    "sec": 2.4
+  },
+  {
+    "name": "event_a7m4",
+    "source": "I:\\2026.09.24\\A7M4\\C0152.MP4",
+    "start_sec": 300,
+    "length_sec": 30,
+    "ok": true,
+    "MB": 727.9,
+    "sec": 6.7
+  },
+  {
+    "name": "event_fx30",
+    "source": "I:\\2026.09.24\\FX30\\20260922_fx30_2_9765.MP4",
+    "start_sec": 300,
+    "length_sec": 30,
+    "ok": true,
+    "MB": 727.6,
+    "sec": 6.8
+  },
+  {
+    "name": "event_nx800",
+    "source": "I:\\2026.09.24\\HXR-NX800\\CA0230.MP4",
+    "start_sec": 300,
+    "length_sec": 30,
+    "ok": true,
+    "MB": 724.1,
+    "sec": 9.1
+  }
+]

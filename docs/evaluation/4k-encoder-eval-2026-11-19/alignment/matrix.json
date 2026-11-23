@@ -1,0 +1,1052 @@
+[
+  {
+    "encoder": "nvenc",
+    "rc": 0,
+    "wall_sec": 150.0,
+    "outputs": {
+      "canon_8bit_10s": {
+        "duration": 9.976633,
+        "codec": "hevc",
+        "profile": "Main",
+        "pix_fmt": "yuv420p",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "dji_action4_10s": {
+        "duration": 9.955333,
+        "codec": "hevc",
+        "profile": "Main 10",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2880,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "generic_422_10s": {
+        "duration": 10.5,
+        "codec": "hevc",
+        "profile": "Rext",
+        "pix_fmt": "yuv422p10le",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "sowt"
+          ]
+        ]
+      }
+    },
+    "policy_log": [
+      "2026-11-19 15:37:33 | INFO | [FORMAT-PLAN] source=4:2:0/8 -> encode=4:2:0/8 | downgrade=False | vfr=False",
+      "2026-11-19 15:38:19 | INFO | [META_POLICY] dji_action4_10s.mp4 | DJI 非 Action 机型 (tool='GPAC-26.02-rev0-g118e60a9-master'): 默认不保留元数据, 走普通转码路径 (可用 --preserve-metadata 覆盖)",
+      "2026-11-19 15:38:19 | INFO | [FORMAT-PLAN] source=4:2:0/10 -> encode=4:2:0/10 | downgrade=False | vfr=False",
+      "2026-11-19 15:38:46 | INFO | [FORMAT-PLAN] source=4:2:2/10 -> encode=4:2:2/10 | downgrade=False | vfr=False"
+    ],
+    "checks": [
+      {
+        "clip": "canon_8bit_10s",
+        "got": "yuv420p",
+        "want": "yuv420p",
+        "ok": true,
+        "profile": "Main",
+        "codec": "hevc",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "dji_action4_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main 10",
+        "codec": "hevc",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "generic_422_10s",
+        "got": "yuv422p10le",
+        "want": "yuv422p10le",
+        "ok": true,
+        "profile": "Rext",
+        "codec": "hevc",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "sowt"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "encoder": "qsv",
+    "rc": 0,
+    "wall_sec": 129.1,
+    "outputs": {
+      "canon_8bit_10s": {
+        "duration": 9.976633,
+        "codec": "hevc",
+        "profile": "Main",
+        "pix_fmt": "yuv420p",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "dji_action4_10s": {
+        "duration": 9.955333,
+        "codec": "hevc",
+        "profile": "Main 10",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2880,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "generic_422_10s": {
+        "duration": 10.5,
+        "codec": "hevc",
+        "profile": "Main 10",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "sowt"
+          ]
+        ]
+      }
+    },
+    "policy_log": [
+      "2026-11-19 15:40:22 | INFO | [FORMAT-PLAN] source=4:2:0/8 -> encode=4:2:0/8 | downgrade=False | vfr=False",
+      "2026-11-19 15:41:10 | INFO | [META_POLICY] dji_action4_10s.mp4 | DJI 非 Action 机型 (tool='GPAC-26.02-rev0-g118e60a9-master'): 默认不保留元数据, 走普通转码路径 (可用 --preserve-metadata 覆盖)",
+      "2026-11-19 15:41:10 | INFO | [FORMAT-PLAN] source=4:2:0/10 -> encode=4:2:0/10 | downgrade=False | vfr=False",
+      "2026-11-19 15:41:34 | INFO | [FORMAT-PLAN] source=4:2:2/10 -> encode=4:2:0/10 | downgrade=True | vfr=False"
+    ],
+    "checks": [
+      {
+        "clip": "canon_8bit_10s",
+        "got": "yuv420p",
+        "want": "yuv420p",
+        "ok": true,
+        "profile": "Main",
+        "codec": "hevc",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "dji_action4_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main 10",
+        "codec": "hevc",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "generic_422_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main 10",
+        "codec": "hevc",
+        "streams": [
+          [
+            "video",
+            "hvc1"
+          ],
+          [
+            "audio",
+            "sowt"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "encoder": "x265",
+    "rc": 0,
+    "wall_sec": 319.6,
+    "outputs": {
+      "canon_8bit_10s": {
+        "duration": 10.01,
+        "codec": "hevc",
+        "profile": "Main",
+        "pix_fmt": "yuv420p",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "hev1"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "dji_action4_10s": {
+        "duration": 9.943267,
+        "codec": "hevc",
+        "profile": "Main 10",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2880,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "hev1"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "generic_422_10s": {
+        "duration": 10.5,
+        "codec": "hevc",
+        "profile": "Rext",
+        "pix_fmt": "yuv422p10le",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "hev1"
+          ],
+          [
+            "audio",
+            "twos"
+          ]
+        ]
+      }
+    },
+    "policy_log": [
+      "2026-11-19 15:42:18 | INFO | [FORMAT-PLAN] source=4:2:0/8 -> encode=4:2:0/8 | downgrade=False | reason=source_supported",
+      "2026-11-19 15:43:31 | INFO | [FORMAT-PLAN] source=4:2:0/10 -> encode=4:2:0/10 | downgrade=False | reason=source_supported",
+      "2026-11-19 15:43:32 | INFO | [META_POLICY] dji_action4_10s.mp4 | DJI 非 Action 机型 (tool='GPAC-26.02-rev0-g118e60a9-master'): 默认不保留元数据, 走普通转码路径 (可用 --preserve-metadata 覆盖)",
+      "2026-11-19 15:45:11 | INFO | [FORMAT-PLAN] source=4:2:2/10 -> encode=4:2:2/10 | downgrade=False | reason=source_supported"
+    ],
+    "checks": [
+      {
+        "clip": "canon_8bit_10s",
+        "got": "yuv420p",
+        "want": "yuv420p",
+        "ok": true,
+        "profile": "Main",
+        "codec": "hevc",
+        "streams": [
+          [
+            "video",
+            "hev1"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "audio",
+            "in24"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "dji_action4_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main 10",
+        "codec": "hevc",
+        "streams": [
+          [
+            "video",
+            "hev1"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "generic_422_10s",
+        "got": "yuv422p10le",
+        "want": "yuv422p10le",
+        "ok": true,
+        "profile": "Rext",
+        "codec": "hevc",
+        "streams": [
+          [
+            "video",
+            "hev1"
+          ],
+          [
+            "audio",
+            "twos"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "encoder": "nvenc-av1",
+    "rc": 0,
+    "wall_sec": 169.9,
+    "outputs": {
+      "canon_8bit_10s": {
+        "duration": 9.976633,
+        "codec": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "dji_action4_10s": {
+        "duration": 9.955333,
+        "codec": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2880,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "generic_422_10s": {
+        "duration": 10.5,
+        "codec": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ]
+        ]
+      }
+    },
+    "policy_log": [
+      "2026-11-19 15:47:39 | INFO | [FORMAT-PLAN] source=4:2:0/8 -> encode=4:2:0/10 | downgrade=False | vfr=False",
+      "2026-11-19 15:48:32 | INFO | [META_POLICY] dji_action4_10s.mp4 | DJI 非 Action 机型 (tool='GPAC-26.02-rev0-g118e60a9-master'): 默认不保留元数据, 走普通转码路径 (可用 --preserve-metadata 覆盖)",
+      "2026-11-19 15:48:32 | INFO | [FORMAT-PLAN] source=4:2:0/10 -> encode=4:2:0/10 | downgrade=False | vfr=False",
+      "2026-11-19 15:49:06 | INFO | [FORMAT-PLAN] source=4:2:2/10 -> encode=4:2:0/10 | downgrade=True | vfr=False"
+    ],
+    "checks": [
+      {
+        "clip": "canon_8bit_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main",
+        "codec": "av1",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "dji_action4_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main",
+        "codec": "av1",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "generic_422_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main",
+        "codec": "av1",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "encoder": "qsv-av1",
+    "rc": 0,
+    "wall_sec": 159.9,
+    "outputs": {
+      "canon_8bit_10s": {
+        "duration": 9.976633,
+        "codec": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "dji_action4_10s": {
+        "duration": 9.955333,
+        "codec": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2880,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "generic_422_10s": {
+        "duration": 10.5,
+        "codec": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ]
+        ]
+      }
+    },
+    "policy_log": [
+      "2026-11-19 15:50:39 | INFO | [FORMAT-PLAN] source=4:2:0/8 -> encode=4:2:0/10 | downgrade=False | vfr=False",
+      "2026-11-19 15:51:36 | INFO | [META_POLICY] dji_action4_10s.mp4 | DJI 非 Action 机型 (tool='GPAC-26.02-rev0-g118e60a9-master'): 默认不保留元数据, 走普通转码路径 (可用 --preserve-metadata 覆盖)",
+      "2026-11-19 15:51:36 | INFO | [FORMAT-PLAN] source=4:2:0/10 -> encode=4:2:0/10 | downgrade=False | vfr=False",
+      "2026-11-19 15:52:17 | INFO | [FORMAT-PLAN] source=4:2:2/10 -> encode=4:2:0/10 | downgrade=True | vfr=False"
+    ],
+    "checks": [
+      {
+        "clip": "canon_8bit_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main",
+        "codec": "av1",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "dji_action4_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main",
+        "codec": "av1",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "generic_422_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main",
+        "codec": "av1",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "encoder": "svtav1",
+    "rc": 0,
+    "wall_sec": 283.2,
+    "outputs": {
+      "canon_8bit_10s": {
+        "duration": 10.01,
+        "codec": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "dji_action4_10s": {
+        "duration": 9.943267,
+        "codec": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2880,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      "generic_422_10s": {
+        "duration": 10.5,
+        "codec": "av1",
+        "profile": "Main",
+        "pix_fmt": "yuv420p10le",
+        "width": 3840,
+        "height": 2160,
+        "color_space": "bt709",
+        "color_primaries": "bt709",
+        "color_transfer": "bt709",
+        "color_range": "tv",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ]
+        ]
+      }
+    },
+    "policy_log": [
+      "2026-11-19 15:53:01 | INFO | [FORMAT-PLAN] source=4:2:0/8 -> encode=4:2:0/10 | downgrade=False | reason=av1_10bit",
+      "2026-11-19 15:53:48 | INFO | [FORMAT-PLAN] source=4:2:0/10 -> encode=4:2:0/10 | downgrade=False | reason=av1_10bit",
+      "2026-11-19 15:53:49 | INFO | [META_POLICY] dji_action4_10s.mp4 | DJI 非 Action 机型 (tool='GPAC-26.02-rev0-g118e60a9-master'): 默认不保留元数据, 走普通转码路径 (可用 --preserve-metadata 覆盖)",
+      "2026-11-19 15:56:43 | INFO | [FORMAT-PLAN] source=4:2:2/10 -> encode=4:2:0/10 | downgrade=True | reason=av1_420_only"
+    ],
+    "checks": [
+      {
+        "clip": "canon_8bit_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main",
+        "codec": "av1",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "dji_action4_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main",
+        "codec": "av1",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "mp4a"
+          ],
+          [
+            "data",
+            "tmcd"
+          ]
+        ]
+      },
+      {
+        "clip": "generic_422_10s",
+        "got": "yuv420p10le",
+        "want": "yuv420p10le",
+        "ok": true,
+        "profile": "Main",
+        "codec": "av1",
+        "streams": [
+          [
+            "video",
+            "av01"
+          ],
+          [
+            "audio",
+            "ipcm"
+          ]
+        ]
+      }
+    ]
+  }
+]

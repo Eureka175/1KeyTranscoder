@@ -1,0 +1,71 @@
+{
+  "schema": "canon-r6v-investigation/metadata/1",
+  "source_had": {
+    "data_streams": [
+      "tmcd (SMPTE 时间码, 154/686 帧)",
+      "cndm (Canon 专有 metadata, 255 kb/s)"
+    ],
+    "chapters": 0,
+    "stream_disposition": "所有 7 条流的 default 均 = 1",
+    "color_metadata": {
+      "color_range": "pc",
+      "color_space": "bt709",
+      "color_transfer": null,
+      "color_primaries": null
+    },
+    "container_tags": {
+      "major_brand": "XFVC",
+      "compatible_brands": "XFVCmp42iso2",
+      "timecode": {
+        "A0013C699": "02:19:00;11",
+        "A0013C700": "02:19:05;15"
+      },
+      "make": "",
+      "model": ""
+    },
+    "sidecar": "CPF（二进制，两条内容完全相同，未解析）"
+  },
+  "sony_structures_absent": {
+    "checked": [
+      "rtmd",
+      "nrtm",
+      "PROF",
+      "USMT"
+    ],
+    "present": false,
+    "note": "不得假设 Canon 文件具有 Sony 的 rtmd/nrtm/PROF/USMT 结构。实测：一条都没有。项目分类器因此正确判为 non_sony。"
+  },
+  "project_policy_by_code": {
+    "location": "core/batch_hw.py:1292-1296",
+    "log_line": "POLICY | non-Sony source: metadata dropped by policy (video+audio only)",
+    "means": "非 Sony 源按设计丢弃 metadata，只保留视频+音频。",
+    "observed_in_real_run": true,
+    "observed_run": "work/canon_r6v/cli_out2 的 nvenc 真实转码日志"
+  },
+  "what_survived_the_rigaya_path": {
+    "evidence": "work/canon_r6v/offline/*/nvenc_A0013C699_avhw.mov",
+    "source_streams": 7,
+    "delivered_streams": 6,
+    "survived": [
+      "video (hevc, hvc1)",
+      "4 x audio (pcm_s24le, in24) —— 轨道数与声道数保留，字节序改写",
+      "tmcd (时间码)"
+    ],
+    "dropped": [
+      "cndm (Canon 专有 metadata)"
+    ]
+  },
+  "preservation_verdict": {
+    "tmcd": "PRESERVED",
+    "cndm": "DROPPED",
+    "color_metadata": "源里只有 color_range/color_space，无 transfer/primaries。本轮未核对产物中的取值 —— PENDING。",
+    "chapters": "源本无 chapter，无丢失。",
+    "is_design_or_defect": "cndm 的丢弃与 core/batch_hw.py 的非 Sony 策略一致（'metadata dropped by policy'），因此是既有设计，不是硬件解码引入的。是否应当保留 Canon metadata 属于产品决策，本调查不建议直接改。"
+  },
+  "limitations": [
+    "只验证到硬件编码中间件，未验证产品最终交付容器里的 metadata。",
+    "未逐项核对 stream disposition 在产物中的取值。",
+    "未核对 color_range / color_space 是否在产物中保持一致。",
+    "CPF sidecar 未解析（二进制），不清楚其中是否含需要保留的信息。"
+  ]
+}

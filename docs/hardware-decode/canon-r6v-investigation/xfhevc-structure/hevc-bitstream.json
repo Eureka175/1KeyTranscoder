@@ -1,0 +1,170 @@
+{
+  "role": "XF-HEVC 的 HEVC 位流层结构（VPS/SPS/PPS + 首 slice）",
+  "source": "ffmpeg trace_headers（位流直读，非解码推断）",
+  "hvcC": {
+    "configurationVersion": 1,
+    "general_profile_space": 0,
+    "general_tier_flag": 1,
+    "general_profile_idc": 4,
+    "general_profile_compatibility_flags": "0x08000000",
+    "general_constraint_indicator_flags": "0x9D0800000000",
+    "general_level_idc": 183,
+    "min_spatial_segmentation_idc": 0,
+    "parallelismType": 0,
+    "chromaFormat": 2,
+    "bitDepthLumaMinus8": 2,
+    "bitDepthChromaMinus8": 2,
+    "avgFrameRate": 0,
+    "constantFrameRate": 0,
+    "numTemporalLayers": 1,
+    "temporalIdNested": 1,
+    "lengthSizeMinusOne": 3,
+    "numOfArrays": 3,
+    "arrays": [
+      {
+        "nal_unit_type": 32,
+        "count": 1,
+        "nal_units": [
+          {
+            "length": 23,
+            "sha256": "af9678d983f6f580"
+          }
+        ]
+      },
+      {
+        "nal_unit_type": 33,
+        "count": 1,
+        "nal_units": [
+          {
+            "length": 133,
+            "sha256": "9fb5295beb13f5cb"
+          }
+        ]
+      },
+      {
+        "nal_unit_type": 34,
+        "count": 1,
+        "nal_units": [
+          {
+            "length": 8,
+            "sha256": "c67f4f9c375d95f0"
+          }
+        ]
+      }
+    ]
+  },
+  "colr": {
+    "colour_type": "nclx",
+    "colour_primaries": 2,
+    "transfer_characteristics": 2,
+    "matrix_coefficients": 1,
+    "full_range_flag": true
+  },
+  "sps_pps_vps_fields": {
+    "vps_video_parameter_set_id": 0,
+    "vps_max_sub_layers_minus1": 0,
+    "vps_temporal_id_nesting_flag": 1,
+    "general_profile_space": 0,
+    "general_tier_flag": 1,
+    "general_profile_idc": 4,
+    "general_level_idc": 183,
+    "general_progressive_source_flag": 1,
+    "general_interlaced_source_flag": 0,
+    "general_frame_only_constraint_flag": 1,
+    "sps_video_parameter_set_id": 0,
+    "sps_max_sub_layers_minus1": 0,
+    "sps_temporal_id_nesting_flag": 1,
+    "sps_seq_parameter_set_id": 0,
+    "chroma_format_idc": 2,
+    "pic_width_in_luma_samples": 6912,
+    "pic_height_in_luma_samples": 4608,
+    "conformance_window_flag": 0,
+    "bit_depth_luma_minus8": 2,
+    "bit_depth_chroma_minus8": 2,
+    "log2_max_pic_order_cnt_lsb_minus4": 4,
+    "sps_sub_layer_ordering_info_present_flag": 0,
+    "log2_min_luma_coding_block_size_minus3": 0,
+    "log2_diff_max_min_luma_coding_block_size": 2,
+    "log2_min_luma_transform_block_size_minus2": 0,
+    "log2_diff_max_min_luma_transform_block_size": 2,
+    "max_transform_hierarchy_depth_inter": 2,
+    "max_transform_hierarchy_depth_intra": 2,
+    "scaling_list_enabled_flag": 1,
+    "amp_enabled_flag": 0,
+    "sample_adaptive_offset_enabled_flag": 0,
+    "pcm_enabled_flag": 0,
+    "num_short_term_ref_pic_sets": 7,
+    "long_term_ref_pics_present_flag": 0,
+    "sps_temporal_mvp_enabled_flag": 0,
+    "strong_intra_smoothing_enabled_flag": 0,
+    "vui_parameters_present_flag": 1,
+    "aspect_ratio_info_present_flag": 0,
+    "overscan_info_present_flag": 0,
+    "video_signal_type_present_flag": 1,
+    "video_full_range_flag": 1,
+    "colour_description_present_flag": 1,
+    "colour_primaries": 2,
+    "transfer_characteristics": 2,
+    "matrix_coefficients": 1,
+    "chroma_loc_info_present_flag": 0,
+    "bitstream_restriction_flag": 1,
+    "pps_pic_parameter_set_id": 0,
+    "pps_seq_parameter_set_id": 0,
+    "entropy_coding_sync_enabled_flag": 0,
+    "tiles_enabled_flag": 1,
+    "uniform_spacing_flag": 1,
+    "num_tile_columns_minus1": 1,
+    "num_tile_rows_minus1": 0,
+    "loop_filter_across_tiles_enabled_flag": 0,
+    "pps_loop_filter_across_slices_enabled_flag": 1,
+    "deblocking_filter_control_present_flag": 1,
+    "pps_scaling_list_data_present_flag": 0,
+    "lists_modification_present_flag": 0,
+    "log2_parallel_merge_level_minus2": 0,
+    "slice_segment_header_extension_present_flag": 0,
+    "weighted_pred_flag": 0,
+    "weighted_bipred_flag": 0,
+    "num_ref_idx_l0_default_active_minus1": 0,
+    "num_ref_idx_l1_default_active_minus1": 0,
+    "first_slice_header": {
+      "first_slice_segment_in_pic_flag": 1,
+      "slice_type": 2,
+      "five_minus_max_num_merge_cand": 4
+    },
+    "nal_unit_types_seen": [
+      0,
+      1,
+      6,
+      19,
+      32,
+      33,
+      34
+    ]
+  },
+  "derived": {
+    "profile": "Main 4:2:2 10 (Rext, general_profile_idc=4)",
+    "tier": "high (general_tier_flag=1)",
+    "level_idc": 183,
+    "chroma_format": "4:2:2 (chroma_format_idc=2)",
+    "bit_depth": 10,
+    "resolution": "6912x4608",
+    "ctu_log2": 5,
+    "tiles": "2 列 x 1 行（uniform_spacing=1）",
+    "entropy_coding_sync": 0,
+    "sao": 0,
+    "amp": 0,
+    "temporal_mvp": 0,
+    "short_term_ref_pic_sets": 7,
+    "scaling_list": 1,
+    "weighted_pred": 0,
+    "nal_unit_types_seen": [
+      0,
+      1,
+      6,
+      19,
+      32,
+      33,
+      34
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "schema": "canon-r6v-investigation/frame-comparison/1",
+  "canonical_pix_fmt": "yuv422p10le",
+  "why_canonicalise": "非无损视频跨解码器的像素结果可能因色彩格式/转换路径不同而不同。两条路径都显式指定同一个 pix_fmt 后再取指纹，因此指纹差异不可能由转换路径解释。",
+  "method": {
+    "intermediate": "FFV1 level-3, g=1, matroska —— 无损，所以指纹看到的就是解码器的输出本身，没有二次量化。",
+    "fingerprint": "对 canonical yuv422p10le 原始帧逐帧取完整 SHA-256（127,401,984 字节/帧），再对帧序列取摘要。",
+    "window": "每条素材前 24 帧（decode 阶段窗口）"
+  },
+  "software_vs_ffmpeg_hardware": {
+    "A0013C699": {
+      "sw_frames": 24,
+      "hw_frames": 24,
+      "counts_equal": true,
+      "identical_position_for_position": true,
+      "first_diff_index": null,
+      "sw_sequence_sha256": "ca3f4027932a29584630d00fbbaeffab319874797a57cd723062cac4cf1044d7",
+      "hw_sequence_sha256": "ca3f4027932a29584630d00fbbaeffab319874797a57cd723062cac4cf1044d7",
+      "verdict": "PASS"
+    },
+    "A0013C700": {
+      "sw_frames": 24,
+      "hw_frames": 24,
+      "counts_equal": true,
+      "identical_position_for_position": true,
+      "first_diff_index": null,
+      "sw_sequence_sha256": "d091b6bd91c1973a7d8e93df1b522acdabf938617988f3bac9f147e3c3f8f933",
+      "hw_sequence_sha256": "d091b6bd91c1973a7d8e93df1b522acdabf938617988f3bac9f147e3c3f8f933",
+      "verdict": "PASS"
+    }
+  },
+  "software_vs_rigaya_hardware": {
+    "A0013C699": {
+      "result": "帧数不同：avsw 154 vs avhw 152",
+      "verdict": "FAIL（已定位为 avhw 侧丢弃 2 个前导帧）",
+      "note": "本项只做到帧数层。**未做** avhw/avsw 产物的逐帧指纹定位 —— 即没有逐帧确认'丢的就是显示序第 0、1 帧'。结构性证据（负 DTS + 2 个前导 B 帧 + 项目公式吻合）支持该结论，但它是推断，不是指纹实测。",
+      "status_for_pixel_identity": "PENDING"
+    },
+    "A0013C700": {
+      "result": "帧数不同：avsw 686 vs avhw 684",
+      "verdict": "FAIL（同上）",
+      "status_for_pixel_identity": "PENDING"
+    }
+  },
+  "what_was_NOT_done": [
+    "未对 avhw/avsw 的**编码产物**做逐帧指纹比对（只比了帧数）。",
+    "未做显示顺序 / PTS 连续性 / 重复帧 / 重排序差异的逐帧检查。",
+    "未覆盖完整帧数（decode 窗口是 24 帧，非全片）。",
+    "因此\"丢的恰好是前两帧\"仍是**基于结构的推断**，标记 PENDING，不能写成已证明。"
+  ]
+}

@@ -1,0 +1,1208 @@
+{
+  "role": "XF-HEVC 轨道与采样表结构",
+  "track_count": 7,
+  "tracks": [
+    {
+      "index": 0,
+      "track_id": 1,
+      "handler_type": "vide",
+      "handler_name": "",
+      "sample_entry_format": [
+        "hvc1"
+      ],
+      "tkhd": {
+        "version": 0,
+        "flags": 7,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "track_id": 1,
+        "duration": 154154,
+        "layer": 0,
+        "alternate_group": 0,
+        "volume": 0.0,
+        "matrix": [
+          65536,
+          0,
+          0,
+          0,
+          65536,
+          0,
+          0,
+          0,
+          1073741824
+        ],
+        "width": 6912.0,
+        "height": 4608.0,
+        "enabled": true,
+        "in_movie": true,
+        "in_preview": true
+      },
+      "mdhd": {
+        "version": 0,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "timescale": 30000,
+        "duration": 154154,
+        "duration_s": 5.138467,
+        "language": "eng",
+        "quality": 0
+      },
+      "elst": {
+        "version": 0,
+        "entry_count": 1,
+        "entries": [
+          {
+            "segment_duration": 154154,
+            "media_time": 1001,
+            "media_rate": 0.00390625
+          }
+        ]
+      },
+      "tref": null,
+      "stts": {
+        "entry_count": 1,
+        "sample_count": 154,
+        "total_duration": 154154,
+        "unique_deltas": [
+          1001
+        ],
+        "first_entries": [
+          {
+            "count": 154,
+            "delta": 1001
+          }
+        ],
+        "constant_delta": 1001
+      },
+      "stss": {
+        "sync_sample_count": 11,
+        "first_indices": [
+          1,
+          16,
+          31,
+          46,
+          61,
+          76,
+          91,
+          106,
+          121,
+          136,
+          151
+        ]
+      },
+      "ctts": {
+        "entry_count": 103,
+        "first_entries": [
+          {
+            "sample_count": 1,
+            "offset": 3003
+          },
+          {
+            "sample_count": 2,
+            "offset": 0
+          },
+          {
+            "sample_count": 1,
+            "offset": 3003
+          },
+          {
+            "sample_count": 2,
+            "offset": 0
+          },
+          {
+            "sample_count": 1,
+            "offset": 3003
+          },
+          {
+            "sample_count": 2,
+            "offset": 0
+          },
+          {
+            "sample_count": 1,
+            "offset": 3003
+          },
+          {
+            "sample_count": 2,
+            "offset": 0
+          },
+          {
+            "sample_count": 1,
+            "offset": 3003
+          },
+          {
+            "sample_count": 2,
+            "offset": 0
+          },
+          {
+            "sample_count": 1,
+            "offset": 3003
+          },
+          {
+            "sample_count": 2,
+            "offset": 0
+          }
+        ]
+      },
+      "stsz": {
+        "sample_size_uniform": 0,
+        "sample_count": 154,
+        "constant_sample_size": null
+      },
+      "stsc": {
+        "entry_count": 2,
+        "first_entries": [
+          {
+            "first_chunk": 1,
+            "samples_per_chunk": 15,
+            "sample_description_index": 1
+          },
+          {
+            "first_chunk": 11,
+            "samples_per_chunk": 4,
+            "sample_description_index": 1
+          }
+        ]
+      },
+      "co64": {
+        "chunk_count": 11,
+        "first_offsets": [
+          0,
+          828812,
+          0,
+          36362139,
+          0,
+          67139122,
+          0,
+          97932022,
+          0,
+          128756783
+        ],
+        "first_chunk_offset": 0,
+        "max_chunk_offset": 0
+      },
+      "stbl_children": [
+        "stsd",
+        "stts",
+        "stss",
+        "ctts",
+        "stsc",
+        "stsz",
+        "co64",
+        "sdtp"
+      ],
+      "sample_entry": {
+        "format": "hvc1",
+        "size": 315,
+        "offset": 68307,
+        "data_reference_index": 1,
+        "pre_defined": 0,
+        "reserved": 0,
+        "pre_defined2": [
+          0,
+          0,
+          0
+        ],
+        "width": 6912,
+        "height": 4608,
+        "horizresolution": 72.0,
+        "vertresolution": 72.0,
+        "reserved3": 0,
+        "frame_count": 1,
+        "compressorname": "",
+        "compressorname_raw": "0000000000000000000000000000000000000000000000000000000000000000",
+        "depth": 24,
+        "pre_defined3": -1,
+        "child_boxes": [
+          {
+            "type": "hvcC",
+            "size": 210,
+            "offset": 68393
+          },
+          {
+            "type": "colr",
+            "size": 19,
+            "offset": 68603
+          }
+        ],
+        "hvcC": {
+          "configurationVersion": 1,
+          "general_profile_space": 0,
+          "general_tier_flag": 1,
+          "general_profile_idc": 4,
+          "general_profile_compatibility_flags": "0x08000000",
+          "general_constraint_indicator_flags": "0x9D0800000000",
+          "general_level_idc": 183,
+          "min_spatial_segmentation_idc": 0,
+          "parallelismType": 0,
+          "chromaFormat": 2,
+          "bitDepthLumaMinus8": 2,
+          "bitDepthChromaMinus8": 2,
+          "avgFrameRate": 0,
+          "constantFrameRate": 0,
+          "numTemporalLayers": 1,
+          "temporalIdNested": 1,
+          "lengthSizeMinusOne": 3,
+          "numOfArrays": 3,
+          "arrays": [
+            {
+              "nal_unit_type": 32,
+              "count": 1,
+              "nal_units": [
+                {
+                  "length": 23,
+                  "sha256": "af9678d983f6f580"
+                }
+              ]
+            },
+            {
+              "nal_unit_type": 33,
+              "count": 1,
+              "nal_units": [
+                {
+                  "length": 133,
+                  "sha256": "9fb5295beb13f5cb"
+                }
+              ]
+            },
+            {
+              "nal_unit_type": 34,
+              "count": 1,
+              "nal_units": [
+                {
+                  "length": 8,
+                  "sha256": "c67f4f9c375d95f0"
+                }
+              ]
+            }
+          ]
+        },
+        "colr": {
+          "colour_type": "nclx",
+          "colour_primaries": 2,
+          "transfer_characteristics": 2,
+          "matrix_coefficients": 1,
+          "full_range_flag": true
+        }
+      }
+    },
+    {
+      "index": 1,
+      "track_id": 2,
+      "handler_type": "soun",
+      "handler_name": "",
+      "sample_entry_format": [
+        "ipcm"
+      ],
+      "tkhd": {
+        "version": 0,
+        "flags": 7,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "track_id": 2,
+        "duration": 154154,
+        "layer": 0,
+        "alternate_group": 0,
+        "volume": 1.0,
+        "matrix": [
+          65536,
+          0,
+          0,
+          0,
+          65536,
+          0,
+          0,
+          0,
+          1073741824
+        ],
+        "width": 0.0,
+        "height": 0.0,
+        "enabled": true,
+        "in_movie": true,
+        "in_preview": true
+      },
+      "mdhd": {
+        "version": 0,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "timescale": 48000,
+        "duration": 246646,
+        "duration_s": 5.138458,
+        "language": "eng",
+        "quality": 0
+      },
+      "elst": {
+        "version": 0,
+        "entry_count": 1,
+        "entries": [
+          {
+            "segment_duration": 154154,
+            "media_time": 0,
+            "media_rate": 0.00390625
+          }
+        ]
+      },
+      "tref": null,
+      "stts": {
+        "entry_count": 1,
+        "sample_count": 246646,
+        "total_duration": 246646,
+        "unique_deltas": [
+          1
+        ],
+        "first_entries": [
+          {
+            "count": 246646,
+            "delta": 1
+          }
+        ],
+        "constant_delta": 1
+      },
+      "stss": null,
+      "ctts": null,
+      "stsz": {
+        "sample_size_uniform": 3,
+        "sample_count": 246646,
+        "constant_sample_size": 3
+      },
+      "stsc": {
+        "entry_count": 2,
+        "first_entries": [
+          {
+            "first_chunk": 1,
+            "samples_per_chunk": 24024,
+            "sample_description_index": 1
+          },
+          {
+            "first_chunk": 11,
+            "samples_per_chunk": 6406,
+            "sample_description_index": 1
+          }
+        ]
+      },
+      "co64": {
+        "chunk_count": 11,
+        "first_offsets": [
+          0,
+          540384,
+          0,
+          36073711,
+          0,
+          66850694,
+          0,
+          97643594,
+          0,
+          128468355
+        ],
+        "first_chunk_offset": 0,
+        "max_chunk_offset": 0
+      },
+      "stbl_children": [
+        "stsd",
+        "stts",
+        "stsc",
+        "stsz",
+        "co64"
+      ],
+      "sample_entry": {
+        "format": "ipcm",
+        "size": 50,
+        "offset": 70785,
+        "data_reference_index": 1,
+        "version": 0,
+        "revision": 0,
+        "vendor": 0,
+        "channel_count": 1,
+        "sample_size": 24,
+        "compression_id": 0,
+        "packet_size": 0,
+        "sample_rate": 48000.0,
+        "child_boxes": [
+          {
+            "type": "pcmC",
+            "size": 14
+          }
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "track_id": 3,
+      "handler_type": "soun",
+      "handler_name": "",
+      "sample_entry_format": [
+        "ipcm"
+      ],
+      "tkhd": {
+        "version": 0,
+        "flags": 7,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "track_id": 3,
+        "duration": 154154,
+        "layer": 0,
+        "alternate_group": 0,
+        "volume": 1.0,
+        "matrix": [
+          65536,
+          0,
+          0,
+          0,
+          65536,
+          0,
+          0,
+          0,
+          1073741824
+        ],
+        "width": 0.0,
+        "height": 0.0,
+        "enabled": true,
+        "in_movie": true,
+        "in_preview": true
+      },
+      "mdhd": {
+        "version": 0,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "timescale": 48000,
+        "duration": 246646,
+        "duration_s": 5.138458,
+        "language": "eng",
+        "quality": 0
+      },
+      "elst": {
+        "version": 0,
+        "entry_count": 1,
+        "entries": [
+          {
+            "segment_duration": 154154,
+            "media_time": 0,
+            "media_rate": 0.00390625
+          }
+        ]
+      },
+      "tref": null,
+      "stts": {
+        "entry_count": 1,
+        "sample_count": 246646,
+        "total_duration": 246646,
+        "unique_deltas": [
+          1
+        ],
+        "first_entries": [
+          {
+            "count": 246646,
+            "delta": 1
+          }
+        ],
+        "constant_delta": 1
+      },
+      "stss": null,
+      "ctts": null,
+      "stsz": {
+        "sample_size_uniform": 3,
+        "sample_count": 246646,
+        "constant_sample_size": 3
+      },
+      "stsc": {
+        "entry_count": 2,
+        "first_entries": [
+          {
+            "first_chunk": 1,
+            "samples_per_chunk": 24024,
+            "sample_description_index": 1
+          },
+          {
+            "first_chunk": 11,
+            "samples_per_chunk": 6406,
+            "sample_description_index": 1
+          }
+        ]
+      },
+      "co64": {
+        "chunk_count": 11,
+        "first_offsets": [
+          0,
+          612476,
+          0,
+          36145803,
+          0,
+          66922786,
+          0,
+          97715686,
+          0,
+          128540447
+        ],
+        "first_chunk_offset": 0,
+        "max_chunk_offset": 0
+      },
+      "stbl_children": [
+        "stsd",
+        "stts",
+        "stsc",
+        "stsz",
+        "co64"
+      ],
+      "sample_entry": {
+        "format": "ipcm",
+        "size": 50,
+        "offset": 71316,
+        "data_reference_index": 1,
+        "version": 0,
+        "revision": 0,
+        "vendor": 0,
+        "channel_count": 1,
+        "sample_size": 24,
+        "compression_id": 0,
+        "packet_size": 0,
+        "sample_rate": 48000.0,
+        "child_boxes": [
+          {
+            "type": "pcmC",
+            "size": 14
+          }
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "track_id": 4,
+      "handler_type": "soun",
+      "handler_name": "",
+      "sample_entry_format": [
+        "ipcm"
+      ],
+      "tkhd": {
+        "version": 0,
+        "flags": 7,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "track_id": 4,
+        "duration": 154154,
+        "layer": 0,
+        "alternate_group": 0,
+        "volume": 1.0,
+        "matrix": [
+          65536,
+          0,
+          0,
+          0,
+          65536,
+          0,
+          0,
+          0,
+          1073741824
+        ],
+        "width": 0.0,
+        "height": 0.0,
+        "enabled": true,
+        "in_movie": true,
+        "in_preview": true
+      },
+      "mdhd": {
+        "version": 0,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "timescale": 48000,
+        "duration": 246646,
+        "duration_s": 5.138458,
+        "language": "eng",
+        "quality": 0
+      },
+      "elst": {
+        "version": 0,
+        "entry_count": 1,
+        "entries": [
+          {
+            "segment_duration": 154154,
+            "media_time": 0,
+            "media_rate": 0.00390625
+          }
+        ]
+      },
+      "tref": null,
+      "stts": {
+        "entry_count": 1,
+        "sample_count": 246646,
+        "total_duration": 246646,
+        "unique_deltas": [
+          1
+        ],
+        "first_entries": [
+          {
+            "count": 246646,
+            "delta": 1
+          }
+        ],
+        "constant_delta": 1
+      },
+      "stss": null,
+      "ctts": null,
+      "stsz": {
+        "sample_size_uniform": 3,
+        "sample_count": 246646,
+        "constant_sample_size": 3
+      },
+      "stsc": {
+        "entry_count": 2,
+        "first_entries": [
+          {
+            "first_chunk": 1,
+            "samples_per_chunk": 24024,
+            "sample_description_index": 1
+          },
+          {
+            "first_chunk": 11,
+            "samples_per_chunk": 6406,
+            "sample_description_index": 1
+          }
+        ]
+      },
+      "co64": {
+        "chunk_count": 11,
+        "first_offsets": [
+          0,
+          684568,
+          0,
+          36217895,
+          0,
+          66994878,
+          0,
+          97787778,
+          0,
+          128612539
+        ],
+        "first_chunk_offset": 0,
+        "max_chunk_offset": 0
+      },
+      "stbl_children": [
+        "stsd",
+        "stts",
+        "stsc",
+        "stsz",
+        "co64"
+      ],
+      "sample_entry": {
+        "format": "ipcm",
+        "size": 50,
+        "offset": 71847,
+        "data_reference_index": 1,
+        "version": 0,
+        "revision": 0,
+        "vendor": 0,
+        "channel_count": 1,
+        "sample_size": 24,
+        "compression_id": 0,
+        "packet_size": 0,
+        "sample_rate": 48000.0,
+        "child_boxes": [
+          {
+            "type": "pcmC",
+            "size": 14
+          }
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "track_id": 5,
+      "handler_type": "soun",
+      "handler_name": "",
+      "sample_entry_format": [
+        "ipcm"
+      ],
+      "tkhd": {
+        "version": 0,
+        "flags": 7,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "track_id": 5,
+        "duration": 154154,
+        "layer": 0,
+        "alternate_group": 0,
+        "volume": 1.0,
+        "matrix": [
+          65536,
+          0,
+          0,
+          0,
+          65536,
+          0,
+          0,
+          0,
+          1073741824
+        ],
+        "width": 0.0,
+        "height": 0.0,
+        "enabled": true,
+        "in_movie": true,
+        "in_preview": true
+      },
+      "mdhd": {
+        "version": 0,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "timescale": 48000,
+        "duration": 246646,
+        "duration_s": 5.138458,
+        "language": "eng",
+        "quality": 0
+      },
+      "elst": {
+        "version": 0,
+        "entry_count": 1,
+        "entries": [
+          {
+            "segment_duration": 154154,
+            "media_time": 0,
+            "media_rate": 0.00390625
+          }
+        ]
+      },
+      "tref": null,
+      "stts": {
+        "entry_count": 1,
+        "sample_count": 246646,
+        "total_duration": 246646,
+        "unique_deltas": [
+          1
+        ],
+        "first_entries": [
+          {
+            "count": 246646,
+            "delta": 1
+          }
+        ],
+        "constant_delta": 1
+      },
+      "stss": null,
+      "ctts": null,
+      "stsz": {
+        "sample_size_uniform": 3,
+        "sample_count": 246646,
+        "constant_sample_size": 3
+      },
+      "stsc": {
+        "entry_count": 2,
+        "first_entries": [
+          {
+            "first_chunk": 1,
+            "samples_per_chunk": 24024,
+            "sample_description_index": 1
+          },
+          {
+            "first_chunk": 11,
+            "samples_per_chunk": 6406,
+            "sample_description_index": 1
+          }
+        ]
+      },
+      "co64": {
+        "chunk_count": 11,
+        "first_offsets": [
+          0,
+          756660,
+          0,
+          36289987,
+          0,
+          67066970,
+          0,
+          97859870,
+          0,
+          128684631
+        ],
+        "first_chunk_offset": 0,
+        "max_chunk_offset": 0
+      },
+      "stbl_children": [
+        "stsd",
+        "stts",
+        "stsc",
+        "stsz",
+        "co64"
+      ],
+      "sample_entry": {
+        "format": "ipcm",
+        "size": 50,
+        "offset": 72378,
+        "data_reference_index": 1,
+        "version": 0,
+        "revision": 0,
+        "vendor": 0,
+        "channel_count": 1,
+        "sample_size": 24,
+        "compression_id": 0,
+        "packet_size": 0,
+        "sample_rate": 48000.0,
+        "child_boxes": [
+          {
+            "type": "pcmC",
+            "size": 14
+          }
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "track_id": 6,
+      "handler_type": "tmcd",
+      "handler_name": "",
+      "sample_entry_format": [
+        "tmcd"
+      ],
+      "tkhd": {
+        "version": 0,
+        "flags": 7,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "track_id": 6,
+        "duration": 154154,
+        "layer": 0,
+        "alternate_group": 0,
+        "volume": 0.0,
+        "matrix": [
+          65536,
+          0,
+          0,
+          0,
+          65536,
+          0,
+          0,
+          0,
+          1073741824
+        ],
+        "width": 0.0,
+        "height": 0.0,
+        "enabled": true,
+        "in_movie": true,
+        "in_preview": true
+      },
+      "mdhd": {
+        "version": 0,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "timescale": 30000,
+        "duration": 154154,
+        "duration_s": 5.138467,
+        "language": "eng",
+        "quality": 0
+      },
+      "elst": null,
+      "tref": null,
+      "stts": {
+        "entry_count": 1,
+        "sample_count": 154,
+        "total_duration": 154154,
+        "unique_deltas": [
+          1001
+        ],
+        "first_entries": [
+          {
+            "count": 154,
+            "delta": 1001
+          }
+        ],
+        "constant_delta": 1001
+      },
+      "stss": null,
+      "ctts": null,
+      "stsz": {
+        "sample_size_uniform": 4,
+        "sample_count": 154,
+        "constant_sample_size": 4
+      },
+      "stsc": {
+        "entry_count": 2,
+        "first_entries": [
+          {
+            "first_chunk": 1,
+            "samples_per_chunk": 15,
+            "sample_description_index": 1
+          },
+          {
+            "first_chunk": 11,
+            "samples_per_chunk": 4,
+            "sample_description_index": 1
+          }
+        ]
+      },
+      "co64": {
+        "chunk_count": 11,
+        "first_offsets": [
+          0,
+          524324,
+          0,
+          36057651,
+          0,
+          66834634,
+          0,
+          97627534,
+          0,
+          128452295
+        ],
+        "first_chunk_offset": 0,
+        "max_chunk_offset": 0
+      },
+      "stbl_children": [
+        "stsd",
+        "stts",
+        "stsc",
+        "stsz",
+        "co64"
+      ],
+      "sample_entry": {
+        "format": "tmcd",
+        "size": 34,
+        "offset": 72869,
+        "data_reference_index": 1,
+        "tail_size": 18,
+        "tail_hex": "000000000000000300007530000003e91e00",
+        "flags": 0,
+        "time_scale": 3,
+        "frame_duration_units": 0,
+        "number_of_frames": 0
+      },
+      "data_payload": {
+        "sample_count": 154,
+        "uniform_sample_size": 4,
+        "total_bytes": 616,
+        "chunk_box": "co64",
+        "chunk_count": 11,
+        "first_chunk_offset": 524324,
+        "samples_per_chunk_first": 15,
+        "payload_samples": [
+          {
+            "index": 0,
+            "offset": 524324,
+            "size": 4,
+            "sha256": "e93214987a1e69f101c3a02365dbe206e374a946287632d782fab64162f86f86",
+            "hex": "0003d067",
+            "as_u32_be": [
+              249959
+            ],
+            "as_u32_le": [
+              1741685504
+            ]
+          },
+          {
+            "index": 1,
+            "offset": 524328,
+            "size": 4,
+            "sha256": "ef1df83a5b3f44c2141b0d73b11d14a0d552df4a8d18b6fd298d6a7465f299b6",
+            "hex": "0003d068",
+            "as_u32_be": [
+              249960
+            ],
+            "as_u32_le": [
+              1758462720
+            ]
+          },
+          {
+            "index": 2,
+            "offset": 524332,
+            "size": 4,
+            "sha256": "636c3ec1702f4aa4d20e317dd47890ed20bac7566d34441c8da651be0fe9635e",
+            "hex": "0003d069",
+            "as_u32_be": [
+              249961
+            ],
+            "as_u32_le": [
+              1775239936
+            ]
+          },
+          {
+            "index": 3,
+            "offset": 524336,
+            "size": 4,
+            "sha256": "8140caaeed17622bacfcea087eb8cf4c4aaffed1f9ed668b6c62e86814a30c8a",
+            "hex": "0003d06a",
+            "as_u32_be": [
+              249962
+            ],
+            "as_u32_le": [
+              1792017152
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "track_id": 7,
+      "handler_type": "meta",
+      "handler_name": "",
+      "sample_entry_format": [
+        "cndm"
+      ],
+      "tkhd": {
+        "version": 0,
+        "flags": 7,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "track_id": 7,
+        "duration": 154154,
+        "layer": 0,
+        "alternate_group": 0,
+        "volume": 0.0,
+        "matrix": [
+          65536,
+          0,
+          0,
+          0,
+          65536,
+          0,
+          0,
+          0,
+          1073741824
+        ],
+        "width": 0.0,
+        "height": 0.0,
+        "enabled": true,
+        "in_movie": true,
+        "in_preview": true
+      },
+      "mdhd": {
+        "version": 0,
+        "creation_time": 3861218018,
+        "modification_time": 3861218018,
+        "timescale": 30000,
+        "duration": 154154,
+        "duration_s": 5.138467,
+        "language": "eng",
+        "quality": 0
+      },
+      "elst": {
+        "version": 0,
+        "entry_count": 1,
+        "entries": [
+          {
+            "segment_duration": 30030000,
+            "media_time": 0,
+            "media_rate": 0.00390625
+          }
+        ]
+      },
+      "tref": [
+        {
+          "type": "cdsc",
+          "track_ids": [
+            1
+          ]
+        }
+      ],
+      "stts": {
+        "entry_count": 1,
+        "sample_count": 154,
+        "total_duration": 154154,
+        "unique_deltas": [
+          1001
+        ],
+        "first_entries": [
+          {
+            "count": 154,
+            "delta": 1001
+          }
+        ],
+        "constant_delta": 1001
+      },
+      "stss": null,
+      "ctts": null,
+      "stsz": {
+        "sample_size_uniform": 1064,
+        "sample_count": 154,
+        "constant_sample_size": 1064
+      },
+      "stsc": {
+        "entry_count": 2,
+        "first_entries": [
+          {
+            "first_chunk": 1,
+            "samples_per_chunk": 15,
+            "sample_description_index": 1
+          },
+          {
+            "first_chunk": 11,
+            "samples_per_chunk": 4,
+            "sample_description_index": 1
+          }
+        ]
+      },
+      "co64": {
+        "chunk_count": 11,
+        "first_offsets": [
+          0,
+          524404,
+          0,
+          36057731,
+          0,
+          66834714,
+          0,
+          97627614,
+          0,
+          128452375
+        ],
+        "first_chunk_offset": 0,
+        "max_chunk_offset": 0
+      },
+      "stbl_children": [
+        "stsd",
+        "stts",
+        "stsc",
+        "stsz",
+        "co64"
+      ],
+      "sample_entry": {
+        "format": "cndm",
+        "size": 16,
+        "offset": 73400,
+        "data_reference_index": 1,
+        "tail_size": 0,
+        "tail_hex": ""
+      },
+      "data_payload": {
+        "sample_count": 154,
+        "uniform_sample_size": 1064,
+        "total_bytes": 163856,
+        "chunk_box": "co64",
+        "chunk_count": 11,
+        "first_chunk_offset": 524404,
+        "samples_per_chunk_first": 15,
+        "payload_samples": [
+          {
+            "index": 0,
+            "offset": 524404,
+            "size": 1064,
+            "sha256": "a36a81efc367ca85c6581813aa8fa11f6e387da99796eff9e18bc86b69556cee",
+            "hex": "010000000c0000000001b50b67d0030000000000020000000c040000060e2b34025301010c020101010100008300001880000002d00080010002d7d580050002"
+          },
+          {
+            "index": 1,
+            "offset": 525468,
+            "size": 1064,
+            "sha256": "fc2395c0f242e77b6bf3d0b236a751e960c8684fcded9d582bd676adac53e971",
+            "hex": "010000000c0000000001b50b68d0030000000000020000000c040000060e2b34025301010c020101010100008300001880000002d00080010002d7d580050002"
+          },
+          {
+            "index": 2,
+            "offset": 526532,
+            "size": 1064,
+            "sha256": "0c1bed2e1bb0d9c9784ae135810e96eafe940fa57caf057f62fa8fd8b9a89a9a",
+            "hex": "010000000c0000000001b50b69d0030000000000020000000c040000060e2b34025301010c020101010100008300001880000002d00080010002d7d580050002"
+          },
+          {
+            "index": 3,
+            "offset": 527596,
+            "size": 1064,
+            "sha256": "0dd37db1c08a0281e4e8929e3adf0c81fd1864cf28078910bfc8a349501e5fb0",
+            "hex": "010000000c0000000001b50b6ad0030000000000020000000c040000060e2b34025301010c020101010100008300001880000002d00080010002d7d580050002"
+          }
+        ]
+      }
+    }
+  ],
+  "notes": [
+    "7 条轨道：1 视频 + 4 单声道音频 + 1 tmcd + 1 cndm(meta)。",
+    "所有轨道统一使用 co64（64 位块偏移），不是 stco。",
+    "所有轨道 tkhd.flags = 7（enabled|in_movie|in_preview）。",
+    "cndm 轨道带 tref cdsc -> 视频轨 track_id=1，与 Sony rtmd 同构。"
+  ]
+}

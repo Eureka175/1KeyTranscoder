@@ -1,0 +1,316 @@
+{
+  "role": "XAVC 容器深挖：uuid box / 根级 meta / 载荷",
+  "sources": {
+    "XAVC_422": "F:\\1KeyTranscoder\\testsets\\a7m5_2ch_10bit422\\20260921_C1316.MP4",
+    "XAVC_HS_420": "F:\\1KeyTranscoder\\testsets\\a7m5_4ch_long\\20260919_C1305.MP4"
+  },
+  "probes": {
+    "XAVC_422": {
+      "path": "F:\\1KeyTranscoder\\testsets\\a7m5_2ch_10bit422\\20260921_C1316.MP4",
+      "bytes": 201478247,
+      "box_order": [
+        "ftyp",
+        "uuid",
+        "free",
+        "mdat",
+        "moov",
+        "meta"
+      ],
+      "root_boxes": [
+        {
+          "type": "ftyp",
+          "offset": 0,
+          "size": 32
+        },
+        {
+          "type": "uuid",
+          "offset": 32,
+          "size": 183
+        },
+        {
+          "type": "free",
+          "offset": 215,
+          "size": 130841
+        },
+        {
+          "type": "mdat",
+          "offset": 131056,
+          "size": 201326608
+        },
+        {
+          "type": "moov",
+          "offset": 201457664,
+          "size": 10280
+        },
+        {
+          "type": "meta",
+          "offset": 201467944,
+          "size": 10303
+        }
+      ],
+      "root_meta": {
+        "offset": 201467944,
+        "size": 10303,
+        "children": [
+          {
+            "type": "hdlr",
+            "offset": 201467956,
+            "size": 55,
+            "handler_type": "nrtm"
+          },
+          {
+            "type": "iinf",
+            "offset": 201468011,
+            "size": 68
+          },
+          {
+            "type": "iloc",
+            "offset": 201468079,
+            "size": 32
+          },
+          {
+            "type": "idat",
+            "offset": 201468111,
+            "size": 7911
+          },
+          {
+            "type": "xml ",
+            "offset": 201476022,
+            "size": 2225
+          }
+        ]
+      },
+      "uuid_boxes": [
+        {
+          "context": "root",
+          "guid": "{50524F46-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "PROF",
+          "whole_size": 183,
+          "payload_size": 159,
+          "payload_head_hex": "0000000000000004000000144650524600000000200000000000000000000034",
+          "payload_sha256_8": "2a84e015c73603cd"
+        },
+        {
+          "context": "trak:vide",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "USMT",
+          "whole_size": 52,
+          "payload_size": 28,
+          "payload_head_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+          "payload_sha256_8": "2bdf64af54834e08"
+        },
+        {
+          "context": "trak:soun",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "USMT",
+          "whole_size": 52,
+          "payload_size": 28,
+          "payload_head_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+          "payload_sha256_8": "2bdf64af54834e08"
+        },
+        {
+          "context": "trak:meta",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "USMT",
+          "whole_size": 52,
+          "payload_size": 28,
+          "payload_head_hex": "0000001c4d544454000100120000000a55c400000000001000000000",
+          "payload_sha256_8": "e3e8888ca0caa582"
+        },
+        {
+          "context": "moov",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "USMT",
+          "whole_size": 46,
+          "payload_size": 22,
+          "payload_head_hex": "000000164d5444540001000c0000000bd5c4000001e0",
+          "payload_sha256_8": "19920f7246d9fe63"
+        }
+      ],
+      "uuid_count": 5,
+      "uuid_guids": [
+        "{50524F46-21D2-4FCE-BB88-695CFAC9C740}",
+        "{55534D54-21D2-4FCE-BB88-695CFAC9C740}"
+      ]
+    },
+    "XAVC_HS_420": {
+      "path": "F:\\1KeyTranscoder\\testsets\\a7m5_4ch_long\\20260919_C1305.MP4",
+      "bytes": 53489618518,
+      "box_order": [
+        "ftyp",
+        "uuid",
+        "uuid",
+        "free",
+        "mdat",
+        "moov",
+        "meta"
+      ],
+      "root_boxes": [
+        {
+          "type": "ftyp",
+          "offset": 0,
+          "size": 32
+        },
+        {
+          "type": "uuid",
+          "offset": 32,
+          "size": 183
+        },
+        {
+          "type": "uuid",
+          "offset": 215,
+          "size": 4035
+        },
+        {
+          "type": "free",
+          "offset": 4250,
+          "size": 126806
+        },
+        {
+          "type": "mdat",
+          "offset": 131056,
+          "size": 53485764624
+        },
+        {
+          "type": "moov",
+          "offset": 53485895680,
+          "size": 3711534
+        },
+        {
+          "type": "meta",
+          "offset": 53489607214,
+          "size": 11304
+        }
+      ],
+      "root_meta": {
+        "offset": 53489607214,
+        "size": 11304,
+        "children": [
+          {
+            "type": "hdlr",
+            "offset": 53489607226,
+            "size": 55,
+            "handler_type": "nrtm"
+          },
+          {
+            "type": "iinf",
+            "offset": 53489607281,
+            "size": 68
+          },
+          {
+            "type": "iloc",
+            "offset": 53489607349,
+            "size": 32
+          },
+          {
+            "type": "idat",
+            "offset": 53489607381,
+            "size": 7911
+          },
+          {
+            "type": "xml ",
+            "offset": 53489615292,
+            "size": 3226
+          }
+        ]
+      },
+      "uuid_boxes": [
+        {
+          "context": "root",
+          "guid": "{50524F46-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "PROF",
+          "whole_size": 183,
+          "payload_size": 159,
+          "payload_head_hex": "0000000000000004000000144650524600000000200000000000000000000034",
+          "payload_sha256_8": "6dc37b3ad36a957a"
+        },
+        {
+          "context": "root",
+          "guid": "{BE7ACFCB-97A9-42E8-9C71-999491E3AFAC}",
+          "label": "",
+          "whole_size": 4035,
+          "payload_size": 4011,
+          "payload_head_hex": "3c3f787061636b657420626567696e3d22efbbbf222069643d2257354d304d70",
+          "payload_sha256_8": "16cdb6d520743651"
+        },
+        {
+          "context": "trak:vide",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "USMT",
+          "whole_size": 52,
+          "payload_size": 28,
+          "payload_head_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+          "payload_sha256_8": "2bdf64af54834e08"
+        },
+        {
+          "context": "trak:soun",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "USMT",
+          "whole_size": 52,
+          "payload_size": 28,
+          "payload_head_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+          "payload_sha256_8": "2bdf64af54834e08"
+        },
+        {
+          "context": "trak:soun",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "USMT",
+          "whole_size": 52,
+          "payload_size": 28,
+          "payload_head_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+          "payload_sha256_8": "2bdf64af54834e08"
+        },
+        {
+          "context": "trak:soun",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "USMT",
+          "whole_size": 52,
+          "payload_size": 28,
+          "payload_head_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+          "payload_sha256_8": "2bdf64af54834e08"
+        },
+        {
+          "context": "trak:soun",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "USMT",
+          "whole_size": 52,
+          "payload_size": 28,
+          "payload_head_hex": "0000001c4d544454000100120000000a55c400000000000100000000",
+          "payload_sha256_8": "2bdf64af54834e08"
+        },
+        {
+          "context": "trak:meta",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "USMT",
+          "whole_size": 52,
+          "payload_size": 28,
+          "payload_head_hex": "0000001c4d544454000100120000000a55c400000000001000000000",
+          "payload_sha256_8": "e3e8888ca0caa582"
+        },
+        {
+          "context": "moov",
+          "guid": "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+          "label": "USMT",
+          "whole_size": 46,
+          "payload_size": 22,
+          "payload_head_hex": "000000164d5444540001000c0000000bd5c4000001e0",
+          "payload_sha256_8": "19920f7246d9fe63"
+        }
+      ],
+      "uuid_count": 9,
+      "uuid_guids": [
+        "{50524F46-21D2-4FCE-BB88-695CFAC9C740}",
+        "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+        "{BE7ACFCB-97A9-42E8-9C71-999491E3AFAC}"
+      ]
+    }
+  },
+  "findings": {
+    "root_meta_box": "两条 XAVC 素材的顶层最后都有一个根级 `meta` box（约 10 KB），XF-HEVC 没有。",
+    "uuid_families": [
+      "{50524F46-21D2-4FCE-BB88-695CFAC9C740}",
+      "{55534D54-21D2-4FCE-BB88-695CFAC9C740}",
+      "{BE7ACFCB-97A9-42E8-9C71-999491E3AFAC}"
+    ]
+  }
+}

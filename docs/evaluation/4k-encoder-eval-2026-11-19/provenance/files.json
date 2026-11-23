@@ -1,0 +1,132 @@
+[
+  {
+    "path": "alignment\\matrix.json",
+    "bytes": 24242,
+    "sha256": "5a8c50fdab978952fff9d27a034942d97afcab13b791d4f93725d4b229c62b67"
+  },
+  {
+    "path": "alignment\\REPORT.md",
+    "bytes": 972,
+    "sha256": "a09190a6126598342172a7399775864d6c3085102e1df140c463986490ca4953"
+  },
+  {
+    "path": "charts\\00_contact_sheet.png",
+    "bytes": 778690,
+    "sha256": "ba7cb1de287f94b53786e78b995eba0a81f3bf44ee694b622281a47b98d8e984"
+  },
+  {
+    "path": "charts\\01_rate_quality_by_clip.png",
+    "bytes": 440412,
+    "sha256": "1cc8fd6b014e6833a73a8252a43189cb50eb5f9125ddafe2e82f219879ec7da5"
+  },
+  {
+    "path": "charts\\02_rate_quality_aggregate.png",
+    "bytes": 108933,
+    "sha256": "e331bbfc6f226aa7edfb8aac326d431d0754a32e7eec647346d0781491525533"
+  },
+  {
+    "path": "charts\\03_speed_quality.png",
+    "bytes": 134142,
+    "sha256": "ab5ad27fc160c17b86f7a125cc5c38f56742117b0ab5a41d0f1141d3ef0ed97f"
+  },
+  {
+    "path": "charts\\04_rate_control_wall.png",
+    "bytes": 180453,
+    "sha256": "c11d2d6889cfd7d5b378fcf3d8deec76b3d5e75b08fc39bb00ea82ca4c93b023"
+  },
+  {
+    "path": "charts\\05_hq_heatmaps.png",
+    "bytes": 201748,
+    "sha256": "ab2de83d3c724fcb86f473e68c9cc4a0cf02f55ae6a1e06f581348e7426b4bbe"
+  },
+  {
+    "path": "charts\\06_night_vs_day.png",
+    "bytes": 88592,
+    "sha256": "1f12af0589cf244b607ff03965b1c98219d7da3ad39ac3971da8f32b1226d6b1"
+  },
+  {
+    "path": "charts\\07_preset_ladder.png",
+    "bytes": 220165,
+    "sha256": "794e7e654cc4603891795bcac77cfc45178d7edd2fc5c96bb4a6a6046e5866f6"
+  },
+  {
+    "path": "charts\\08_efficiency_vs_nvenc.png",
+    "bytes": 71698,
+    "sha256": "668b6723abd273b2000514d16ad8d7e52a63f076faf75ef229a923409ff9cb77"
+  },
+  {
+    "path": "charts\\09_qsv_icq_effect.png",
+    "bytes": 128140,
+    "sha256": "6a953cf9d3558b8437dc14eae9b0dccfc5e81f7bc7adea291bbf69b028bcdac7"
+  },
+  {
+    "path": "charts\\4K_20261119图表合集.pdf",
+    "bytes": 1385087,
+    "sha256": "a1da1e6e38046002582924e3b8cb2f07591ba46ef3243a8d7c305de210ceae73"
+  },
+  {
+    "path": "charts\\REPORT_CHARTS.md",
+    "bytes": 1211,
+    "sha256": "759c5d3f824959822e1be6407fd0e06e06993e85de10caa16339b35389aa61a8"
+  },
+  {
+    "path": "metrics\\metrics_hardware.csv",
+    "bytes": 21683,
+    "sha256": "5bf319a7d5d09d168c02aecbb99ac677e6e4729104e6074f76122a146215da0f"
+  },
+  {
+    "path": "metrics\\metrics_hardware.json",
+    "bytes": 101338,
+    "sha256": "693c952cdee07d494a55dd121b166497335078b54dd98c7f5df2c4277213b00a"
+  },
+  {
+    "path": "metrics\\metrics_software.csv",
+    "bytes": 3877,
+    "sha256": "07fcc5d5eb41d8dbba51b33f9278b4770fd6df837e6a73f409d190fc13c5b97b"
+  },
+  {
+    "path": "metrics\\metrics_software.json",
+    "bytes": 12501,
+    "sha256": "2f4425c40d80968cc8f0a86ced7091e7c0da7fdf41a0140545ff87a675baf31f"
+  },
+  {
+    "path": "provenance\\param_backup_MANIFEST.json",
+    "bytes": 1518,
+    "sha256": "22cec93a5f73560c413900d723b6e849bfba372c30323639b9b6e17a2af5cd25"
+  },
+  {
+    "path": "provenance\\PAUSED.md",
+    "bytes": 1296,
+    "sha256": "62973da9421b6b3c3760b0ea209f58570ace579b33e213aef688389c7be39194"
+  },
+  {
+    "path": "provenance\\rate_control_wall.txt",
+    "bytes": 16354,
+    "sha256": "8fc8f196bcd0fbb3e753d9a67666f906ca669d080c6c63557cc4cde9a28d0b13"
+  },
+  {
+    "path": "provenance\\test_clip_library_MANIFEST.json",
+    "bytes": 2825,
+    "sha256": "4e2c950a0ff0c55a8192ef52eed3d1ce97e5e7fd89e9487d44138a66233b808f"
+  },
+  {
+    "path": "REPORT_4K_EVALUATION.md",
+    "bytes": 2859,
+    "sha256": "4d5848943aca99337f341e9fc8120d7c1917cdeb170f18bca113da666947fa95"
+  },
+  {
+    "path": "REPORT_HARDWARE.md",
+    "bytes": 13623,
+    "sha256": "634a015204c474b7c2929ad4568fc9584afebcbbe73c501999a02a93245cab11"
+  },
+  {
+    "path": "REPORT_LONGTEST.md",
+    "bytes": 4629,
+    "sha256": "75db4cfe731d34a399fe6cd8c1f2f15a633e8b362dca82c8aaacd474c004d4fa"
+  },
+  {
+    "path": "REPORT_SOFTWARE.md",
+    "bytes": 7172,
+    "sha256": "3ae89883493dbcf6bf4f8450bc4e6ae61dcfe5290611d6d95cc0db566f8b834a"
+  }
+]

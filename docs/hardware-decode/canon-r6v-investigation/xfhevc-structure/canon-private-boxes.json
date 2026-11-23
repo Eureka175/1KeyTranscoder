@@ -1,0 +1,50 @@
+{
+  "role": "Canon 私有 metadata 结构（XAVC 没有对应物）",
+  "moov_uuid_box": {
+    "uuid_box_total": 65810,
+    "payload_bytes": 65786,
+    "context": "moov",
+    "guid": "{85C0B687-820F-11E0-8111-F4CE462B6A48}",
+    "boxes": [
+      {
+        "offset": 0,
+        "size": 38,
+        "type": "CNCV",
+        "payload_size": 30,
+        "value": "CanonMP4_002/10.00.03/00.00.00"
+      },
+      {
+        "offset": 38,
+        "size": 65552,
+        "type": "CNTH",
+        "payload_size": 65544,
+        "contains_jpeg_thumbnail": true,
+        "jpeg_offset_in_payload": 8
+      },
+      {
+        "offset": 65590,
+        "size": 196,
+        "type": "CNOP",
+        "payload_size": 188,
+        "nested_fourcc": [
+          "CNLG",
+          "CNLC",
+          "CNFB"
+        ],
+        "head_hex": "00000010434e4c47000000010000000200000010434e4c4300000001000000010000003c434e46420000000180000000"
+      }
+    ]
+  },
+  "second_source_CNCV": "CanonMP4_002/10.00.03/00.00.00",
+  "two_sources_same_guid": true,
+  "interpretation": {
+    "CNCV": "Canon 私有版本串：'CanonMP4_002/10.00.03/00.00.00'",
+    "CNTH": "容器级 metadata 区（约 64 KiB），内含 JPEG EXIF 缩略图",
+    "CNOP": "Canon 操作/选项表，内含嵌套 fourcc（CNLG 等）",
+    "CNDA": "相机数据区",
+    "CNID": "素材标识（出现源文件名 A_0013C699）",
+    "CNCM": "相机型号区",
+    "EXIF": "Canon EOS R6 V，拍摄时间 2026:05:10 00:33:37"
+  },
+  "note": "UUID {85C0B687-820F-11E0-8111-F4CE462B6A48} 是 Canon 私有的moov 级扩展容器。与 Sony 的 PROF/USMT uuid 是同类机制（厂商私有 uuid box），但 GUID 与内部结构完全不同。"
+}

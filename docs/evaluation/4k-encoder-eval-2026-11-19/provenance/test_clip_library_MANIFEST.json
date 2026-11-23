@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "created": "2026-11-18",
+  "description": "1KeyTranscoder test clip library (foundation for the next long-range evaluation task). clips/ holds newly curated material; references point at the existing 4K evaluation matrices.",
+  "entries": [
+    {
+      "id": "indoor_static_noisy_20261117_30s",
+      "path": "clips/indoor_static_noisy_20261117_30s.MP4",
+      "kind": "material",
+      "tags": [
+        "indoor",
+        "static",
+        "high-noise",
+        "rec709",
+        "4k",
+        "10bit",
+        "60fps",
+        "sony-xavc"
+      ],
+      "source": "F:\\Pictures\\2026\\202611\\20261117\\20261117_C1652.MP4",
+      "source_window_sec": [
+        120,
+        150
+      ],
+      "source_readonly": true,
+      "container": "MP4",
+      "video": {
+        "codec": "hevc",
+        "profile": "Main 10",
+        "width": 3840,
+        "height": 2160,
+        "pix_fmt": "yuv420p10le",
+        "fps": 59.94,
+        "frames": 1792,
+        "duration_sec": 29.896,
+        "bitrate_mbps": 45.014,
+        "color_space": "bt709",
+        "color_transfer": "bt709",
+        "color_primaries": "bt709",
+        "color_range": "tv"
+      },
+      "audio": "none (video-only library clip)",
+      "sha256": "890064a8f95c716d254b45cbdbe33b79828477c79d8bc7e4091ee5e14464504a",
+      "bytes": 168245390,
+      "created": "2026-11-18",
+      "why": "室内静态较高噪点 rec709 素材；用于编码器噪声/静态场景的码控与画质评估"
+    }
+  ],
+  "references": {
+    "eval_main_6x30s": [
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\clips\\day_action4_pov.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\clips\\day_daily_canon.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\clips\\day_daily_sony.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\clips\\event_sony_422.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\clips\\night_action4_pov.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\clips\\night_dance_iso.MP4"
+    ],
+    "eval_extra_9x30s": [
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\extra_clips\\day_action4_202611_0025.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\extra_clips\\day_canon_b_202610.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\extra_clips\\day_pocket_202610.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\extra_clips\\day_sony_20261018.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\extra_clips\\event_a7m4.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\extra_clips\\event_fx30.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\extra_clips\\event_nx800.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\extra_clips\\night_dance_iso_b.MP4",
+      "F:\\1KeyTranscoder\\work\\hw4k_matrix\\extra_clips\\night_dance_iso_c.MP4"
+    ]
+  }
+}

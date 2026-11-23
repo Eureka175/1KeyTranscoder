@@ -1,0 +1,26 @@
+{
+  "role": "Sony 镜头档案 KLV 载荷内部结构探测",
+  "source": "F:\\1KeyTranscoder\\testsets\\a7m5_2ch_10bit422\\20260921_C1316.MP4",
+  "payload_bytes": 7871,
+  "payload_sha256": "2682d11ab780d30658742c166da632360d2c808826bcd73ef02681a4e6d13af5",
+  "head_256_hex": "ff00000101ff011eb600000002c57e000100020000000200020000000300480000000100000020a62bb90fcb0cac46347428118e566d2b701b7606c3cf526ed625a3569fdae3155411d465c14cdd7ca3f89216577f812bdf0ab95cdcc7302aa004f912125a1e4300040f280000000100000010a62bcb0c34748e56701bc3cfd6259fda5411c14ca3f8577fdf0adcc7a004125a1cb51588df40bde810309ae4e6aece63dc4b00f65b30dfb01b9a067a2a5cc1c5d2865ed0501c42a222a02642e27c76b1e78e8575ce30c699613d6e35d9f37df283bdb8343adb94ed5219218a62512e652180bd810d163c1ac4fb3872fedf968296424efcd824b8e2743ebaa12f",
+  "md5_like_blocks": [
+    {
+      "offset": 35,
+      "block_hex": "a62bb90fcb0cac46347428118e566d2b"
+    }
+  ],
+  "float_run_probes": {
+    "big_endian_lt1": [],
+    "big_endian_lt4": [],
+    "little_endian_lt4": []
+  },
+  "grid_hypotheses": {
+    "17x17x4": 1156,
+    "33x33x4": 4356,
+    "65x65x4": 16900,
+    "payload": 7871
+  },
+  "status": "STRUCTURE_ONLY",
+  "note": "载荷头部（前 96 B）是 TLV 风格的头部；其后是数据区。**未解出字段语义**。项目 preservation 把它当不透明 blob（item_id/name/mime/type/size/sha256），本次是首次尝试拆内容。"
+}

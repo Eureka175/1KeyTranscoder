@@ -1,0 +1,49 @@
+{
+  "role": "容器内 nrtm XML 与 sidecar XML 的字节差异定位",
+  "method": "容器侧：解析根级 meta box -> xml box，去掉 4 字节 FullBox 头。sidecar 侧：直接读文件。逐字节比对。",
+  "pairs": [
+    {
+      "mp4": "20260921_C1316.MP4",
+      "xml": "20260921_C1316M01.XML",
+      "a": {
+        "label": "container",
+        "bytes": 2213,
+        "sha256": "006830b53d7bfc81fbcc0c1d6a5f2c493e9597062f0c82552e6547cf2c0a8e88"
+      },
+      "b": {
+        "label": "sidecar",
+        "bytes": 2212,
+        "sha256": "a88b0c3dfd39101527aba26b7363e512c96bf1302b151b41c9913c87c5cb9c2e"
+      },
+      "identical": false,
+      "length_delta": 1,
+      "first_diff_offset": null,
+      "diff_byte_count_in_common_prefix": 0,
+      "diff_offsets_first20": [],
+      "tail_of_longer": "b'\\x00'",
+      "tail_offset": 2212
+    },
+    {
+      "mp4": "20260919_C1305.MP4",
+      "xml": "20260919_C1305M01.XML",
+      "a": {
+        "label": "container",
+        "bytes": 3214,
+        "sha256": "665a993e197559322a454625d29bea1b59c1af8c3f60b0a746ff4b0b99cb4c88"
+      },
+      "b": {
+        "label": "sidecar",
+        "bytes": 3213,
+        "sha256": "f90229b73a4c5ead14b2e50912d3340c9e003f5d4e35a676779fe3704b8ffd69"
+      },
+      "identical": false,
+      "length_delta": 1,
+      "first_diff_offset": null,
+      "diff_byte_count_in_common_prefix": 0,
+      "diff_offsets_first20": [],
+      "tail_of_longer": "b'\\x00'",
+      "tail_offset": 3213
+    }
+  ],
+  "conclusion": "两条素材的容器内 XML 与 sidecar XML **内容相同**，唯一差异是容器侧多一个尾部 NUL 字节（C 字符串终止符）。即：sidecar XML 是容器内 nrtm XML 的导出副本（去掉了尾部 NUL）。先前版本报告中『大小差 1 B、sha256 不同，差异位置未定位』现已定位并解释。"
+}

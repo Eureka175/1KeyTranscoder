@@ -20,7 +20,22 @@ from typing import Any
 from core.models import EffectiveParams, SourceInfo
 from core.scaling import ceil_expression
 
-from .base import EncoderBackend, ffmpeg_pix_fmt
+from .base import EncoderBackend
+from .format_policy import plan_output_format, pix_fmt_name
+
+
+def x265_pix_fmt(src_info: SourceInfo) -> str:
+    """Output pixel format via the shared format policy.
+
+    x265 preserves 4:2:0 / 4:2:2 / 4:4:4 at 8/10/12-bit; unsupported
+    combinations fall back to 4:2:0/10-bit.  The same plan is logged by
+    the software path with the hardware FORMAT-PLAN contract.
+    """
+    plan = plan_output_format(
+        backend="x265", codec="hevc",
+        chroma=src_info.chroma, depth=src_info.bit_depth,
+    )
+    return pix_fmt_name(plan.chroma, plan.depth)
 
 PARAM_MAP = {
     "rd": "rd",
@@ -177,7 +192,7 @@ def build_command(
     encode_params = [
         "-preset", str(profile["preset"]),
         "-crf", str(profile["crf"]),
-        "-pix_fmt", ffmpeg_pix_fmt(src_info),
+        "-pix_fmt", x265_pix_fmt(src_info),
     ]
     if drop_metadata_streams:
         # Classic software stream policy: primary video + audio + subtitles.
@@ -263,7 +278,7 @@ def build_video_command(
         "-c:v", "libx265",
         "-preset", str(profile["preset"]),
         "-crf", str(profile["crf"]),
-        "-pix_fmt", ffmpeg_pix_fmt(src_info),
+        "-pix_fmt", x265_pix_fmt(src_info),
 
         "-an", "-sn", "-dn",
         "-fps_mode", "passthrough",

@@ -1,0 +1,50 @@
+{
+  "role": "Sony 镜头档案（nrtm idat）内部结构",
+  "source": "F:\\1KeyTranscoder\\testsets\\a7m5_2ch_10bit422\\20260921_C1316.MP4",
+  "nrtm_children": {
+    "hdlr": {
+      "offset": 201467956,
+      "size": 55
+    },
+    "iinf": {
+      "offset": 201468011,
+      "size": 68
+    },
+    "iloc": {
+      "offset": 201468079,
+      "size": 32
+    },
+    "idat": {
+      "offset": 201468111,
+      "size": 7911
+    },
+    "xml ": {
+      "offset": 201476022,
+      "size": 2225
+    }
+  },
+  "idat_bytes": 7903,
+  "idat_sha256": "d1ccbebf8ac05144ee98a7574a894e926cf4a48df79f4efdcf5d9eca8255af3e",
+  "lpif_marker_offset": 4,
+  "header_hex_16": "00001edf4c50494600000000060e2b34",
+  "header_u32be": [
+    7903,
+    1280330054,
+    0,
+    101591860
+  ],
+  "klv_map": [
+    {
+      "offset": 12,
+      "ul": "060e2b34025301010e060c0201020241",
+      "ul_prefix": "060e2b3402530101",
+      "ul_suffix": "0e060c0201020241",
+      "length": 7871,
+      "length_bytes": 4,
+      "value_sha8": "2682d11a",
+      "value_head": "ff00000101ff011eb600000002c57e000100020000000200"
+    }
+  ],
+  "status": "STRUCTURE_ONLY",
+  "note": "确认：idat = LPIF 头 + 一条 SMPTE UL KLV（UL 060e2b34025301010e060c0201020241），该 UL 的载荷包裹整个镜头档案。载荷内部结构未解出。"
+}

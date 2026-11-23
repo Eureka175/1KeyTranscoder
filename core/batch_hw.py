@@ -73,7 +73,10 @@ from encoders.hwdecode import (
     route_decode,
     source_kind_from_streams,
 )
-from encoders.integrity import verify_encode
+from encoders.integrity import (
+    verify_container_counts,
+    verify_encode,
+)
 from encoders.nvencc import NvencBackend
 from encoders.qsvencc import QsvBackend
 from encoders.resize import ResizeRequest, ResizeSpec, resolve_resize
@@ -103,6 +106,7 @@ from .probe import build_source_info, count_frames, probe_source
 
 from preservation.gpac import GpacContainerBackend
 from preservation.pipeline import run_sony_pipeline
+from preservation.policy import log_metadata_plan, resolve_metadata_plan
 from preservation import dji, isobmf
 
 StatusCb = Callable[[str, str], None]
@@ -451,6 +455,10 @@ def hw_encode_with_fallback(
     seek_requested: bool = False,
     source_kind: str = SOURCE_UNKNOWN,
     resize: ResizeSpec | None = None,
+    on_encode_complete: Callable[[], None] | None = None,
+    integrity_gate: threading.Semaphore | None = None,
+    encode_gate: threading.Semaphore | None = None,
+    skip_integrity: bool = False,
 ) -> tuple[list[str], tuple[str, int], float]:
     """Automatic three-tier downgrade ladder (NO prompt window).
 
@@ -525,6 +533,7 @@ def hw_encode_with_fallback(
     reader = route.reader
     reader_expected = READER_IDENTITY[backend.kind][reader]
     hw_fallbacks = 0
+    integrity_skipped = False
     discarded: list[str] = []
     #: Set only when a *completed* hardware attempt was rejected by the
     #: integrity gate. A source-driven software decision must never be
@@ -543,6 +552,12 @@ def hw_encode_with_fallback(
     stripped = False
     rung_idx = 0
     color = src_info.color
+    # QSV's forcecfr path can emit duplicate/non-monotonic timestamps on
+    # genuine VFR timelines.  If that specific muxer error appears, retry
+    # the same format rung with --avsync vfr; the source timestamps are
+    # preserved and QSVEncC accepts the same file.
+    avsync_override: str | None = None
+    avsync_retry_attempted = False
 
     def route_summary(integ, status: str, used_binary) -> str:
         """One line answering "why did this file use --avhw or --avsw?".
@@ -571,12 +586,15 @@ def hw_encode_with_fallback(
 
     while rung_idx < len(rungs):
         c, d = rungs[rung_idx]
-        cmd, skipped, color_notes = backend.command(
-            cur_input, output, profile, c, d, vfr, audio_copy, color,
-            reader=reader,
-            container=intermediate_container(backend.codec),
+        command_kwargs = dict(
+            source=cur_input, output=output, profile=profile, chroma=c,
+            depth=d, vfr=vfr, audio_copy=audio_copy, color=color,
+            reader=reader, container=intermediate_container(backend.codec),
             resize=resize,
         )
+        if avsync_override is not None:
+            command_kwargs["avsync"] = avsync_override
+        cmd, skipped, color_notes = backend.command(**command_kwargs)
         if reader == "avhw":
             cmd = use_decode_binary(cmd, backend.tool, hw_tool)
         if skipped and rung_idx == 0:
@@ -593,34 +611,155 @@ def hw_encode_with_fallback(
                     logger, file_logger, f"{backend.name}: {note}", warnings
                 )
         file_logger.info("COMMAND | %s", subprocess.list2cmdline(cmd))
-        raw_log = output.with_name(output.name + f".{label}.log")
+        # Raw encoder stdout belongs to the job's work directory, not to the
+        # user-visible output tree.  It used to sit next to the `.part.mov`
+        # (`<output>.part.mov.nvencc.log`) and survived successful delivery,
+        # leaving one log per source beside the finished MP4s.  The work dir is
+        # GC'd on success and retained on failure, which is exactly the wanted
+        # lifetime for a diagnostic log.
+        raw_log = work_dir / f"encode.{label}.log"
         try:
             if raw_log.exists():
                 raw_log.unlink()
         except OSError:
             pass
-        rc, elapsed = run_hw_tool(
-            cmd, raw_log, total_frames, label, progress=show_progress,
-        )
+        if encode_gate is not None:
+            encode_gate.acquire()
+        try:
+            rc, elapsed = run_hw_tool(
+                cmd, raw_log, total_frames, label, progress=show_progress,
+                progress_cb=progress_cb,
+            )
+        finally:
+            if encode_gate is not None:
+                encode_gate.release()
+
+        # The encoder has already produced a complete intermediate here.  In
+        # async-integrity mode this is the point where the next DJI group may
+        # be released for encoding.  The callback is deliberately fired only
+        # after the single verifier slot has been acquired: a group whose
+        # intermediate is merely *waiting* for the verifier must not release
+        # another group, otherwise two intermediates could pile up.  The
+        # joined source stays on disk until note_finished(), so the verifier
+        # can still read the expected container frame count.
+        def _notify_encode_complete() -> None:
+            if (on_encode_complete is None or rc != 0
+                    or not output.is_file()
+                    or output.stat().st_size <= 0):
+                return
+            try:
+                on_encode_complete()
+            except Exception as exc:                  # noqa: BLE001
+                file_logger.warning(
+                    "ASYNC-INTEGRITY | encode-complete callback failed: %s",
+                    exc,
+                )
 
         # --- integrity gate (HD-C11..C13, HD-F05) ------------------------
         verdict = None
-        if reader == "avhw":
+        if reader != "avhw":
+            if skip_integrity:
+                integrity_skipped = True
+                logger.warning(
+                    "[INTEGRITY] skipped | --no-metadata | %s | "
+                    "reader=%s | integrity=skipped",
+                    source.name, reader,
+                )
+                file_logger.warning(
+                    "INTEGRITY | skipped | reason=no_metadata | reader=%s | "
+                    "integrity=skipped", reader,
+                )
+            _notify_encode_complete()
+        if reader == "avhw" and skip_integrity:
+            integrity_skipped = True
+            logger.warning(
+                "[INTEGRITY] skipped | --no-metadata | %s | frames=%s | "
+                "integrity=skipped",
+                source.name, total_frames or "?",
+            )
+            file_logger.warning(
+                "INTEGRITY | skipped | reason=no_metadata | frames=%s | "
+                "integrity=skipped",
+                total_frames or "?",
+            )
+            _notify_encode_complete()
+        elif reader == "avhw":
+            # This gate fully software-decodes the output to count frames.
+            # On long 4K files that is minutes, not seconds; log the phase so
+            # the run never looks "stuck" after the encoder exits.
+            logger.info(
+                "[INTEGRITY] verifying hardware-decode output | frames=%s | "
+                "size=%.1f MB | software decode (auto threads)",
+                total_frames or "?",
+                (output.stat().st_size / 1024**2)
+                if output.is_file() else 0.0,
+            )
+            file_logger.info(
+                "INTEGRITY | independent decode begins | frames=%s",
+                total_frames or "?",
+            )
+            stop_heartbeat = threading.Event()
+            heartbeat_started = time.monotonic()
+
+            def _integrity_heartbeat() -> None:
+                while not stop_heartbeat.wait(30.0):
+                    elapsed = time.monotonic() - heartbeat_started
+                    logger.info(
+                        "[INTEGRITY] still software-decoding output | "
+                        "elapsed=%.0f min | frames=%s",
+                        elapsed / 60.0, total_frames or "?",
+                    )
+                    file_logger.info(
+                        "INTEGRITY | still decoding | elapsed=%.0f sec",
+                        elapsed,
+                    )
+
+            heartbeat = threading.Thread(
+                target=_integrity_heartbeat,
+                name="integrity-heartbeat",
+                daemon=True,
+            )
+            heartbeat.start()
             try:
                 log_text = raw_log.read_text(
                     encoding="utf-8", errors="replace"
                 ) if raw_log.is_file() else ""
             except OSError:
                 log_text = ""
-            verdict = verify_encode(
-                source=source,
-                output=output if (rc == 0 and output.is_file()) else None,
-                log_text=log_text,
-                rc=rc,
-                reader_requested=reader,
-                reader_expected_identity=reader_expected,
-            )
+            if integrity_gate is not None:
+                logger.info(
+                    "[INTEGRITY] waiting for the single verifier slot | "
+                    "%s | frames=%s",
+                    source.name, total_frames or "?",
+                )
+            try:
+                if integrity_gate is not None:
+                    integrity_gate.acquire()
+                try:
+                    # Holding the verifier slot: release the next DJI group
+                    # now, but not before this group owns the only pending
+                    # verification slot.
+                    _notify_encode_complete()
+                    verdict = verify_encode(
+                        source=source,
+                        output=output if (rc == 0 and output.is_file()) else None,
+                        log_text=log_text,
+                        rc=rc,
+                        reader_requested=reader,
+                        reader_expected_identity=reader_expected,
+                    )
+                finally:
+                    if integrity_gate is not None:
+                        integrity_gate.release()
+            finally:
+                stop_heartbeat.set()
+                heartbeat.join(timeout=2.0)
             file_logger.info("INTEGRITY | %s", verdict.log_line())
+            logger.info(
+                "[INTEGRITY] %s | %s",
+                "PASS" if verdict.ok else "FAIL",
+                verdict.log_line(),
+            )
             if not verdict.ok:
                 _cls, _detail = classify_reader_failure(log_text)
                 reason = verdict.reason
@@ -683,8 +822,40 @@ def hw_encode_with_fallback(
                     )
             else:
                 ok = True
+        if ok and (reader == "avsw" and hw_fallbacks > 0
+                   and not skip_integrity):
+            # A hardware-integrity failure forced a software re-encode.
+            # Re-check the replacement artifact by container + independent
+            # decode counts; there is no avcuvid/avqsv reader identity to
+            # reconcile.  This also runs under the single verifier slot.
+            if integrity_gate is not None:
+                integrity_gate.acquire()
+            try:
+                sw_ok, sw_counts = verify_container_counts(
+                    source, output, ffprobe=ffprobe)
+            finally:
+                if integrity_gate is not None:
+                    integrity_gate.release()
+            file_logger.info(
+                "INTEGRITY | software re-encode %s | %s",
+                "PASS" if sw_ok else "FAIL", sw_counts,
+            )
+            logger.info(
+                "[INTEGRITY] software re-encode %s | %s",
+                "PASS" if sw_ok else "FAIL", sw_counts,
+            )
+            if not sw_ok:
+                ok = False
+            else:
+                # The delivered artifact is now the software re-encode; the
+                # hardware verdict belongs to the discarded attempt and must
+                # not turn the accepted fallback into hardware_integrity=FAIL.
+                verdict = None
         if ok:
-            integ = "PASS" if (verdict is None or verdict.ok) else "FAIL"
+            if integrity_skipped:
+                integ = "SKIPPED"
+            else:
+                integ = "PASS" if (verdict is None or verdict.ok) else "FAIL"
             summary = route_summary(integ, "ok", cmd[0])
             file_logger.info("DECODE_DECISION | %s", summary)
             if route.hardware:
@@ -698,6 +869,30 @@ def hw_encode_with_fallback(
 
         tail = read_log_tail(raw_log)
         cls = "format" if rc == 0 else classify_failure(tail)
+
+        # QSV forcecfr + VFR can fail at the muxer with a non-monotonic DTS.
+        # Retry exactly once on the same rung with --avsync vfr before any
+        # format downgrade or reader fallback; otherwise a valid VFR source
+        # is reported as an all-rungs failure.
+        if (
+            not avsync_retry_attempted
+            and avsync_override is None
+            and vfr
+            and backend.kind == "qsvencc"
+            and ("non monotonically" in tail.lower()
+                 or "invalid, non monotonically" in tail.lower())
+        ):
+            avsync_retry_attempted = True
+            avsync_override = "vfr"
+            safe_unlink(output)
+            emit_warning(
+                logger,
+                file_logger,
+                "QSV VFR forcecfr failed with non-monotonic DTS -> "
+                "retrying same format with --avsync vfr",
+                warnings,
+            )
+            continue
 
         if cls == "reader" and not stripped and gpac is not None:
             try:
@@ -804,6 +999,10 @@ def prepare_source_hw(
     )
 
     src_info = build_source_info(src, source_summary, source_streams)
+    if src_info.chroma == "mono":
+        raise ValueError(
+            "mono sources are not supported; use a 4:2:0/4:2:2/4:4:4 source"
+        )
     vfr = detect_vfr(src_info)
     if vfr:
         file_logger.warning(
@@ -1014,6 +1213,11 @@ def encode_one_sony_hw(
     throughput_cb: Callable[[float], None] | None = None,
     audio_task: "AudioSyncTask | None" = None,
     resize: ResizeSpec | None = None,
+    progress_cb: Callable[[int, float], None] | None = None,
+    on_encode_complete: Callable[[], None] | None = None,
+    integrity_gate: threading.Semaphore | None = None,
+    encode_gate: threading.Semaphore | None = None,
+    skip_integrity: bool = False,
 ) -> str:
     """Sony preservation path with a rigaya hardware encoder."""
     work_dir = work_root / job_id_for(src)
@@ -1077,6 +1281,11 @@ def encode_one_sony_hw(
             resize=resize,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
+            progress_cb=progress_cb,
+            on_encode_complete=on_encode_complete,
+            integrity_gate=integrity_gate,
+            encode_gate=encode_gate,
+            skip_integrity=skip_integrity,
         )
         warnings.extend(enc_warnings)
         file_logger.info("ENCODE_FORMAT | %s/%s", used[0], used[1])
@@ -1298,6 +1507,12 @@ def encode_one_hw_classic(
     video_handoff: VideoHandoffHook | None = None,
     audio_task: "AudioSyncTask | None" = None,
     resize: ResizeSpec | None = None,
+    progress_cb: Callable[[int, float], None] | None = None,
+    drop_data_tracks: bool = False,
+    on_encode_complete: Callable[[], None] | None = None,
+    integrity_gate: threading.Semaphore | None = None,
+    encode_gate: threading.Semaphore | None = None,
+    skip_integrity: bool = False,
 ) -> str:
     """Non-Sony material: video + audio only, single-tool single pass.
     At check_level='full' the PSNR/SSIM sample gates delivery (FAIL
@@ -1366,6 +1581,11 @@ def encode_one_hw_classic(
             resize=resize,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
+            progress_cb=progress_cb,
+            on_encode_complete=on_encode_complete,
+            integrity_gate=integrity_gate,
+            encode_gate=encode_gate,
+            skip_integrity=skip_integrity,
         )
     except Exception as exc:
         logger.error("[FAIL] hardware encode | %s | %s", src, exc)
@@ -1386,7 +1606,8 @@ def encode_one_hw_classic(
         return "failed"
 
     # PSNR/SSIM quality sample (check=full) gates delivery: a corrupted
-    # encode must never land in the output tree.    if check_level == "full" and ffmpeg is not None:
+    # encode must never land in the output tree.
+    if check_level == "full" and ffmpeg is not None:
         from preservation.quality import run_quality_sample
 
         q = run_quality_sample(
@@ -1409,6 +1630,11 @@ def encode_one_hw_classic(
             )
             safe_unlink(part_dst)
             return "failed"
+    elif check_level == "full":
+        logger.warning(
+            "[QUALITY] full check requested but ffmpeg is unavailable; "
+            "PSNR/SSIM sample skipped for %s", src.name,
+        )
 
     # ---- 可选的"外部接手最终输出" (v0.8.0+: 显式音频计划) --------------
     # 视频侧到这里已经交付了一个**视频产物**; 接下来怎么做是接手方的事。
@@ -1489,6 +1715,7 @@ def encode_one_hw_classic(
             gpac=gpac, intermediate=part_dst, dst=dst,
             work_dir=work_dir,
             meta_source=_meta_manifest(work_dir),
+            drop_data_tracks=drop_data_tracks,
             log=lambda msg: file_logger.info("CONTAINER | %s", msg),
         )
     except (OSError, RuntimeError) as exc:
@@ -1575,6 +1802,7 @@ def _finish_with_handoff(
                 gpac=gpac, intermediate=part_dst, dst=dst,
                 work_dir=work_dir,
                 meta_source=_meta_manifest(work_dir),
+                drop_data_tracks=drop_data_tracks,
                 log=lambda msg: file_logger.info("CONTAINER | %s", msg),
             )
         except (OSError, RuntimeError) as exc:
@@ -1634,6 +1862,11 @@ def encode_one_dji_hw(
     throughput_cb: Callable[[float], None] | None = None,
     audio_task: "AudioSyncTask | None" = None,
     resize: ResizeSpec | None = None,
+    progress_cb: Callable[[int, float], None] | None = None,
+    on_encode_complete: Callable[[], None] | None = None,
+    integrity_gate: threading.Semaphore | None = None,
+    encode_gate: threading.Semaphore | None = None,
+    skip_integrity: bool = False,
 ) -> str:
     """DJI preservation path (Osmo Action / drones).
 
@@ -1714,6 +1947,11 @@ def encode_one_dji_hw(
             resize=resize,
             logger=logger, file_logger=file_logger,
             show_progress=show_progress,
+            progress_cb=progress_cb,
+            on_encode_complete=on_encode_complete,
+            integrity_gate=integrity_gate,
+            encode_gate=encode_gate,
+            skip_integrity=skip_integrity,
         )
         warnings.extend(enc_warnings)
         file_logger.info("ENCODE_FORMAT | %s/%s", used[0], used[1])
@@ -2034,6 +2272,7 @@ def remux_container_lossless(
     src: Path,
     dst: Path,
     log: Callable[[str], None],
+    drop_data_tracks: bool = False,
 ) -> str:
     """``src`` -> ``dst`` as a **container-only** re-mux (stream copy).
 
@@ -2060,7 +2299,22 @@ def remux_container_lossless(
         raise RuntimeError(f"no tracks in {src} to re-mux")
 
     usable = [t for t in tracks if _is_remuxable_track(t)]
-    skipped = [t for t in tracks if t not in usable]
+    dropped: list[dict] = []
+    if drop_data_tracks:
+        # --no-metadata policy: an ordinary transcode keeps video/audio/
+        # subtitles only.  NVEncC can carry the source timecode track
+        # (``tmcd``) into its MOV intermediate even without --data-copy, so
+        # the container re-mux is the last place where a DJI/Sony metadata
+        # track can still leak into a "no metadata" delivery.
+        dropped = [t for t in usable if _is_metadata_track(t)]
+        usable = [t for t in usable if not _is_metadata_track(t)]
+        for t in dropped:
+            log(
+                f"container re-mux: dropping metadata track #{t.get('id')} "
+                f"(handler={t.get('handler')!r} entry={t.get('entry')!r}) — "
+                f"--no-metadata policy"
+            )
+    skipped = [t for t in tracks if t not in usable and t not in dropped]
     for t in skipped:
         log(
             f"container re-mux: skipping track #{t.get('id')} "
@@ -2110,6 +2364,20 @@ def _is_remuxable_track(track: dict) -> bool:
     return bool(str(track.get("entry") or "").strip())
 
 
+def _is_metadata_track(track: dict) -> bool:
+    """True for data/metadata tracks that ``--no-metadata`` must not carry.
+
+    ``handler`` is ``"meta"`` for the mp4 data-track family (DJI
+    djmd/dbgi/tmcd, Sony rtmd); the explicit entry list is a belt-and-braces
+    check for muxers that report a different handler for timecode.
+    """
+    handler = str(track.get("handler") or "").lower()
+    entry = str(track.get("entry") or "").lower()
+    return handler in ("meta", "hint", "mdir") or entry in (
+        "tmcd", "rtmd", "djmd", "dbgi", "nrtm",
+    )
+
+
 def place_final(
     *,
     gpac: GpacContainerBackend,
@@ -2118,6 +2386,7 @@ def place_final(
     work_dir: Path,
     log: Callable[[str], None],
     meta_source: Path | None = None,
+    drop_data_tracks: bool = False,
 ) -> None:
     """Put the finished intermediate at ``dst`` with a matching container.
 
@@ -2128,7 +2397,10 @@ def place_final(
     flavours is wanted (see ``_iso_media_kind``):
 
     * suffix already matches -> plain rename.  No re-mux: the MOV source
-      case must not pay for, or risk, a second box rewrite.
+      case must not pay for, or risk, a second box rewrite.  The one
+      exception is ``drop_data_tracks`` (``--no-metadata``): a re-mux is
+      then required to strip data/timecode tracks the encoder intermediate
+      carried over from the source.
     * suffix differs -> lossless container re-mux, built under
       ``work_dir/final/`` and renamed into place only once complete, so
       a half-written delivery is never visible at ``dst``.
@@ -2154,7 +2426,8 @@ def place_final(
     """
     want_suffix = _REMUX_SUFFIX.get(dst.suffix.lower())
     src_suffix = intermediate.suffix.upper()
-    if want_suffix is not None and want_suffix == src_suffix:
+    if want_suffix is not None and want_suffix == src_suffix \
+            and not drop_data_tracks:
         safe_unlink(dst)
         os.replace(intermediate, dst)
         log(
@@ -2167,6 +2440,12 @@ def place_final(
         # Final container is one this project does not re-mux (MKV, TS,
         # MXF…).  The historical behaviour was a bare rename; keep it,
         # and say so rather than implying a conversion happened.
+        if drop_data_tracks:
+            log(
+                f"final: WARNING --no-metadata cannot be enforced for "
+                f"{dst.suffix} (container is not re-muxed here); metadata "
+                f"tracks carried by the encoder intermediate stay"
+            )
         safe_unlink(dst)
         os.replace(intermediate, dst)
         log(
@@ -2198,7 +2477,8 @@ def place_final(
     staged = work_dir / "final" / f"container-remux{dst.suffix}"
     safe_unlink(staged)
     log(remux_container_lossless(
-        gpac=gpac, src=intermediate, dst=staged, log=log
+        gpac=gpac, src=intermediate, dst=staged, log=log,
+        drop_data_tracks=drop_data_tracks,
     ))
     if not (staged.is_file() and staged.stat().st_size > 0):
         raise RuntimeError(f"container re-mux produced no output: {staged}")
@@ -2305,6 +2585,16 @@ class BatchCtx:
     #: DJI 默认元数据策略的覆盖开关 (--preserve-metadata)。默认 False 时
     #: Pocket/无人机按"不保留 metadata"的普通转码路径处理; Action 系列不受影响。
     preserve_metadata: bool = False
+    #: 强制按"保留元数据"处理的源 (resolve() 后比较) -> 连接时首段的机型标签。
+    #: DJI Action 分段连接生成的 staging 文件会丢失 moov 里的机型 `tool` 标签,
+    #: 无法再做 Action 系列识别; 连接时已确认原分段机型, 因此由调用方显式列出。
+    #: --no-metadata 优先。
+    preserve_metadata_sources: dict[Path, str | None] = field(
+        default_factory=dict)
+    #: 显式关闭元数据保留 (--no-metadata)。这是**元数据策略**, 不是解码开关:
+    #: Sony/DJI 走普通转码路径 (video+audio only), 硬件优先解码与完整性校验
+    #: 完全不变。与 --preserve-metadata 同时给出时以本开关为准 (显式关闭优先)。
+    no_metadata: bool = False
     dry_run: bool = False
     failed_path: Path | None = None
     status: DashboardStatus | None = None
@@ -2326,6 +2616,24 @@ class BatchCtx:
         default_factory=lambda: threading.Semaphore(1))
     #: P2: run audio channel-sync concurrently with video encode per file.
     async_pipeline: bool = False
+    #: Progressive DJI split-join coordinator (core.dji_join.ProgressiveStager)
+    #: or None.  When set, a joined unit's source is staged on demand, the
+    #: encoder's progress arms the next unit's lossless join, and the source is
+    #: reclaimed once the file is delivered.
+    dji_stager: Any = None
+    #: Opt-in: release the next DJI group for encoding as soon as this group's
+    #: encoder has produced its intermediate, then run the software integrity
+    #: decode while the next group encodes.  One verifier slot; the next group
+    #: is capped so at most one intermediate can wait for verification.
+    async_integrity: bool = False
+    #: Serializes software integrity decode across workers when async mode is
+    #: on (and on every hardware path where this context is passed).
+    integrity_gate: Any = field(
+        default_factory=lambda: threading.Semaphore(1))
+    #: --jobs slot.  Only an actual encoder invocation holds this; waiting for
+    #: integrity verification does not consume an encode slot, so async mode
+    #: does not reduce --jobs concurrency.  Set by run_hw_pool().
+    encode_gate: Any = None
 
 
 def _record_throughput(
@@ -2334,6 +2642,45 @@ def _record_throughput(
     """Thread-safe append used by the continuous scheduler."""
     with ctx.throughput_lock:
         ctx.throughput.append((backend_name, fps))
+
+
+def _wait_for_encode_space(
+    ctx: BatchCtx, logger: logging.Logger, src: Path
+) -> None:
+    """Do not start another encode when pending verified outputs filled disk.
+
+    Async verification allows intermediate artifacts to accumulate while the
+    verifier is behind.  Before starting a new encoder invocation, wait until
+    the output volume has a small reserve; verification workers will reclaim
+    space as they finish.  This is deliberately checked here (inside the
+    worker) rather than in the scheduler so it also applies to the fixed
+    --jobs pool and to a single worker.
+    """
+    if not ctx.async_integrity or ctx.dry_run or ctx.no_metadata:
+        return
+    try:
+        reserve_gb = float(os.environ.get(
+            "KTS_ASYNC_DISK_RESERVE_GB", "10"))
+    except ValueError:
+        reserve_gb = 10.0
+    reserve = max(0, int(reserve_gb * 1024 ** 3))
+    warned = False
+    while True:
+        try:
+            free = shutil.disk_usage(ctx.output_root).free
+        except OSError:
+            return
+        if free >= reserve:
+            return
+        if not warned:
+            logger.warning(
+                "[ASYNC-INTEGRITY] disk low | free=%.1f GB < reserve=%.1f "
+                "GB | waiting to start %s until pending verification "
+                "reclaims space",
+                free / 1024 ** 3, reserve / 1024 ** 3, src.name,
+            )
+            warned = True
+        time.sleep(10.0)
 
 
 #: One process-wide audio-sync slot (P2).  channel_sync itself spawns a
@@ -2489,6 +2836,26 @@ def _status_cb_for(
     return cb
 
 
+def _dji_progress_cb(
+    ctx: BatchCtx, src: Path, total_frames: int
+) -> Callable[[int, float], None] | None:
+    """Forward encoder progress to the progressive DJI stager, if any."""
+    stager = ctx.dji_stager
+    if stager is None:
+        return None
+
+    def cb(frames: int, _fps: float) -> None:
+        stager.note_progress(src, frames, total_frames)
+
+    return cb
+
+
+def _dji_note_finished(ctx: BatchCtx, src: Path, result: str) -> None:
+    stager = ctx.dji_stager
+    if stager is not None:
+        stager.note_finished(src, result)
+
+
 def process_file_hw(
     ctx: BatchCtx,
     backend,
@@ -2505,15 +2872,41 @@ def process_file_hw(
         src, ctx.input_root, ctx.logs_root, ctx.preset
     )
     file_logger = build_file_logger(file_log)
-    if ctx.status is not None:
-        ctx.status.start(src, ctx.preset, backend.name)
 
     if dst.is_file() and dst.stat().st_size > 0:
         logger.info("[SKIP] %s | %s", src, dst)
         file_logger.info("SKIP | output already exists | output=%s", dst)
         if ctx.status is not None:
             ctx.status.finish(src, "skipped")
+        _dji_note_finished(ctx, src, "skipped")
         return "skipped"
+
+    # Progressive DJI split joining: block until this joined unit's source
+    # exists (the previous unit's encode gates the next join), so a failed
+    # join becomes a per-file failure instead of a whole-batch crash.
+    if ctx.dji_stager is not None:
+        try:
+            ctx.dji_stager.ensure_ready(src)
+        except Exception as exc:                   # noqa: BLE001
+            logger.error("[DJI-JOIN] FATAL: %s", exc)
+            file_logger.error("DJI JOIN FAILED | %s", exc)
+            if ctx.failed_path is not None:
+                record_failure(
+                    ctx.failed_path,
+                    source=src, preset=ctx.preset,
+                    backend_name=backend.name,
+                    stage="dji-join", error=str(exc),
+                    log_path=str(file_log),
+                )
+            if ctx.status is not None:
+                ctx.status.finish(src, "failed")
+            _dji_note_finished(ctx, src, "failed")
+            return "failed"
+
+    # The row stays "queued" while a progressive join is being produced; the
+    # real worker start (and therefore dashboard elapsed) begins only now.
+    if ctx.status is not None:
+        ctx.status.start(src, ctx.preset, backend.name)
 
     try:
         source_summary, source_streams, src_info, vfr = prepare_source_hw(
@@ -2535,6 +2928,7 @@ def process_file_hw(
                 source=src, preset=ctx.preset, backend_name=backend.name,
                 stage="probe", error=str(exc), log_path=str(file_log),
             )
+        _dji_note_finished(ctx, src, "failed")
         return "failed"
 
     file_resize: ResizeSpec | None = None
@@ -2553,6 +2947,7 @@ def process_file_hw(
                     source=src, preset=ctx.preset, backend_name=backend.name,
                     stage="resize", error=str(exc), log_path=str(file_log),
                 )
+            _dji_note_finished(ctx, src, "failed")
             return "failed"
         file_logger.info(
             "RESIZE | source=%dx%d target=%dx%d algo=%s",
@@ -2570,6 +2965,46 @@ def process_file_hw(
         if ctx.check_level == "full"
         else None
     )
+    # Async integrity may leave pending intermediates on disk; do not start
+    # another encoder when the output volume is below its safety reserve.
+    _wait_for_encode_space(ctx, logger, src)
+
+    # Encoder progress feeds the progressive DJI stager (None without one).
+    progress_cb = _dji_progress_cb(
+        ctx, src, source_summary["total_frames"]
+    )
+    if ctx.dji_stager is not None:
+        # Probe succeeded, so this joined group is now really being encoded:
+        # let the stager produce the next group in the background (the
+        # stager's space guard still applies).
+        ctx.dji_stager.note_encode_started(src)
+
+    # Async integrity (opt-in): the classic encoder callback below releases
+    # the next DJI group's encode gate immediately after the intermediate is
+    # complete.  Verification then runs in this worker while another worker
+    # encodes the next group.  The joined source is intentionally retained
+    # until verifier/finalisation (note_finished), so verify_encode still has
+    # the source container's expected sample count.
+    on_encode_complete: Callable[[], None] | None = None
+    integrity_gate: threading.Semaphore | None = None
+    if ctx.async_integrity and not ctx.dry_run:
+        integrity_gate = ctx.integrity_gate
+        if ctx.dji_stager is not None:
+            def _on_encode_complete(async_src: Path = src) -> None:
+                try:
+                    ctx.dji_stager.note_encode_complete(async_src)
+                except Exception as exc:              # noqa: BLE001
+                    file_logger.warning(
+                        "ASYNC-INTEGRITY | stager release failed: %s", exc
+                    )
+                    return
+                logger.info(
+                    "[ASYNC-INTEGRITY] encode complete | %s | next group "
+                    "may encode while this output is verified",
+                    async_src.name,
+                )
+
+            on_encode_complete = _on_encode_complete
 
     # Hardware decode on this path is the rigaya readers, decided per file by
     # `encoders.hwdecode.route_decode` inside `hw_encode_with_fallback` from the
@@ -2627,25 +3062,29 @@ def process_file_hw(
                 source=src, preset=ctx.preset, backend_name=backend.name,
                 stage="audio-plan", error=refusal, log_path=str(file_log),
             )
+        _dji_note_finished(ctx, src, "failed")
         return "failed"
 
-    is_dji = is_dji_source(source_streams)
-    dji_keep_meta, dji_tool = (True, None)
-    if is_dji:
-        # DJI 默认元数据策略 (2026-10-25): 除 Action 系列外 (Pocket / 无人机)
-        # 默认不保留 metadata, 走普通转码路径; --preserve-metadata 可覆盖。
-        dji_keep_meta, dji_tool = dji.keep_metadata_by_default(ctx.gpac, src)
-        if not dji_keep_meta and not ctx.preserve_metadata:
-            logger.info(
-                "[META_POLICY] %s | DJI 非 Action 机型 (tool=%r): "
-                "默认不保留元数据, 走普通转码路径 "
-                "(可用 --preserve-metadata 覆盖)",
-                src.name, dji_tool,
-            )
-            file_logger.info(
-                "META_POLICY | dji_default_skip | tool=%r | "
-                "container rebuild skipped", dji_tool,
-            )
+    # Metadata preservation policy is shared with the software classic path
+    # (preservation/policy.py); this block only wires it to the hardware
+    # dispatch.  --no-metadata is the metadata policy, not a decode switch:
+    # Sony/DJI sources fall through to the ordinary video+audio transcode
+    # path, while hardware-first decode and the integrity gate are unaffected.
+    join_tool = ctx.preserve_metadata_sources.get(src.resolve())
+    metadata_plan = resolve_metadata_plan(
+        streams=source_streams,
+        gpac=ctx.gpac,
+        src=src,
+        no_metadata=bool(ctx.no_metadata),
+        preserve_metadata=bool(ctx.preserve_metadata),
+        forced_join=(
+            not ctx.no_metadata
+            and src.resolve() in ctx.preserve_metadata_sources
+        ),
+        join_tool=join_tool,
+    )
+    log_metadata_plan(metadata_plan, src=src, logger=logger,
+                      file_logger=file_logger)
 
     # P2: audio channel-sync only reads the source; start it before dispatch so
     # it overlaps the video encode.  One process-wide gate serializes audio
@@ -2664,7 +3103,7 @@ def process_file_hw(
             file_logger=file_logger,
         )
 
-    if is_sony_source(source_streams):
+    if metadata_plan.is_sony and metadata_plan.preserve:
         result = encode_one_sony_hw(
             src=src,
             dst=dst,
@@ -2701,8 +3140,13 @@ def process_file_hw(
                 ctx, backend.name, fps),
             audio_task=audio_task,
             resize=file_resize,
+            progress_cb=progress_cb,
+            on_encode_complete=on_encode_complete,
+            integrity_gate=integrity_gate,
+            encode_gate=ctx.encode_gate,
+            skip_integrity=bool(ctx.no_metadata),
         )
-    elif is_dji and (dji_keep_meta or ctx.preserve_metadata):
+    elif metadata_plan.is_dji and metadata_plan.preserve:
         result = encode_one_dji_hw(
             src=src,
             dst=dst,
@@ -2739,6 +3183,11 @@ def process_file_hw(
                 ctx, backend.name, fps),
             audio_task=audio_task,
             resize=file_resize,
+            progress_cb=progress_cb,
+            on_encode_complete=on_encode_complete,
+            integrity_gate=integrity_gate,
+            encode_gate=ctx.encode_gate,
+            skip_integrity=bool(ctx.no_metadata),
         )
     else:
         result = encode_one_hw_classic(
@@ -2775,6 +3224,15 @@ def process_file_hw(
             video_handoff=ctx.video_handoff,
             audio_task=audio_task,
             resize=file_resize,
+            progress_cb=progress_cb,
+            # --no-metadata: the ordinary transcode must not carry DJI/Sony
+            # data/timecode tracks that the encoder intermediate inherited
+            # from the source; the container re-mux strips them.
+            drop_data_tracks=ctx.no_metadata,
+            on_encode_complete=on_encode_complete,
+            integrity_gate=integrity_gate,
+            encode_gate=ctx.encode_gate,
+            skip_integrity=bool(ctx.no_metadata),
         )
 
     # Release an async audio task even when the encoder failed before reaching
@@ -2804,12 +3262,42 @@ def process_file_hw(
         )
     if ctx.status is not None:
         ctx.status.finish(src, result)
+    _dji_note_finished(ctx, src, result)
     return result
+
+
+class EncodeSlots:
+    """Dynamic --jobs gate: only actual encoder invocations hold a slot.
+
+    Unlike a plain Semaphore the limit can follow AdaptiveJobs' measured
+    worker count for ``--jobs auto`` without replacing the gate object that
+    already-running encode calls hold.
+    """
+
+    def __init__(self, limit: int) -> None:
+        self._cond = threading.Condition()
+        self._limit = max(1, int(limit))
+        self._active = 0
+
+    def acquire(self) -> None:
+        with self._cond:
+            while self._active >= self._limit:
+                self._cond.wait()
+            self._active += 1
+
+    def release(self) -> None:
+        with self._cond:
+            self._active = max(0, self._active - 1)
+            self._cond.notify()
+
+    def set_limit(self, limit: int) -> None:
+        with self._cond:
+            self._limit = max(1, int(limit))
+            self._cond.notify_all()
 
 
 class AdaptiveJobs:
     """Runtime-adaptive worker count (no hardcoded per-backend table).
-
     Measures per-wave AGGREGATE encode throughput (sum of per-file
     encoder fps across the wave) and adjusts the worker count between
     waves: grow when the current wave clearly beats the previous one,
@@ -2875,6 +3363,22 @@ class AdaptiveJobs:
         return self._adapt(agg_fps, label, "completion window")
 
 
+def _process_file_hw_guarded(
+    ctx: BatchCtx, backend, src: Path, logger: logging.Logger
+) -> str:
+    """process_file_hw, but never leave the DJI stager waiting on a crash.
+
+    An unexpected exception would otherwise skip ``note_finished`` and the
+    next joined group's ``ensure_ready`` could wait forever (especially with
+    the parallel pool, where the scheduler keeps other workers blocked).
+    """
+    try:
+        return process_file_hw(ctx, backend, src, logger)
+    except BaseException:
+        _dji_note_finished(ctx, src, "failed")
+        raise
+
+
 def _admit_sources(ctx: BatchCtx, backend, sources: list[Path]) -> None:
     """B2: make every queued source visible in the dashboard up front."""
     if ctx.status is None:
@@ -2909,17 +3413,35 @@ def run_hw_pool(
     _admit_sources(ctx, backend, sources)
     admitted = list(sources)
 
+    if ctx.async_integrity:
+        logger.info(
+            "[ASYNC-INTEGRITY] enabled | verifier queue=1 | encode slots "
+            "are controlled by --jobs; verification runs outside the "
+            "encoder process"
+        )
+
     if workers != "auto":
         n = int(workers)
-        if n <= 1:
+        if ctx.async_integrity:
+            # --jobs counts encoder invocations only.  The pool may hold up to
+            # two extra workers waiting for verification; they never hold an
+            # encode slot.
+            ctx.encode_gate = threading.Semaphore(max(1, n))
+            pool_workers = n + 2
+        else:
+            pool_workers = n
+        if n <= 1 and not ctx.async_integrity:
             ctx.show_progress = True
             for src in sources:
-                counters[process_file_hw(ctx, backend, src, logger)] += 1
+                counters[_process_file_hw_guarded(
+                    ctx, backend, src, logger)] += 1
             return counters
         ctx.show_progress = False
-        with ThreadPoolExecutor(max_workers=n) as ex:
+        with ThreadPoolExecutor(max_workers=pool_workers) as ex:
             futures = {
-                ex.submit(process_file_hw, ctx, backend, src, logger): src
+                ex.submit(
+                    _process_file_hw_guarded, ctx, backend, src, logger
+                ): src
                 for src in sources
             }
             for fut in as_completed(futures):
@@ -2929,27 +3451,46 @@ def run_hw_pool(
     # ---- continuous adaptive scheduling (P1) ----
     ctx.show_progress = False
     ctrl = AdaptiveJobs(logger, start=2)
+    if ctx.async_integrity:
+        # Auto starts at two encoder slots; --jobs remains an encoder
+        # concurrency limit, not a total worker count.  Extra pool workers
+        # only wait for verification and therefore do not consume a slot.
+        ctx.encode_gate = EncodeSlots(2)
+    pending_extra = 2 if ctx.async_integrity else 0
     # B4: longest first; the continuous refill then packs shorter jobs around
     # the long critical-path file instead of delaying it to the last wave.
-    ordered = _largest_first(admitted)
-    logger.info(
-        "[SCHED] auto largest-first order: %s",
-        ", ".join(p.name for p in ordered[:5]) +
-        (" ..." if len(ordered) > 5 else ""),
-    )
+    # Progressive DJI joining is the exception: its joined groups must be
+    # encoded in plan order (the stager only produces one group ahead), so
+    # the admitted order is preserved there.
+    if ctx.dji_stager is not None:
+        ordered = list(admitted)
+        logger.info(
+            "[SCHED] auto DJI-join plan order: %s",
+            ", ".join(p.name for p in ordered[:5]) +
+            (" ..." if len(ordered) > 5 else ""),
+        )
+    else:
+        ordered = _largest_first(admitted)
+        logger.info(
+            "[SCHED] auto largest-first order: %s",
+            ", ".join(p.name for p in ordered[:5]) +
+            (" ..." if len(ordered) > 5 else ""),
+        )
     pending = deque(ordered)
     fps_window: deque[float] = deque(maxlen=8)
     counters.update({"done": 0, "skipped": 0, "failed": 0,
                      "dry-run": 0})
-    with ThreadPoolExecutor(max_workers=ctrl.cap) as ex:
+    with ThreadPoolExecutor(max_workers=ctrl.cap + pending_extra) as ex:
         futures: dict[Any, Path] = {}
         while pending or futures:
             # Refill immediately up to the current target; a completion below
             # frees a slot and this loop draws the next source right away.
-            while pending and len(futures) < max(1, ctrl.current):
+            target = max(1, ctrl.current) + pending_extra
+            while pending and len(futures) < target:
                 _src = pending.popleft()
                 futures[ex.submit(
-                    process_file_hw, ctx, backend, _src, logger)] = _src
+                    _process_file_hw_guarded, ctx, backend, _src,
+                    logger)] = _src
             if not futures:
                 break
             done, _not_done = wait(
@@ -2966,7 +3507,9 @@ def run_hw_pool(
                 ctx.throughput.clear()
             fps_window.extend(fps for _name, fps in samples)
             if fps_window:
-                ctrl.note_sample(sum(fps_window), backend.name)
+                new_jobs = ctrl.note_sample(sum(fps_window), backend.name)
+                if isinstance(ctx.encode_gate, EncodeSlots):
+                    ctx.encode_gate.set_limit(new_jobs)
 
     return counters
 
@@ -3054,8 +3597,8 @@ def run_multihw_pool(
                 made = False
                 if nvenc_sources and active_n < ctrl_n.current:
                     _src = nvenc_sources.popleft()
-                    _f = ex.submit(process_file_hw, ctx, backend_nvenc,
-                                   _src, logger)
+                    _f = ex.submit(_process_file_hw_guarded, ctx,
+                                   backend_nvenc, _src, logger)
                     futures[_f] = (_src, backend_nvenc, "nvenc")
                     active_n += 1
                     made = True
@@ -3063,8 +3606,8 @@ def run_multihw_pool(
                     break
                 if qsv_sources and active_q < ctrl_q.current:
                     _src = qsv_sources.popleft()
-                    _f = ex.submit(process_file_hw, ctx, backend_qsv,
-                                   _src, logger)
+                    _f = ex.submit(_process_file_hw_guarded, ctx,
+                                   backend_qsv, _src, logger)
                     futures[_f] = (_src, backend_qsv, "qsv")
                     active_q += 1
                     made = True

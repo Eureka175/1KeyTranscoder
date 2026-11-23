@@ -37,14 +37,22 @@ NVENC，QSV 机器（无 NVENC）则按政策转 4:2:0 并在日志中显式 WAR
 
 ## 3. 程序侧保障
 
-- 静态路由：`--experimental-multihw` 下 4:2:2 源 → NVENC（保真路径）；
-  纯 QSV 环境走 4:2:0 并打 WARNING（`capability-driven downgrade:
-  4:2:2/10 -> 4:2:0/10`）。
+- 全路径统一策略（2026-11-16，2026-11-20 更新）：`encoders/format_policy.py`
+  统一决定输出色度/位深。**默认所有输出 10-bit，色度跟随输入**；
+  `--experimental-multihw` 下 4:2:2 源优先 → NVENC（保真路径）；
+  **QSV 在 caps 声明支持 4:2:2 时同样保留 4:2:2**，caps 不支持时才降到
+  4:2:0/10 并打 WARNING（`capability-driven downgrade: 4:2:2/10 ->
+  4:2:0/10`）。本机 Arc 140T 的 caps 为 `422=False`，因此该机仍输出
+  4:2:0/10——这是实测能力事实，不再是 QSV 后端的固定政策。
+  需要强制指定时用 `--output-depth {8,10,12}` 与
+  `--output-chroma {420,422,444,mono}`；显式覆盖不再自动降级。
+- 软件 x265 走同一策略：保留 4:2:2/10-bit/4:4:4；SVT-AV1 属 AV1 420-only，
+  统一 4:2:0/10 并告警。切换后端不会再改变"是否保真"的判定。
 - 验证：`--check` 的 validate/selfcheck 断言成品为 HEVC（hvc1/hev1），
   对 Rext 与 Main10 一视同仁；`--check full` 的 Gyroflow 消费端校验
   用 FFmpeg 软解复核整条时间线，等价于一次独立解码验证。
-- 审计：postprobe CSV 与 `SOURCE_FORMAT` 日志记录 profile/pix_fmt，
-  可事后核对任一成品的实际形态。
+- 审计：postprobe CSV 与 `SOURCE_FORMAT` / `FORMAT_PLAN` 日志记录
+  profile/pix_fmt，可事后核对任一成品的实际形态。
 
 ## 4. 归档建议（推荐操作）
 

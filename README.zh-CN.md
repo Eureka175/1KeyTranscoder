@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-[![Version](https://img.shields.io/badge/version-0.9.12-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.22-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#运行要求)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -46,6 +46,50 @@ python 1kt.py --input D:\footage --output D:\archive --encoder qsv --preset uhq
 
 预设：`uhq`、`hq`、`small`、`fast`。
 
+## DJI Action 分段录制
+
+DJI Action 相机录到约 16 GB 会切出新文件。`--dji-join`（**默认关闭**）检测
+连续分段，用一趟 MP4Box 无损连接（`-unalign-cat` 保证视频严格 CFR，保留
+`djmd`/`dbgi`/`tmcd`），再把连接后的完整素材交给普通编码管线。
+
+```powershell
+python 1kt.py --input D:\footage --output D:\archive --dji-join
+python 1kt.py ... --dji-join --dry-run           # 只检测分组，不连接不编码
+```
+
+连接是渐进的：第一组先连接好才开始编码，之后每组都在上一组编码期间后台
+连接；该组编码交付后立即删除它的 joined 源。峰值落盘只有“当前组 + 下一组”，
+不是全部组之和。`-flat` 让 MP4Box 直接写目标文件（不再生成同体积临时文件），
+所以 60 GB 的组只占约 60 GB，而不是约 120–180 GB。暂存树在
+`<output>/.dji_join_work_*`，全部成功后删除；失败或
+`--dji-join-keep-temp` 时保留（keep-temp 会保留所有 joined 组，需按总和预留
+空间）。详见 [DJI 分段录制](docs/dji-segments.md)。
+
+## Sony XAVC 无损 remux（不重新编码）
+
+Sony 相机按 128 MiB 录制 chunk 写 `mdat`，短片会在 chunk 尾部留下未使用空间。
+`--remux` 用原生轨道复制重写容器：
+
+```powershell
+python 1kt.py --input "D:\SonyClips" --output "D:\SonyClips_remux" --remux
+```
+
+- 视频 / PCM 音频 / `rtmd` 数据轨原样复制；
+- 保留 `nrtm`、Lens profile、vendor `uuid`、`tref/cdsc`、XAVC brand；
+- 每个输出都用 `advanced` 校验与源一致；
+- 同时复制 XML 边车；非 Sony 文件明确拒绝。
+
+`20261122扫街` 53 个文件实测：**19.67 GB → 17.88 GB，节省 1.79 GB（9.09%）**，
+单文件节省 1.4%–40.2%。
+
+## 输出格式
+
+- 默认 **10-bit**，不论源深度；`--output-depth {8,10,12}` 可覆盖；
+- 色度默认跟随源（4:2:0 / 4:2:2 / 4:4:4），`--output-chroma {420,422,444}`
+  可显式指定；
+- NVENC HEVC 支持真正的 4:4:4；QSV / AV1 对不支持的手动色度明确报错；
+- **mono 不支持**（源和输出都不支持），会给出明确错误。
+
 ## 缩放
 
 - `--resize WxH`：精确输出分辨率（偶数尺寸），不修正源长宽比。
@@ -84,8 +128,12 @@ python 1kt.py --input D:\deliverables --output D:\fixed --repair
 `basic` 检查核心元数据和流信息；`advanced` 增加完整结构检查与 Gyroflow 校验；
 `full` 增加详细自检和 PSNR/SSIM 抽样。
 
-批处理支持断点续跑。失败文件写入 `logs/failed_files.json`，可用
+批处理支持断点续跑。失败文件写入 `<output>/logs/failed_files.json`，可用
 `--retry-list` 重试。
+
+运行日志（含每文件日志和看板 JSON）统一位于 `<output>/logs/`，输出目录自带
+完整日志；NVENC/QSV 的原始编码日志位于 `<output>/.1ktwork/<job>/`，成功后
+随工作目录清理，不再残留在成品目录。
 
 ## 测试
 
@@ -97,12 +145,23 @@ python tests\full_autotest.py --level full
 
 ## 文档
 
+- [v0.9.22 发布说明](docs/release_notes_v0.9.22.md)
+- [v0.9.21 发布说明](docs/release_notes_v0.9.21.md)
+- [v0.9.20 发布说明](docs/release_notes_v0.9.20.md)
+- [v0.9.19 发布说明](docs/release_notes_v0.9.19.md)
+- [v0.9.18 发布说明](docs/release_notes_v0.9.18.md)
+- [v0.9.17 发布说明](docs/release_notes_v0.9.17.md)
+- [v0.9.16 发布说明](docs/release_notes_v0.9.16.md)
+- [v0.9.15 发布说明](docs/release_notes_v0.9.15.md)
+- [v0.9.14 发布说明](docs/release_notes_v0.9.14.md)
 - [v0.9.12 发布说明](docs/release_notes_v0.9.12.md)
+- [DJI Action 分段录制](docs/dji-segments.md)
 - [硬件缩放验证](docs/design/hardware_scaling_validation.md)
 - [硬件缩放可行性](docs/design/hardware_scaling_feasibility.md)
 - [音频计划指南](docs/audio_plan.md)
 - [x265 档位设计](docs/x265-profile-design.md)
 - [硬件解码](docs/hardware-decode/README.md)
+- [4K 编码器评估归档（2026-11-16，硬件 + x265 / SVT-AV1）](docs/evaluation/4k-encoder-eval-2026-11-16/README.md)
 
 ## 许可
 
