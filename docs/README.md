@@ -126,7 +126,8 @@ F:\1KeyTranscoder\
 
 | 文件 | 说明 |
 |---|---|
-| [`release_notes_v0.9.22.md`](release_notes_v0.9.22.md) | **v0.9.22 发布说明（当前版本 · Pre-release）**：硬件完整性校验默认异步（队列 1/不占 `--jobs`）、`--no-metadata` 跳过校验、缩放后 `--check full` 按交付尺寸计算 PSNR/SSIM。✅ **随 tag `v0.9.22`（prerelease）** |
+| [`release_notes_v0.9.23.md`](release_notes_v0.9.23.md) | **v0.9.23 发布说明（当前版本 · Pre-release）**：`--remux --dji-join` 无损连接+DJI 容器重建（不编码）；remux 校验跟随 `--check` 三档；remux 复用 `--jobs` 调度，校验异步单队列，失败自动重试一次。✅ **随 tag `v0.9.23`（prerelease）** |
+| [`release_notes_v0.9.22.md`](release_notes_v0.9.22.md) | *上一版（v0.9.22 · Pre-release）*：硬件完整性校验默认异步、`--no-metadata` 跳过校验、缩放后 `--check full` 按交付尺寸计算 PSNR/SSIM。✅ **已随 tag `v0.9.22`（prerelease）** |
 | [`release_notes_v0.9.21.md`](release_notes_v0.9.21.md) | *上一版（v0.9.21 · Pre-release）*：DJI 分段连接渐进式 staging。✅ **本地 tag `v0.9.21`（prerelease）** |
 | [`release_notes_v0.9.12.md`](release_notes_v0.9.12.md) | *上一版（v0.9.12 · Pre-release）*：修复无 CUDA 设备时 channel-sync GPU residual 队列死锁，自动回退 CPU。✅ **已随 tag `v0.9.12`（prerelease）** |
 | [`release_notes_v0.9.11.md`](release_notes_v0.9.11.md) | *上一版（v0.9.11 · Pre-release）*：QSV `lanczos3`；Sony AVC timescale/stts 修复。✅ **已随 tag `v0.9.11`（prerelease）** |

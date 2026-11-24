@@ -1614,9 +1614,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--remux", action="store_true",
         help=(
-            "无损 remux 模式（不编码）：重写 Sony XAVC 容器，去掉相机按 128MB "
+            "无损 remux 模式（不编码）：Sony XAVC 重写容器，去掉相机按 128MB "
             "录制 chunk 分配但未使用的尾部空间；视频/PCM/rtmd 原样复制，保留 "
-            "nrtm/Lens profile/uuid/tref 与 XAVC brand。输出目录会复制 XML 边车。"
+            "nrtm/Lens profile/uuid/tref 与 XAVC brand。"
+            "与 --dji-join 同用时：先无损连接 DJI 分段，再对 joined 文件做"
+            "无损容器重建（保留 djmd/dbgi/tmcd），校验等级跟随 --check；"
+            "未分组 DJI 单文件也做同样重建。输出目录会复制 XML 边车。"
         ),
     )
     parser.add_argument(
@@ -2573,16 +2576,10 @@ def main() -> int:
                   file=sys.stderr)
             return 2
 
-    # --remux cannot run before the mode dispatch of repair / DJI join.
+    # --remux cannot run before the mode dispatch of repair.
     if getattr(args, "remux", False):
         if getattr(args, "repair", False):
             print("[FATAL] --remux cannot be combined with --repair.",
-                  file=sys.stderr)
-            return 2
-        if getattr(args, "dji_join", False) or getattr(
-            args, "dji_join_keep_temp", False
-        ):
-            print("[FATAL] --remux cannot be combined with --dji-join.",
                   file=sys.stderr)
             return 2
 
@@ -2641,13 +2638,12 @@ def main() -> int:
         print(f"[FATAL] {exc}", file=sys.stderr)
         return 2
 
-    # --remux: lossless Sony XAVC container rewrite (no encoder needed).
+    # --remux: lossless container rewrite (no encoder needed).  Sony files
+    # use the XAVC remux path; with --dji-join, DJI split groups are joined
+    # and their joined containers are rebuilt losslessly (no video encode).
     if getattr(args, "remux", False):
         incompatible = [
             ("--encoder", getattr(args, "encoder", None)),
-            ("--dji-join", getattr(args, "dji_join", False)),
-            ("--dji-join-keep-temp",
-             getattr(args, "dji_join_keep_temp", False)),
             ("--retry-list", getattr(args, "retry_list", None)),
             ("--repair", getattr(args, "repair", False)),
             ("--channel-sync-transparent",
@@ -2668,6 +2664,9 @@ def main() -> int:
             ffprobe=ffprobe,
             gpac=gpac,
             script_dir=script_dir,
+            gyroflow=gyroflow,
+            ffmpeg=ffmpeg,
+            jobs=getattr(args, "jobs", "auto"),
         )
 
     # --channel-sync-transparent: 剪辑前预处理独立流程 (跳过视频编码,

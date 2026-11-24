@@ -220,6 +220,39 @@ real encoder + real cleanup) passed on:
 Log sequence in those runs: `join start` → `join done` → `prefetch armed
 (encode-start)` → `reclaimed` per group → `joined report` → `staging removed`.
 
+### 2026-11-23: `--remux --dji-join` (no video encode)
+
+`--remux` can now combine lossless DJI joining with a lossless container
+rebuild:
+
+```powershell
+python 1kt.py --input "D:\DJI" --output "D:\DJI_remux" --remux --dji-join
+```
+
+- split groups are joined through the same progressive `ProgressiveStager`
+  (first group ready before remux starts; next join overlaps the current
+  rebuild; staging is removed on success);
+- each joined file and each ungrouped DJI file is rebuilt with MP4Box native
+  track copy: video, audio, `djmd`/`dbgi`/`tmcd` are copied bit-for-bit;
+- no encoder is started (`--encoder` remains incompatible with `--remux`);
+- validation follows `--check`: `basic` / `advanced` / `full`; `full` records
+  PSNR/SSIM as `SKIPPED_NOT_APPLICABLE` because the video is stream-copied;
+- `--jobs` is shared with the main pipeline: `N` concurrent remux jobs or
+  `auto` (AdaptiveJobs, start=2); remux work slots are separate from the single
+  async validation slot, so a worker waiting for `--check` does not hold a job;
+- a failed validation deletes the artifact and retries the remux once; a
+  second failure marks the file failed;
+- `--no-metadata` keeps the remux lossless but reduces validation to
+  container/frame checks;
+- XML sidecars are copied; sidecars belonging to the first segment are also
+  copied under the joined output name;
+- `--dji-join-keep-temp` keeps the staging tree.
+
+Measured on the 3 × 2 s synthetic DJI set: 3/3 groups rebuilt, all `basic`
+and `full` checks PASS (full: Gyroflow PASS, quality N/A), staging removed.
+A single ungrouped 2 s DJI file also rebuilt successfully (28.9 → 28.1 MB,
+2.6% saved from container padding).
+
 ### 2026-11-23: async hardware integrity (default on)
 
 Hardware-decode integrity is a full independent software decode of the

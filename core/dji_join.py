@@ -580,6 +580,7 @@ class ProgressiveStager:
         prefetch_fraction: float = PREFETCH_FRACTION,
         reserve_bytes: int = SPACE_RESERVE_BYTES,
         space_poll_sec: float = SPACE_POLL_SEC,
+        parallel_groups: bool = False,
     ) -> None:
         self.plan = plan
         self.root = staging_root
@@ -591,6 +592,9 @@ class ProgressiveStager:
         self.prefetch_fraction = prefetch_fraction
         self.reserve_bytes = int(reserve_bytes)
         self.space_poll_sec = space_poll_sec
+        #: Remux mode may rebuild several already-joined groups concurrently;
+        #: the encode pipeline keeps the strict one-at-a-time order.
+        self.parallel_groups = bool(parallel_groups)
 
         self.groups = list(plan.groups)
         self.group_dest = [
@@ -714,7 +718,7 @@ class ProgressiveStager:
                     raise DjiJoinError(
                         f"staging closed before {src.name} was encoded"
                     )
-                earlier_done = all(
+                earlier_done = self.parallel_groups or all(
                     (i in self._finished or i in self._released)
                     for i in range(idx)
                 )

@@ -2003,7 +2003,7 @@ revision, not a general claim for later releases**（8.27–8.30 未检验）。
 | `encoders/hwdecode.py` | 428 | **v0.7.0** 硬件解码能力路由 + 白名单 + reason codes |
 | `encoders/hw.py` | 395 | `plan_initial_format()`：兼容包装，委托 `encoders/format_policy.py` |
 | `encoders/format_policy.py` | 161 | **唯一输出格式策略**：默认所有输出 10-bit；色度跟随输入，能力不支持时降 420；`--output-depth`/`--output-chroma` 手动覆盖；mono 明确拒绝；AV1 420-only |
-| `core/remux.py` | 300+ | **`--remux` 无损 Sony XAVC 容器重写**：原生轨道复制去除 128 MiB chunk 尾部空洞，保留 rtmd/nrtm/uuid/tref/brand，advanced 校验后才落盘 |
+| `core/remux.py` | 300+ | **`--remux` 无损容器重写**：Sony XAVC 原生轨道复制去除 128 MiB chunk 尾部空洞，保留 rtmd/nrtm/uuid/tref/brand，advanced 校验后才落盘；**`--remux --dji-join`** 先无损连接 DJI 分段，再对 joined/未分组 DJI 文件做轨道级容器重建并保留 djmd/dbgi/tmcd，校验跟随 `--check` |
 | `encoders/x265.py` | 300 | x265 后端（`x265_pix_fmt()` 走统一策略） |
 | `encoders/svtav1.py` | 249 | SVT-AV1 后端（`av1_pix_fmt()` 统一 420/10） |
 | `encoders/caps.py` | 215 | `--check-features` 能力探测 |

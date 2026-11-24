@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-[![Version](https://img.shields.io/badge/version-0.9.22-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.23-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -70,7 +70,7 @@ and kept on failure or with `--dji-join-keep-temp` (which also keeps every
 joined group, so plan for the full sum). See
 [DJI split recordings](docs/dji-segments.md).
 
-## Sony XAVC remux (no re-encode)
+## Lossless remux (Sony XAVC / DJI)
 
 Sony cameras allocate each clip's media data in 128 MiB chunks; a short clip
 leaves unused tail space inside `mdat`. `--remux` rewrites the container
@@ -82,8 +82,30 @@ python 1kt.py --input "D:\SonyClips" --output "D:\SonyClips_remux" --remux
 
 - Video / PCM audio / `rtmd` data track are copied bit-for-bit;
 - `nrtm`, Lens profile, vendor `uuid`, `tref/cdsc` and XAVC brands are preserved;
-- every output is validated against its source (`advanced`);
+- validation follows `--check` (`basic` / `advanced` / `full`); full adds
+  Gyroflow + detailed selfcheck; PSNR/SSIM is N/A because video is stream-copied;
 - XML sidecars are copied; non-Sony files are rejected explicitly.
+
+With `--dji-join`, remux mode also handles DJI split recordings without any
+video encode:
+
+```powershell
+python 1kt.py --input "D:\DJI" --output "D:\DJI_remux" --remux --dji-join
+```
+
+- split groups are joined losslessly first;
+- each joined file (and each ungrouped DJI file) is rebuilt as a fresh
+  container with video/audio/`djmd`/`dbgi`/`tmcd` copied bit-for-bit;
+- validation follows `--check` (`basic` / `advanced` / `full`); full quality
+  metrics are reported as not applicable because the video is stream-copied;
+- XML sidecars are copied and joined-sidecar names follow the joined output.
+
+Both remux paths honor `--jobs` (`auto` uses the same adaptive scheduler as
+the main pipeline; `N` sets the number of concurrent remux jobs). Validation
+is asynchronous with one verifier slot: waiting for `--check` does not consume
+a remux job slot. `--no-metadata` keeps remux lossless but reduces validation
+to container/frame checks. A failed validation removes the artifact and
+retries the remux once; a second failure marks the file failed.
 
 Measured on 53 Sony clips: **19.67 GB -> 17.88 GB, 1.79 GB saved (9.09%)**,
 per-file savings 1.4%–40.2%.
@@ -159,6 +181,7 @@ environment-only checks report FAIL.
 
 ## Documentation
 
+- [Release notes v0.9.23](docs/release_notes_v0.9.23.md)
 - [Release notes v0.9.22](docs/release_notes_v0.9.22.md)
 - [Release notes v0.9.21](docs/release_notes_v0.9.21.md)
 - [Release notes v0.9.20](docs/release_notes_v0.9.20.md)

@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-[![Version](https://img.shields.io/badge/version-0.9.22-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.23-blue)](VERSION)
 [![License](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#运行要求)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -65,7 +65,7 @@ python 1kt.py ... --dji-join --dry-run           # 只检测分组，不连接�
 `--dji-join-keep-temp` 时保留（keep-temp 会保留所有 joined 组，需按总和预留
 空间）。详见 [DJI 分段录制](docs/dji-segments.md)。
 
-## Sony XAVC 无损 remux（不重新编码）
+## 无损 remux（Sony XAVC / DJI）
 
 Sony 相机按 128 MiB 录制 chunk 写 `mdat`，短片会在 chunk 尾部留下未使用空间。
 `--remux` 用原生轨道复制重写容器：
@@ -76,8 +76,27 @@ python 1kt.py --input "D:\SonyClips" --output "D:\SonyClips_remux" --remux
 
 - 视频 / PCM 音频 / `rtmd` 数据轨原样复制；
 - 保留 `nrtm`、Lens profile、vendor `uuid`、`tref/cdsc`、XAVC brand；
-- 每个输出都用 `advanced` 校验与源一致；
+- 校验等级跟随 `--check`（`basic` / `advanced` / `full`）；full 增加
+  Gyroflow + 深度自检，PSNR/SSIM 因 stream copy 记为不适用；
 - 同时复制 XML 边车；非 Sony 文件明确拒绝。
+
+加 `--dji-join` 后，remux 模式也可处理 DJI 分段录制，且完全不编码视频：
+
+```powershell
+python 1kt.py --input "D:\DJI" --output "D:\DJI_remux" --remux --dji-join
+```
+
+- 先无损连接 DJI 分段；
+- 每个 joined 文件（以及未分组的 DJI 单文件）都重建为干净容器，
+  视频/音频/`djmd`/`dbgi`/`tmcd` 原样复制；
+- 校验等级跟随 `--check`（`basic` / `advanced` / `full`）；full 的质量指标
+  因视频是 stream copy 而单列为不适用；
+- XML 边车会复制，joined 输出的边车名跟随 joined 文件名。
+
+两条 remux 路径都遵循 `--jobs`（`auto` 复用主流程自适应调度；`N` 为并发
+remux 任务数）。校验是异步的，只有一个 verifier 槽位；等待 `--check` 不占用
+remux 任务槽位。`--no-metadata` 下仍保持无损 remux，但校验降为纯容器/帧数
+检查；校验失败会删除产物并自动重试 remux 一次，第二次失败则标记文件失败。
 
 `20261122扫街` 53 个文件实测：**19.67 GB → 17.88 GB，节省 1.79 GB（9.09%）**，
 单文件节省 1.4%–40.2%。
@@ -145,6 +164,7 @@ python tests\full_autotest.py --level full
 
 ## 文档
 
+- [v0.9.23 发布说明](docs/release_notes_v0.9.23.md)
 - [v0.9.22 发布说明](docs/release_notes_v0.9.22.md)
 - [v0.9.21 发布说明](docs/release_notes_v0.9.21.md)
 - [v0.9.20 发布说明](docs/release_notes_v0.9.20.md)
